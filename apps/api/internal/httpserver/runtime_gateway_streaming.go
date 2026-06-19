@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -303,10 +304,10 @@ readLoop:
 			if sc.err != nil {
 				if sc.err != io.EOF {
 					interrupted = true
-					// A non-EOF mid-stream read error must surface to the client as
-					// an error frame, not a silent truncation that looks like a clean
-					// but incomplete response.
-					_ = writeSSEStreamError(w, flusher, "upstream stream error", "upstream_stream_error", http.StatusBadGateway)
+					// A non-EOF mid-stream read error must surface to the client in
+					// the source protocol, not as a silent truncation that looks like
+					// a clean but incomplete response.
+					_ = writeConversationStreamError(w, flusher, canonical, "upstream stream error", "upstream_stream_error", http.StatusBadGateway)
 				}
 				break readLoop
 			}
@@ -316,7 +317,7 @@ readLoop:
 			_ = providerResp.StreamBody.Close()
 			// Tell the client the stream stalled instead of leaving it to hang on a
 			// connection that simply stops producing data.
-			_ = writeSSEStreamError(w, flusher, "upstream stream idle timeout", "stream_idle_timeout", http.StatusGatewayTimeout)
+			_ = writeConversationStreamError(w, flusher, canonical, "upstream stream idle timeout", "stream_idle_timeout", http.StatusGatewayTimeout)
 			break readLoop
 		case <-keepaliveCh:
 			if err := writeSSEKeepalive(w, flusher); err != nil {
@@ -562,10 +563,105 @@ readLoop:
 	s.runtime.recordGatewayUsage(r.Context(), record)
 }
 
+type responsesStreamFailedEvent struct {
+	Type     string                        `json:"type"`
+	Response responsesStreamFailedResponse `json:"response"`
+}
+
+type responsesStreamFailedResponse struct {
+	ID     string                     `json:"id"`
+	Object string                     `json:"object"`
+	Model  string                     `json:"model,omitempty"`
+	Status string                     `json:"status"`
+	Output []any                      `json:"output"`
+	Error  responsesStreamFailedError `json:"error"`
+}
+
+type responsesStreamFailedError struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+func writeConversationStreamError(w http.ResponseWriter, flusher http.Flusher, canonical gatewaycontract.CanonicalRequest, message string, code string, statusCode int) error {
+	if gatewaySourceEndpointIsResponses(canonical.SourceEndpoint) {
+		return writeResponsesStreamFailed(w, flusher, canonical, message, code)
+	}
+	return writeSSEStreamError(w, flusher, message, code, statusCode)
+}
+
+func gatewaySourceEndpointIsResponses(sourceEndpoint string) bool {
+	sourceEndpoint = strings.ToLower(strings.TrimSpace(sourceEndpoint))
+	return strings.HasSuffix(sourceEndpoint, "/responses") || gatewaySourceEndpointIsResponsesCompact(sourceEndpoint)
+}
+
+func writeResponsesStreamFailed(w http.ResponseWriter, flusher http.Flusher, canonical gatewaycontract.CanonicalRequest, message string, code string) error {
+	model := strings.TrimSpace(canonical.CanonicalModel)
+	if model == "" {
+		model = strings.TrimSpace(canonical.Model)
+	}
+	payload := responsesStreamFailedEvent{
+		Type: "response.failed",
+		Response: responsesStreamFailedResponse{
+			ID:     responsesStreamFailureID(canonical.RequestID),
+			Object: "response",
+			Model:  model,
+			Status: "failed",
+			Output: []any{},
+			Error: responsesStreamFailedError{
+				Code:    strings.TrimSpace(code),
+				Message: strings.TrimSpace(message),
+			},
+		},
+	}
+	if payload.Response.Error.Code == "" {
+		payload.Response.Error.Code = "stream_error"
+	}
+	if payload.Response.Error.Message == "" {
+		payload.Response.Error.Message = "upstream stream error"
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	if _, err := w.Write([]byte("event: response.failed\ndata: ")); err != nil {
+		return err
+	}
+	if _, err := w.Write(raw); err != nil {
+		return err
+	}
+	if _, err := w.Write([]byte("\n\n")); err != nil {
+		return err
+	}
+	if flusher != nil {
+		flusher.Flush()
+	}
+	return nil
+}
+
+func responsesStreamFailureID(requestID string) string {
+	var b strings.Builder
+	for _, r := range strings.TrimSpace(requestID) {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' {
+			b.WriteRune(r)
+		}
+		if b.Len() >= 96 {
+			break
+		}
+	}
+	part := b.String()
+	if part == "" {
+		part = "stream_error"
+	}
+	if strings.HasPrefix(part, "resp_") {
+		return part
+	}
+	return "resp_" + part
+}
+
 // writeSSEStreamError emits an in-band `event: error` SSE frame so a client sees
 // a real error instead of a silently truncated stream. The frame shape (type:
-// error + nested error object) is Anthropic-compatible and tolerated by chat /
-// responses clients, which read the data payload regardless of the event name.
+// error + nested error object) is compatible with chat and Anthropic-style SSE
+// clients that do not define a richer terminal failure event.
 func writeSSEStreamError(w http.ResponseWriter, flusher http.Flusher, message string, code string, statusCode int) error {
 	payload := map[string]any{
 		"type":        "error",

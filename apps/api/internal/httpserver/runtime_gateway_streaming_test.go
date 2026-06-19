@@ -622,6 +622,72 @@ func TestGatewayResponsesToCodexStreamsVerbatimIncrementally(t *testing.T) {
 	}
 }
 
+func TestGatewayResponsesStreamEmitsResponseFailedOnIdleTimeout(t *testing.T) {
+	first := "event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_upstream\",\"object\":\"response\",\"model\":\"responses-idle-upstream\",\"status\":\"in_progress\",\"output\":[]}}\n\n"
+	release := make(chan struct{})
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/backend-api/codex/responses" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		flusher, _ := w.(http.Flusher)
+		_, _ = io.WriteString(w, first)
+		if flusher != nil {
+			flusher.Flush()
+		}
+		<-release
+	}))
+	defer upstream.Close()
+	defer close(release)
+
+	cfg := config.Load()
+	cfg.Gateway.StreamIdleTimeout = 80 * time.Millisecond
+	cfg.Gateway.StreamKeepaliveInterval = 10 * time.Second
+	opsStore := opserrorlogsmemory.New()
+	handler := New(cfg, nil, WithOpsErrorLogsStore(opsStore))
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"responses-idle-provider","display_name":"Responses Idle Provider","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"responses-idle-model","display_name":"Responses Idle Model","status":"active","capabilities":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"responses-idle-upstream","status":"active","capability_override":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"responses-idle-account","runtime_class":"cli_client_token","upstream_client":"codex_cli","credential":{"cli_client_token":"codex-token"},"metadata":{"base_url":"`+upstream.URL+`/backend-api/codex"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(`{"model":"responses-idle-model","stream":true,"input":"hi"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set(requestIDHeader, "req_responses_stream_idle_timeout")
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "event: response.created") {
+		t.Fatalf("expected the first Responses event before the stall, got: %q", body)
+	}
+	for _, want := range []string{
+		"event: response.failed",
+		`"type":"response.failed"`,
+		`"status":"failed"`,
+		`"code":"stream_idle_timeout"`,
+		`"message":"upstream stream idle timeout"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected Responses timeout stream to contain %q, got: %q", want, body)
+		}
+	}
+	if strings.Contains(body, "event: error") || strings.Contains(body, "response.completed") || strings.Contains(body, "data: [DONE]") {
+		t.Fatalf("Responses timeout stream must fail with response.failed only, got: %q", body)
+	}
+
+	opsLog := waitForStreamTimeoutOpsLog(t, opsStore, "req_responses_stream_idle_timeout")
+	if opsLog.SourceEndpoint != "/v1/responses" || opsLog.ErrorClass != "stream_idle_timeout" ||
+		opsLog.ErrorPhase != "stream" ||
+		opsLog.ErrorSource != "upstream_stream" ||
+		opsLog.StreamCompletionState != "idle_timeout" {
+		t.Fatalf("unexpected Responses stream timeout ops error log: %+v", opsLog)
+	}
+}
+
 func TestGatewayChatCompletionsStreamEmitsKeepaliveDuringUpstreamGap(t *testing.T) {
 	chunk1 := "data: {\"id\":\"chunk_1\",\"choices\":[{\"delta\":{\"content\":\"hello\"}}]}\n\n"
 	chunk2 := "data: {\"id\":\"chunk_2\",\"choices\":[{\"delta\":{\"content\":\" world\"},\"finish_reason\":\"stop\"}]}\n\n"
@@ -715,11 +781,23 @@ func TestGatewayChatCompletionsStreamEmitsErrorOnIdleTimeout(t *testing.T) {
 	if !strings.Contains(body, "event: error") || !strings.Contains(body, "stream_idle_timeout") {
 		t.Fatalf("expected an idle-timeout error frame, got: %q", body)
 	}
+	opsLog := waitForStreamTimeoutOpsLog(t, opsStore, "req_stream_idle_timeout")
+	if opsLog.ErrorClass != "stream_idle_timeout" ||
+		opsLog.ErrorPhase != "stream" ||
+		opsLog.ErrorSource != "upstream_stream" ||
+		opsLog.StreamCompletionState != "idle_timeout" {
+		t.Fatalf("unexpected stream timeout ops error log: %+v", opsLog)
+	}
+}
+
+func waitForStreamTimeoutOpsLog(t *testing.T, store *opserrorlogsmemory.Store, requestID string) opserrorlogscontract.Entry {
+	t.Helper()
+
 	var opsResult opserrorlogscontract.ListResult
 	var err error
 	deadline := time.Now().Add(2 * time.Second)
 	for {
-		opsResult, err = opsStore.List(t.Context(), opserrorlogscontract.ListFilter{RequestID: "req_stream_idle_timeout"})
+		opsResult, err = store.List(t.Context(), opserrorlogscontract.ListFilter{RequestID: requestID})
 		if err != nil {
 			t.Fatalf("list ops error logs: %v", err)
 		}
@@ -729,14 +807,23 @@ func TestGatewayChatCompletionsStreamEmitsErrorOnIdleTimeout(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	if len(opsResult.Items) != 1 {
-		t.Fatalf("expected stream timeout ops error log, got %+v", opsResult.Items)
+		t.Fatalf("expected stream timeout ops error log for request %q, got %+v", requestID, opsResult.Items)
 	}
-	opsLog := opsResult.Items[0]
-	if opsLog.ErrorClass != "stream_idle_timeout" ||
-		opsLog.ErrorPhase != "stream" ||
-		opsLog.ErrorSource != "upstream_stream" ||
-		opsLog.StreamCompletionState != "idle_timeout" {
-		t.Fatalf("unexpected stream timeout ops error log: %+v", opsLog)
+	return opsResult.Items[0]
+}
+
+func TestResponsesStreamFailureIDSanitizesRequestID(t *testing.T) {
+	if got := responsesStreamFailureID("req-a/b c_1"); got != "resp_reqabc_1" {
+		t.Fatalf("unexpected sanitized response id %q", got)
+	}
+	if got := responsesStreamFailureID("resp_existing"); got != "resp_existing" {
+		t.Fatalf("expected existing response id to be preserved, got %q", got)
+	}
+	if got := responsesStreamFailureID(""); got != "resp_stream_error" {
+		t.Fatalf("expected fallback response id, got %q", got)
+	}
+	if got := responsesStreamFailureID(strings.Repeat("a", 200)); len(got) != len("resp_")+96 {
+		t.Fatalf("expected bounded response id, got len=%d id=%q", len(got), got)
 	}
 }
 
