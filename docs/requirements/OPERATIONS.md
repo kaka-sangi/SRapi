@@ -451,7 +451,7 @@ srapi_ops_error_log_dropped_total
 srapi_ops_error_log_write_failures_total
 ```
 
-AI Gateway 专项指标以 `OBSERVABILITY_SPEC.md` 为准。
+AI Gateway 专项指标和默认 Prometheus 告警规则以 `OBSERVABILITY_SPEC.md` 为准；默认规则必须覆盖 Ops alert posture 和 scheduler no-available-account 持续升高。
 
 当前 `/metrics` 使用 Prometheus client SDK 输出 text format，基于持久化 usage logs、scheduler decisions/leases、account health snapshots 和 Reverse Proxy Runtime 快照聚合；Gateway request duration 和 provider probe latency 暴露为 histogram，固定 bucket 为 `0.05`、`0.1`、`0.25`、`0.5`、`1`、`2.5`、`5`、`10` 秒和 `+Inf`。指标 label 只允许低基数 route/model/protocol/result/error/status 类字段，避免使用 API Key、用户邮箱、账号名、account id、prompt 或 credential。
 

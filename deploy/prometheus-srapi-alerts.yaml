@@ -1,5 +1,5 @@
 groups:
-  - name: srapi.ops.alert-posture
+  - name: srapi.ops.rules
     labels:
       service: srapi
       team: platform
@@ -32,4 +32,21 @@ groups:
             Warning-level SRapi Ops alert events have remained firing for at least
             15 minutes. Review AdminOps alert posture before the condition burns
             into a critical incident.
+          runbook_url: docs/requirements/OPERATIONS.md
+
+      - alert: SRapiSchedulerNoAvailableAccounts
+        expr: sum by (strategy, reason) (increase(srapi_scheduler_no_available_total[5m])) > 5
+        for: 5m
+        keep_firing_for: 10m
+        labels:
+          severity: warning
+          component: scheduler
+        annotations:
+          summary: SRapi scheduler cannot find usable provider accounts
+          description: >-
+            Scheduler no-available-account decisions are rising for a strategy
+            and primary reject reason. Inspect AdminOps system logs, ops error
+            logs, scheduler decisions, and recent account health to identify
+            whether capability mapping, quota, credentials, cooldown, or group
+            scope is blocking routing.
           runbook_url: docs/requirements/OPERATIONS.md

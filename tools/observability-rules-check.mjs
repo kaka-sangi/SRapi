@@ -9,8 +9,10 @@ const composeConfig = "deploy/docker-compose.yml";
 
 const requiredPhrases = [
   "srapi_ops_alert_events",
+  "srapi_scheduler_no_available_total",
   "SRapiCriticalOpsAlertsFiring",
   "SRapiWarningOpsAlertsPersisting",
+  "SRapiSchedulerNoAvailableAccounts",
   "runbook_url:",
 ];
 

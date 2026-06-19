@@ -93,7 +93,7 @@ test("alertmanager route stays low-cardinality and secret-free", () => {
   );
 });
 
-test("prometheus alert rules stay on the ops alert posture metric", () => {
+test("prometheus alert rules cover ops posture and scheduler no-account signals", () => {
   const rules = readFileSync("deploy/prometheus-srapi-alerts.yaml", "utf8");
 
   assert.match(
@@ -104,9 +104,11 @@ test("prometheus alert rules stay on the ops alert posture metric", () => {
     rules,
     /srapi_ops_alert_events\{severity="warning",status="firing"\}/,
   );
+  assert.match(rules, /srapi_scheduler_no_available_total/);
+  assert.match(rules, /SRapiSchedulerNoAvailableAccounts/);
   assert.doesNotMatch(
     rules,
-    /fingerprint|rule_id|api_key|account_id|request_id/i,
+    /fingerprint|rule_id|api_key|account_id|user_id|request_id/i,
   );
 });
 
@@ -118,7 +120,11 @@ test("prometheus alert rules parse into low-cardinality labels and runbooks", ()
 
   assert.deepEqual(
     parsed.map((rule) => rule.alert),
-    ["SRapiCriticalOpsAlertsFiring", "SRapiWarningOpsAlertsPersisting"],
+    [
+      "SRapiCriticalOpsAlertsFiring",
+      "SRapiWarningOpsAlertsPersisting",
+      "SRapiSchedulerNoAvailableAccounts",
+    ],
   );
   for (const rule of parsed) {
     assert.equal(rule.groupLabels.has("service"), true);
