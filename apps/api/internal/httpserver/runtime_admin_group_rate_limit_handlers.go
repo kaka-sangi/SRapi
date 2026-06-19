@@ -134,10 +134,7 @@ func (s *Server) handleDeleteAdminGroupRateLimit(w http.ResponseWriter, r *http.
 		return
 	}
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "group_rate_limit.delete", "account_group_rate_limit", strconv.Itoa(groupID), nil, nil))
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       map[string]any{"account_group_id": groupID, "deleted": true},
-		"request_id": requestID,
-	})
+	writeJSONAny(w, http.StatusOK, deleteResponse(true, requestID))
 }
 
 func (s *Server) writeGroupRateLimitError(w http.ResponseWriter, err error, requestID string) {

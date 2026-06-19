@@ -380,9 +380,9 @@ func gatewaySourceEndpointIsResponsesCompact(sourceEndpoint string) bool {
 
 func gatewayRateLimitReason(name string) string {
 	switch strings.TrimSpace(name) {
-	case "rpm":
+	case "rpm", "model_rpm", "group_rpm":
 		return "rpm_limit_exceeded"
-	case "tpm":
+	case "tpm", "model_tpm", "group_tpm":
 		return "tpm_limit_exceeded"
 	default:
 		return "rate_limit_exceeded"

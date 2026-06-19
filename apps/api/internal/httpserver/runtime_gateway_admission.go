@@ -425,9 +425,9 @@ func (rt *runtimeState) prepareProviderDispatch(ctx context.Context, account *ac
 
 func gatewayAccountQuotaErrorClass(name string) string {
 	switch strings.TrimSpace(name) {
-	case "account_rpm":
+	case "account_rpm", "group_rpm":
 		return "rpm_limit_exceeded"
-	case "account_tpm":
+	case "account_tpm", "group_tpm":
 		return "tpm_limit_exceeded"
 	default:
 		return "rate_limit"

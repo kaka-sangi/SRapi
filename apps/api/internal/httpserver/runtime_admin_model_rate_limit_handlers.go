@@ -134,10 +134,7 @@ func (s *Server) handleDeleteAdminModelRateLimit(w http.ResponseWriter, r *http.
 		return
 	}
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "model_rate_limit.delete", "model_rate_limit", strconv.Itoa(modelID), nil, nil))
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       map[string]any{"model_id": modelID, "deleted": true},
-		"request_id": requestID,
-	})
+	writeJSONAny(w, http.StatusOK, deleteResponse(true, requestID))
 }
 
 func (s *Server) writeModelRateLimitError(w http.ResponseWriter, err error, requestID string) {
