@@ -52,6 +52,7 @@ import type { OpsErrorLog, OpsSystemLog, RequestLogFileDescriptor } from "@/lib/
 
 const RESOLUTION_OPTIONS = ["open", "investigating", "resolved", "muted"] as const;
 type ResolutionValue = (typeof RESOLUTION_OPTIONS)[number];
+type UpstreamErrorEvent = NonNullable<OpsErrorLog["upstream_errors"]>[number];
 
 export interface ErrorLogDetailDialogProps {
   errorLogId: string | null;
@@ -109,6 +110,7 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
     : detail.source_protocol ?? detail.platform ?? "—";
   const events = detail.upstream_errors ?? [];
   const firstAt = events.length > 0 ? events[0]?.at_unix_ms ?? 0 : 0;
+  const attemptSummary = summarizeUpstreamAttempts(events);
   const resolutionMutation = useUpdateErrorLogResolution();
   const schedulerDiagnostic = parseSchedulerDiagnostic(detail.error_body_excerpt);
   const upstreamDiagnostic = schedulerDiagnostic
@@ -232,11 +234,37 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
           <p className="font-mono text-2xs uppercase text-srapi-text-tertiary">
             {t("adminErrorLogs.attemptHistory")}
           </p>
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Field
+              label={t("adminErrorLogs.attempt")}
+              value={formatInteger(attemptSummary.attempts)}
+              mono
+            />
+            <Field
+              label={t("adminErrorLogs.statusCode")}
+              value={attemptSummary.statuses || "—"}
+              mono
+            />
+            <Field
+              label={t("adminErrorLogs.account")}
+              value={attemptSummary.accounts || "—"}
+            />
+            <Field
+              label={t("adminErrorLogs.upstreamTargetCount")}
+              value={
+                attemptSummary.targetCount > 0
+                  ? formatInteger(attemptSummary.targetCount)
+                  : "—"
+              }
+              mono
+            />
+          </div>
           <ol className="mt-2 space-y-2">
             {events.map((ev, idx) => {
               const offsetMs =
                 firstAt > 0 && (ev.at_unix_ms ?? 0) > 0 ? (ev.at_unix_ms ?? 0) - firstAt : 0;
               const eventDiagnostic = parseUpstreamErrorDiagnostic(ev.body_excerpt);
+              const upstreamTarget = formatUpstreamTarget(ev.upstream_url);
               return (
                 <li
                   key={`${ev.attempt_no ?? idx}-${idx}`}
@@ -270,6 +298,17 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
                       </span>
                     ) : null}
                   </div>
+                  {upstreamTarget ? (
+                    <div className="mt-1 flex items-start gap-1.5 text-xs text-srapi-text-secondary">
+                      <span className="shrink-0 font-medium">
+                        {t("adminErrorLogs.upstreamTarget")}:
+                      </span>
+                      <span className="min-w-0 break-all font-mono text-2xs text-srapi-text-tertiary">
+                        {upstreamTarget}
+                      </span>
+                      <CopyButton value={upstreamTarget} size="inline" />
+                    </div>
+                  ) : null}
                   {ev.message ? (
                     <p className="mt-1 break-words text-xs text-srapi-text-primary">
                       {ev.message}
@@ -850,4 +889,58 @@ function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function summarizeUpstreamAttempts(events: UpstreamErrorEvent[]): {
+  attempts: number;
+  statuses: string;
+  accounts: string;
+  targetCount: number;
+} {
+  return {
+    attempts: events.length,
+    statuses: countLabels(
+      events
+        .map((event) => event.upstream_status_code)
+        .filter((status) => status != null && status > 0)
+        .map((status) => String(status)),
+    ),
+    accounts: countLabels(
+      events
+        .map((event) => event.account_name || event.account_id || "")
+        .filter((account) => account.trim() !== ""),
+    ),
+    targetCount: new Set(
+      events
+        .map((event) => formatUpstreamTarget(event.upstream_url))
+        .filter((target) => target !== ""),
+    ).size,
+  };
+}
+
+function countLabels(values: string[]): string {
+  const counts = new Map<string, number>();
+  for (const value of values) {
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+
+  return Array.from(counts.entries())
+    .slice(0, 4)
+    .map(([value, count]) => (count > 1 ? `${value}×${formatInteger(count)}` : value))
+    .join(", ");
+}
+
+function formatUpstreamTarget(raw?: string | null): string {
+  const value = raw?.trim();
+  if (!value) return "";
+
+  try {
+    const parsed = new URL(value);
+    return `${parsed.host}${parsed.pathname || "/"}`;
+  } catch {
+    return value
+      .split("#", 1)[0]
+      .split("?", 1)[0]
+      .replace(/^[a-z][a-z0-9+.-]*:\/\//i, "");
+  }
 }

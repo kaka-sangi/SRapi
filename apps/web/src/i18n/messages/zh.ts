@@ -2378,6 +2378,8 @@ export const zh: Messages = {
     upstreamMessage: "上游错误信息",
     upstreamBodyExcerpt: "上游错误正文",
     upstreamDiagnostic: "上游诊断",
+    upstreamTarget: "上游目标",
+    upstreamTargetCount: "上游目标数",
     attemptEvidence: "尝试证据",
     schedulerDiagnostic: "调度诊断",
     openSchedulerDecision: "调度决策",

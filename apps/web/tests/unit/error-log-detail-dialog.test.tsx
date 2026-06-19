@@ -102,7 +102,7 @@ const mocks = vi.hoisted(() => ({
         account_name: "account-12",
         upstream_status_code: 503,
         upstream_request_id: "up-1",
-        upstream_url: "https://upstream.invalid/v1/chat/completions",
+        upstream_url: "https://upstream.invalid/v1/chat/completions?api_key=secret#retry",
         kind: "http_error",
         message: "Upstream request failed",
         body_excerpt:
@@ -260,6 +260,9 @@ describe("ErrorLogDetailDialog request dump evidence", () => {
     expect(screen.getByText("real upstream detail")).toBeInTheDocument();
     expect(screen.getAllByText("overloaded_error").length).toBeGreaterThan(0);
     expect(screen.getAllByText("server_overloaded").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/上游目标/).length).toBeGreaterThan(0);
+    expect(screen.getByText("upstream.invalid/v1/chat/completions")).toBeInTheDocument();
+    expect(screen.queryByText(/api_key=secret/)).not.toBeInTheDocument();
   });
 
   it("shows related system logs and request evidence links", () => {

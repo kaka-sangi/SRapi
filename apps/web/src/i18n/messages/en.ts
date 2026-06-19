@@ -2401,6 +2401,8 @@ export const en = {
     upstreamMessage: "Upstream message",
     upstreamBodyExcerpt: "Upstream body",
     upstreamDiagnostic: "Upstream diagnostics",
+    upstreamTarget: "Upstream target",
+    upstreamTargetCount: "Upstream targets",
     attemptEvidence: "Attempt evidence",
     schedulerDiagnostic: "Scheduler diagnostics",
     openSchedulerDecision: "Scheduler decision",
