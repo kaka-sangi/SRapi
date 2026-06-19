@@ -7,6 +7,7 @@
  */
 export type {
   Id,
+  JsonObject,
   User,
   UserStatus,
   UserBalance,

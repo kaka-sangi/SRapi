@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Activity, BellRing, BellOff, Maximize2, Minimize2, Pencil, Trash2 } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
@@ -36,7 +37,7 @@ import {
   buildOpsSettingsBody,
   type OpsSettingsFormState,
 } from "@/lib/admin-ops-settings-form";
-import type { OpsSloDefinition, OpsAlertRule, OpsAlertSilence } from "@/lib/sdk-types";
+import type { JsonObject, OpsSloDefinition, OpsAlertRule, OpsAlertSilence } from "@/lib/sdk-types";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { adminErrorMessage } from "@/lib/admin-api";
@@ -54,6 +55,7 @@ import { MonitorContent } from "@/components/admin/ops-channel-monitor";
 import { ScheduledTestsContent } from "@/components/admin/ops-scheduled-tests";
 import { StrategyContent } from "@/components/admin/ops-strategy";
 import { SchedulerDecisionsPanel } from "@/components/features/scheduler-decisions-panel";
+import { adminErrorInvestigationHref } from "@/lib/admin-log-links";
 
 export default function AdminOpsPage() {
   return (
@@ -239,6 +241,9 @@ function OpsOverviewContent() {
             platform: tWithFallback("adminOps.owner.platform", "Platform"),
             other: tWithFallback("adminOps.owner.other", "Other"),
           }}
+          investigationHref={(item) =>
+            adminErrorInvestigationHref({ error_class: item.error_class })
+          }
         />
       </div>
 
@@ -347,30 +352,38 @@ function OpsOverviewContent() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {activeAlerts.map((alert) => (
-              <div
-                key={alert.id}
-                className="flex items-center justify-between gap-4 border-t border-srapi-border py-2.5 first:border-t-0"
-              >
-                <div className="min-w-0">
-                  <div className="truncate text-sm text-srapi-text-primary">{alert.summary}</div>
-                  <div className="font-mono text-2xs text-srapi-text-tertiary tabular">
-                    {formatDateTime(alert.started_at ?? alert.created_at)}
+            {activeAlerts.map((alert) => {
+              const investigationHref = alertInvestigationHref(alert.details);
+              return (
+                <div
+                  key={alert.id}
+                  className="flex items-center justify-between gap-4 border-t border-srapi-border py-2.5 first:border-t-0"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate text-sm text-srapi-text-primary">{alert.summary}</div>
+                    <div className="font-mono text-2xs text-srapi-text-tertiary tabular">
+                      {formatDateTime(alert.started_at ?? alert.created_at)}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <QuietBadge status={quietStatusFor(alert.severity)} label={alert.severity} />
+                    {investigationHref ? (
+                      <Button asChild variant="ghost" size="sm">
+                        <Link href={investigationHref}>{t("adminOps.investigate")}</Link>
+                      </Button>
+                    ) : null}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      loading={ackMut.isPending && ackMut.variables === alert.id}
+                      onClick={() => ackAlert(alert.id)}
+                    >
+                      {t("adminOps.acknowledge")}
+                    </Button>
                   </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-3">
-                  <QuietBadge status={quietStatusFor(alert.severity)} label={alert.severity} />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    loading={ackMut.isPending && ackMut.variables === alert.id}
-                    onClick={() => ackAlert(alert.id)}
-                  >
-                    {t("adminOps.acknowledge")}
-                  </Button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </CardContent>
         </Card>
       ) : null}
@@ -607,4 +620,17 @@ function OpsTabs({ value }: { value: string }) {
       </TabsList>
     </Tabs>
   );
+}
+
+function alertInvestigationHref(details: JsonObject | undefined): string | null {
+  return adminErrorInvestigationHref({
+    error_class: detailString(details, "error_class"),
+    source_endpoint: detailString(details, "source_endpoint"),
+    model: detailString(details, "model"),
+  });
+}
+
+function detailString(details: JsonObject | undefined, key: string): string | null {
+  const value = details?.[key];
+  return typeof value === "string" && value.trim() ? value : null;
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  adminErrorInvestigationHref,
   adminErrorLogsHref,
   adminRequestDumpsHref,
   adminRequestEvidenceHref,
@@ -11,6 +12,23 @@ describe("admin log evidence links", () => {
     expect(adminErrorLogsHref({ request_id: "req_123", trace_id: "trace_456" })).toBe(
       "/admin/logs?tab=error&q=req_123",
     );
+  });
+
+  it("builds an error-log investigation link from error class and model", () => {
+    expect(
+      adminErrorInvestigationHref({
+        error_class: "server_bad",
+        source_endpoint: "/v1/chat/completions",
+        model: "gpt-ops",
+      }),
+    ).toBe("/admin/logs?tab=error&q=server_bad&f_model=gpt-ops");
+  });
+
+  it("falls back to source endpoint for error-log investigation search", () => {
+    expect(adminErrorInvestigationHref({ source_endpoint: "/v1/messages" })).toBe(
+      "/admin/logs?tab=error&q=%2Fv1%2Fmessages",
+    );
+    expect(adminErrorInvestigationHref({})).toBeNull();
   });
 
   it("falls back to trace id for error-log search", () => {

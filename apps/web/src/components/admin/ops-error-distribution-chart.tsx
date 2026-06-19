@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { formatInteger } from "@/lib/admin-format";
@@ -42,6 +43,7 @@ export function OpsErrorDistributionChart({
   totalLabel,
   ownerLabels,
   loading,
+  investigationHref,
 }: {
   items: OpsErrorDistributionItem[];
   title: string;
@@ -49,6 +51,7 @@ export function OpsErrorDistributionChart({
   totalLabel: string;
   ownerLabels: Record<Owner, string>;
   loading?: boolean;
+  investigationHref?: (item: OpsErrorDistributionItem) => string | null;
 }) {
   const { total, segments, topClasses } = useMemo(() => {
     const byOwner = new Map<Owner, number>();
@@ -161,11 +164,12 @@ export function OpsErrorDistributionChart({
               <div className="space-y-1.5">
                 {topClasses.map((item) => {
                   const owner = normalizeOwner(item.owner);
-                  return (
-                    <div
-                      key={`${item.owner}:${item.error_class}`}
-                      className="flex items-center gap-2 border-t border-srapi-border pt-1.5 first:border-t-0 first:pt-0"
-                    >
+                  const href = investigationHref?.(item) ?? null;
+                  const className =
+                    "flex items-center gap-2 border-t border-srapi-border pt-1.5 first:border-t-0 first:pt-0" +
+                    (href ? " rounded-sm underline-offset-2 hover:text-srapi-text-primary hover:underline" : "");
+                  const content = (
+                    <>
                       <span
                         className={cn("inline-block h-2 w-2 shrink-0 rounded-full", OWNER_STYLE[owner].dot)}
                       />
@@ -178,6 +182,21 @@ export function OpsErrorDistributionChart({
                       <span className="w-10 shrink-0 text-right font-mono text-2xs text-srapi-text-tertiary tabular">
                         {(item.share * 100).toFixed(1)}%
                       </span>
+                    </>
+                  );
+                  if (href) {
+                    return (
+                      <Link key={`${item.owner}:${item.error_class}`} href={href} className={className}>
+                        {content}
+                      </Link>
+                    );
+                  }
+                  return (
+                    <div
+                      key={`${item.owner}:${item.error_class}`}
+                      className={className}
+                    >
+                      {content}
                     </div>
                   );
                 })}

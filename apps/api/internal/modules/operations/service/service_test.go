@@ -457,6 +457,8 @@ func TestEvaluateSLOAlertsCreatesUpdatesAndResolvesBurnRateAlerts(t *testing.T) 
 		WindowDays: 1,
 		Filter: contract.SLOFilter{
 			SourceEndpoint:    "/v1/chat/completions",
+			Model:             "gpt-ops",
+			ProviderID:        ptrInt(7),
 			ErrorOwnerExclude: []string{"client", "business"},
 		},
 		AlertPolicy: contract.AlertPolicy{
@@ -496,9 +498,9 @@ func TestEvaluateSLOAlertsCreatesUpdatesAndResolvesBurnRateAlerts(t *testing.T) 
 		t.Fatalf("seed prefix-only alert: %v", err)
 	}
 	store.usageLogs = []usagecontract.UsageLog{
-		{RequestID: "req_ok", SourceEndpoint: "/v1/chat/completions", Success: true, CreatedAt: now.Add(-2 * time.Minute)},
-		{RequestID: "req_bad_1", SourceEndpoint: "/v1/chat/completions", Success: false, ErrorClass: ptrString("upstream_error"), CreatedAt: now.Add(-2 * time.Minute)},
-		{RequestID: "req_bad_2", SourceEndpoint: "/v1/chat/completions", Success: false, ErrorClass: ptrString("timeout"), CreatedAt: now.Add(-3 * time.Minute)},
+		{RequestID: "req_ok", SourceEndpoint: "/v1/chat/completions", Model: "gpt-ops", ProviderID: ptrInt(7), Success: true, CreatedAt: now.Add(-2 * time.Minute)},
+		{RequestID: "req_bad_1", SourceEndpoint: "/v1/chat/completions", Model: "gpt-ops", ProviderID: ptrInt(7), Success: false, ErrorClass: ptrString("upstream_error"), CreatedAt: now.Add(-2 * time.Minute)},
+		{RequestID: "req_bad_2", SourceEndpoint: "/v1/chat/completions", Model: "gpt-ops", ProviderID: ptrInt(7), Success: false, ErrorClass: ptrString("timeout"), CreatedAt: now.Add(-3 * time.Minute)},
 	}
 
 	result, err := svc.EvaluateSLOAlerts(t.Context())
@@ -521,6 +523,9 @@ func TestEvaluateSLOAlertsCreatesUpdatesAndResolvesBurnRateAlerts(t *testing.T) 
 	}
 	if burnAlert.Details["long_window_seconds"] != int(time.Hour/time.Second) || burnAlert.Details["short_window_seconds"] != int((5*time.Minute)/time.Second) {
 		t.Fatalf("unexpected burn-rate alert windows: %+v", burnAlert.Details)
+	}
+	if burnAlert.Details["source_endpoint"] != "/v1/chat/completions" || burnAlert.Details["model"] != "gpt-ops" || burnAlert.Details["provider_id"] != 7 {
+		t.Fatalf("expected SLO scope in burn-rate alert details, got %+v", burnAlert.Details)
 	}
 
 	result, err = svc.EvaluateSLOAlerts(t.Context())
@@ -834,3 +839,4 @@ func findAlertByRule(t *testing.T, alerts []contract.AlertEvent, ruleID string) 
 }
 
 func ptrString(value string) *string { return &value }
+func ptrInt(value int) *int          { return &value }

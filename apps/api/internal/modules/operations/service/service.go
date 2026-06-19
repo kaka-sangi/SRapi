@@ -520,7 +520,7 @@ func burnRateSummary(definition contract.SLODefinition, threshold contract.BurnR
 }
 
 func burnRateDetails(definition contract.SLODefinition, threshold contract.BurnRateThreshold, longEval contract.SLOEvaluation, shortEval contract.SLOEvaluation) map[string]any {
-	return map[string]any{
+	details := map[string]any{
 		"slo_id":                definition.ID,
 		"slo_name":              definition.Name,
 		"sli_type":              string(definition.SLIType),
@@ -537,6 +537,35 @@ func burnRateDetails(definition contract.SLODefinition, threshold contract.BurnR
 		"long_bad_requests":     longEval.BadRequests,
 		"short_bad_requests":    shortEval.BadRequests,
 		"error_budget_consumed": longEval.ErrorBudgetConsumed,
+	}
+	addSLOFilterDetails(details, definition.Filter)
+	return details
+}
+
+func addSLOFilterDetails(details map[string]any, filter contract.SLOFilter) {
+	if strings.TrimSpace(filter.SourceEndpoint) != "" {
+		details["source_endpoint"] = strings.TrimSpace(filter.SourceEndpoint)
+	}
+	if strings.TrimSpace(filter.Model) != "" {
+		details["model"] = strings.TrimSpace(filter.Model)
+	}
+	if filter.ProviderID != nil {
+		details["provider_id"] = *filter.ProviderID
+	}
+	if len(filter.ErrorOwnerExclude) > 0 {
+		details["error_owner_exclude"] = append([]string(nil), filter.ErrorOwnerExclude...)
+	}
+}
+
+func addAlertRuleScopeDetails(details map[string]any, scope contract.AlertRuleScope) {
+	if strings.TrimSpace(scope.SourceEndpoint) != "" {
+		details["source_endpoint"] = strings.TrimSpace(scope.SourceEndpoint)
+	}
+	if strings.TrimSpace(scope.Model) != "" {
+		details["model"] = strings.TrimSpace(scope.Model)
+	}
+	if scope.ProviderID != nil {
+		details["provider_id"] = *scope.ProviderID
 	}
 }
 

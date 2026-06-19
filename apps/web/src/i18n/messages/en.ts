@@ -2095,6 +2095,7 @@ export const en = {
     emptySlo: "No SLOs defined",
     emptySloBody: "Define an SLO to track gateway reliability.",
     acknowledge: "Acknowledge",
+    investigate: "Investigate",
     alertsEmpty: "No active alerts",
     trends: "Trends",
     throughput: "Requests",

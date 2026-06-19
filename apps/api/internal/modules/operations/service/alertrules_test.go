@@ -88,14 +88,18 @@ func TestEvaluateAlertRulesFiresUpdatesAndResolvesEvents(t *testing.T) {
 		Severity:        contract.AlertSeverityCritical,
 		WindowSeconds:   3600,
 		MinRequestCount: 2,
-		Scope:           contract.AlertRuleScope{SourceEndpoint: "/v1/chat/completions"},
+		Scope: contract.AlertRuleScope{
+			SourceEndpoint: "/v1/chat/completions",
+			Model:          "gpt-ops",
+			ProviderID:     intPtr(7),
+		},
 	}); err != nil {
 		t.Fatalf("create rule: %v", err)
 	}
 	store.usageLogs = []usagecontract.UsageLog{
-		{RequestID: "req_ok", SourceEndpoint: "/v1/chat/completions", Success: true, CreatedAt: now.Add(-2 * time.Minute)},
-		{RequestID: "req_bad_1", SourceEndpoint: "/v1/chat/completions", Success: false, ErrorClass: ptrString("upstream_error"), CreatedAt: now.Add(-3 * time.Minute)},
-		{RequestID: "req_bad_2", SourceEndpoint: "/v1/chat/completions", Success: false, ErrorClass: ptrString("timeout"), CreatedAt: now.Add(-4 * time.Minute)},
+		{RequestID: "req_ok", SourceEndpoint: "/v1/chat/completions", Model: "gpt-ops", ProviderID: intPtr(7), Success: true, CreatedAt: now.Add(-2 * time.Minute)},
+		{RequestID: "req_bad_1", SourceEndpoint: "/v1/chat/completions", Model: "gpt-ops", ProviderID: intPtr(7), Success: false, ErrorClass: ptrString("upstream_error"), CreatedAt: now.Add(-3 * time.Minute)},
+		{RequestID: "req_bad_2", SourceEndpoint: "/v1/chat/completions", Model: "gpt-ops", ProviderID: intPtr(7), Success: false, ErrorClass: ptrString("timeout"), CreatedAt: now.Add(-4 * time.Minute)},
 	}
 
 	result, err := svc.EvaluateAlertRules(t.Context())
@@ -114,6 +118,9 @@ func TestEvaluateAlertRulesFiresUpdatesAndResolvesEvents(t *testing.T) {
 	}
 	if alerts[0].RuleID != "rule.1" || alerts[0].Status != contract.AlertStatusFiring || alerts[0].Severity != contract.AlertSeverityCritical {
 		t.Fatalf("unexpected fired alert: %+v", alerts[0])
+	}
+	if alerts[0].Details["source_endpoint"] != "/v1/chat/completions" || alerts[0].Details["model"] != "gpt-ops" || alerts[0].Details["provider_id"] != 7 {
+		t.Fatalf("expected alert rule scope in details, got %+v", alerts[0].Details)
 	}
 
 	result, err = svc.EvaluateAlertRules(t.Context())
@@ -207,3 +214,4 @@ func metricPtr(v contract.AlertMetricType) *contract.AlertMetricType { return &v
 func operatorPtr(v contract.AlertOperator) *contract.AlertOperator   { return &v }
 func severityPtr(v contract.AlertSeverity) *contract.AlertSeverity   { return &v }
 func floatPtr(v float64) *float64                                    { return &v }
+func intPtr(v int) *int                                              { return &v }

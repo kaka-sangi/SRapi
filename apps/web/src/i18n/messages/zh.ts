@@ -2072,6 +2072,7 @@ export const zh: Messages = {
     emptySlo: "未定义 SLO",
     emptySloBody: "定义 SLO 即可跟踪网关可靠性。",
     acknowledge: "确认",
+    investigate: "调查",
     alertsEmpty: "暂无活跃告警",
     trends: "趋势",
     throughput: "请求数",

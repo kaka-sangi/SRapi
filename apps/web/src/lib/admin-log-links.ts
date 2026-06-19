@@ -5,6 +5,12 @@ export interface LogCorrelationIDs {
   trace_id?: string | null;
 }
 
+export interface ErrorLogInvestigationLinkParams {
+  error_class?: string | null;
+  source_endpoint?: string | null;
+  model?: string | null;
+}
+
 /** Build a filtered Error logs link for a request/trace investigation. */
 export function adminErrorLogsHref(params: LogCorrelationIDs): string | null {
   const query = new URLSearchParams();
@@ -13,6 +19,17 @@ export function adminErrorLogsHref(params: LogCorrelationIDs): string | null {
   if (!search) return null;
   query.set("q", search);
   return `${ADMIN_ROUTES.logs}?${query.toString()}`;
+}
+
+/** Build an Error logs link for an ops alert or aggregate investigation. */
+export function adminErrorInvestigationHref(params: ErrorLogInvestigationLinkParams): string | null {
+  const query = new URLSearchParams();
+  query.set("tab", "error");
+  const search = clean(params.error_class) || clean(params.source_endpoint);
+  if (search) query.set("q", search);
+  setIfPresent(query, "f_model", params.model);
+  const hasFilter = Boolean(query.get("q") || query.get("f_model"));
+  return hasFilter ? `${ADMIN_ROUTES.logs}?${query.toString()}` : null;
 }
 
 /** Build a filtered Request evidence link for a request investigation. */

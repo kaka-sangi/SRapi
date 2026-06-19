@@ -445,7 +445,7 @@ func ruleSummary(rule contract.AlertRule, metric ruleMetric) string {
 }
 
 func ruleDetails(rule contract.AlertRule, metric ruleMetric) map[string]any {
-	return map[string]any{
+	details := map[string]any{
 		"rule_id":           rule.ID,
 		"rule_name":         rule.Name,
 		"metric_type":       string(rule.MetricType),
@@ -461,6 +461,8 @@ func ruleDetails(rule contract.AlertRule, metric ruleMetric) map[string]any {
 		"latency_p95_ms":    metric.latencyP95,
 		"min_request_count": rule.MinRequestCount,
 	}
+	addAlertRuleScopeDetails(details, rule.Scope)
+	return details
 }
 
 func applyAlertRuleDefaults(rule *contract.AlertRule) {
