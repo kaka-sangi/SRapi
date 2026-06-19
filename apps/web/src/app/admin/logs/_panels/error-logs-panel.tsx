@@ -32,6 +32,7 @@ import {
   LOG_WINDOW_ALL_LABEL_KEY,
   logWindowSince,
 } from "@/lib/log-window-filter";
+import { compactSchedulerDiagnostic } from "@/lib/scheduler-diagnostic";
 
 const DEFAULT_HIDDEN_COLUMNS = ["api_key_id", "provider_id", "source_endpoint", "error_owner"];
 
@@ -209,11 +210,7 @@ export function ErrorLogsPanel() {
       key: "error_message",
       header: t("adminErrorLogs.upstreamMessage"),
       hideOnMobile: true,
-      render: (e) => (
-        <span className="line-clamp-2 break-words text-xs text-srapi-text-secondary">
-          {e.error_message || "—"}
-        </span>
-      ),
+      render: (e) => <ErrorMessageCell log={e} />,
     },
     {
       key: "latency",
@@ -410,6 +407,39 @@ export function ErrorLogsPanel() {
         }}
       />
     </>
+  );
+}
+
+function ErrorMessageCell({ log }: { log: OpsErrorLog }) {
+  const diagnostic = compactSchedulerDiagnostic(log.error_body_excerpt);
+  if (diagnostic) {
+    return (
+      <div className="min-w-0 space-y-1">
+        <div className="flex flex-wrap gap-1">
+          <span className="rounded bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-primary">
+            {diagnostic.reason}
+          </span>
+          {diagnostic.count ? (
+            <span className="rounded bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary">
+              ×{diagnostic.count}
+            </span>
+          ) : null}
+          {diagnostic.action ? (
+            <span className="rounded bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary">
+              {diagnostic.action}
+            </span>
+          ) : null}
+        </div>
+        <span className="line-clamp-1 break-words text-xs text-srapi-text-secondary">
+          {log.error_message || "—"}
+        </span>
+      </div>
+    );
+  }
+  return (
+    <span className="line-clamp-2 break-words text-xs text-srapi-text-secondary">
+      {log.error_message || "—"}
+    </span>
   );
 }
 

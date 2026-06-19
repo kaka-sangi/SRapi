@@ -37,6 +37,10 @@ import {
   adminSystemLogsHref,
 } from "@/lib/admin-log-links";
 import { parseRequestDumpSummary } from "@/lib/request-log-dump-summary";
+import {
+  parseSchedulerDiagnostic,
+  type SchedulerDiagnostic,
+} from "@/lib/scheduler-diagnostic";
 import type { OpsErrorLog, OpsSystemLog, RequestLogFileDescriptor } from "@/lib/sdk-types";
 
 const RESOLUTION_OPTIONS = ["open", "investigating", "resolved", "muted"] as const;
@@ -99,6 +103,7 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
   const events = detail.upstream_errors ?? [];
   const firstAt = events.length > 0 ? events[0]?.at_unix_ms ?? 0 : 0;
   const resolutionMutation = useUpdateErrorLogResolution();
+  const schedulerDiagnostic = parseSchedulerDiagnostic(detail.error_body_excerpt);
 
   return (
     <div className="space-y-4">
@@ -126,6 +131,8 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
           value={detail.error_message}
         />
       ) : null}
+
+      {schedulerDiagnostic ? <SchedulerDiagnosticSummary diagnostic={schedulerDiagnostic} /> : null}
 
       {detail.error_body_excerpt ? (
         <EvidenceBlock
@@ -617,6 +624,76 @@ function EvidenceBlock({
         </p>
         <CopyButton value={value} size="inline" />
       </div>
+    </div>
+  );
+}
+
+function SchedulerDiagnosticSummary({ diagnostic }: { diagnostic: SchedulerDiagnostic }) {
+  const { t } = useLanguage();
+  const topReasons = diagnostic.reasonCounts.slice(0, 4);
+  return (
+    <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+            {t("adminErrorLogs.schedulerDiagnostic")}
+          </p>
+          <p className="mt-1 text-sm text-srapi-text-primary">
+            {diagnostic.primaryReason || "—"}
+            {diagnostic.primaryCount != null ? (
+              <span className="ml-2 font-mono text-2xs text-srapi-text-tertiary">
+                ×{formatInteger(diagnostic.primaryCount)}
+              </span>
+            ) : null}
+          </p>
+        </div>
+        {diagnostic.operatorAction ? (
+          <QuietBadge status="limited" label={diagnostic.operatorAction} />
+        ) : null}
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Field
+          label={t("adminErrorLogs.schedulerDecisionId")}
+          value={diagnostic.decisionId != null ? formatInteger(diagnostic.decisionId) : "—"}
+          mono
+          copyable={diagnostic.decisionId != null}
+        />
+        <Field
+          label={t("adminErrorLogs.schedulerCandidates")}
+          value={diagnostic.candidateCount != null ? formatInteger(diagnostic.candidateCount) : "—"}
+          mono
+        />
+        <Field
+          label={t("adminErrorLogs.schedulerRejected")}
+          value={diagnostic.rejectedCount != null ? formatInteger(diagnostic.rejectedCount) : "—"}
+          mono
+        />
+        <Field
+          label={t("adminErrorLogs.responseStatus")}
+          value={diagnostic.responseStatus != null ? String(diagnostic.responseStatus) : "—"}
+          mono
+        />
+      </div>
+
+      {topReasons.length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {topReasons.map((item) => (
+            <span
+              key={item.reason}
+              className="rounded bg-srapi-surface px-2 py-1 font-mono text-2xs text-srapi-text-secondary"
+            >
+              {item.reason}({formatInteger(item.count)})
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      {diagnostic.selectionRationale ? (
+        <p className="mt-3 break-words text-xs text-srapi-text-tertiary">
+          {diagnostic.selectionRationale}
+        </p>
+      ) : null}
     </div>
   );
 }
