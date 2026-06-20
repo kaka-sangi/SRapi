@@ -67,6 +67,7 @@ export const queryKeys = {
       ["admin", "ops", "notification-deliveries", params ?? {}] as const,
     users: (params?: unknown) => ["admin", "users", params ?? {}] as const,
     providers: (params?: unknown) => ["admin", "providers", params ?? {}] as const,
+    gatewayResources: () => ["admin", "gateway-resources"] as const,
     models: (params?: unknown) => ["admin", "models", params ?? {}] as const,
     modelMappings: (params?: unknown) => ["admin", "model-mappings", params ?? {}] as const,
     accounts: (params?: unknown) => ["admin", "accounts", params ?? {}] as const,

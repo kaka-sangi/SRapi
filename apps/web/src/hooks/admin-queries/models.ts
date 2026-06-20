@@ -85,6 +85,7 @@ export function useCreateModel() {
   return useAdminMutation(
     (body: P<typeof adminApi.createModel>) => adminApi.createModel(body),
     ["admin", "models"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 export function useUpdateModel() {
@@ -92,10 +93,15 @@ export function useUpdateModel() {
     (vars: { id: string; body: B<typeof adminApi.updateModel> }) =>
       adminApi.updateModel(vars.id, vars.body),
     ["admin", "models"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 export function useDeleteModel() {
-  return useAdminMutation((id: string) => adminApi.deleteModel(id), ["admin", "models"]);
+  return useAdminMutation(
+    (id: string) => adminApi.deleteModel(id),
+    ["admin", "models"],
+    queryKeys.admin.gatewayResources(),
+  );
 }
 export function useCreateModelAlias() {
   return useAdminMutation(
@@ -109,6 +115,7 @@ export function useCreateModelMapping() {
     (vars: { id: string; body: B<typeof adminApi.createModelMapping> }) =>
       adminApi.createModelMapping(vars.id, vars.body),
     ["admin", "models"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 // Aliases/mappings of one model — fetched on demand (manage dialog). Keyed under
@@ -146,11 +153,13 @@ export function useUpdateModelMapping() {
     (vars: { id: string; mappingId: string; body: Parameters<typeof adminApi.updateModelMapping>[2] }) =>
       adminApi.updateModelMapping(vars.id, vars.mappingId, vars.body),
     ["admin", "models"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 export function useDeleteModelMapping() {
   return useAdminMutation(
     (vars: { id: string; mappingId: string }) => adminApi.deleteModelMapping(vars.id, vars.mappingId),
     ["admin", "models"],
+    queryKeys.admin.gatewayResources(),
   );
 }

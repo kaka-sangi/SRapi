@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 import { Activity, AlertTriangle, Cable, CheckCircle2, Globe, KeyRound, Route } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
@@ -21,21 +20,8 @@ import {
 } from "@/components/ui/table";
 import { ADMIN_ROUTES } from "@/lib/routes";
 import { useLanguage } from "@/context/LanguageContext";
-import {
-  useAccountsHealthSummary,
-  useAdminAccounts,
-  useAdminApiKeys,
-  useAdminModelMappings,
-  useAdminModels,
-  useAdminProviders,
-  useAdminProxies,
-} from "@/hooks/admin-queries";
-import {
-  buildGatewayResourceSummary,
-  type GatewayProviderResourceRow,
-} from "@/lib/admin-gateway-resources";
-
-const OVERVIEW_LIMIT = 500;
+import { useAdminGatewayResources } from "@/hooks/admin-queries";
+import type { GatewayProviderResourceRow } from "@/lib/sdk-types";
 
 export default function AdminGatewayResourcesPage() {
   return (
@@ -47,41 +33,10 @@ export default function AdminGatewayResourcesPage() {
 
 function GatewayResourcesContent() {
   const { t } = useLanguage();
-  const providers = useAdminProviders({ page: 1, page_size: OVERVIEW_LIMIT });
-  const accounts = useAdminAccounts({ page: 1, page_size: OVERVIEW_LIMIT });
-  const apiKeys = useAdminApiKeys({ page: 1, page_size: OVERVIEW_LIMIT });
-  const models = useAdminModels({ page: 1, page_size: OVERVIEW_LIMIT });
-  const modelMappings = useAdminModelMappings({ page: 1, page_size: OVERVIEW_LIMIT, status: "active" });
-  const proxies = useAdminProxies({ page: 1, page_size: OVERVIEW_LIMIT });
-  const health = useAccountsHealthSummary();
-  const [nowMs] = useState(() => Date.now());
-
-  const loading =
-    providers.isLoading ||
-    accounts.isLoading ||
-    apiKeys.isLoading ||
-    models.isLoading ||
-    modelMappings.isLoading ||
-    proxies.isLoading ||
-    health.isLoading;
-  const error =
-    providers.isError ||
-    accounts.isError ||
-    apiKeys.isError ||
-    models.isError ||
-    modelMappings.isError ||
-    proxies.isError ||
-    health.isError;
-  const summary = buildGatewayResourceSummary({
-    providers: providers.data?.data ?? [],
-    accounts: accounts.data?.data ?? [],
-    apiKeys: apiKeys.data?.data ?? [],
-    models: models.data?.data ?? [],
-    modelMappings: modelMappings.data?.data ?? [],
-    proxies: proxies.data?.data ?? [],
-    health: health.data ?? [],
-    nowMs,
-  });
+  const gatewayResources = useAdminGatewayResources();
+  const loading = gatewayResources.isLoading;
+  const error = gatewayResources.isError;
+  const summary = gatewayResources.data;
 
   return (
     <>
@@ -120,27 +75,27 @@ function GatewayResourcesContent() {
             <ResourceKpi
               icon={Cable}
               label={t("adminGatewayResources.activeProviders")}
-              value={`${summary.activeProviders}/${summary.providers}`}
+              value={`${summary?.active_providers ?? 0}/${summary?.providers ?? 0}`}
             />
             <ResourceKpi
               icon={Activity}
               label={t("adminGatewayResources.routableAccounts")}
-              value={`${summary.routableAccounts}/${summary.activeAccounts}`}
+              value={`${summary?.routable_accounts ?? 0}/${summary?.active_accounts ?? 0}`}
             />
             <ResourceKpi
               icon={Route}
               label={t("adminGatewayResources.activeModels")}
-              value={String(summary.activeModels)}
+              value={String(summary?.active_models ?? 0)}
             />
             <ResourceKpi
               icon={Globe}
               label={t("adminGatewayResources.availableProxies")}
-              value={`${summary.availableProxies}/${summary.activeProxies}`}
+              value={`${summary?.available_proxies ?? 0}/${summary?.active_proxies ?? 0}`}
             />
             <ResourceKpi
               icon={KeyRound}
               label={t("adminGatewayResources.scopedApiKeys")}
-              value={`${summary.scopedApiKeys}/${summary.activeApiKeys}`}
+              value={`${summary?.scoped_api_keys ?? 0}/${summary?.active_api_keys ?? 0}`}
             />
           </div>
 
@@ -164,7 +119,7 @@ function GatewayResourcesContent() {
                     </tr>
                   </TableHeader>
                   <TableBody>
-                    {summary.rows.map((row) => (
+                    {(summary?.rows ?? []).map((row) => (
                       <ProviderResourceRow key={row.provider.id} row={row} />
                     ))}
                   </TableBody>
@@ -226,26 +181,26 @@ function ProviderResourceRow({ row }: { row: GatewayProviderResourceRow }) {
         {row.provider.adapter_type}
       </TableCell>
       <TableCell className="text-right font-mono text-2xs tabular">
-        <span className={row.activeModelMappings > 0 ? "text-srapi-text-primary" : "text-srapi-error"}>
-          {row.activeModelMappings}
+        <span className={row.active_model_mappings > 0 ? "text-srapi-text-primary" : "text-srapi-error"}>
+          {row.active_model_mappings}
         </span>
       </TableCell>
       <TableCell className="text-right font-mono text-2xs tabular">
-        <span className="text-srapi-success">{row.routableAccounts}</span>
-        <span className="text-srapi-text-tertiary"> / {row.totalAccounts}</span>
+        <span className="text-srapi-success">{row.routable_accounts}</span>
+        <span className="text-srapi-text-tertiary"> / {row.total_accounts}</span>
       </TableCell>
       <TableCell className="text-right font-mono text-2xs tabular">
-        <span className={row.proxyAttentionAccounts > 0 ? "text-srapi-error" : "text-srapi-text-primary"}>
-          {row.proxiedAccounts}
+        <span className={row.proxy_attention_accounts > 0 ? "text-srapi-error" : "text-srapi-text-primary"}>
+          {row.proxied_accounts}
         </span>
-        {row.proxyAttentionAccounts > 0 ? (
-          <span className="text-srapi-text-tertiary"> · {row.proxyAttentionAccounts}</span>
+        {row.proxy_attention_accounts > 0 ? (
+          <span className="text-srapi-text-tertiary"> · {row.proxy_attention_accounts}</span>
         ) : null}
       </TableCell>
       <TableCell className="text-right font-mono text-2xs tabular">
-        <span className="text-srapi-text-primary">{row.apiKeyCount}</span>
-        {row.scopedKeyCount > 0 ? (
-          <span className="text-srapi-text-tertiary"> · {row.scopedKeyCount}</span>
+        <span className="text-srapi-text-primary">{row.api_key_count}</span>
+        {row.scoped_key_count > 0 ? (
+          <span className="text-srapi-text-tertiary"> · {row.scoped_key_count}</span>
         ) : null}
       </TableCell>
       <TableCell>

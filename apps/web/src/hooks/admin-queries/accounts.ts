@@ -56,6 +56,7 @@ export function useSetAccountStatus() {
     onSettled: () => {
       qc.invalidateQueries(accountListFilter);
       qc.invalidateQueries({ queryKey: queryKeys.admin.accountsHealthSummary() });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.gatewayResources() });
     },
   });
 }
@@ -71,6 +72,7 @@ export function useTestAccount() {
       qc.invalidateQueries({ queryKey: ["admin", "accounts"] });
       qc.invalidateQueries({ queryKey: queryKeys.admin.accountHealth(id) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.accountsHealthSummary() });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.gatewayResources() });
     },
   });
 }
@@ -109,6 +111,7 @@ export function useFetchAccountQuota() {
       qc.invalidateQueries({ queryKey: ["admin", "accounts"] });
       qc.invalidateQueries({ queryKey: queryKeys.admin.accountQuota(id) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.accountsHealthSummary() });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.gatewayResources() });
     },
   });
 }
@@ -166,6 +169,7 @@ export function useCreateAccount() {
   return useAdminMutation(
     (body: P<typeof adminApi.createAccount>) => adminApi.createAccount(body),
     ["admin", "accounts"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 export function useUpdateAccount() {
@@ -173,29 +177,47 @@ export function useUpdateAccount() {
     (vars: { id: string; body: B<typeof adminApi.updateAccount> }) =>
       adminApi.updateAccount(vars.id, vars.body),
     ["admin", "accounts"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 export function useDeleteAccount() {
-  return useAdminMutation((id: string) => adminApi.deleteAccount(id), ["admin", "accounts"]);
+  return useAdminMutation(
+    (id: string) => adminApi.deleteAccount(id),
+    ["admin", "accounts"],
+    queryKeys.admin.gatewayResources(),
+  );
 }
 export function useBindAccountProxy() {
   return useAdminMutation(
     (vars: { id: string; proxyId: string | null }) =>
       adminApi.bindAccountProxy(vars.id, vars.proxyId),
     ["admin", "accounts"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 export function useClearAccountError() {
-  return useAdminMutation((id: string) => adminApi.clearAccountError(id), ["admin", "accounts"]);
+  return useAdminMutation(
+    (id: string) => adminApi.clearAccountError(id),
+    ["admin", "accounts"],
+    queryKeys.admin.gatewayResources(),
+  );
 }
 export function useRecoverAccount() {
-  return useAdminMutation((id: string) => adminApi.recoverAccount(id), ["admin", "accounts"]);
+  return useAdminMutation(
+    (id: string) => adminApi.recoverAccount(id),
+    ["admin", "accounts"],
+    queryKeys.admin.gatewayResources(),
+  );
 }
 // On-demand OAuth token refresh — the row's token_expires_at, needs_reauth_at
 // and refresh_last_error can all change as a result, so invalidate every
 // account list view so the new state is rendered.
 export function useRefreshAccount() {
-  return useAdminMutation((id: string) => adminApi.refreshAccount(id), ["admin", "accounts"]);
+  return useAdminMutation(
+    (id: string) => adminApi.refreshAccount(id),
+    ["admin", "accounts"],
+    queryKeys.admin.gatewayResources(),
+  );
 }
 export function useResetAccountQuota() {
   const qc = useQueryClient();
@@ -205,6 +227,7 @@ export function useResetAccountQuota() {
       qc.invalidateQueries({ queryKey: ["admin", "accounts"] });
       qc.invalidateQueries({ queryKey: queryKeys.admin.accountQuota(id) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.accountsHealthSummary() });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.gatewayResources() });
     },
   });
 }
@@ -213,12 +236,14 @@ export function useDiscoverAccountModels() {
     (vars: { id: string; body?: B<typeof adminApi.discoverAccountModels> }) =>
       adminApi.discoverAccountModels(vars.id, vars.body),
     ["admin", "accounts"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 export function useImportAccounts() {
   return useAdminMutation(
     (body: P<typeof adminApi.importAccounts>) => adminApi.importAccounts(body),
     ["admin", "accounts"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 /** Import Codex/ChatGPT desktop session blobs as upstream codex_cli accounts. */
@@ -226,12 +251,14 @@ export function useImportCodexSession() {
   return useAdminMutation(
     (body: P<typeof adminApi.importCodexSession>) => adminApi.importCodexSession(body),
     ["admin", "accounts"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 export function useBatchActionAccounts() {
   return useAdminMutation(
     (body: P<typeof adminApi.batchActionAccounts>) => adminApi.batchActionAccounts(body),
     ["admin", "accounts"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 // POST /admin/accounts/batch — bulk-create up to 1000 accounts in one call
@@ -242,6 +269,7 @@ export function useBatchCreateAccounts() {
   return useAdminMutation(
     (body: P<typeof adminApi.batchCreateAccounts>) => adminApi.batchCreateAccounts(body),
     ["admin", "accounts"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 
@@ -253,6 +281,7 @@ export function useBatchDeleteAccounts() {
   return useAdminMutation(
     (accountIds: P<typeof adminApi.batchDeleteAccounts>) => adminApi.batchDeleteAccounts(accountIds),
     ["admin", "accounts"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 
@@ -265,6 +294,7 @@ export function useBatchUpdateAccountConcurrency() {
     (items: P<typeof adminApi.batchUpdateAccountConcurrency>) =>
       adminApi.batchUpdateAccountConcurrency(items),
     ["admin", "accounts"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 
@@ -276,6 +306,7 @@ export function useBatchRefreshAccounts() {
   return useAdminMutation(
     (accountIds: P<typeof adminApi.batchRefreshAccounts>) => adminApi.batchRefreshAccounts(accountIds),
     ["admin", "accounts"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 
@@ -288,6 +319,7 @@ export function useBatchUpdateAccountCredentials() {
     (items: P<typeof adminApi.batchUpdateAccountCredentials>) =>
       adminApi.batchUpdateAccountCredentials(items),
     ["admin", "accounts"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 
@@ -298,6 +330,7 @@ export function useBatchUpdateAccounts() {
   return useAdminMutation(
     (body: P<typeof adminApi.batchUpdateAccounts>) => adminApi.batchUpdateAccounts(body),
     ["admin", "accounts"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 
@@ -311,6 +344,7 @@ export function useBulkUpdateAccounts() {
   return useAdminMutation(
     (body: P<typeof adminApi.bulkUpdateAccounts>) => adminApi.bulkUpdateAccounts(body),
     ["admin", "accounts"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 
@@ -322,6 +356,7 @@ export function useBatchQuotaFetchAccounts() {
   return useAdminMutation(
     (accountIds: P<typeof adminApi.batchQuotaFetchAccounts>) => adminApi.batchQuotaFetchAccounts(accountIds),
     ["admin", "accounts"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 /** Export is read-only; expose as a mutation so pages can trigger it on click. */
@@ -334,6 +369,7 @@ export function useCreateProxy() {
   return useAdminMutation(
     (body: P<typeof adminApi.createProxy>) => adminApi.createProxy(body),
     ["admin", "proxies"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 export function useUpdateProxy() {
@@ -341,10 +377,15 @@ export function useUpdateProxy() {
     (vars: { id: string; body: B<typeof adminApi.updateProxy> }) =>
       adminApi.updateProxy(vars.id, vars.body),
     ["admin", "proxies"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 export function useDeleteProxy() {
-  return useAdminMutation((id: string) => adminApi.deleteProxy(id), ["admin", "proxies"]);
+  return useAdminMutation(
+    (id: string) => adminApi.deleteProxy(id),
+    ["admin", "proxies"],
+    queryKeys.admin.gatewayResources(),
+  );
 }
 // One-shot probe through the proxy. No cache invalidation — the test doesn't
 // mutate proxy state, just returns the probe outcome the page surfaces in a
@@ -369,6 +410,7 @@ export function useBatchCreateProxies() {
   return useAdminMutation(
     (proxies: P<typeof adminApi.batchCreateProxies>) => adminApi.batchCreateProxies(proxies),
     ["admin", "proxies"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 // Bulk soft-delete with per-id outcome. Same semantics as single-id delete:
@@ -377,6 +419,7 @@ export function useBatchDeleteProxies() {
   return useAdminMutation(
     (proxyIds: P<typeof adminApi.batchDeleteProxies>) => adminApi.batchDeleteProxies(proxyIds),
     ["admin", "proxies"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 
@@ -385,6 +428,7 @@ export function useCreateGroup() {
   return useAdminMutation(
     (body: P<typeof adminApi.createAccountGroup>) => adminApi.createAccountGroup(body),
     ["admin", "account-groups"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 export function useUpdateGroup() {
@@ -392,16 +436,22 @@ export function useUpdateGroup() {
     (vars: { id: string; body: B<typeof adminApi.updateAccountGroup> }) =>
       adminApi.updateAccountGroup(vars.id, vars.body),
     ["admin", "account-groups"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 export function useDeleteGroup() {
-  return useAdminMutation((id: string) => adminApi.deleteAccountGroup(id), ["admin", "account-groups"]);
+  return useAdminMutation(
+    (id: string) => adminApi.deleteAccountGroup(id),
+    ["admin", "account-groups"],
+    queryKeys.admin.gatewayResources(),
+  );
 }
 export function useAddGroupMember() {
   return useAdminMutation(
     (vars: { accountId: string; groupId: string }) =>
       adminApi.addAccountToGroup(vars.accountId, vars.groupId),
     ["admin", "account-groups"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 export function useRemoveGroupMember() {
@@ -409,5 +459,6 @@ export function useRemoveGroupMember() {
     (vars: { accountId: string; groupId: string }) =>
       adminApi.removeAccountFromGroup(vars.accountId, vars.groupId),
     ["admin", "account-groups"],
+    queryKeys.admin.gatewayResources(),
   );
 }

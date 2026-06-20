@@ -9,6 +9,7 @@ import { affiliateApi } from "./admin-api/affiliate";
 import { backupSnapshotsApi } from "./admin-api/backup-snapshots";
 import { diagnosticsApi } from "./admin-api/diagnostics";
 import { errorLogsApi } from "./admin-api/error-logs";
+import { gatewayResourcesApi } from "./admin-api/gateway-resources";
 import { modelsApi } from "./admin-api/models";
 import { monitoringApi } from "./admin-api/monitoring";
 import { notificationsApi } from "./admin-api/notifications";
@@ -71,6 +72,7 @@ export const adminApi = {
   ...usersApi,
   ...providersApi,
   ...modelsApi,
+  ...gatewayResourcesApi,
   ...accountsApi,
   ...proxiesApi,
   ...usageApi,

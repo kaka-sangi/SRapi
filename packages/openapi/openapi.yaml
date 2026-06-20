@@ -32,6 +32,8 @@ tags:
     description: Provider account administration endpoints.
   - name: AdminProxies
     description: Encrypted egress proxy registry and account bindings.
+  - name: AdminGatewayResources
+    description: Aggregated gateway readiness resources for the admin console.
   - name: AdminAccountGroups
     description: Provider account pool and group administration endpoints.
   - name: AdminCapabilities
@@ -5305,6 +5307,39 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AccountHealthSummaryResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/gateway-resources:
+    get:
+      tags:
+        - AdminGatewayResources
+      operationId: getAdminGatewayResources
+      summary: Get gateway resource readiness.
+      description: >-
+        Returns a server-side aggregate of provider, account, model mapping,
+        proxy, health, and API key state used to explain whether gateway traffic
+        can route without relying on paginated console list endpoints.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      responses:
+        "200":
+          description: Gateway resource readiness summary.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GatewayResourceSummaryResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -21547,6 +21582,145 @@ components:
             $ref: "#/components/schemas/ModelProviderMapping"
         pagination:
           $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    GatewayProviderResourceStatus:
+      type: string
+      enum:
+        - ready
+        - limited
+        - blocked
+
+    GatewayProviderResourceReason:
+      type: string
+      enum:
+        - provider_disabled
+        - no_active_models
+        - no_model_mappings
+        - no_active_accounts
+        - no_routable_accounts
+        - proxy_attention
+        - no_api_keys
+
+    GatewayProviderResourceRow:
+      type: object
+      required:
+        - provider
+        - total_accounts
+        - routable_accounts
+        - attention_accounts
+        - proxied_accounts
+        - proxy_attention_accounts
+        - active_model_mappings
+        - api_key_count
+        - scoped_key_count
+        - status
+        - reasons
+      properties:
+        provider:
+          $ref: "#/components/schemas/Provider"
+        total_accounts:
+          type: integer
+          minimum: 0
+        routable_accounts:
+          type: integer
+          minimum: 0
+        attention_accounts:
+          type: integer
+          minimum: 0
+        proxied_accounts:
+          type: integer
+          minimum: 0
+        proxy_attention_accounts:
+          type: integer
+          minimum: 0
+        active_model_mappings:
+          type: integer
+          minimum: 0
+        api_key_count:
+          type: integer
+          minimum: 0
+        scoped_key_count:
+          type: integer
+          minimum: 0
+        status:
+          $ref: "#/components/schemas/GatewayProviderResourceStatus"
+        reasons:
+          type: array
+          items:
+            $ref: "#/components/schemas/GatewayProviderResourceReason"
+
+    GatewayResourceSummary:
+      type: object
+      required:
+        - providers
+        - active_providers
+        - active_models
+        - active_model_mappings
+        - active_api_keys
+        - active_accounts
+        - routable_accounts
+        - active_proxies
+        - available_proxies
+        - expired_proxies
+        - proxied_accounts
+        - proxy_attention_accounts
+        - scoped_api_keys
+        - rows
+      properties:
+        providers:
+          type: integer
+          minimum: 0
+        active_providers:
+          type: integer
+          minimum: 0
+        active_models:
+          type: integer
+          minimum: 0
+        active_model_mappings:
+          type: integer
+          minimum: 0
+        active_api_keys:
+          type: integer
+          minimum: 0
+        active_accounts:
+          type: integer
+          minimum: 0
+        routable_accounts:
+          type: integer
+          minimum: 0
+        active_proxies:
+          type: integer
+          minimum: 0
+        available_proxies:
+          type: integer
+          minimum: 0
+        expired_proxies:
+          type: integer
+          minimum: 0
+        proxied_accounts:
+          type: integer
+          minimum: 0
+        proxy_attention_accounts:
+          type: integer
+          minimum: 0
+        scoped_api_keys:
+          type: integer
+          minimum: 0
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/GatewayProviderResourceRow"
+
+    GatewayResourceSummaryResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/GatewayResourceSummary"
         request_id:
           $ref: "#/components/schemas/RequestId"
 

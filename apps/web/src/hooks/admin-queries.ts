@@ -17,6 +17,7 @@ export * from "./admin-queries/accounts";
 export * from "./admin-queries/account-usage";
 export * from "./admin-queries/providers";
 export * from "./admin-queries/models";
+export * from "./admin-queries/gateway-resources";
 export * from "./admin-queries/subscriptions";
 export * from "./admin-queries/payments";
 export * from "./admin-queries/affiliate";

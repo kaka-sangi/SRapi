@@ -18,6 +18,7 @@ export function useCreateProvider() {
   return useAdminMutation(
     (body: P<typeof adminApi.createProvider>) => adminApi.createProvider(body),
     ["admin", "providers"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 export function useUpdateProvider() {
@@ -25,10 +26,15 @@ export function useUpdateProvider() {
     (vars: { id: string; body: B<typeof adminApi.updateProvider> }) =>
       adminApi.updateProvider(vars.id, vars.body),
     ["admin", "providers"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 export function useDeleteProvider() {
-  return useAdminMutation((id: string) => adminApi.deleteProvider(id), ["admin", "providers"]);
+  return useAdminMutation(
+    (id: string) => adminApi.deleteProvider(id),
+    ["admin", "providers"],
+    queryKeys.admin.gatewayResources(),
+  );
 }
 export function useTestProvider() {
   const qc = useQueryClient();
@@ -53,6 +59,7 @@ export function useRunQuickSetup() {
       qc.invalidateQueries({ queryKey: ["admin", "accounts"] });
       qc.invalidateQueries({ queryKey: ["admin", "models"] });
       qc.invalidateQueries({ queryKey: queryKeys.admin.accountsHealthSummary() });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.gatewayResources() });
     },
   });
 }
@@ -66,6 +73,7 @@ export function useQuickMapModels() {
     mutationFn: (body: P<typeof adminApi.quickMapModels>) => adminApi.quickMapModels(body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin", "models"] });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.gatewayResources() });
     },
   });
 }

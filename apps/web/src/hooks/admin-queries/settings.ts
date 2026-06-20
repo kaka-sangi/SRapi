@@ -76,12 +76,14 @@ export function useUpdateAdminApiKey() {
     (vars: { id: string; body: B<typeof adminApi.updateAdminApiKey> }) =>
       adminApi.updateAdminApiKey(vars.id, vars.body),
     ["admin", "api-keys"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 export function useResetAdminApiKeyUsage() {
   return useAdminMutation(
     (id: string) => adminApi.resetAdminApiKeyUsage(id),
     ["admin", "api-keys"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 export function useAdminApiKeyUsage(id: string | null, days: number, enabled: boolean) {

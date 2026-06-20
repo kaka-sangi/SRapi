@@ -1657,6 +1657,46 @@ export type ModelProviderMappingPagedListResponse = {
     request_id: RequestId;
 };
 
+export type GatewayProviderResourceStatus = 'ready' | 'limited' | 'blocked';
+
+export type GatewayProviderResourceReason = 'provider_disabled' | 'no_active_models' | 'no_model_mappings' | 'no_active_accounts' | 'no_routable_accounts' | 'proxy_attention' | 'no_api_keys';
+
+export type GatewayProviderResourceRow = {
+    provider: Provider;
+    total_accounts: number;
+    routable_accounts: number;
+    attention_accounts: number;
+    proxied_accounts: number;
+    proxy_attention_accounts: number;
+    active_model_mappings: number;
+    api_key_count: number;
+    scoped_key_count: number;
+    status: GatewayProviderResourceStatus;
+    reasons: Array<GatewayProviderResourceReason>;
+};
+
+export type GatewayResourceSummary = {
+    providers: number;
+    active_providers: number;
+    active_models: number;
+    active_model_mappings: number;
+    active_api_keys: number;
+    active_accounts: number;
+    routable_accounts: number;
+    active_proxies: number;
+    available_proxies: number;
+    expired_proxies: number;
+    proxied_accounts: number;
+    proxy_attention_accounts: number;
+    scoped_api_keys: number;
+    rows: Array<GatewayProviderResourceRow>;
+};
+
+export type GatewayResourceSummaryResponse = {
+    data: GatewayResourceSummary;
+    request_id: RequestId;
+};
+
 export type AdminQuickMapModelsRequest = {
     provider_id: Id;
     models: Array<string>;
@@ -13737,6 +13777,39 @@ export type GetAdminAccountsHealthSummaryResponses = {
 };
 
 export type GetAdminAccountsHealthSummaryResponse = GetAdminAccountsHealthSummaryResponses[keyof GetAdminAccountsHealthSummaryResponses];
+
+export type GetAdminGatewayResourcesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/gateway-resources';
+};
+
+export type GetAdminGatewayResourcesErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminGatewayResourcesError = GetAdminGatewayResourcesErrors[keyof GetAdminGatewayResourcesErrors];
+
+export type GetAdminGatewayResourcesResponses = {
+    /**
+     * Gateway resource readiness summary.
+     */
+    200: GatewayResourceSummaryResponse;
+};
+
+export type GetAdminGatewayResourcesResponse = GetAdminGatewayResourcesResponses[keyof GetAdminGatewayResourcesResponses];
 
 export type DeleteAdminAccountData = {
     body?: never;

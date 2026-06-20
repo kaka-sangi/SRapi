@@ -1322,6 +1322,60 @@ func (e GatewayErrorObjectType) Valid() bool {
 	}
 }
 
+// Defines values for GatewayProviderResourceReason.
+const (
+	NoActiveAccounts   GatewayProviderResourceReason = "no_active_accounts"
+	NoActiveModels     GatewayProviderResourceReason = "no_active_models"
+	NoApiKeys          GatewayProviderResourceReason = "no_api_keys"
+	NoModelMappings    GatewayProviderResourceReason = "no_model_mappings"
+	NoRoutableAccounts GatewayProviderResourceReason = "no_routable_accounts"
+	ProviderDisabled   GatewayProviderResourceReason = "provider_disabled"
+	ProxyAttention     GatewayProviderResourceReason = "proxy_attention"
+)
+
+// Valid indicates whether the value is a known member of the GatewayProviderResourceReason enum.
+func (e GatewayProviderResourceReason) Valid() bool {
+	switch e {
+	case NoActiveAccounts:
+		return true
+	case NoActiveModels:
+		return true
+	case NoApiKeys:
+		return true
+	case NoModelMappings:
+		return true
+	case NoRoutableAccounts:
+		return true
+	case ProviderDisabled:
+		return true
+	case ProxyAttention:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GatewayProviderResourceStatus.
+const (
+	GatewayProviderResourceStatusBlocked GatewayProviderResourceStatus = "blocked"
+	GatewayProviderResourceStatusLimited GatewayProviderResourceStatus = "limited"
+	GatewayProviderResourceStatusReady   GatewayProviderResourceStatus = "ready"
+)
+
+// Valid indicates whether the value is a known member of the GatewayProviderResourceStatus enum.
+func (e GatewayProviderResourceStatus) Valid() bool {
+	switch e {
+	case GatewayProviderResourceStatusBlocked:
+		return true
+	case GatewayProviderResourceStatusLimited:
+		return true
+	case GatewayProviderResourceStatusReady:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GatewayUsageResponseMode.
 const (
 	QuotaLimited GatewayUsageResponseMode = "quota_limited"
@@ -3613,22 +3667,22 @@ func (e VideoObjectObject) Valid() bool {
 
 // Defines values for VideoObjectStatus.
 const (
-	Completed  VideoObjectStatus = "completed"
-	Failed     VideoObjectStatus = "failed"
-	InProgress VideoObjectStatus = "in_progress"
-	Queued     VideoObjectStatus = "queued"
+	VideoObjectStatusCompleted  VideoObjectStatus = "completed"
+	VideoObjectStatusFailed     VideoObjectStatus = "failed"
+	VideoObjectStatusInProgress VideoObjectStatus = "in_progress"
+	VideoObjectStatusQueued     VideoObjectStatus = "queued"
 )
 
 // Valid indicates whether the value is a known member of the VideoObjectStatus enum.
 func (e VideoObjectStatus) Valid() bool {
 	switch e {
-	case Completed:
+	case VideoObjectStatusCompleted:
 		return true
-	case Failed:
+	case VideoObjectStatusFailed:
 		return true
-	case InProgress:
+	case VideoObjectStatusInProgress:
 		return true
-	case Queued:
+	case VideoObjectStatusQueued:
 		return true
 	default:
 		return false
@@ -7824,6 +7878,51 @@ type GatewayErrorObjectType string
 // GatewayErrorResponse defines model for GatewayErrorResponse.
 type GatewayErrorResponse struct {
 	Error GatewayErrorObject `json:"error"`
+}
+
+// GatewayProviderResourceReason defines model for GatewayProviderResourceReason.
+type GatewayProviderResourceReason string
+
+// GatewayProviderResourceRow defines model for GatewayProviderResourceRow.
+type GatewayProviderResourceRow struct {
+	ActiveModelMappings    int                             `json:"active_model_mappings"`
+	ApiKeyCount            int                             `json:"api_key_count"`
+	AttentionAccounts      int                             `json:"attention_accounts"`
+	Provider               Provider                        `json:"provider"`
+	ProxiedAccounts        int                             `json:"proxied_accounts"`
+	ProxyAttentionAccounts int                             `json:"proxy_attention_accounts"`
+	Reasons                []GatewayProviderResourceReason `json:"reasons"`
+	RoutableAccounts       int                             `json:"routable_accounts"`
+	ScopedKeyCount         int                             `json:"scoped_key_count"`
+	Status                 GatewayProviderResourceStatus   `json:"status"`
+	TotalAccounts          int                             `json:"total_accounts"`
+}
+
+// GatewayProviderResourceStatus defines model for GatewayProviderResourceStatus.
+type GatewayProviderResourceStatus string
+
+// GatewayResourceSummary defines model for GatewayResourceSummary.
+type GatewayResourceSummary struct {
+	ActiveAccounts         int                          `json:"active_accounts"`
+	ActiveApiKeys          int                          `json:"active_api_keys"`
+	ActiveModelMappings    int                          `json:"active_model_mappings"`
+	ActiveModels           int                          `json:"active_models"`
+	ActiveProviders        int                          `json:"active_providers"`
+	ActiveProxies          int                          `json:"active_proxies"`
+	AvailableProxies       int                          `json:"available_proxies"`
+	ExpiredProxies         int                          `json:"expired_proxies"`
+	Providers              int                          `json:"providers"`
+	ProxiedAccounts        int                          `json:"proxied_accounts"`
+	ProxyAttentionAccounts int                          `json:"proxy_attention_accounts"`
+	RoutableAccounts       int                          `json:"routable_accounts"`
+	Rows                   []GatewayProviderResourceRow `json:"rows"`
+	ScopedApiKeys          int                          `json:"scoped_api_keys"`
+}
+
+// GatewayResourceSummaryResponse defines model for GatewayResourceSummaryResponse.
+type GatewayResourceSummaryResponse struct {
+	Data      GatewayResourceSummary `json:"data"`
+	RequestId RequestId              `json:"request_id"`
 }
 
 // GatewayUsageModel defines model for GatewayUsageModel.
@@ -22648,6 +22747,9 @@ type ServerInterface interface {
 	// Server-Sent Events stream for real-time admin notifications.
 	// (GET /api/v1/admin/events)
 	GetAdminEventStream(w http.ResponseWriter, r *http.Request)
+	// Get gateway resource readiness.
+	// (GET /api/v1/admin/gateway-resources)
+	GetAdminGatewayResources(w http.ResponseWriter, r *http.Request)
 	// List per-account-group rate limits.
 	// (GET /api/v1/admin/group-rate-limits)
 	ListAdminGroupRateLimits(w http.ResponseWriter, r *http.Request)
@@ -28637,6 +28739,26 @@ func (siw *ServerInterfaceWrapper) GetAdminEventStream(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetAdminEventStream(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminGatewayResources operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminGatewayResources(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminGatewayResources(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -40020,6 +40142,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/error-passthrough-rules/{id}", wrapper.UpdateAdminErrorPassthroughRule)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/error-stream", wrapper.GetAdminErrorStream)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/events", wrapper.GetAdminEventStream)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/gateway-resources", wrapper.GetAdminGatewayResources)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/group-rate-limits", wrapper.ListAdminGroupRateLimits)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/group-rate-limits", wrapper.UpsertAdminGroupRateLimit)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/group-rate-limits/{groupId}", wrapper.DeleteAdminGroupRateLimit)
