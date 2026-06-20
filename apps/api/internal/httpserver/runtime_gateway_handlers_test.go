@@ -705,3 +705,46 @@ func TestProviderImageGenerationRequestCapturesCodexRequestSettings(t *testing.T
 		}
 	}
 }
+
+func TestProviderImageEditRequestCapturesCodexRequestSettings(t *testing.T) {
+	req := gatewaycontract.CanonicalRequest{
+		RequestID:      "req_codex_image_edit_settings",
+		SourceProtocol: gatewaycontract.ProtocolOpenAICompatible,
+		SourceEndpoint: "/v1/images/edits",
+		CanonicalModel: "codex-image-model",
+		ImagePrompt:    "edit a cat",
+		RawBody: []byte(`{
+			"client_metadata":{
+				"x-codex-turn-metadata":"{\"prompt_cache_key\":\"image-edit-cache-1\"}",
+				"x-codex-window-id":"window-body",
+				"x-codex-installation-id":"install-body"
+			}
+		}`),
+	}
+	httpReq := httptest.NewRequest(http.MethodPost, "/v1/images/edits", strings.NewReader(string(req.RawBody)))
+	httpReq.Header.Set("ChatGPT-Account-ID", "account-1")
+	httpReq.Header.Set("Originator", "Codex Desktop")
+	httpReq.Header.Set("Version", "0.118.0")
+	httpReq.Header.Set("X-Client-Request-Id", "client-req-1")
+	httpReq.Header.Set("Session_id", "session-1")
+	httpReq.Header.Set("Accept-Language", "fr-FR")
+
+	providerReq := providerImageEditRequest(req, schedulercontract.Candidate{}, httpReq)
+
+	want := map[string]string{
+		"chatgpt_account_id":      "account-1",
+		"codex_originator":        "Codex Desktop",
+		"codex_version":           "0.118.0",
+		"codex_client_request_id": "client-req-1",
+		"codex_session_id":        "session-1",
+		"accept-language":         "fr-FR",
+		"codex_turn_metadata":     `{"prompt_cache_key":"image-edit-cache-1"}`,
+		"codex_window_id":         "window-body",
+		"codex_installation_id":   "install-body",
+	}
+	for key, expected := range want {
+		if got := strings.TrimSpace(providerReq.RequestSettings[key].(string)); got != expected {
+			t.Fatalf("image edit request setting %s = %q, want %q; all=%+v", key, got, expected, providerReq.RequestSettings)
+		}
+	}
+}

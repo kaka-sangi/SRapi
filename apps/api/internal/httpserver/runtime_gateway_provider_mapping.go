@@ -218,24 +218,25 @@ func providerVideoRequest(req gatewaycontract.CanonicalRequest, candidate schedu
 	}
 }
 
-func providerImageEditRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate) provideradaptercontract.ImageEditRequest {
+func providerImageEditRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate, source ...*http.Request) provideradaptercontract.ImageEditRequest {
 	return provideradaptercontract.ImageEditRequest{
-		RequestID:      req.RequestID,
-		SourceProtocol: string(req.SourceProtocol),
-		SourceEndpoint: req.SourceEndpoint,
-		Model:          req.CanonicalModel,
-		Prompt:         req.ImagePrompt,
-		Images:         providerImageInputs(req.ImageInputs),
-		Mask:           providerImageInputPtr(req.ImageMask),
-		Count:          req.ImageCount,
-		Size:           req.ImageSize,
-		Quality:        req.ImageQuality,
-		ResponseFormat: req.ImageResponseFormat,
-		User:           req.ImageUser,
-		Extra:          cloneAnyMap(req.ImageExtra),
-		Provider:       candidate.Provider,
-		Account:        candidate.Account,
-		Mapping:        candidate.Mapping,
+		RequestID:       req.RequestID,
+		SourceProtocol:  string(req.SourceProtocol),
+		SourceEndpoint:  req.SourceEndpoint,
+		Model:           req.CanonicalModel,
+		Prompt:          req.ImagePrompt,
+		Images:          providerImageInputs(req.ImageInputs),
+		Mask:            providerImageInputPtr(req.ImageMask),
+		Count:           req.ImageCount,
+		Size:            req.ImageSize,
+		Quality:         req.ImageQuality,
+		ResponseFormat:  req.ImageResponseFormat,
+		User:            req.ImageUser,
+		Extra:           cloneAnyMap(req.ImageExtra),
+		Provider:        candidate.Provider,
+		Account:         candidate.Account,
+		Mapping:         candidate.Mapping,
+		RequestSettings: gatewayProviderRequestSettings(sourceHTTPRequest(source), req),
 	}
 }
 

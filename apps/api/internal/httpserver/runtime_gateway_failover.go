@@ -480,7 +480,7 @@ func (s *Server) invokeProviderImageEditWithFailover(
 ) gatewayFailoverResult[provideradaptercontract.ImageGenerationResponse] {
 	return invokeGatewayCandidateWithFailover(s, ctx, r, authed, canonical, scheduleReq, modelID, forcedProviderKey, admission, startedAt,
 		func(ctx context.Context, candidate schedulercontract.Candidate) (provideradaptercontract.ImageGenerationResponse, error) {
-			return s.runtime.invokeProviderImageEdit(ctx, providerImageEditRequest(canonical, candidate))
+			return s.runtime.invokeProviderImageEdit(ctx, providerImageEditRequest(canonical, candidate, r))
 		})
 }
 

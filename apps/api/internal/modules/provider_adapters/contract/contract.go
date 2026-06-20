@@ -270,23 +270,24 @@ type ImageInput struct {
 }
 
 type ImageEditRequest struct {
-	RequestID      string
-	SourceProtocol string
-	SourceEndpoint string
-	Model          string
-	Prompt         string
-	Images         []ImageInput
-	Mask           *ImageInput
-	Count          int
-	Size           string
-	Quality        string
-	ResponseFormat string
-	User           string
-	Extra          map[string]any
-	Provider       providercontract.Provider
-	Account        accountcontract.ProviderAccount
-	Mapping        modelcontract.ModelProviderMapping
-	Credential     map[string]any
+	RequestID       string
+	SourceProtocol  string
+	SourceEndpoint  string
+	Model           string
+	Prompt          string
+	Images          []ImageInput
+	Mask            *ImageInput
+	Count           int
+	Size            string
+	Quality         string
+	ResponseFormat  string
+	User            string
+	Extra           map[string]any
+	Provider        providercontract.Provider
+	Account         accountcontract.ProviderAccount
+	Mapping         modelcontract.ModelProviderMapping
+	Credential      map[string]any
+	RequestSettings map[string]any
 }
 
 type ImageVariationRequest struct {
