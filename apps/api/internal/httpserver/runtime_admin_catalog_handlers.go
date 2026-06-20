@@ -275,10 +275,7 @@ func (s *Server) handleDeleteAdminProvider(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider.delete", "provider", strconv.Itoa(providerID), providerAuditSnapshot(before), nil))
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       map[string]any{"id": providerID, "deleted": true},
-		"request_id": requestID,
-	})
+	writeJSONAny(w, http.StatusOK, deleteResponse(true, requestID))
 }
 
 func (s *Server) handleTestAdminProvider(w http.ResponseWriter, r *http.Request) {
@@ -476,10 +473,7 @@ func (s *Server) handleDeleteAdminModel(w http.ResponseWriter, r *http.Request) 
 	}
 	s.runtime.invalidateModelCache(before.CanonicalName)
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "model.delete", "model", strconv.Itoa(modelID), modelAuditSnapshot(before), nil))
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       map[string]any{"id": modelID, "deleted": true},
-		"request_id": requestID,
-	})
+	writeJSONAny(w, http.StatusOK, deleteResponse(true, requestID))
 }
 
 func (s *Server) handleCreateAdminModelAlias(w http.ResponseWriter, r *http.Request) {
@@ -663,10 +657,7 @@ func (s *Server) handleDeleteAdminModelAlias(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "model_alias.delete", "model_alias", strconv.Itoa(aliasID), map[string]any{"model_id": modelID}, nil))
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       map[string]any{"id": aliasID, "deleted": true},
-		"request_id": requestID,
-	})
+	writeJSONAny(w, http.StatusOK, deleteResponse(true, requestID))
 }
 
 func (s *Server) handleUpdateAdminModelAlias(w http.ResponseWriter, r *http.Request) {
@@ -802,10 +793,7 @@ func (s *Server) handleDeleteAdminModelMapping(w http.ResponseWriter, r *http.Re
 		return
 	}
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "model_provider_mapping.delete", "model_provider_mapping", strconv.Itoa(mappingID), map[string]any{"model_id": modelID}, nil))
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       map[string]any{"id": mappingID, "deleted": true},
-		"request_id": requestID,
-	})
+	writeJSONAny(w, http.StatusOK, deleteResponse(true, requestID))
 }
 
 func (s *Server) handleUpdateAdminModelMapping(w http.ResponseWriter, r *http.Request) {
@@ -1597,10 +1585,7 @@ func (s *Server) handleDeleteAdminAccount(w http.ResponseWriter, r *http.Request
 		return
 	}
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "account.delete", "account", strconv.Itoa(accountID), accountAuditSnapshot(before), nil))
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       map[string]any{"id": accountID, "deleted": true},
-		"request_id": requestID,
-	})
+	writeJSONAny(w, http.StatusOK, deleteResponse(true, requestID))
 }
 
 func (s *Server) handleBindAdminAccountProxy(w http.ResponseWriter, r *http.Request) {

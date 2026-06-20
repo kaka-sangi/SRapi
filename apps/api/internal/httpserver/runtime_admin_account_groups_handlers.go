@@ -156,10 +156,7 @@ func (s *Server) handleDeleteAdminAccountGroup(w http.ResponseWriter, r *http.Re
 		s.logger.Warn("failed to clear group rate limit on group delete", "group_id", groupID, "error", err)
 	}
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "account_group.delete", "account_group", strconv.Itoa(groupID), accountGroupAuditSnapshot(before), nil))
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       map[string]any{"id": groupID, "deleted": true},
-		"request_id": requestID,
-	})
+	writeJSONAny(w, http.StatusOK, deleteResponse(true, requestID))
 }
 
 func (s *Server) handleListAdminAccountGroupMembers(w http.ResponseWriter, r *http.Request) {
