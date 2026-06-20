@@ -210,7 +210,7 @@ func (s *Server) handleCreateImageEdit(w http.ResponseWriter, r *http.Request) {
 			LatencyMS:      elapsedMillis(startedAt),
 			UsageEstimated: true,
 		})
-		writeGatewayError(w, imageEditDecodeStatus(err), apiopenapi.InvalidRequestError, imageEditDecodeMessage(err), "invalid_request")
+		writeGatewayError(w, imageRequestDecodeStatus(err), apiopenapi.InvalidRequestError, imageEditDecodeMessage(err), "invalid_request")
 		return
 	}
 	modelResolution, err := s.runtime.resolveModelCached(r.Context(), body.Model)
@@ -363,7 +363,7 @@ func (s *Server) handleCreateImageVariation(w http.ResponseWriter, r *http.Reque
 		writeGatewayAuthError(w, err, requestID)
 		return
 	}
-	body, imageContentType, err := s.decodeImageVariationMultipart(w, r)
+	body, imageContentType, err := s.decodeImageVariationRequest(w, r)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
@@ -376,7 +376,7 @@ func (s *Server) handleCreateImageVariation(w http.ResponseWriter, r *http.Reque
 			LatencyMS:      elapsedMillis(startedAt),
 			UsageEstimated: true,
 		})
-		writeGatewayError(w, imageEditDecodeStatus(err), apiopenapi.InvalidRequestError, "invalid image variation request", "invalid_request")
+		writeGatewayError(w, imageRequestDecodeStatus(err), apiopenapi.InvalidRequestError, imageVariationDecodeMessage(err), "invalid_request")
 		return
 	}
 	modelResolution, err := s.runtime.resolveModelCached(r.Context(), body.Model)
@@ -579,7 +579,11 @@ func (s *Server) decodeImageEditJSON(w http.ResponseWriter, r *http.Request) (ap
 	if err := s.decodeJSONBody(w, r, &raw); err != nil {
 		return apiopenapi.ImageEditRequest{}, imageEditMultipartMetadata{}, err
 	}
-	images, contentTypes, err := imageEditJSONImages(raw)
+	refs := append([]json.RawMessage(nil), raw.Images...)
+	if len(raw.Image) > 0 && string(raw.Image) != "null" {
+		refs = append([]json.RawMessage{raw.Image}, refs...)
+	}
+	images, contentTypes, err := imageFilesFromJSONReferences(refs)
 	if err != nil {
 		return apiopenapi.ImageEditRequest{}, imageEditMultipartMetadata{}, err
 	}
@@ -655,18 +659,14 @@ func (r *imageEditJSONRequest) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func imageEditJSONImages(req imageEditJSONRequest) ([]openapi_types.File, []string, error) {
-	refs := append([]json.RawMessage(nil), req.Images...)
-	if len(req.Image) > 0 && string(req.Image) != "null" {
-		refs = append([]json.RawMessage{req.Image}, refs...)
-	}
+func imageFilesFromJSONReferences(refs []json.RawMessage) ([]openapi_types.File, []string, error) {
 	if len(refs) == 0 {
 		return nil, nil, fmt.Errorf("image file is required")
 	}
 	images := make([]openapi_types.File, 0, len(refs))
 	contentTypes := make([]string, 0, len(refs))
 	for idx, raw := range refs {
-		image, contentType, err := imageEditJSONReference(raw, idx+1)
+		image, contentType, err := imageFileFromJSONReference(raw, idx+1)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -676,10 +676,10 @@ func imageEditJSONImages(req imageEditJSONRequest) ([]openapi_types.File, []stri
 	return images, contentTypes, nil
 }
 
-func imageEditJSONReference(raw json.RawMessage, index int) (openapi_types.File, string, error) {
+func imageFileFromJSONReference(raw json.RawMessage, index int) (openapi_types.File, string, error) {
 	var asString string
 	if err := json.Unmarshal(raw, &asString); err == nil {
-		return imageEditFileFromDataURL(asString, "", index)
+		return imageFileFromDataURL(asString, "", index)
 	}
 	var obj map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &obj); err != nil {
@@ -691,19 +691,19 @@ func imageEditJSONReference(raw json.RawMessage, index int) (openapi_types.File,
 	filename := jsonRawString(obj["filename"])
 	mimeType := jsonRawString(obj["mime_type"])
 	if b64Value := jsonRawString(obj["b64_json"]); b64Value != "" {
-		return imageEditFileFromBase64(b64Value, mimeType, filename, index)
+		return imageFileFromBase64(b64Value, mimeType, filename, index)
 	}
 	if imageURLRaw, ok := obj["image_url"]; ok {
-		imageURL, err := imageEditJSONImageURL(imageURLRaw)
+		imageURL, err := imageURLFromJSONReference(imageURLRaw)
 		if err != nil {
 			return openapi_types.File{}, "", err
 		}
-		return imageEditFileFromDataURL(imageURL, filename, index)
+		return imageFileFromDataURL(imageURL, filename, index)
 	}
 	return openapi_types.File{}, "", fmt.Errorf("image reference is unsupported")
 }
 
-func imageEditJSONImageURL(raw json.RawMessage) (string, error) {
+func imageURLFromJSONReference(raw json.RawMessage) (string, error) {
 	var asString string
 	if err := json.Unmarshal(raw, &asString); err == nil {
 		return strings.TrimSpace(asString), nil
@@ -719,7 +719,7 @@ func imageEditJSONImageURL(raw json.RawMessage) (string, error) {
 	return urlValue, nil
 }
 
-func imageEditFileFromDataURL(value, filename string, index int) (openapi_types.File, string, error) {
+func imageFileFromDataURL(value, filename string, index int) (openapi_types.File, string, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return openapi_types.File{}, "", fmt.Errorf("image reference is empty")
@@ -738,10 +738,10 @@ func imageEditFileFromDataURL(value, filename string, index int) (openapi_types.
 	if mimeType == "" {
 		mimeType = "application/octet-stream"
 	}
-	return imageEditFileFromBase64(encoded, mimeType, filename, index)
+	return imageFileFromBase64(encoded, mimeType, filename, index)
 }
 
-func imageEditFileFromBase64(value, mimeType, filename string, index int) (openapi_types.File, string, error) {
+func imageFileFromBase64(value, mimeType, filename string, index int) (openapi_types.File, string, error) {
 	data, err := base64.StdEncoding.DecodeString(strings.TrimSpace(value))
 	if err != nil {
 		return openapi_types.File{}, "", fmt.Errorf("image reference base64 is invalid")
@@ -753,13 +753,13 @@ func imageEditFileFromBase64(value, mimeType, filename string, index int) (opena
 	if mimeType == "" {
 		mimeType = "application/octet-stream"
 	}
-	filename = imageEditJSONFilename(filename, mimeType, index)
+	filename = imageJSONReferenceFilename(filename, mimeType, index)
 	var file openapi_types.File
 	file.InitFromBytes(data, filename)
 	return file, mimeType, nil
 }
 
-func imageEditJSONFilename(filename, mimeType string, index int) string {
+func imageJSONReferenceFilename(filename, mimeType string, index int) string {
 	filename = strings.TrimSpace(filename)
 	if filename != "" {
 		return filepath.Base(filename)
@@ -823,6 +823,13 @@ func imageEditJSONAdditionalProperties(values map[string]interface{}) map[string
 	return out
 }
 
+func (s *Server) decodeImageVariationRequest(w http.ResponseWriter, r *http.Request) (apiopenapi.ImageVariationRequest, string, error) {
+	if strings.Contains(strings.ToLower(r.Header.Get("Content-Type")), "application/json") {
+		return s.decodeImageVariationJSON(w, r)
+	}
+	return s.decodeImageVariationMultipart(w, r)
+}
+
 func (s *Server) decodeImageVariationMultipart(w http.ResponseWriter, r *http.Request) (apiopenapi.ImageVariationRequest, string, error) {
 	limited := http.MaxBytesReader(w, r.Body, s.cfg.Gateway.MaxBodySize)
 	r.Body = limited
@@ -852,7 +859,66 @@ func (s *Server) decodeImageVariationMultipart(w http.ResponseWriter, r *http.Re
 	return body, contentType, nil
 }
 
-func imageEditDecodeStatus(err error) int {
+type imageVariationJSONRequest struct {
+	Image                json.RawMessage        `json:"image"`
+	Images               []json.RawMessage      `json:"images"`
+	Model                string                 `json:"model"`
+	N                    *int                   `json:"n"`
+	Size                 string                 `json:"size"`
+	ResponseFormat       string                 `json:"response_format"`
+	User                 string                 `json:"user"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+func (r *imageVariationJSONRequest) UnmarshalJSON(data []byte) error {
+	type alias imageVariationJSONRequest
+	var known alias
+	if err := json.Unmarshal(data, &known); err != nil {
+		return err
+	}
+	var all map[string]interface{}
+	if err := json.Unmarshal(data, &all); err != nil {
+		return err
+	}
+	for _, key := range []string{"image", "images", "model", "n", "size", "response_format", "user"} {
+		delete(all, key)
+	}
+	*r = imageVariationJSONRequest(known)
+	if len(all) > 0 {
+		r.AdditionalProperties = all
+	}
+	return nil
+}
+
+func (s *Server) decodeImageVariationJSON(w http.ResponseWriter, r *http.Request) (apiopenapi.ImageVariationRequest, string, error) {
+	var raw imageVariationJSONRequest
+	if err := s.decodeJSONBody(w, r, &raw); err != nil {
+		return apiopenapi.ImageVariationRequest{}, "", err
+	}
+	refs := append([]json.RawMessage(nil), raw.Images...)
+	if len(raw.Image) > 0 && string(raw.Image) != "null" {
+		refs = append([]json.RawMessage{raw.Image}, refs...)
+	}
+	if len(refs) > 1 {
+		return apiopenapi.ImageVariationRequest{}, "", fmt.Errorf("image variation accepts exactly one image reference")
+	}
+	images, contentTypes, err := imageFilesFromJSONReferences(refs)
+	if err != nil {
+		return apiopenapi.ImageVariationRequest{}, "", err
+	}
+	body := apiopenapi.ImageVariationRequest{
+		Image:                images[0],
+		Model:                strings.TrimSpace(raw.Model),
+		N:                    raw.N,
+		Size:                 optionalImageVariationSize(raw.Size),
+		ResponseFormat:       optionalImageVariationResponseFormat(raw.ResponseFormat),
+		User:                 optionalJSONString(raw.User),
+		AdditionalProperties: imageEditJSONAdditionalProperties(raw.AdditionalProperties),
+	}
+	return body, contentTypes[0], nil
+}
+
+func imageRequestDecodeStatus(err error) int {
 	if errors.Is(err, errRequestTooLarge) {
 		return http.StatusRequestEntityTooLarge
 	}
@@ -869,6 +935,20 @@ func imageEditDecodeMessage(err error) string {
 	message := strings.TrimSpace(err.Error())
 	if message == "" {
 		return "invalid image edit request"
+	}
+	return message
+}
+
+func imageVariationDecodeMessage(err error) string {
+	if err == nil {
+		return "invalid image variation request"
+	}
+	if errors.Is(err, errRequestTooLarge) {
+		return "image variation request is too large"
+	}
+	message := strings.TrimSpace(err.Error())
+	if message == "" {
+		return "invalid image variation request"
 	}
 	return message
 }

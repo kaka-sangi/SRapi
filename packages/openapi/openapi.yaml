@@ -13711,7 +13711,7 @@ paths:
         - Gateway
       operationId: createImageVariation
       summary: Create OpenAI-compatible image variations.
-      description: OpenAI-compatible image variation route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account with image_variations effective capability, forwards a multipart source image to the selected OpenAI-compatible provider adapter, and records media usage and Scheduler evidence. The OpenAI upstream endpoint currently only supports `dall-e-2`.
+      description: OpenAI-compatible image variation route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account with image_variations effective capability, forwards a source image to the selected OpenAI-compatible provider adapter as a multipart upstream request, and records media usage and Scheduler evidence. JSON bodies may use one local data URL or base64 image reference; remote URLs, file IDs, and multiple variation images are rejected until a dedicated secure fetch/files boundary exists. The OpenAI upstream endpoint currently only supports `dall-e-2`.
       security:
         - gatewayBearerAuth: []
       requestBody:
@@ -13730,6 +13730,16 @@ paths:
                   image: source.png
                   n: 1
                   size: 1024x1024
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImageVariationJsonRequest"
+            examples:
+              data_url:
+                value:
+                  model: dall-e-2
+                  image:
+                    image_url: data:image/png;base64,iVBORw0KGgo=
+                  response_format: b64_json
       responses:
         "200":
           description: OpenAI-compatible image variation response.
@@ -15174,7 +15184,7 @@ paths:
         - Gateway
       operationId: createOpenAICompatibleImageVariationAlias
       summary: Create OpenAI-compatible image variations with openai-compatible provider context.
-      description: Provider alias route. It reuses the standard image variation runtime, requires image_variations effective capability, and forces the `openai-compatible` provider context.
+      description: Provider alias route. It reuses the standard image variation runtime, requires image_variations effective capability, and forces the `openai-compatible` provider context. JSON bodies may use one local data URL or base64 image reference; remote URLs, file IDs, and multiple variation images are rejected until a dedicated secure fetch/files boundary exists.
       security:
         - gatewayBearerAuth: []
       requestBody:
@@ -15186,6 +15196,9 @@ paths:
             encoding:
               image:
                 contentType: image/*
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImageVariationJsonRequest"
       responses:
         "200":
           description: OpenAI-compatible image variation response.
@@ -32254,13 +32267,13 @@ components:
         - prompt
       properties:
         image:
-          $ref: "#/components/schemas/ImageEditJsonReference"
+          $ref: "#/components/schemas/ImageJsonReference"
           description: Single local image reference. Prefer `images` for multiple references.
         images:
           type: array
           minItems: 1
           items:
-            $ref: "#/components/schemas/ImageEditJsonReference"
+            $ref: "#/components/schemas/ImageJsonReference"
           description: One or more local image references to edit. SRapi accepts data URLs and base64 JSON payloads; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
         model:
           type: string
@@ -32313,7 +32326,7 @@ components:
           type: string
       additionalProperties: true
 
-    ImageEditJsonReference:
+    ImageJsonReference:
       oneOf:
         - type: string
           description: Data URL containing a base64-encoded image.
@@ -32336,7 +32349,7 @@ components:
               type: string
             file_id:
               type: string
-          description: Local image reference object. `file_id` and remote URLs are explicitly rejected by the runtime in WP-510.
+          description: Local image reference object. `file_id` and remote URLs are explicitly rejected by the runtime until a dedicated secure fetch/files boundary exists.
 
     ImageVariationRequest:
       type: object
@@ -32373,6 +32386,51 @@ components:
           x-enum-varnames:
             - ImageVariationRequestResponseFormatURL
             - ImageVariationRequestResponseFormatB64JSON
+          default: url
+        user:
+          type: string
+      additionalProperties: true
+
+    ImageVariationJsonRequest:
+      type: object
+      required:
+        - model
+      properties:
+        image:
+          $ref: "#/components/schemas/ImageJsonReference"
+          description: Single local source image reference for variation generation. SRapi accepts data URLs and base64 JSON payloads; remote URLs, file IDs, and multiple images are rejected until a dedicated secure fetch/files boundary exists.
+        images:
+          type: array
+          minItems: 1
+          maxItems: 1
+          items:
+            $ref: "#/components/schemas/ImageJsonReference"
+          description: Optional OpenAI SDK style wrapper for exactly one local source image reference.
+        model:
+          type: string
+        n:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 1
+        size:
+          type: string
+          enum:
+            - 256x256
+            - 512x512
+            - 1024x1024
+          x-enum-varnames:
+            - ImageVariationJsonRequestSize256x256
+            - ImageVariationJsonRequestSize512x512
+            - ImageVariationJsonRequestSize1024x1024
+        response_format:
+          type: string
+          enum:
+            - url
+            - b64_json
+          x-enum-varnames:
+            - ImageVariationJsonRequestResponseFormatURL
+            - ImageVariationJsonRequestResponseFormatB64JSON
           default: url
         user:
           type: string

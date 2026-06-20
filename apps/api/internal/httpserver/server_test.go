@@ -8194,6 +8194,126 @@ func TestGatewayImageVariationRouteTargetsOpenAICompatibleUpstream(t *testing.T)
 	}
 }
 
+func TestGatewayImageVariationAcceptsJSONImageReference(t *testing.T) {
+	type upstreamCall struct {
+		Path           string
+		Authorization  string
+		Model          string
+		Count          string
+		Size           string
+		ResponseFormat string
+		User           string
+		Filename       string
+		ContentType    string
+		Image          string
+	}
+	var (
+		mu    sync.Mutex
+		calls []upstreamCall
+	)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseMultipartForm(16 << 20); err != nil {
+			t.Fatalf("parse upstream multipart: %v", err)
+		}
+		imageFile, imageHeader, err := r.FormFile("image")
+		if err != nil {
+			t.Fatalf("expected upstream image: %v", err)
+		}
+		defer imageFile.Close()
+		imageBytes, err := io.ReadAll(imageFile)
+		if err != nil {
+			t.Fatalf("read upstream image: %v", err)
+		}
+		mu.Lock()
+		calls = append(calls, upstreamCall{
+			Path:           r.URL.Path,
+			Authorization:  r.Header.Get("Authorization"),
+			Model:          r.FormValue("model"),
+			Count:          r.FormValue("n"),
+			Size:           r.FormValue("size"),
+			ResponseFormat: r.FormValue("response_format"),
+			User:           r.FormValue("user"),
+			Filename:       imageHeader.Filename,
+			ContentType:    imageHeader.Header.Get("Content-Type"),
+			Image:          string(imageBytes),
+		})
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"created":1710000700,"data":[{"b64_json":"dmFyaWF0aW9uLWpzb24="}],"model":"image-variation-json-upstream","usage":{"input_tokens":19,"output_tokens":3,"total_tokens":22}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"wp530-openai","display_name":"WP530 OpenAI","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"image_variations":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp530-image-variation-json-model","display_name":"WP530 Image Variation JSON Model","status":"active","capabilities":[{"key":"image_variations","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"image-variation-json-upstream","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp530-image-variation-json-account","runtime_class":"api_key","credential":{"api_key":"image-variation-json-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	jsonBody := `{"model":"wp530-image-variation-json-model","n":2,"size":"512x512","response_format":"b64_json","user":"image-variation-json-user","image":{"b64_json":"UE5HLXZhcmlhdGlvbi1qc29u","mime_type":"image/png","filename":"source.png"}}`
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/images/variations", jsonBody)
+	var imageResp apiopenapi.ImageGenerationResponse
+	if err := json.NewDecoder(rec.Body).Decode(&imageResp); err != nil {
+		t.Fatalf("decode image variation json response: %v", err)
+	}
+	if imageResp.Created != 1710000700 || len(imageResp.Data) != 1 || imageResp.Data[0].B64Json == nil || *imageResp.Data[0].B64Json == "" {
+		t.Fatalf("unexpected image variation json response: %+v", imageResp)
+	}
+
+	mu.Lock()
+	gotCalls := append([]upstreamCall(nil), calls...)
+	mu.Unlock()
+	if len(gotCalls) != 1 {
+		t.Fatalf("expected one upstream call, got %+v", gotCalls)
+	}
+	got := gotCalls[0]
+	if got.Path != "/v1/images/variations" || got.Authorization != "Bearer image-variation-json-secret" || got.Model != "image-variation-json-upstream" {
+		t.Fatalf("unexpected upstream image variation json call: %+v", got)
+	}
+	if got.Count != "2" || got.Size != "512x512" || got.ResponseFormat != "b64_json" || got.User != "image-variation-json-user" || got.Filename != "source.png" || got.ContentType != "image/png" || got.Image != "PNG-variation-json" {
+		t.Fatalf("unexpected upstream image variation json details: %+v", got)
+	}
+}
+
+func TestGatewayImageVariationRejectsUnsupportedJSONReferences(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	for name, tc := range map[string]struct {
+		body    string
+		message string
+	}{
+		"remote_url": {
+			body:    `{"model":"dall-e-2","image":{"image_url":"https://example.com/source.png"}}`,
+			message: "remote image URLs are not supported",
+		},
+		"file_id": {
+			body:    `{"model":"dall-e-2","image":{"file_id":"file-abc123"}}`,
+			message: "file_id image references are not supported",
+		},
+		"multiple_images": {
+			body:    `{"model":"dall-e-2","images":[{"image_url":"data:image/png;base64,UE5HLW9uZQ=="},{"image_url":"data:image/png;base64,UE5HLXR3bw=="}]}`,
+			message: "image variation accepts exactly one image reference",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/v1/images/variations", strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+apiKey)
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d body=%s", rec.Code, rec.Body.String())
+			}
+			if !strings.Contains(rec.Body.String(), tc.message) {
+				t.Fatalf("expected %q rejection, got %s", tc.message, rec.Body.String())
+			}
+		})
+	}
+}
+
 func TestGatewayImageVariationAliasForcesProviderContext(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)

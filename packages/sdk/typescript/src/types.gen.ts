@@ -6312,11 +6312,11 @@ export type ImageEditRequest = {
 };
 
 export type ImageEditJsonRequest = {
-    image?: ImageEditJsonReference;
+    image?: ImageJsonReference;
     /**
      * One or more local image references to edit. SRapi accepts data URLs and base64 JSON payloads; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
      */
-    images?: Array<ImageEditJsonReference>;
+    images?: Array<ImageJsonReference>;
     model: string;
     prompt: string;
     n?: number;
@@ -6349,7 +6349,7 @@ export type ImageEditJsonRequest = {
     [key: string]: unknown;
 };
 
-export type ImageEditJsonReference = string | {
+export type ImageJsonReference = string | {
     image_url?: string | {
         url?: string;
         [key: string]: unknown;
@@ -6366,6 +6366,22 @@ export type ImageVariationRequest = {
      * Source image to use for variation generation. OpenAI currently supports this endpoint for `dall-e-2`.
      */
     image: Blob | File;
+    model: string;
+    n?: number;
+    size?: '256x256' | '512x512' | '1024x1024';
+    response_format?: 'url' | 'b64_json';
+    user?: string;
+    [key: string]: unknown;
+};
+
+export type ImageVariationJsonRequest = {
+    image?: ImageJsonReference;
+    /**
+     * Optional OpenAI SDK style wrapper for exactly one local source image reference.
+     */
+    images?: [
+        ImageJsonReference
+    ];
     model: string;
     n?: number;
     size?: '256x256' | '512x512' | '1024x1024';
@@ -21827,7 +21843,7 @@ export type CreateImageEditResponses = {
 export type CreateImageEditResponse = CreateImageEditResponses[keyof CreateImageEditResponses];
 
 export type CreateImageVariationData = {
-    body: ImageVariationRequest;
+    body: ImageVariationJsonRequest;
     path?: never;
     query?: never;
     url: '/v1/images/variations';
@@ -23396,7 +23412,7 @@ export type CreateOpenAiCompatibleImageEditAliasResponses = {
 export type CreateOpenAiCompatibleImageEditAliasResponse = CreateOpenAiCompatibleImageEditAliasResponses[keyof CreateOpenAiCompatibleImageEditAliasResponses];
 
 export type CreateOpenAiCompatibleImageVariationAliasData = {
-    body: ImageVariationRequest;
+    body: ImageVariationJsonRequest;
     path?: never;
     query?: never;
     url: '/api/provider/openai-compatible/v1/images/variations';

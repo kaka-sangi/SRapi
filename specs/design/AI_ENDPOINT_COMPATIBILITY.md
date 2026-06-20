@@ -600,13 +600,13 @@ Images variations endpoint
 
 边界：
 
-- `POST /v1/images/variations` 接受 OpenAI-compatible multipart form-data：单个 `image`、`model`、`n`、`size`、`response_format` 和 `user`。
+- `POST /v1/images/variations` 接受 OpenAI-compatible multipart form-data 和 JSON 本地图像引用：单个 `image`、`model`、`n`、`size`、`response_format` 和 `user`。JSON `image` 或单元素 `images` 可使用 data URL、`{"image_url":"data:..."}`、`{"image_url":{"url":"data:..."}}` 或 `{"b64_json":"...","mime_type":"...","filename":"..."}`，并会解码进同一个 canonical image variation request。
 - OpenAI 官方 upstream 当前说明该 endpoint 仅支持 `dall-e-2`；SRapi 不在 Gateway 层硬编码模型名，而是通过模型映射把本地 canonical model 映射到上游模型。
 - 请求仍进入 API Key auth、模型可见性、entitlement、Scheduler、Provider Adapter、usage、billing 和 feedback 证据链。
 - Scheduler 使用 `image_variations` endpoint capability；Provider 或 account/mapping 必须显式声明 image variation 能力，generation-only provider 不会被误选。
 - OpenAI-compatible provider alias（例如 `/api/provider/openai-compatible/v1/images/variations`）强制 provider context。
 - OpenAI-compatible API-key 和 reverse-proxy accounts 上游调用 multipart `/images/variations`，并解析 `url`、`b64_json` 和 `revised_prompt`。
-- 多图 variation、JSON image references、streaming image variation events 和 frontend visuals 留给后续包。
+- Remote `image_url`、`file_id` references、多图 variation、streaming image variation events 和 frontend visuals 留给后续 Files API / media compatibility 包。
 
 WP-310 已实现：
 
