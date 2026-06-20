@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { RefreshCw, Server } from "lucide-react";
@@ -218,14 +218,18 @@ function AccountsContent() {
     return () => window.removeEventListener("keydown", onKey);
   }, [qc, readOnlyHealthView]);
 
-  const providerOptions = (providers.data?.data ?? []).map((p) => ({
-    value: p.id,
-    label: p.display_name || p.name,
-    platformFamily: p.platform_family ?? null,
-    authMethods: p.auth_methods ?? null,
-    adapterType: p.adapter_type,
-    accountTemplate: extractAccountTemplate(p),
-  }));
+  const providerOptions = useMemo(
+    () =>
+      (providers.data?.data ?? []).map((p) => ({
+        value: p.id,
+        label: p.display_name || p.name,
+        platformFamily: p.platform_family ?? null,
+        authMethods: p.auth_methods ?? null,
+        adapterType: p.adapter_type,
+        accountTemplate: extractAccountTemplate(p),
+      })),
+    [providers.data],
+  );
   const groupFilterOptions = (groups.data?.data ?? []).map((g) => ({
     value: String(g.id),
     label: g.name,
@@ -1176,6 +1180,7 @@ function AccountsContent() {
       <BulkAddAccountsDialog
         open={bulkAddOpen}
         onOpenChange={setBulkAddOpen}
+        providerOptions={providerOptions}
         defaultProviderId={providers.data?.data?.[0]?.id ?? ""}
       />
 

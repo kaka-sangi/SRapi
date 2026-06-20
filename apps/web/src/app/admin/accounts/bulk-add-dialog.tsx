@@ -41,11 +41,17 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import {
   useAdminGroups,
-  useAdminProviders,
   useAdminProxies,
   useBatchCreateAccounts,
 } from "@/hooks/admin-queries";
 import { adminErrorMessage } from "@/lib/admin-api";
+import { ACCOUNT_RUNTIME_CLASSES } from "@/lib/admin-account-form";
+import {
+  buildDefaultAccountName,
+  getProviderTemplate,
+  providerLabelFor,
+  type AccountProviderOption,
+} from "@/components/admin/account-form-helpers";
 import type {
   BatchCreateProviderAccountsResult,
   Id,
@@ -65,13 +71,21 @@ const NO_PROXY_VALUE = "__none__";
 type RuntimeChoice =
   | "api_key"
   | "cli_client_token"
-  | "web_session_cookie";
+  | "web_session_cookie"
+  | "custom_reverse_proxy";
+
+const BULK_RUNTIME_CHOICES: RuntimeChoice[] = [
+  "api_key",
+  "cli_client_token",
+  "web_session_cookie",
+  "custom_reverse_proxy",
+];
 
 interface ParsedItem {
   index: number;        // index in the parsed (valid) array
   rawLine: number;      // 1-based line number in the textarea — for error display
   name: string;
-  apiKey: string;
+  credential: string;
 }
 
 interface ParsedRow {
@@ -84,7 +98,7 @@ interface ParsedRow {
 // Parse "name,api_key" OR bare "api_key" OR "name\tapi_key" — accept any of
 // comma, tab, or pipe so an operator pasting from a spreadsheet, terminal, or
 // note doesn't get a confusing "format" error.
-function parseLines(text: string, stripComments: boolean): ParsedRow[] {
+function parseLines(text: string, stripComments: boolean, providerLabel: string): ParsedRow[] {
   const lines = text.split("\n");
   const rows: ParsedRow[] = [];
   let validCount = 0;
@@ -119,51 +133,35 @@ function parseLines(text: string, stripComments: boolean): ParsedRow[] {
       continue;
     }
     if (!name) {
-      // Auto-generate a unique-ish default name from the prefix + key tail.
-      // The operator can later rename — but the batch will reject duplicates
-      // server-side, so the prefix matters; we use the position index to keep
-      // it deterministic.
-      name = `account-${validCount + 1}`;
+      name = buildDefaultAccountName(providerLabel, apiKey, validCount + 1);
     }
     rows.push({
       rawLine,
       ok: true,
-      parsed: { index: validCount, rawLine, name, apiKey },
+      parsed: { index: validCount, rawLine, name, credential: apiKey },
     });
     validCount++;
   }
   return rows;
 }
 
-interface ProviderOpt {
-  value: string;
-  label: string;
-}
-
 export function BulkAddAccountsDialog({
   open,
   onOpenChange,
   defaultProviderId,
+  providerOptions,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultProviderId?: string;
+  providerOptions: AccountProviderOption[];
 }) {
   const { t } = useLanguage();
   const { toast } = useToast();
-  const providersQuery = useAdminProviders();
   const groupsQuery = useAdminGroups();
   const proxiesQuery = useAdminProxies();
   const batchCreate = useBatchCreateAccounts();
 
-  const providerOptions: ProviderOpt[] = useMemo(
-    () =>
-      (providersQuery.data?.data ?? []).map((p) => ({
-        value: String(p.id),
-        label: p.display_name || p.name,
-      })),
-    [providersQuery.data],
-  );
   const groupOptions = useMemo(
     () =>
       (groupsQuery.data?.data ?? []).map((g) => ({ value: String(g.id), label: g.name })),
@@ -181,27 +179,51 @@ export function BulkAddAccountsDialog({
   const [priority, setPriority] = useState<string>("");
   const [weight, setWeight] = useState<string>("");
   const [riskLevel, setRiskLevel] = useState<"normal" | "medium" | "high">("normal");
+  const [baseUrl, setBaseUrl] = useState("");
   const [stripComments, setStripComments] = useState(true);
   const [text, setText] = useState("");
   const [result, setResult] = useState<BatchCreateProviderAccountsResult | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // First successful render after providers load — pick the first provider so
-  // the operator does not have to click into the select first.
-  if (!providerId && providerOptions.length > 0) {
-    setProviderId(providerOptions[0].value);
-  }
+  const effectiveProviderId = providerId || defaultProviderId || providerOptions[0]?.value || "";
 
-  const parsedRows = useMemo(() => parseLines(text, stripComments), [text, stripComments]);
+  const selectedProvider = useMemo(
+    () => providerOptions.find((opt) => opt.value === effectiveProviderId),
+    [effectiveProviderId, providerOptions],
+  );
+  const providerLabel = providerLabelFor(providerOptions, effectiveProviderId);
+  const template = useMemo(
+    () => getProviderTemplate(providerOptions, effectiveProviderId),
+    [providerOptions, effectiveProviderId],
+  );
+  const templateBaseUrl =
+    typeof template?.default_metadata?.base_url === "string"
+      ? (template.default_metadata.base_url as string)
+      : "";
+  const runtimeOptions = useMemo(() => {
+    const allowed = selectedProvider?.authMethods?.length
+      ? selectedProvider.authMethods
+      : ACCOUNT_RUNTIME_CLASSES;
+    const scoped = BULK_RUNTIME_CHOICES.filter((rc) => allowed.includes(rc as RuntimeClass));
+    return scoped.length > 0 ? scoped : BULK_RUNTIME_CHOICES;
+  }, [selectedProvider]);
+  const effectiveRuntimeClass = runtimeOptions.includes(runtimeClass)
+    ? runtimeClass
+    : (runtimeOptions[0] ?? "api_key");
+
+  const parsedRows = useMemo(
+    () => parseLines(text, stripComments, providerLabel),
+    [text, stripComments, providerLabel],
+  );
   const validRows = parsedRows.filter((r) => r.ok && r.parsed);
   const invalidRows = parsedRows.filter((r) => !r.ok);
   const overLimit = validRows.length > MAX_ITEMS;
   const canSubmit =
-    !!providerId && validRows.length > 0 && !overLimit && !batchCreate.isPending;
+    !!effectiveProviderId && validRows.length > 0 && !overLimit && !batchCreate.isPending;
 
   function credentialKeyFor(rc: RuntimeChoice): string {
     if (rc === "web_session_cookie") return "cookie";
-    if (rc === "cli_client_token") return "access_token";
+    if (rc === "cli_client_token" || rc === "custom_reverse_proxy") return "access_token";
     return "api_key";
   }
 
@@ -223,26 +245,30 @@ export function BulkAddAccountsDialog({
       setSubmitError(t("adminAccounts.bulkAddMaxItemsExceeded", { max: MAX_ITEMS }));
       return;
     }
-    const credKey = credentialKeyFor(runtimeClass);
+    const credKey = credentialKeyFor(effectiveRuntimeClass);
     const priorityNum = priority.trim() === "" ? undefined : Number.parseInt(priority, 10);
     const weightNum = weight.trim() === "" ? undefined : Number.parseFloat(weight);
     const groupNum =
       groupId === NO_GROUP_VALUE ? undefined : Number.parseInt(groupId, 10);
     const resolvedProxyId = proxyId === NO_PROXY_VALUE ? null : proxyId;
+    const metadata: Record<string, unknown> = {};
+    if (baseUrl.trim()) metadata.base_url = baseUrl.trim();
     try {
       const res = await batchCreate.mutateAsync({
         defaults: {
-          provider_id: providerId as Id,
-          runtime_class: runtimeClass as RuntimeClass,
+          provider_id: effectiveProviderId as Id,
+          runtime_class: effectiveRuntimeClass as RuntimeClass,
+          upstream_client: template?.upstream_client,
           group_id: groupNum,
           proxy_id: resolvedProxyId,
           priority: Number.isFinite(priorityNum) ? priorityNum : undefined,
           weight: Number.isFinite(weightNum) ? weightNum : undefined,
           risk_level: riskLevel,
+          metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
         },
         items: items.map((item) => ({
           name: item.name,
-          credential: { [credKey]: item.apiKey },
+          credential: { [credKey]: item.credential },
         })),
       });
       setResult(res);
@@ -311,7 +337,14 @@ export function BulkAddAccountsDialog({
             </h3>
             <div>
               <Label htmlFor="bulk-provider">{t("adminAccounts.provider")}</Label>
-              <Select value={providerId} onValueChange={setProviderId} disabled={batchCreate.isPending}>
+              <Select
+                value={effectiveProviderId}
+                onValueChange={(value) => {
+                  setProviderId(value);
+                  setBaseUrl("");
+                }}
+                disabled={batchCreate.isPending}
+              >
                 <SelectTrigger id="bulk-provider">
                   <SelectValue placeholder={t("adminAccounts.provider")} />
                 </SelectTrigger>
@@ -327,7 +360,7 @@ export function BulkAddAccountsDialog({
             <div>
               <Label htmlFor="bulk-runtime">{t("adminAccounts.authType")}</Label>
               <Select
-                value={runtimeClass}
+                value={effectiveRuntimeClass}
                 onValueChange={(v) => setRuntimeClass(v as RuntimeChoice)}
                 disabled={batchCreate.isPending}
               >
@@ -335,11 +368,25 @@ export function BulkAddAccountsDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="api_key">{t("adminAccounts.runtime.api_key")}</SelectItem>
-                  <SelectItem value="cli_client_token">{t("adminAccounts.runtime.cli_client_token")}</SelectItem>
-                  <SelectItem value="web_session_cookie">{t("adminAccounts.runtime.web_session_cookie")}</SelectItem>
+                  {runtimeOptions.map((rc) => (
+                    <SelectItem key={rc} value={rc}>
+                      {t(`adminAccounts.runtime.${rc}`)}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div>
+              <Label htmlFor="bulk-base-url">{t("adminAccounts.baseUrl")}</Label>
+              <Input
+                id="bulk-base-url"
+                type="url"
+                className="font-mono"
+                value={baseUrl}
+                placeholder={templateBaseUrl || t("adminAccounts.baseUrlPlaceholder")}
+                onChange={(e) => setBaseUrl(e.target.value)}
+                disabled={batchCreate.isPending}
+              />
             </div>
             <div>
               <Label htmlFor="bulk-group">{t("adminAccounts.bulkAddGroupOptional")}</Label>

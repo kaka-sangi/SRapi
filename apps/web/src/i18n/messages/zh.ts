@@ -929,6 +929,7 @@ export const zh: Messages = {
     baseUrl: "Base URL",
     baseUrlPlaceholder: "https://api.openai.com/v1",
     baseUrlHint: "自定义上游 API 地址。留空则使用服务商默认地址。",
+    createAnother: "保存后继续添加",
     bulkAdd: "批量添加",
     bulkAddTitle: "批量添加账号",
     bulkAddDescription: "每行一条凭据；默认值应用到每一行。",

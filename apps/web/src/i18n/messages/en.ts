@@ -948,6 +948,7 @@ export const en = {
     baseUrl: "Base URL",
     baseUrlPlaceholder: "https://api.openai.com/v1",
     baseUrlHint: "Custom upstream API endpoint. Leave empty to use the provider default.",
+    createAnother: "Create another after save",
     bulkAdd: "Bulk add",
     bulkAddTitle: "Bulk add accounts",
     bulkAddDescription: "Paste one credential per line. Defaults apply to every row.",

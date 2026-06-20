@@ -50,11 +50,14 @@ import {
 import type { ProviderAccount } from "@/lib/sdk-types";
 import {
   buildCredentialJson,
+  buildDefaultAccountName,
+  credentialNameSeed,
   defaultCredInput,
   getProviderTemplate,
   groupProviders,
   hasCredential,
   metadataStringList,
+  providerLabelFor,
   specFor,
   type AccountProviderOption,
   type RuntimeClass,
@@ -112,6 +115,14 @@ export function AccountFormDialog({
     !allowedFor(initial.providerId).includes(initial.runtimeClass)
       ? (allowedFor(initial.providerId)[0] ?? initial.runtimeClass)
       : initial.runtimeClass;
+  const initialTemplate =
+    mode === "create" ? getProviderTemplate(providerOptions, initial.providerId) : null;
+  const initialMetadata = { ...initial.metadata };
+  if (mode === "create" && initialTemplate?.default_metadata) {
+    for (const [key, value] of Object.entries(initialTemplate.default_metadata)) {
+      if (!(key in initialMetadata)) initialMetadata[key] = value;
+    }
+  }
 
   const [providerId, setProviderId] = useState(initial.providerId);
   const [name, setName] = useState(initial.name);
@@ -122,15 +133,18 @@ export function AccountFormDialog({
   const [riskLevel, setRiskLevel] = useState(initial.riskLevel);
   const [priority, setPriority] = useState(initial.priority);
   const [weight, setWeight] = useState(initial.weight);
-  const [upstreamClient, setUpstreamClient] = useState(initial.upstreamClient);
+  const [upstreamClient, setUpstreamClient] = useState(
+    initial.upstreamClient || initialTemplate?.upstream_client || "",
+  );
   const [baseUrl, setBaseUrl] = useState(
-    typeof initial.metadata.base_url === "string" ? (initial.metadata.base_url as string) : "",
+    typeof initialMetadata.base_url === "string" ? (initialMetadata.base_url as string) : "",
   );
   const [metadata, setMetadata] = useState<Record<string, unknown>>(() => {
-    const m = { ...initial.metadata };
+    const m = { ...initialMetadata };
     delete m.base_url;
     return m;
   });
+  const [createAnother, setCreateAnother] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [credVisible, setCredVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -246,6 +260,11 @@ export function AccountFormDialog({
   };
 
   const runtimeClassOptions = allowedFor(providerId);
+  const providerLabel = providerLabelFor(providerOptions, providerId);
+  const defaultName = buildDefaultAccountName(
+    providerLabel,
+    credentialNameSeed(runtimeClass, credInput, credFields),
+  );
 
   function changeRuntime(rc: RuntimeClass) {
     setRuntimeClass(rc);
@@ -255,6 +274,11 @@ export function AccountFormDialog({
   }
 
   function changeProvider(id: string) {
+    const previousTemplate = getProviderTemplate(providerOptions, providerId);
+    const previousBaseUrl =
+      typeof previousTemplate?.default_metadata?.base_url === "string"
+        ? (previousTemplate.default_metadata.base_url as string)
+        : "";
     setProviderId(id);
     // Clamp the auth method to one the newly-selected provider accepts.
     const methods = allowedFor(id);
@@ -265,12 +289,14 @@ export function AccountFormDialog({
     const template = getProviderTemplate(providerOptions, id);
     if (template && mode === "create") {
       if (template.upstream_client) setUpstreamClient(template.upstream_client);
+      const nextBaseUrl =
+        typeof template.default_metadata?.base_url === "string"
+          ? (template.default_metadata.base_url as string)
+          : "";
+      setBaseUrl((prev) => (!prev || prev === previousBaseUrl ? nextBaseUrl : prev));
       if (template.default_metadata) {
         const dm = { ...template.default_metadata };
-        if (typeof dm.base_url === "string") {
-          setBaseUrl((prev) => prev || (dm.base_url as string));
-          delete dm.base_url;
-        }
+        delete dm.base_url;
         setMetadata((prev) => {
           const next = { ...prev };
           for (const [k, v] of Object.entries(dm)) {
@@ -285,6 +311,14 @@ export function AccountFormDialog({
 
   function setCredField(key: string, value: string) {
     setCredFields((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function resetCredentialForNextAccount() {
+    setName("");
+    setCredInput(defaultCredInput(runtimeClass));
+    setCredFields({});
+    setCredVisible(false);
+    setError(null);
   }
 
   function handleTest() {
@@ -317,9 +351,12 @@ export function AccountFormDialog({
     }
     const finalMetadata = { ...metadata };
     if (baseUrl.trim()) finalMetadata.base_url = baseUrl.trim();
+    const credentialSeed = credentialNameSeed(runtimeClass, credInput, credFields);
+    const finalName =
+      name.trim() || (mode === "create" ? buildDefaultAccountName(providerLabel, credentialSeed) : "");
     const formState: AdminAccountFormState = {
       providerId,
-      name,
+      name: finalName,
       runtimeClass,
       upstreamClient,
       credential: buildCredentialJson(runtimeClass, credInput, credFields),
@@ -346,6 +383,10 @@ export function AccountFormDialog({
         title: t(mode === "create" ? "feedback.created" : "feedback.updated"),
         tone: "success",
       });
+      if (mode === "create" && createAnother) {
+        resetCredentialForNextAccount();
+        return;
+      }
       onOpenChange(false);
     } catch (err) {
       setError(adminErrorMessage(err));
@@ -419,7 +460,7 @@ export function AccountFormDialog({
               <Input
                 id="account-name"
                 value={name}
-                placeholder={t("adminAccounts.namePlaceholder")}
+                placeholder={mode === "create" ? defaultName : t("adminAccounts.namePlaceholder")}
                 disabled={busy}
                 onChange={(e) => setName(e.target.value)}
               />
@@ -805,6 +846,16 @@ export function AccountFormDialog({
           </div>
 
           <DialogFooter className="mt-6">
+            {mode === "create" ? (
+              <label className="mr-auto flex items-center gap-2 text-xs text-srapi-text-secondary">
+                <Switch
+                  checked={createAnother}
+                  onCheckedChange={setCreateAnother}
+                  disabled={busy}
+                />
+                {t("adminAccounts.createAnother")}
+              </label>
+            ) : null}
             <Button type="button" variant="ghost" disabled={busy} onClick={() => onOpenChange(false)}>
               {t("common.cancel")}
             </Button>

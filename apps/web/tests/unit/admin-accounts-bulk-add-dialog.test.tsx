@@ -23,16 +23,6 @@ vi.mock("@/context/ToastContext", () => ({
 }));
 
 vi.mock("@/hooks/admin-queries", () => ({
-  useAdminProviders: () => ({
-    data: {
-      data: [
-        { id: "1", name: "openai", display_name: "OpenAI" },
-        { id: "2", name: "anthropic", display_name: "Anthropic" },
-      ],
-    },
-    isLoading: false,
-    isError: false,
-  }),
   useAdminGroups: () => ({
     data: { data: [{ id: "10", name: "group-a" }] },
     isLoading: false,
@@ -50,18 +40,37 @@ vi.mock("@/hooks/admin-queries", () => ({
   }),
 }));
 
+const providerOptions = [
+  {
+    value: "1",
+    label: "OpenAI",
+    authMethods: ["api_key" as const],
+  },
+  {
+    value: "2",
+    label: "Codex",
+    authMethods: ["cli_client_token" as const],
+    adapterType: "reverse-proxy-codex-cli",
+  },
+];
+
 beforeEach(() => {
   batchMutateAsync.mockReset();
 });
 
-function renderDialog() {
+function renderDialog(defaultProviderId = "1") {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return render(
     <QueryClientProvider client={client}>
       <LanguageProvider>
-        <BulkAddAccountsDialog open onOpenChange={() => {}} defaultProviderId="1" />
+        <BulkAddAccountsDialog
+          open
+          onOpenChange={() => {}}
+          providerOptions={providerOptions}
+          defaultProviderId={defaultProviderId}
+        />
       </LanguageProvider>
     </QueryClientProvider>,
   );
@@ -82,6 +91,69 @@ describe("BulkAddAccountsDialog", () => {
     const counts = screen.getByTestId("bulk-counts");
     expect(counts.textContent ?? "").toMatch(/3/);
     expect(screen.getByTestId("bulk-submit")).not.toBeDisabled();
+  });
+
+  it("submits auto-named bare credentials with shared base URL metadata", async () => {
+    const user = userEvent.setup({ delay: null });
+    batchMutateAsync.mockResolvedValueOnce({
+      results: [{ index: 0, name: "openai-ecretkey", account_id: "123" }],
+      succeeded: 1,
+      failed: 0,
+    });
+    renderDialog();
+    fireEvent.change(screen.getByLabelText("Base URL"), {
+      target: { value: "https://api.example.com/v1" },
+    });
+    fireEvent.change(screen.getByTestId("bulk-items-textarea"), {
+      target: { value: "sk-secretkey" },
+    });
+    await user.click(screen.getByTestId("bulk-submit"));
+
+    expect(batchMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        defaults: expect.objectContaining({
+          provider_id: "1",
+          runtime_class: "api_key",
+          metadata: { base_url: "https://api.example.com/v1" },
+        }),
+        items: [
+          {
+            name: "openai-ecretkey",
+            credential: { api_key: "sk-secretkey" },
+          },
+        ],
+      }),
+    );
+  });
+
+  it("uses the provider template and auth method for Codex batches", async () => {
+    const user = userEvent.setup({ delay: null });
+    batchMutateAsync.mockResolvedValueOnce({
+      results: [{ index: 0, name: "codex-lientjwt", account_id: "123" }],
+      succeeded: 1,
+      failed: 0,
+    });
+    renderDialog("2");
+    fireEvent.change(screen.getByTestId("bulk-items-textarea"), {
+      target: { value: "codex-clientjwt" },
+    });
+    await user.click(screen.getByTestId("bulk-submit"));
+
+    expect(batchMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        defaults: expect.objectContaining({
+          provider_id: "2",
+          runtime_class: "cli_client_token",
+          upstream_client: "codex_cli",
+        }),
+        items: [
+          {
+            name: "codex-lientjwt",
+            credential: { access_token: "codex-clientjwt" },
+          },
+        ],
+      }),
+    );
   });
 
   it("renders a mixed success / failure result panel after submit", async () => {

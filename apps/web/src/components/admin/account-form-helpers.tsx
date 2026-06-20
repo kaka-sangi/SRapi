@@ -49,6 +49,17 @@ export function getProviderTemplate(
   return null;
 }
 
+export function providerLabelFor(providerOptions: AccountProviderOption[], providerId: string): string {
+  return providerOptions.find((opt) => opt.value === providerId)?.label?.trim() || "account";
+}
+
+export function buildDefaultAccountName(providerLabel: string, credentialValue: string, index?: number): string {
+  const prefix = slugName(providerLabel) || "account";
+  const tail = credentialTail(credentialValue);
+  if (tail) return `${prefix}-${tail}`;
+  return `${prefix}-${index && index > 0 ? index : 1}`;
+}
+
 export type RuntimeClass = AdminAccountFormState["runtimeClass"];
 
 /**
@@ -168,4 +179,35 @@ export function buildCredentialJson(
   }
   const v = value.trim();
   return v ? JSON.stringify({ [spec.credKey as string]: v }) : "";
+}
+
+export function credentialNameSeed(
+  rc: RuntimeClass,
+  value: string,
+  fields: Record<string, string>,
+): string {
+  const spec = specFor(rc);
+  if (spec.kind === "fields") {
+    for (const f of spec.fields ?? []) {
+      const v = fields[f.key]?.trim();
+      if (v) return v;
+    }
+    return "";
+  }
+  return value.trim();
+}
+
+function slugName(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 36);
+}
+
+function credentialTail(value: string): string {
+  const normalized = value.trim().replace(/[^a-zA-Z0-9]/g, "");
+  if (normalized.length < 6) return "";
+  return normalized.slice(-8).toLowerCase();
 }
