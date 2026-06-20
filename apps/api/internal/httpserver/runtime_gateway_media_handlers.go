@@ -587,8 +587,19 @@ func (s *Server) decodeImageEditJSON(w http.ResponseWriter, r *http.Request) (ap
 	if err != nil {
 		return apiopenapi.ImageEditRequest{}, imageEditMultipartMetadata{}, err
 	}
+	var mask *openapi_types.File
+	maskContentType := ""
+	if len(raw.Mask) > 0 && string(raw.Mask) != "null" {
+		maskFile, contentType, err := imageFileFromJSONReference(raw.Mask, 1)
+		if err != nil {
+			return apiopenapi.ImageEditRequest{}, imageEditMultipartMetadata{}, err
+		}
+		mask = &maskFile
+		maskContentType = contentType
+	}
 	body := apiopenapi.ImageEditRequest{
 		Image:                images,
+		Mask:                 mask,
 		Model:                strings.TrimSpace(raw.Model),
 		Prompt:               strings.TrimSpace(raw.Prompt),
 		N:                    raw.N,
@@ -605,7 +616,7 @@ func (s *Server) decodeImageEditJSON(w http.ResponseWriter, r *http.Request) (ap
 		User:                 optionalJSONString(raw.User),
 		AdditionalProperties: imageEditJSONAdditionalProperties(raw.AdditionalProperties),
 	}
-	return body, imageEditMultipartMetadata{ImageContentTypes: contentTypes}, nil
+	return body, imageEditMultipartMetadata{ImageContentTypes: contentTypes, MaskContentType: maskContentType}, nil
 }
 
 func applyImageEditMultipartMetadata(canonical *gatewaycontract.CanonicalRequest, meta imageEditMultipartMetadata) {
@@ -622,6 +633,7 @@ func applyImageEditMultipartMetadata(canonical *gatewaycontract.CanonicalRequest
 type imageEditJSONRequest struct {
 	Image                json.RawMessage        `json:"image"`
 	Images               []json.RawMessage      `json:"images"`
+	Mask                 json.RawMessage        `json:"mask"`
 	Model                string                 `json:"model"`
 	Prompt               string                 `json:"prompt"`
 	N                    *int                   `json:"n"`
@@ -649,7 +661,7 @@ func (r *imageEditJSONRequest) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &all); err != nil {
 		return err
 	}
-	for _, key := range []string{"image", "images", "model", "prompt", "n", "size", "quality", "response_format", "output_format", "output_compression", "background", "moderation", "input_fidelity", "stream", "partial_images", "user"} {
+	for _, key := range []string{"image", "images", "mask", "model", "prompt", "n", "size", "quality", "response_format", "output_format", "output_compression", "background", "moderation", "input_fidelity", "stream", "partial_images", "user"} {
 		delete(all, key)
 	}
 	*r = imageEditJSONRequest(known)

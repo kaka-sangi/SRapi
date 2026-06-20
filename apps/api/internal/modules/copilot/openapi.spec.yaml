@@ -13646,7 +13646,7 @@ paths:
         - Gateway
       operationId: createImageEdit
       summary: Create OpenAI-compatible image edits.
-      description: OpenAI-compatible image edit route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account with image_edits effective capability, forwards image edit inputs to the selected OpenAI-compatible provider adapter as multipart upstream requests, and records media usage and Scheduler evidence. JSON bodies may use local data URL or base64 image references; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
+      description: OpenAI-compatible image edit route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account with image_edits effective capability, forwards image edit inputs to the selected OpenAI-compatible provider adapter as multipart upstream requests, and records media usage and Scheduler evidence. JSON bodies may use local data URL or base64 source image and mask references; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
       security:
         - gatewayBearerAuth: []
       requestBody:
@@ -13678,6 +13678,8 @@ paths:
                   prompt: Replace the background with a clean studio setting
                   images:
                     - image_url: data:image/png;base64,iVBORw0KGgo=
+                  mask:
+                    image_url: data:image/png;base64,iVBORw0KGgo=
                   response_format: b64_json
       responses:
         "200":
@@ -15135,7 +15137,7 @@ paths:
         - Gateway
       operationId: createOpenAICompatibleImageEditAlias
       summary: Create OpenAI-compatible image edits with openai-compatible provider context.
-      description: Provider alias route. It reuses the standard image edit runtime, requires image_edits effective capability, and forces the `openai-compatible` provider context. JSON bodies may use local data URL or base64 image references; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
+      description: Provider alias route. It reuses the standard image edit runtime, requires image_edits effective capability, and forces the `openai-compatible` provider context. JSON bodies may use local data URL or base64 source image and mask references; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
       security:
         - gatewayBearerAuth: []
       requestBody:
@@ -32275,6 +32277,9 @@ components:
           items:
             $ref: "#/components/schemas/ImageJsonReference"
           description: One or more local image references to edit. SRapi accepts data URLs and base64 JSON payloads; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
+        mask:
+          $ref: "#/components/schemas/ImageJsonReference"
+          description: Optional local mask image reference. SRapi accepts data URLs and base64 JSON payloads; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
         model:
           type: string
         prompt:

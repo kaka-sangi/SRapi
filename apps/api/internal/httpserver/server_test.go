@@ -7822,6 +7822,9 @@ func TestGatewayImageEditAcceptsJSONImageReferences(t *testing.T) {
 		Filenames         []string
 		ContentTypes      []string
 		Images            []string
+		MaskFilename      string
+		MaskContentType   string
+		Mask              string
 	}
 	var (
 		mu    sync.Mutex
@@ -7860,6 +7863,18 @@ func TestGatewayImageEditAcceptsJSONImageReferences(t *testing.T) {
 			call.ContentTypes = append(call.ContentTypes, header.Header.Get("Content-Type"))
 			call.Images = append(call.Images, string(imageBytes))
 		}
+		if maskFile, maskHeader, err := r.FormFile("mask"); err == nil {
+			maskBytes, readErr := io.ReadAll(maskFile)
+			_ = maskFile.Close()
+			if readErr != nil {
+				t.Fatalf("read upstream mask: %v", readErr)
+			}
+			call.MaskFilename = maskHeader.Filename
+			call.MaskContentType = maskHeader.Header.Get("Content-Type")
+			call.Mask = string(maskBytes)
+		} else if !errors.Is(err, http.ErrMissingFile) {
+			t.Fatalf("open upstream mask: %v", err)
+		}
 		mu.Lock()
 		calls = append(calls, call)
 		mu.Unlock()
@@ -7876,7 +7891,7 @@ func TestGatewayImageEditAcceptsJSONImageReferences(t *testing.T) {
 	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp510-image-edit-json-account","runtime_class":"api_key","credential":{"api_key":"image-edit-json-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 
-	jsonBody := `{"model":"wp510-image-edit-json-model","prompt":"combine references","n":1,"size":"1024x1536","quality":"high","response_format":"b64_json","output_format":"webp","output_compression":88,"background":"transparent","images":[{"image_url":"data:image/png;base64,UE5HLWpzb24="},{"b64_json":"SlBFRy1qc29u","mime_type":"image/jpeg","filename":"two.jpg"}]}`
+	jsonBody := `{"model":"wp510-image-edit-json-model","prompt":"combine references","n":1,"size":"1024x1536","quality":"high","response_format":"b64_json","output_format":"webp","output_compression":88,"background":"transparent","images":[{"image_url":"data:image/png;base64,UE5HLWpzb24="},{"b64_json":"SlBFRy1qc29u","mime_type":"image/jpeg","filename":"two.jpg"}],"mask":{"image_url":"data:image/png;base64,TUFTSy1qc29u","filename":"mask.png"}}`
 	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/images/edits", jsonBody)
 	var imageResp apiopenapi.ImageGenerationResponse
 	if err := json.NewDecoder(rec.Body).Decode(&imageResp); err != nil {
@@ -7901,6 +7916,9 @@ func TestGatewayImageEditAcceptsJSONImageReferences(t *testing.T) {
 	}
 	if len(got.Images) != 2 || got.Images[0] != "PNG-json" || got.Images[1] != "JPEG-json" || got.Filenames[0] != "image_1.png" || got.Filenames[1] != "two.jpg" || got.ContentTypes[0] != "image/png" || got.ContentTypes[1] != "image/jpeg" {
 		t.Fatalf("unexpected upstream image edit json images: %+v", got)
+	}
+	if got.Mask != "MASK-json" || got.MaskFilename != "mask.png" || got.MaskContentType != "image/png" {
+		t.Fatalf("unexpected upstream image edit json mask: %+v", got)
 	}
 }
 
@@ -8017,12 +8035,29 @@ func TestGatewayImageEditRejectsUnsupportedJSONReferences(t *testing.T) {
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 
-	for name, body := range map[string]string{
-		"remote_url": `{"model":"gpt-image-1","prompt":"edit","images":[{"image_url":"https://example.com/image.png"}]}`,
-		"file_id":    `{"model":"gpt-image-1","prompt":"edit","images":[{"file_id":"file-abc123"}]}`,
+	for name, tc := range map[string]struct {
+		body    string
+		message string
+	}{
+		"remote_url": {
+			body:    `{"model":"gpt-image-1","prompt":"edit","images":[{"image_url":"https://example.com/image.png"}]}`,
+			message: "remote image URLs are not supported",
+		},
+		"file_id": {
+			body:    `{"model":"gpt-image-1","prompt":"edit","images":[{"file_id":"file-abc123"}]}`,
+			message: "file_id image references are not supported",
+		},
+		"mask_remote_url": {
+			body:    `{"model":"gpt-image-1","prompt":"edit","images":[{"image_url":"data:image/png;base64,UE5H"}],"mask":{"image_url":"https://example.com/mask.png"}}`,
+			message: "remote image URLs are not supported",
+		},
+		"mask_file_id": {
+			body:    `{"model":"gpt-image-1","prompt":"edit","images":[{"image_url":"data:image/png;base64,UE5H"}],"mask":{"file_id":"file-mask123"}}`,
+			message: "file_id image references are not supported",
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodPost, "/v1/images/edits", strings.NewReader(body))
+			req := httptest.NewRequest(http.MethodPost, "/v1/images/edits", strings.NewReader(tc.body))
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", "Bearer "+apiKey)
 			rec := httptest.NewRecorder()
@@ -8030,11 +8065,8 @@ func TestGatewayImageEditRejectsUnsupportedJSONReferences(t *testing.T) {
 			if rec.Code != http.StatusBadRequest {
 				t.Fatalf("expected 400, got %d body=%s", rec.Code, rec.Body.String())
 			}
-			if name == "remote_url" && !strings.Contains(rec.Body.String(), "remote image URLs are not supported") {
-				t.Fatalf("expected remote URL rejection, got %s", rec.Body.String())
-			}
-			if name == "file_id" && !strings.Contains(rec.Body.String(), "file_id image references are not supported") {
-				t.Fatalf("expected file_id rejection, got %s", rec.Body.String())
+			if !strings.Contains(rec.Body.String(), tc.message) {
+				t.Fatalf("expected %q rejection, got %s", tc.message, rec.Body.String())
 			}
 		})
 	}

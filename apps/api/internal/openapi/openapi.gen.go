@@ -8032,6 +8032,7 @@ type ImageEditJsonRequest struct {
 	// Images One or more local image references to edit. SRapi accepts data URLs and base64 JSON payloads; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
 	Images            *[]ImageJsonReference `json:"images,omitempty"`
 	InputFidelity     *string               `json:"input_fidelity,omitempty"`
+	Mask              *ImageJsonReference   `json:"mask,omitempty"`
 	Model             string                `json:"model"`
 	Moderation        *string               `json:"moderation,omitempty"`
 	N                 *int                  `json:"n,omitempty"`
@@ -17052,6 +17053,14 @@ func (a *ImageEditJsonRequest) UnmarshalJSON(b []byte) error {
 		delete(object, "input_fidelity")
 	}
 
+	if raw, found := object["mask"]; found {
+		err = json.Unmarshal(raw, &a.Mask)
+		if err != nil {
+			return fmt.Errorf("error reading 'mask': %w", err)
+		}
+		delete(object, "mask")
+	}
+
 	if raw, found := object["model"]; found {
 		err = json.Unmarshal(raw, &a.Model)
 		if err != nil {
@@ -17192,6 +17201,13 @@ func (a ImageEditJsonRequest) MarshalJSON() ([]byte, error) {
 		object["input_fidelity"], err = json.Marshal(a.InputFidelity)
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling 'input_fidelity': %w", err)
+		}
+	}
+
+	if a.Mask != nil {
+		object["mask"], err = json.Marshal(a.Mask)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'mask': %w", err)
 		}
 	}
 

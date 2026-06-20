@@ -6317,6 +6317,7 @@ export type ImageEditJsonRequest = {
      * One or more local image references to edit. SRapi accepts data URLs and base64 JSON payloads; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
      */
     images?: Array<ImageJsonReference>;
+    mask?: ImageJsonReference;
     model: string;
     prompt: string;
     n?: number;
