@@ -1158,7 +1158,7 @@ export const en = {
   },
   gatewayHints: {
     capabilityMismatch:
-      "The request needs a capability (streaming, tools, or images) the chosen model or provider doesn't declare. Enable it on the model/provider, or use a model that supports it.",
+      "The request needs a capability the chosen model or provider doesn't declare. Enable the exact endpoint capability, or use a model that supports it.",
     noAvailableAccount:
       "No usable account was found. If the API key is bound to a group, make sure that group actually contains an account — or leave the key's group empty to use every account.",
     credentialInvalid:

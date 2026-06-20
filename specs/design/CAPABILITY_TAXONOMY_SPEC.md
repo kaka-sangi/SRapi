@@ -110,7 +110,9 @@ anthropic_count_tokens
 gemini_generate_content
 gemini_count_tokens
 embeddings
-images
+image_generations
+image_edits
+image_variations
 audio_transcriptions
 audio_speech
 moderations
@@ -127,6 +129,8 @@ token_counting
 `responses_compact` 是独立端点能力，不能从普通 `responses` 自动推导；compact 需要 Provider Account 能返回 `response.compaction` JSON 语义。只有 preset、provider capability 或 account metadata 明确声明 compact 时，Scheduler 才能把该账号作为 `/v1/responses/compact` 候选。
 
 `responses_input_items` 是独立端点能力，不能从普通 `responses` 自动推导；input_items 需要 Provider Account 能读取 OpenAI Responses stateful 子资源并原样回放 JSON list。只有 preset、provider capability 或 account metadata 明确声明 input_items 时，Scheduler 才能把该账号作为 `/v1/responses/{response_id}/input_items` 候选。
+
+`image_generations`、`image_edits`、`image_variations` 分别表示 Provider Account 能处理 `/v1/images/generations`、`/v1/images/edits`、`/v1/images/variations` 兼容端点。SRapi 不使用 `images` 伞形 endpoint capability；图片生成能力不能自动替代编辑或变体能力，反之亦然。Gateway 必须按具体 image 子资源生成同名 RequestCapability，避免只支持单一路由的账号被误选。
 
 `audio_transcriptions` 表示 Provider Account 能处理 `/v1/audio/transcriptions` 兼容端点；`audio_input` 表示模型/Provider 能消费音频输入，`text_output` 表示可产出转写文本。Gateway audio transcription 请求必须要求 `audio_transcriptions.v1`，避免 text-only 或 image-only provider 被误选。
 

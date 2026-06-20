@@ -85,7 +85,7 @@ Gemini OAuth account runtime 在 provider adapter 中显式返回 `not_supported
 | --- | --- | --- |
 | `rerank-compatible` | 通用 rerank 上游，兼容 Cohere/Jina 风格 `query` + `documents` 请求 | `https://api.cohere.com/v2` |
 
-Rerank-compatible preset 只注册 rerank 路由别名，不自动暴露 chat、responses、images 或 moderation route。
+Rerank-compatible preset 只注册 rerank 路由别名，不自动暴露 chat、responses、image 子资源或 moderation route。
 
 ## 6. Antigravity reverse-proxy preset
 
@@ -285,7 +285,9 @@ responses_compact
 messages
 generate_content
 embeddings
-images
+image_generations
+image_edits
+image_variations
 audio
 audio_transcriptions
 audio_speech

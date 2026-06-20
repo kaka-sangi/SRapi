@@ -136,6 +136,15 @@ func openAIPreset(providerKey string, displayName string, defaultBaseURL string,
 	if openAIPresetSupportsVideos(providerKey) {
 		capabilities[capabilitiescontract.KeyVideos] = true
 	}
+	if openAIPresetSupportsImageGenerations(providerKey) {
+		capabilities[capabilitiescontract.KeyImageGenerations] = true
+	}
+	if openAIPresetSupportsImageEdits(providerKey) {
+		capabilities[capabilitiescontract.KeyImageEdits] = true
+	}
+	if openAIPresetSupportsImageVariations(providerKey) {
+		capabilities[capabilitiescontract.KeyImageVariations] = true
+	}
 	preset := compatiblePreset(providerKey, PlatformFamilyOpenAICompatible, displayName, defaultBaseURL, routeAliases, capabilities)
 	if providerKey == "openai" {
 		preset.RuntimeClassAllowlist = []accountscontract.RuntimeClass{
@@ -531,7 +540,6 @@ func openAICapabilities() map[string]bool {
 		capabilitiescontract.KeyResponses:           true,
 		capabilitiescontract.KeyMessages:            true,
 		capabilitiescontract.KeyEmbeddings:          true,
-		capabilitiescontract.KeyImages:              true,
 		capabilitiescontract.KeyAudioTranscriptions: true,
 		capabilitiescontract.KeyAudioSpeech:         true,
 		capabilitiescontract.KeyModerations:         true,
@@ -570,6 +578,33 @@ func openAIPresetSupportsVideos(providerKey string) bool {
 	}
 }
 
+func openAIPresetSupportsImageGenerations(providerKey string) bool {
+	switch strings.TrimSpace(providerKey) {
+	case "openai", "openai-compatible":
+		return true
+	default:
+		return false
+	}
+}
+
+func openAIPresetSupportsImageEdits(providerKey string) bool {
+	switch strings.TrimSpace(providerKey) {
+	case "openai", "openai-compatible":
+		return true
+	default:
+		return false
+	}
+}
+
+func openAIPresetSupportsImageVariations(providerKey string) bool {
+	switch strings.TrimSpace(providerKey) {
+	case "openai", "openai-compatible":
+		return true
+	default:
+		return false
+	}
+}
+
 func anthropicCapabilities() map[string]bool {
 	return map[string]bool{
 		capabilitiescontract.KeyChatCompletions:      true,
@@ -593,7 +628,7 @@ func rerankCapabilities() map[string]bool {
 func antigravityCapabilities() map[string]bool {
 	return map[string]bool{
 		capabilitiescontract.KeyChatCompletions:       true,
-		capabilitiescontract.KeyImages:                true,
+		capabilitiescontract.KeyImageGenerations:      true,
 		capabilitiescontract.KeyMessages:              true,
 		capabilitiescontract.KeyGeminiGenerateContent: true,
 		capabilitiescontract.KeyGeminiCountTokens:     true,
@@ -621,6 +656,7 @@ func geminiCapabilities() map[string]bool {
 func codexCLICapabilities() map[string]bool {
 	return map[string]bool{
 		capabilitiescontract.KeyChatCompletions:     true,
+		capabilitiescontract.KeyImageGenerations:    true,
 		capabilitiescontract.KeyMessages:            true,
 		capabilitiescontract.KeyResponses:           true,
 		capabilitiescontract.KeyResponsesCompact:    true,

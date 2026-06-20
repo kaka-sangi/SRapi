@@ -65,8 +65,11 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if containsRuntimeClass(openaiPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassOauthRefresh) {
 		t.Fatalf("expected third-party openai-compatible allowlist to exclude oauth_refresh")
 	}
-	if !openaiPreset.Capabilities["images"] || !openaiPreset.Capabilities["audio_speech"] {
-		t.Fatalf("expected openai-compatible preset to advertise images and audio_speech")
+	if !openaiPreset.Capabilities["image_generations"] ||
+		!openaiPreset.Capabilities["image_edits"] ||
+		!openaiPreset.Capabilities["image_variations"] ||
+		!openaiPreset.Capabilities["audio_speech"] {
+		t.Fatalf("expected openai-compatible preset to advertise image subresources and audio_speech")
 	}
 	if !openaiPreset.Capabilities["responses_compact"] {
 		t.Fatalf("expected openai-compatible preset to advertise responses_compact")
@@ -88,9 +91,20 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if !openAIProviderPreset.MatchesPath("/api/provider/openai/v1/chat/completions") {
 		t.Fatalf("expected OpenAI provider route alias to match path")
 	}
+	if !openAIProviderPreset.Capabilities["image_generations"] || !openAIProviderPreset.Capabilities["image_edits"] || !openAIProviderPreset.Capabilities["image_variations"] {
+		t.Fatalf("expected OpenAI preset to advertise image subresources")
+	}
 	if containsRuntimeClass(openAIProviderPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassOauthRefresh) ||
 		containsRuntimeClass(openAIProviderPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassOauthDeviceCode) {
 		t.Fatalf("expected OpenAI preset to exclude unsupported OAuth runtimes")
+	}
+
+	deepseekPreset, ok := registry.Lookup("deepseek")
+	if !ok {
+		t.Fatalf("missing deepseek preset")
+	}
+	if deepseekPreset.Capabilities["image_generations"] || deepseekPreset.Capabilities["image_edits"] || deepseekPreset.Capabilities["image_variations"] {
+		t.Fatalf("expected concrete OpenAI-compatible providers to require explicit image opt-in, got %+v", deepseekPreset.Capabilities)
 	}
 
 	anthropicPreset, ok := registry.Lookup("anthropic-compatible")
@@ -196,7 +210,7 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	}
 	if !antigravityPreset.Capabilities["chat_completions"] ||
 		!antigravityPreset.Capabilities["messages"] ||
-		!antigravityPreset.Capabilities["images"] ||
+		!antigravityPreset.Capabilities["image_generations"] ||
 		!antigravityPreset.Capabilities["gemini_generate_content"] ||
 		!antigravityPreset.Capabilities["gemini_count_tokens"] ||
 		!antigravityPreset.Capabilities["token_counting"] ||
@@ -293,7 +307,7 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 		t.Fatalf("expected chatgpt-web preset to exclude responses_input_items")
 	}
 
-	deepseekPreset, ok := registry.Lookup("deepseek")
+	deepseekPreset, ok = registry.Lookup("deepseek")
 	if !ok {
 		t.Fatalf("missing deepseek preset")
 	}

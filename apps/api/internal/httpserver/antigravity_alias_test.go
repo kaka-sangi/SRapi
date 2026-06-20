@@ -606,12 +606,12 @@ func TestGatewayAntigravityImageGenerationTargetsNativeReverseProxy(t *testing.T
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 	mustInstallProviderPresets(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 	antigravityProvider := mustFindProviderByName(t, handler, sessionCookie, "antigravity")
-	if antigravityProvider.Capabilities == nil || !jsonObjectBool(*antigravityProvider.Capabilities, "images") {
-		t.Fatalf("expected antigravity preset to expose images capability, got %+v", antigravityProvider.Capabilities)
+	if antigravityProvider.Capabilities == nil || !jsonObjectBool(*antigravityProvider.Capabilities, "image_generations") {
+		t.Fatalf("expected antigravity preset to expose image_generations capability, got %+v", antigravityProvider.Capabilities)
 	}
 	updatedProvider := mustUpdateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(antigravityProvider.Id), `{"status":"active"}`)
 	antigravityProvider = updatedProvider.Data
-	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"antigravity-image-model","display_name":"Antigravity Image Model","status":"active","capabilities":[{"key":"images","level":"required","status":"stable","version":"v1"}]}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"antigravity-image-model","display_name":"Antigravity Image Model","status":"active","capabilities":[{"key":"image_generations","level":"required","status":"stable","version":"v1"}]}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(antigravityProvider.Id)+`","upstream_model_name":"gemini-3.1-flash-image","status":"active"}`)
 	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(antigravityProvider.Id)+`","name":"antigravity-image-account","runtime_class":"oauth_refresh","upstream_client":"antigravity_desktop","credential":{"access_token":"desktop-token"},"metadata":{"base_url":"`+upstream.URL+`","project_id":"project-1"},"status":"active","priority":10}`)
 

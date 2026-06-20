@@ -56,7 +56,9 @@ const (
 	KeyGeminiGenerateContent = "gemini_generate_content"
 	KeyGeminiCountTokens     = "gemini_count_tokens"
 	KeyEmbeddings            = "embeddings"
-	KeyImages                = "images"
+	KeyImageGenerations      = "image_generations"
+	KeyImageEdits            = "image_edits"
+	KeyImageVariations       = "image_variations"
 	KeyVideos                = "videos"
 	KeyAudioTranscriptions   = "audio_transcriptions"
 	KeyAudioSpeech           = "audio_speech"
@@ -108,7 +110,9 @@ var defaultDefinitions = []Definition{
 	{Key: KeyGeminiGenerateContent, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports Gemini-compatible generateContent and streamGenerateContent requests."},
 	{Key: KeyGeminiCountTokens, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports Gemini-compatible countTokens requests."},
 	{Key: KeyEmbeddings, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports embeddings."},
-	{Key: KeyImages, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports image generation."},
+	{Key: KeyImageGenerations, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports image generations."},
+	{Key: KeyImageEdits, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports image edits."},
+	{Key: KeyImageVariations, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports image variations."},
 	{Key: KeyVideos, Version: "v1", Category: "endpoint", Status: DefinitionStatusExperimental, Description: "Provider supports video generation and retrieval."},
 	{Key: KeyAudioTranscriptions, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports audio transcription."},
 	{Key: KeyAudioSpeech, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports audio speech synthesis."},
@@ -171,7 +175,12 @@ var convenienceKeys = map[string]string{
 	"supports_gemini_count_tokens":     KeyGeminiCountTokens,
 	"gemini_count_tokens":              KeyGeminiCountTokens,
 	"supports_embeddings":              KeyEmbeddings,
-	"supports_images":                  KeyImages,
+	"supports_image_generations":       KeyImageGenerations,
+	"image_generations":                KeyImageGenerations,
+	"supports_image_edits":             KeyImageEdits,
+	"image_edits":                      KeyImageEdits,
+	"supports_image_variations":        KeyImageVariations,
+	"image_variations":                 KeyImageVariations,
 	"supports_videos":                  KeyVideos,
 	"video":                            KeyVideos,
 	"videos":                           KeyVideos,

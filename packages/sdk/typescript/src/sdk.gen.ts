@@ -5357,7 +5357,7 @@ export const createEmbedding = <ThrowOnError extends boolean = false>(options: O
 /**
  * Create OpenAI-compatible image generations.
  *
- * OpenAI-compatible image generation route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account, invokes the selected OpenAI-compatible provider adapter, and records media usage and Scheduler evidence.
+ * OpenAI-compatible image generation route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account with image_generations effective capability, invokes the selected OpenAI-compatible provider adapter, and records media usage and Scheduler evidence.
  */
 export const createImageGeneration = <ThrowOnError extends boolean = false>(options: Options<CreateImageGenerationData, ThrowOnError>) => (options.client ?? client).post<CreateImageGenerationResponses, CreateImageGenerationErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -5372,7 +5372,7 @@ export const createImageGeneration = <ThrowOnError extends boolean = false>(opti
 /**
  * Create OpenAI-compatible image edits.
  *
- * OpenAI-compatible image edit route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account, forwards image edit inputs to the selected OpenAI-compatible provider adapter as multipart upstream requests, and records media usage and Scheduler evidence. JSON bodies may use local data URL or base64 image references; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
+ * OpenAI-compatible image edit route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account with image_edits effective capability, forwards image edit inputs to the selected OpenAI-compatible provider adapter as multipart upstream requests, and records media usage and Scheduler evidence. JSON bodies may use local data URL or base64 image references; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
  */
 export const createImageEdit = <ThrowOnError extends boolean = false>(options: Options<CreateImageEditData, ThrowOnError>) => (options.client ?? client).post<CreateImageEditResponses, CreateImageEditErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -5387,7 +5387,7 @@ export const createImageEdit = <ThrowOnError extends boolean = false>(options: O
 /**
  * Create OpenAI-compatible image variations.
  *
- * OpenAI-compatible image variation route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account, forwards a multipart source image to the selected OpenAI-compatible provider adapter, and records media usage and Scheduler evidence. The OpenAI upstream endpoint currently only supports `dall-e-2`.
+ * OpenAI-compatible image variation route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account with image_variations effective capability, forwards a multipart source image to the selected OpenAI-compatible provider adapter, and records media usage and Scheduler evidence. The OpenAI upstream endpoint currently only supports `dall-e-2`.
  */
 export const createImageVariation = <ThrowOnError extends boolean = false>(options: Options<CreateImageVariationData, ThrowOnError>) => (options.client ?? client).post<CreateImageVariationResponses, CreateImageVariationErrors, ThrowOnError>({
     ...formDataBodySerializer,
@@ -5812,7 +5812,7 @@ export const createRerankCompatibleRerankAlias = <ThrowOnError extends boolean =
 /**
  * Create OpenAI-compatible image generations with openai-compatible provider context.
  *
- * Provider alias route. It reuses the standard image generation runtime and forces the `openai-compatible` provider context.
+ * Provider alias route. It reuses the standard image generation runtime, requires image_generations effective capability, and forces the `openai-compatible` provider context.
  */
 export const createOpenAiCompatibleImageGenerationAlias = <ThrowOnError extends boolean = false>(options: Options<CreateOpenAiCompatibleImageGenerationAliasData, ThrowOnError>) => (options.client ?? client).post<CreateOpenAiCompatibleImageGenerationAliasResponses, CreateOpenAiCompatibleImageGenerationAliasErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -5827,7 +5827,7 @@ export const createOpenAiCompatibleImageGenerationAlias = <ThrowOnError extends 
 /**
  * Create OpenAI-compatible image edits with openai-compatible provider context.
  *
- * Provider alias route. It reuses the standard image edit runtime and forces the `openai-compatible` provider context. JSON bodies may use local data URL or base64 image references; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
+ * Provider alias route. It reuses the standard image edit runtime, requires image_edits effective capability, and forces the `openai-compatible` provider context. JSON bodies may use local data URL or base64 image references; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
  */
 export const createOpenAiCompatibleImageEditAlias = <ThrowOnError extends boolean = false>(options: Options<CreateOpenAiCompatibleImageEditAliasData, ThrowOnError>) => (options.client ?? client).post<CreateOpenAiCompatibleImageEditAliasResponses, CreateOpenAiCompatibleImageEditAliasErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -5842,7 +5842,7 @@ export const createOpenAiCompatibleImageEditAlias = <ThrowOnError extends boolea
 /**
  * Create OpenAI-compatible image variations with openai-compatible provider context.
  *
- * Provider alias route. It reuses the standard image variation runtime and forces the `openai-compatible` provider context.
+ * Provider alias route. It reuses the standard image variation runtime, requires image_variations effective capability, and forces the `openai-compatible` provider context.
  */
 export const createOpenAiCompatibleImageVariationAlias = <ThrowOnError extends boolean = false>(options: Options<CreateOpenAiCompatibleImageVariationAliasData, ThrowOnError>) => (options.client ?? client).post<CreateOpenAiCompatibleImageVariationAliasResponses, CreateOpenAiCompatibleImageVariationAliasErrors, ThrowOnError>({
     ...formDataBodySerializer,

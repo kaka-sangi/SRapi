@@ -382,7 +382,9 @@ supports_tools
 supports_vision
 supports_json
 supports_audio
-supports_image_generation
+supports_image_generations
+supports_image_edits
+supports_image_variations
 supports_embeddings
 supports_moderations
 supports_rerank
@@ -615,7 +617,9 @@ openai_responses              /v1/responses, /v1/responses/compact
 anthropic_messages            /v1/messages, /v1/messages/count_tokens
 gemini_generate_content       /v1beta/models/{model}:generateContent, :streamGenerateContent, :countTokens
 embeddings                    /v1/embeddings
-images                        /v1/images/generations, /edits, /variations
+image_generations             /v1/images/generations
+image_edits                   /v1/images/edits
+image_variations              /v1/images/variations
 audio                         /v1/audio/transcriptions, /audio/speech
 moderations                   /v1/moderations
 rerank                        /v1/rerank

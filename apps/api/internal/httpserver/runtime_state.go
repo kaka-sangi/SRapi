@@ -1258,7 +1258,7 @@ func (rt *runtimeState) bootstrapGatewayCatalog(ctx context.Context) error {
 			AdapterType:  "openai-compatible",
 			Protocol:     "openai-compatible",
 			Status:       ptrProviderStatus(providercontract.StatusActive),
-			Capabilities: map[string]any{capabilitiescontract.KeyResponses: true, capabilitiescontract.KeyEmbeddings: true, capabilitiescontract.KeyImages: true, capabilitiescontract.KeyAudioTranscriptions: true, capabilitiescontract.KeyAudioSpeech: true, capabilitiescontract.KeyModerations: true},
+			Capabilities: map[string]any{capabilitiescontract.KeyResponses: true, capabilitiescontract.KeyEmbeddings: true, capabilitiescontract.KeyImageGenerations: true, capabilitiescontract.KeyImageEdits: true, capabilitiescontract.KeyImageVariations: true, capabilitiescontract.KeyAudioTranscriptions: true, capabilitiescontract.KeyAudioSpeech: true, capabilitiescontract.KeyModerations: true},
 		}); err != nil {
 			return err
 		}
@@ -1292,11 +1292,13 @@ func (rt *runtimeState) bootstrapGatewayCatalog(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if provider.Capabilities[capabilitiescontract.KeyResponses] != true || provider.Capabilities[capabilitiescontract.KeyEmbeddings] != true || provider.Capabilities[capabilitiescontract.KeyImages] != true || provider.Capabilities[capabilitiescontract.KeyAudioTranscriptions] != true || provider.Capabilities[capabilitiescontract.KeyAudioSpeech] != true || provider.Capabilities[capabilitiescontract.KeyModerations] != true {
+	if provider.Capabilities[capabilitiescontract.KeyResponses] != true || provider.Capabilities[capabilitiescontract.KeyEmbeddings] != true || provider.Capabilities[capabilitiescontract.KeyImageGenerations] != true || provider.Capabilities[capabilitiescontract.KeyImageEdits] != true || provider.Capabilities[capabilitiescontract.KeyImageVariations] != true || provider.Capabilities[capabilitiescontract.KeyAudioTranscriptions] != true || provider.Capabilities[capabilitiescontract.KeyAudioSpeech] != true || provider.Capabilities[capabilitiescontract.KeyModerations] != true {
 		capabilities := cloneAnyMap(provider.Capabilities)
 		capabilities[capabilitiescontract.KeyResponses] = true
 		capabilities[capabilitiescontract.KeyEmbeddings] = true
-		capabilities[capabilitiescontract.KeyImages] = true
+		capabilities[capabilitiescontract.KeyImageGenerations] = true
+		capabilities[capabilitiescontract.KeyImageEdits] = true
+		capabilities[capabilitiescontract.KeyImageVariations] = true
 		capabilities[capabilitiescontract.KeyAudioTranscriptions] = true
 		capabilities[capabilitiescontract.KeyAudioSpeech] = true
 		capabilities[capabilitiescontract.KeyModerations] = true

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	openapi_types "github.com/oapi-codegen/runtime/types"
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
@@ -184,6 +185,61 @@ func TestNormalizeImageGenerationConsumesStreamLocally(t *testing.T) {
 	}
 	if canonical.ImageExtra["partial_images"] != float64(2) {
 		t.Fatalf("expected non-stream image extra to be preserved, got %+v", canonical.ImageExtra)
+	}
+	if !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyImageGenerations) {
+		t.Fatalf("expected image_generations capability, got %+v", canonical.RequestCapabilities)
+	}
+	if requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyImageEdits) ||
+		requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyImageVariations) {
+		t.Fatalf("image generation endpoint should only require image_generations, got %+v", canonical.RequestCapabilities)
+	}
+}
+
+func TestNormalizeImageEditRequiresImageEditCapability(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	file := openapiTestFile(t, "source.png", []byte("PNG-source"))
+	req := apiopenapi.ImageEditRequest{
+		Model:  "gpt-image-2",
+		Prompt: "replace the background",
+		Image:  []openapi_types.File{file},
+	}
+
+	canonical, err := svc.NormalizeImageEdit(req, RequestMeta{SourceEndpoint: "/v1/images/edits"})
+	if err != nil {
+		t.Fatalf("normalize image edit: %v", err)
+	}
+	if !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyImageEdits) {
+		t.Fatalf("expected image_edits capability, got %+v", canonical.RequestCapabilities)
+	}
+	if requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyImageGenerations) ||
+		requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyImageVariations) {
+		t.Fatalf("image edit endpoint should only require image_edits, got %+v", canonical.RequestCapabilities)
+	}
+}
+
+func TestNormalizeImageVariationRequiresImageVariationCapability(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	req := apiopenapi.ImageVariationRequest{
+		Model: "dall-e-2",
+		Image: openapiTestFile(t, "source.png", []byte("PNG-source")),
+	}
+
+	canonical, err := svc.NormalizeImageVariation(req, RequestMeta{SourceEndpoint: "/v1/images/variations"})
+	if err != nil {
+		t.Fatalf("normalize image variation: %v", err)
+	}
+	if !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyImageVariations) {
+		t.Fatalf("expected image_variations capability, got %+v", canonical.RequestCapabilities)
+	}
+	if requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyImageGenerations) ||
+		requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyImageEdits) {
+		t.Fatalf("image variation endpoint should only require image_variations, got %+v", canonical.RequestCapabilities)
 	}
 }
 
@@ -3219,4 +3275,11 @@ func requestCapabilityContains(values []gatewaycontract.RequestCapability, targe
 		}
 	}
 	return false
+}
+
+func openapiTestFile(t *testing.T, filename string, data []byte) openapi_types.File {
+	t.Helper()
+	var file openapi_types.File
+	file.InitFromBytes(data, filename)
+	return file
 }

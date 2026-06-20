@@ -215,7 +215,9 @@ supports_responses_compact
 supports_messages
 supports_generate_content
 supports_embeddings
-supports_images
+supports_image_generations
+supports_image_edits
+supports_image_variations
 supports_audio_speech
 supports_moderations
 supports_rerank
@@ -243,7 +245,7 @@ WP-650 起，`supports_responses_compact` 映射到 canonical `responses_compact
 
 原生 OpenAI Responses 中，`gpt-image-*` image-only model 不能作为顶层 Responses `model` 直接发送。Provider Adapter 仅在 provider/account metadata/config/capabilities 显式配置 `responses_main_model`、`openai_responses_main_model` 或 `image_generation_responses_model` 时，把顶层 image-only model 迁移为 `tools[].type=image_generation` 的 `model`，把 `prompt` 转为 `input`，并把 `size`、`quality`、`background`、`output_format`、`output_compression`、`moderation`、`style`、`partial_images` 等 image 选项迁移到 tool；未配置主 Responses model 时返回 `invalid_request`，避免向上游发送会损耗或失败的伪转换。
 
-WP-290 起，`supports_images` 映射到 canonical `images` endpoint capability。Gateway image generation 请求必须带 `images` request capability；OpenAI-compatible API-key 和 reverse-proxy accounts 使用 `/images/generations` 上游路径，并解析 `url` / `b64_json` image outputs。WP-480 起，Gateway image edit 请求也使用 `images` request capability；OpenAI-compatible API-key 和 reverse-proxy accounts 使用 multipart `/images/edits` 上游路径，转发 `image` / `image[]`、可选 `mask` 和输出选项，并解析同一 OpenAI-compatible image response。WP-510 起，下游 JSON image references 会在 HTTP/Gateway 层解码成同一个 canonical image edit request，Provider Adapter 仍只接收已归一化的 image bytes 并以上游 multipart `/images/edits` 发出；remote URL 和 `file_id` references 仍在 Gateway 层拒绝。WP-520 起，`stream=true` 的 image edit 请求仍经过同一 Provider Adapter 和 usage 证据链，但当前 v1 只把最终 image response 重新包装成 `image.generation.result` SSE；上游 progressive image SSE relay 留待后续包。WP-490 起，Gateway image variation 请求也使用 `images` request capability；OpenAI-compatible API-key 和 reverse-proxy accounts 使用 multipart `/images/variations` 上游路径，转发单个 source `image`、`n`、`size`、`response_format` 和 `user`，并解析同一 OpenAI-compatible image response。OpenAI 官方 upstream 当前仅支持 `dall-e-2`，SRapi 通过 model mapping 决定上游模型名。
+WP-290 起，`supports_image_generations` 映射到 canonical `image_generations` endpoint capability。Gateway image generation 请求必须带 `image_generations` request capability；OpenAI-compatible API-key 和 reverse-proxy accounts 使用 `/images/generations` 上游路径，并解析 `url` / `b64_json` image outputs。WP-480 起，Gateway image edit 请求使用独立 `image_edits` request capability；OpenAI-compatible API-key 和 reverse-proxy accounts 使用 multipart `/images/edits` 上游路径，转发 `image` / `image[]`、可选 `mask` 和输出选项，并解析同一 OpenAI-compatible image response。WP-510 起，下游 JSON image references 会在 HTTP/Gateway 层解码成同一个 canonical image edit request，Provider Adapter 仍只接收已归一化的 image bytes 并以上游 multipart `/images/edits` 发出；remote URL 和 `file_id` references 仍在 Gateway 层拒绝。WP-520 起，`stream=true` 的 image edit 请求仍经过同一 Provider Adapter 和 usage 证据链，但当前 v1 只把最终 image response 重新包装成 `image.generation.result` SSE；上游 progressive image SSE relay 留待后续包。WP-490 起，Gateway image variation 请求使用独立 `image_variations` request capability；OpenAI-compatible API-key 和 reverse-proxy accounts 使用 multipart `/images/variations` 上游路径，转发单个 source `image`、`n`、`size`、`response_format` 和 `user`，并解析同一 OpenAI-compatible image response。OpenAI 官方 upstream 当前仅支持 `dall-e-2`，SRapi 通过 model mapping 决定上游模型名。SRapi 不使用 `images` 伞形 endpoint capability；生成、编辑和变体必须分别声明。
 
 WP-310 起，`supports_moderations` 映射到 canonical `moderations` endpoint capability。Gateway moderation 请求必须带 `moderations` request capability；OpenAI-compatible API-key 和 reverse-proxy accounts 使用 `/moderations` 上游路径，并解析 `flagged`、`categories`、`category_scores` 和 `category_applied_input_types`。
 

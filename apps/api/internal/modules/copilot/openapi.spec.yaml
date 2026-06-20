@@ -13600,7 +13600,7 @@ paths:
         - Gateway
       operationId: createImageGeneration
       summary: Create OpenAI-compatible image generations.
-      description: OpenAI-compatible image generation route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account, invokes the selected OpenAI-compatible provider adapter, and records media usage and Scheduler evidence.
+      description: OpenAI-compatible image generation route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account with image_generations effective capability, invokes the selected OpenAI-compatible provider adapter, and records media usage and Scheduler evidence.
       security:
         - gatewayBearerAuth: []
       requestBody:
@@ -13646,7 +13646,7 @@ paths:
         - Gateway
       operationId: createImageEdit
       summary: Create OpenAI-compatible image edits.
-      description: OpenAI-compatible image edit route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account, forwards image edit inputs to the selected OpenAI-compatible provider adapter as multipart upstream requests, and records media usage and Scheduler evidence. JSON bodies may use local data URL or base64 image references; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
+      description: OpenAI-compatible image edit route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account with image_edits effective capability, forwards image edit inputs to the selected OpenAI-compatible provider adapter as multipart upstream requests, and records media usage and Scheduler evidence. JSON bodies may use local data URL or base64 image references; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
       security:
         - gatewayBearerAuth: []
       requestBody:
@@ -13711,7 +13711,7 @@ paths:
         - Gateway
       operationId: createImageVariation
       summary: Create OpenAI-compatible image variations.
-      description: OpenAI-compatible image variation route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account, forwards a multipart source image to the selected OpenAI-compatible provider adapter, and records media usage and Scheduler evidence. The OpenAI upstream endpoint currently only supports `dall-e-2`.
+      description: OpenAI-compatible image variation route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account with image_variations effective capability, forwards a multipart source image to the selected OpenAI-compatible provider adapter, and records media usage and Scheduler evidence. The OpenAI upstream endpoint currently only supports `dall-e-2`.
       security:
         - gatewayBearerAuth: []
       requestBody:
@@ -15087,7 +15087,7 @@ paths:
         - Gateway
       operationId: createOpenAICompatibleImageGenerationAlias
       summary: Create OpenAI-compatible image generations with openai-compatible provider context.
-      description: Provider alias route. It reuses the standard image generation runtime and forces the `openai-compatible` provider context.
+      description: Provider alias route. It reuses the standard image generation runtime, requires image_generations effective capability, and forces the `openai-compatible` provider context.
       security:
         - gatewayBearerAuth: []
       requestBody:
@@ -15125,7 +15125,7 @@ paths:
         - Gateway
       operationId: createOpenAICompatibleImageEditAlias
       summary: Create OpenAI-compatible image edits with openai-compatible provider context.
-      description: Provider alias route. It reuses the standard image edit runtime and forces the `openai-compatible` provider context. JSON bodies may use local data URL or base64 image references; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
+      description: Provider alias route. It reuses the standard image edit runtime, requires image_edits effective capability, and forces the `openai-compatible` provider context. JSON bodies may use local data URL or base64 image references; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
       security:
         - gatewayBearerAuth: []
       requestBody:
@@ -15174,7 +15174,7 @@ paths:
         - Gateway
       operationId: createOpenAICompatibleImageVariationAlias
       summary: Create OpenAI-compatible image variations with openai-compatible provider context.
-      description: Provider alias route. It reuses the standard image variation runtime and forces the `openai-compatible` provider context.
+      description: Provider alias route. It reuses the standard image variation runtime, requires image_variations effective capability, and forces the `openai-compatible` provider context.
       security:
         - gatewayBearerAuth: []
       requestBody:

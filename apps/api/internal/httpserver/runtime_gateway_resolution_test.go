@@ -243,6 +243,146 @@ func TestEffectiveCapabilitiesResponsesInputItemsRequiresNativeSubresource(t *te
 	}
 }
 
+func TestEffectiveCapabilitiesImageSubresourcesRequireExplicitCapability(t *testing.T) {
+	model := modelcontract.Model{
+		Capabilities: []capabilitiescontract.Descriptor{
+			capabilityRequirement(capabilitiescontract.KeyImageGenerations),
+			capabilityRequirement(capabilitiescontract.KeyImageEdits),
+			capabilityRequirement(capabilitiescontract.KeyImageVariations),
+		},
+	}
+	mapping := modelcontract.ModelProviderMapping{}
+
+	cases := []struct {
+		name           string
+		provider       providercontract.Provider
+		account        accountcontract.ProviderAccount
+		wantGeneration bool
+		wantEdits      bool
+		wantVariations bool
+	}{
+		{
+			name: "generation capability does not imply edit or variation",
+			provider: providercontract.Provider{
+				AdapterType:  "unknown-provider",
+				Capabilities: map[string]any{capabilitiescontract.KeyImageGenerations: true},
+			},
+			wantGeneration: true,
+		},
+		{
+			name: "openai preset advertises image subresources",
+			provider: providercontract.Provider{
+				Name:        "openai",
+				AdapterType: "openai-compatible",
+			},
+			wantGeneration: true,
+			wantEdits:      true,
+			wantVariations: true,
+		},
+		{
+			name: "generic openai-compatible preset advertises image subresources",
+			provider: providercontract.Provider{
+				Name:        "openai-compatible",
+				AdapterType: "openai-compatible",
+			},
+			wantGeneration: true,
+			wantEdits:      true,
+			wantVariations: true,
+		},
+		{
+			name: "concrete openai-compatible provider preset does not inherit generic subresources",
+			provider: providercontract.Provider{
+				Name:         "deepseek",
+				AdapterType:  "openai-compatible",
+				ConfigSchema: map[string]any{"provider_key": "deepseek"},
+			},
+		},
+		{
+			name: "provider override can enable image edits",
+			provider: providercontract.Provider{
+				AdapterType:  "unknown-provider",
+				Capabilities: map[string]any{capabilitiescontract.KeyImageEdits: true},
+			},
+			wantEdits: true,
+		},
+		{
+			name: "account override can enable image generations",
+			provider: providercontract.Provider{
+				AdapterType: "unknown-provider",
+			},
+			account: accountcontract.ProviderAccount{
+				Metadata: map[string]any{"capability_image_generations": true},
+			},
+			wantGeneration: true,
+		},
+		{
+			name: "account override can enable image variations",
+			provider: providercontract.Provider{
+				AdapterType: "unknown-provider",
+			},
+			account: accountcontract.ProviderAccount{
+				Metadata: map[string]any{"capability_image_variations": true},
+			},
+			wantVariations: true,
+		},
+		{
+			name: "account false suppresses preset image edits",
+			provider: providercontract.Provider{
+				Name:        "openai",
+				AdapterType: "openai-compatible",
+			},
+			account: accountcontract.ProviderAccount{
+				Metadata: map[string]any{"capability_image_edits": false},
+			},
+			wantGeneration: true,
+			wantVariations: true,
+		},
+		{
+			name: "account false suppresses preset image variations",
+			provider: providercontract.Provider{
+				Name:        "openai",
+				AdapterType: "openai-compatible",
+			},
+			account: accountcontract.ProviderAccount{
+				Metadata: map[string]any{"capability_image_variations": false},
+			},
+			wantGeneration: true,
+			wantEdits:      true,
+		},
+		{
+			name: "codex preset advertises image generation only",
+			provider: providercontract.Provider{
+				Name:        "codex-cli",
+				AdapterType: "reverse-proxy-codex-cli",
+			},
+			wantGeneration: true,
+		},
+		{
+			name: "antigravity preset advertises image generation only",
+			provider: providercontract.Provider{
+				Name:        "antigravity",
+				AdapterType: "reverse-proxy-antigravity",
+			},
+			wantGeneration: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := effectiveCapabilities(model, mapping, tc.provider, tc.account)
+			if hasCapability(got, capabilitiescontract.KeyImageGenerations) != tc.wantGeneration {
+				t.Fatalf("image_generations presence = %v, want %v; capabilities=%+v", hasCapability(got, capabilitiescontract.KeyImageGenerations), tc.wantGeneration, got)
+			}
+			if hasCapability(got, capabilitiescontract.KeyImageEdits) != tc.wantEdits {
+				t.Fatalf("image_edits presence = %v, want %v; capabilities=%+v", hasCapability(got, capabilitiescontract.KeyImageEdits), tc.wantEdits, got)
+			}
+			if hasCapability(got, capabilitiescontract.KeyImageVariations) != tc.wantVariations {
+				t.Fatalf("image_variations presence = %v, want %v; capabilities=%+v", hasCapability(got, capabilitiescontract.KeyImageVariations), tc.wantVariations, got)
+			}
+		})
+	}
+}
+
 func TestEffectiveCapabilitiesResponsesWebSocketIsCodexAccountScoped(t *testing.T) {
 	model := modelcontract.Model{}
 	mapping := modelcontract.ModelProviderMapping{}

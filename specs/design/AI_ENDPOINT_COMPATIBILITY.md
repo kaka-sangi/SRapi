@@ -446,7 +446,9 @@ supports_responses_compact
 supports_messages
 supports_generate_content
 supports_embeddings
-supports_images
+supports_image_generations
+supports_image_edits
+supports_image_variations
 supports_audio
 supports_stream
 supports_tools
@@ -568,7 +570,7 @@ Images generations endpoint
 
 - `POST /v1/images/generations` 接受 OpenAI-compatible 的 `model`、`prompt`、`n`、`size`、`quality`、`style`、`response_format` 和 `user`。
 - 请求仍进入 API Key auth、模型可见性、entitlement、Scheduler、Provider Adapter、usage、billing 和 feedback 证据链。
-- Scheduler 使用 `images` endpoint capability；Provider 或 account/mapping 必须显式声明 image generation 能力，text-only provider 不会被误选。
+- Scheduler 使用 `image_generations` endpoint capability；Provider 或 account/mapping 必须显式声明 image generation 能力，text-only provider 不会被误选。
 - OpenAI-compatible provider alias（例如 `/api/provider/openai-compatible/v1/images/generations`）强制 provider context。
 - OpenAI-compatible API-key 和 reverse-proxy accounts 上游调用 `/images/generations` 并解析 `url`、`b64_json` 和 `revised_prompt`。
 - Image edits 和 variations 不在 WP-290 范围内。
@@ -585,7 +587,7 @@ Images edits endpoint
 - WP-510 起，同一路由也接受 JSON image references：单个 `image` 或多个 `images` 可使用 data URL、`{"image_url":"data:..."}`、`{"image_url":{"url":"data:..."}}` 或 `{"b64_json":"...","mime_type":"...","filename":"..."}`。JSON references 会解码进同一个 canonical image edit request，并以上游 multipart `/images/edits` 发出。
 - WP-520 起，`stream=true` 的 image edit 请求会在同一 Gateway auth / Scheduler / Provider Adapter / usage path 上返回 `text/event-stream`；当前 v1 只渲染最终 `image.generation.result` chunk 和 `[DONE]`，不会伪造 upstream 增量。
 - 请求仍进入 API Key auth、模型可见性、entitlement、Scheduler、Provider Adapter、usage、billing 和 feedback 证据链。
-- Scheduler 继续使用 `images` endpoint capability；Provider 或 account/mapping 必须显式声明 image 能力，text-only provider 不会被误选。
+- Scheduler 使用 `image_edits` endpoint capability；Provider 或 account/mapping 必须显式声明 image edit 能力，generation-only provider 不会被误选。
 - OpenAI-compatible provider alias（例如 `/api/provider/openai-compatible/v1/images/edits`）强制 provider context。
 - OpenAI-compatible API-key 和 reverse-proxy accounts 上游调用 multipart `/images/edits`，并解析 `url`、`b64_json` 和 `revised_prompt`。
 - Remote `image_url` 和 `file_id` references 仍明确拒绝，直到后续 Files API / remote-fetch 安全边界实现；streaming image edit 的 upstream progressive relay 仍留给后续兼容包。
@@ -601,7 +603,7 @@ Images variations endpoint
 - `POST /v1/images/variations` 接受 OpenAI-compatible multipart form-data：单个 `image`、`model`、`n`、`size`、`response_format` 和 `user`。
 - OpenAI 官方 upstream 当前说明该 endpoint 仅支持 `dall-e-2`；SRapi 不在 Gateway 层硬编码模型名，而是通过模型映射把本地 canonical model 映射到上游模型。
 - 请求仍进入 API Key auth、模型可见性、entitlement、Scheduler、Provider Adapter、usage、billing 和 feedback 证据链。
-- Scheduler 继续使用 `images` endpoint capability；Provider 或 account/mapping 必须显式声明 image 能力，text-only provider 不会被误选。
+- Scheduler 使用 `image_variations` endpoint capability；Provider 或 account/mapping 必须显式声明 image variation 能力，generation-only provider 不会被误选。
 - OpenAI-compatible provider alias（例如 `/api/provider/openai-compatible/v1/images/variations`）强制 provider context。
 - OpenAI-compatible API-key 和 reverse-proxy accounts 上游调用 multipart `/images/variations`，并解析 `url`、`b64_json` 和 `revised_prompt`。
 - 多图 variation、JSON image references、streaming image variation events 和 frontend visuals 留给后续包。

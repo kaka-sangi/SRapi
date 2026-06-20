@@ -36,6 +36,23 @@ func TestCanonicalKeyFromConvenienceMapsDTOKeys(t *testing.T) {
 	if !ok || got != KeyResponsesWebSocket {
 		t.Fatalf("expected supports_responses_websocket to map to %s, got %q ok=%v", KeyResponsesWebSocket, got, ok)
 	}
+	got, ok = CanonicalKeyFromConvenience("supports_image_generations")
+	if !ok || got != KeyImageGenerations {
+		t.Fatalf("expected supports_image_generations to map to %s, got %q ok=%v", KeyImageGenerations, got, ok)
+	}
+	got, ok = CanonicalKeyFromConvenience("supports_image_edits")
+	if !ok || got != KeyImageEdits {
+		t.Fatalf("expected supports_image_edits to map to %s, got %q ok=%v", KeyImageEdits, got, ok)
+	}
+	got, ok = CanonicalKeyFromConvenience("supports_image_variations")
+	if !ok || got != KeyImageVariations {
+		t.Fatalf("expected supports_image_variations to map to %s, got %q ok=%v", KeyImageVariations, got, ok)
+	}
+	for _, oldKey := range []string{"images", "supports_images", "image_generation"} {
+		if got, ok = CanonicalKeyFromConvenience(oldKey); ok {
+			t.Fatalf("expected %s to be rejected, got %q", oldKey, got)
+		}
+	}
 	got, ok = CanonicalKeyFromConvenience("supports_gemini_generate_content")
 	if !ok || got != KeyGeminiGenerateContent {
 		t.Fatalf("expected supports_gemini_generate_content to map to %s, got %q ok=%v", KeyGeminiGenerateContent, got, ok)
@@ -104,6 +121,28 @@ func TestDefaultDefinitionsIncludeResponsesWebSocket(t *testing.T) {
 		}
 	}
 	t.Fatalf("expected default definitions to include %s", KeyResponsesWebSocket)
+}
+
+func TestDefaultDefinitionsIncludeImageSubresourceCapabilities(t *testing.T) {
+	want := map[string]bool{
+		KeyImageGenerations: false,
+		KeyImageEdits:       false,
+		KeyImageVariations:  false,
+	}
+	for _, def := range DefaultDefinitions() {
+		if _, ok := want[def.Key]; !ok {
+			continue
+		}
+		if def.Version != "v1" || def.Category != "endpoint" || def.Status != DefinitionStatusStable {
+			t.Fatalf("unexpected image subresource definition: %+v", def)
+		}
+		want[def.Key] = true
+	}
+	for key, ok := range want {
+		if !ok {
+			t.Fatalf("expected default definitions to include %s", key)
+		}
+	}
 }
 
 func TestDefaultDefinitionsIncludeProtocolTokenAndGeminiEndpointCapabilities(t *testing.T) {

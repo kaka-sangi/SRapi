@@ -289,7 +289,7 @@ func (s *Service) NormalizeImageGeneration(req apiopenapi.ImageGenerationRequest
 	}
 	canonical.ImageExtra = cloneMap(req.AdditionalProperties)
 	delete(canonical.ImageExtra, "stream")
-	canonical.RequestCapabilities = append(canonical.RequestCapabilities, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyImages, Version: "v1"})
+	canonical.RequestCapabilities = append(canonical.RequestCapabilities, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyImageGenerations, Version: "v1"})
 	return canonical, nil
 }
 
@@ -336,7 +336,7 @@ func (s *Service) NormalizeImageEdit(req apiopenapi.ImageEditRequest, meta Reque
 		canonical.ImageUser = strings.TrimSpace(*req.User)
 	}
 	canonical.ImageExtra = imageEditExtra(req)
-	canonical.RequestCapabilities = append(canonical.RequestCapabilities, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyImages, Version: "v1"})
+	canonical.RequestCapabilities = append(canonical.RequestCapabilities, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyImageEdits, Version: "v1"})
 	return canonical, nil
 }
 
@@ -369,7 +369,7 @@ func (s *Service) NormalizeImageVariation(req apiopenapi.ImageVariationRequest, 
 		canonical.ImageUser = strings.TrimSpace(*req.User)
 	}
 	canonical.ImageExtra = cloneMap(req.AdditionalProperties)
-	canonical.RequestCapabilities = append(canonical.RequestCapabilities, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyImages, Version: "v1"})
+	canonical.RequestCapabilities = append(canonical.RequestCapabilities, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyImageVariations, Version: "v1"})
 	return canonical, nil
 }
 
