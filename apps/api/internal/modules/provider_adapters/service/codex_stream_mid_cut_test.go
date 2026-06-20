@@ -60,3 +60,29 @@ func TestCodexStreamWithTerminalEventSucceeds(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", resp.StatusCode)
 	}
 }
+
+// TestCodexStreamInvalidJSONSurfacesAsInvalidResponse pins CLIProxyAPI's
+// OpenAI Responses stream validation: each data frame must be valid JSON, so a
+// malformed upstream event fails fast instead of being ignored as a benign SSE
+// fragment.
+func TestCodexStreamInvalidJSONSurfacesAsInvalidResponse(t *testing.T) {
+	body := []byte(
+		"data: {\"type\":\"response.created\",\"response\":{\"id\":\"r\",\"status\":\"in_progress\"}}\n\n" +
+			"data: {not-json}\n\n" +
+			"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"r\",\"status\":\"completed\",\"usage\":{\"input_tokens\":1,\"output_tokens\":1}}}\n\n",
+	)
+	_, err := parseCodexResponsesBody(body, 200)
+	if err == nil {
+		t.Fatal("expected invalid_response error, got nil")
+	}
+	providerErr, ok := err.(contract.ProviderError)
+	if !ok {
+		t.Fatalf("expected ProviderError, got %T: %v", err, err)
+	}
+	if providerErr.Class != "invalid_response" || providerErr.StatusCode != http.StatusBadGateway {
+		t.Fatalf("expected invalid_response/502, got %+v", providerErr)
+	}
+	if !strings.Contains(providerErr.Message, "invalid stream json") {
+		t.Fatalf("expected error message mentioning invalid stream json, got %q", providerErr.Message)
+	}
+}
