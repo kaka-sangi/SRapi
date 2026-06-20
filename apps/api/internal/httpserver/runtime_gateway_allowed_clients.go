@@ -22,21 +22,34 @@ import (
 
 const accountAllowedClientsMetadataKey = "allowed_clients"
 
-// gatewayAllowedClientPreset is an official client signature. Matching is
-// two-factor: the inbound Originator must equal Originator (case-insensitive)
-// AND every UAContains marker must appear in the User-Agent — so a forgeable
-// originator alone cannot pass.
+// gatewayAllowedClientPreset is an official client signature. Codex/Gemini
+// require both Originator and User-Agent because they normally send a stable
+// Originator header. Claude Code is identified by its real cli User-Agent; it
+// does not consistently send an Originator on inbound Anthropic requests.
 type gatewayAllowedClientPreset struct {
-	Originator string
-	UAContains []string
+	Originator        string
+	RequireOriginator bool
+	UAContains        []string
+	AnyUAContains     []string
 }
 
 // gatewayAllowedClientPresets are the recognized official-client signatures an
 // account's allowed_clients list may reference.
 var gatewayAllowedClientPresets = map[string]gatewayAllowedClientPreset{
-	"codex_cli":   {Originator: "codex_cli_rs", UAContains: []string{"codex_cli_rs/"}},
-	"claude_code": {Originator: "claude code", UAContains: []string{"claude code/"}},
-	"gemini_cli":  {Originator: "gemini_cli", UAContains: []string{"geminicli/"}},
+	"codex_cli": {
+		Originator:        "codex_cli_rs",
+		RequireOriginator: true,
+		UAContains:        []string{"codex_cli_rs/"},
+	},
+	"claude_code": {
+		Originator:    "claude code",
+		AnyUAContains: []string{"claude-cli/", "claude-code/", "claude code/"},
+	},
+	"gemini_cli": {
+		Originator:        "gemini_cli",
+		RequireOriginator: true,
+		UAContains:        []string{"geminicli/"},
+	},
 }
 
 type gatewayInboundClientKey struct{}
@@ -82,18 +95,31 @@ func accountAllowsInboundClient(metadata map[string]any, client gatewayInboundCl
 }
 
 func gatewayClientMatchesPreset(client gatewayInboundClient, preset gatewayAllowedClientPreset) bool {
-	if strings.TrimSpace(preset.Originator) == "" {
-		return false
-	}
-	if !strings.EqualFold(strings.TrimSpace(client.Originator), strings.TrimSpace(preset.Originator)) {
+	if preset.RequireOriginator && strings.TrimSpace(preset.Originator) == "" {
 		return false
 	}
 	ua := strings.ToLower(client.UserAgent)
+	originator := strings.TrimSpace(client.Originator)
+	if strings.TrimSpace(preset.Originator) != "" && originator != "" && !strings.EqualFold(originator, strings.TrimSpace(preset.Originator)) {
+		return false
+	}
+	if preset.RequireOriginator && originator == "" {
+		return false
+	}
 	for _, marker := range preset.UAContains {
 		marker = strings.ToLower(strings.TrimSpace(marker))
 		if marker == "" || !strings.Contains(ua, marker) {
 			return false
 		}
+	}
+	if len(preset.AnyUAContains) > 0 {
+		for _, marker := range preset.AnyUAContains {
+			marker = strings.ToLower(strings.TrimSpace(marker))
+			if marker != "" && strings.Contains(ua, marker) {
+				return true
+			}
+		}
+		return false
 	}
 	return true
 }

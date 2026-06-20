@@ -9,6 +9,7 @@ import (
 
 func TestAccountAllowsInboundClient(t *testing.T) {
 	codex := gatewayInboundClient{UserAgent: "codex_cli_rs/0.125.0 (x86_64)", Originator: "codex_cli_rs"}
+	claudeCode := gatewayInboundClient{UserAgent: "claude-cli/2.1.63 (external, cli)"}
 	browser := gatewayInboundClient{UserAgent: "Mozilla/5.0", Originator: ""}
 	forgedOriginator := gatewayInboundClient{UserAgent: "curl/8.0", Originator: "codex_cli_rs"}
 
@@ -36,6 +37,15 @@ func TestAccountAllowsInboundClient(t *testing.T) {
 	multi := map[string]any{"allowed_clients": []any{"claude_code", "codex_cli"}}
 	if !accountAllowsInboundClient(multi, codex) {
 		t.Fatal("a client matching any listed preset should be accepted")
+	}
+	if !accountAllowsInboundClient(multi, claudeCode) {
+		t.Fatal("claude_code preset must accept the real Claude Code CLI user agent")
+	}
+	if accountAllowsInboundClient(multi, gatewayInboundClient{UserAgent: "curl/8.0", Originator: "Claude Code"}) {
+		t.Fatal("claude_code preset must reject originator-only requests without Claude Code UA")
+	}
+	if accountAllowsInboundClient(multi, gatewayInboundClient{UserAgent: "claude-cli/2.1.63 (external, cli)", Originator: "codex_cli_rs"}) {
+		t.Fatal("claude_code preset must reject a mismatched explicit originator")
 	}
 }
 
