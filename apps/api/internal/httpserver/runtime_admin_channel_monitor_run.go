@@ -8,37 +8,38 @@ import (
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
-func toChannelMonitorRunPayload(run channelmonitorscontract.RunResult) map[string]any {
-	results := make([]map[string]any, 0, len(run.Results))
+func toAPIChannelMonitorRun(run channelmonitorscontract.RunResult) apiopenapi.ChannelMonitorRun {
+	results := make([]apiopenapi.ChannelMonitorCheckResult, 0, len(run.Results))
 	for _, result := range run.Results {
-		entry := map[string]any{
-			"account_id":   result.AccountID,
-			"account_name": result.AccountName,
-			"provider_id":  result.ProviderID,
-			"model":        result.Model,
-			"ok":           result.OK,
-			"status_code":  result.StatusCode,
-			"latency_ms":   result.LatencyMS,
+		entry := apiopenapi.ChannelMonitorCheckResult{
+			AccountId:   int64(result.AccountID),
+			AccountName: result.AccountName,
+			ProviderId:  int64(result.ProviderID),
+			Model:       result.Model,
+			Ok:          result.OK,
+			StatusCode:  int64(result.StatusCode),
+			LatencyMs:   int64(result.LatencyMS),
 		}
 		if result.ErrorClass != "" {
-			entry["error_class"] = result.ErrorClass
+			entry.ErrorClass = &result.ErrorClass
 		}
 		if result.Metadata != nil {
-			entry["metadata"] = result.Metadata
+			metadata := apiopenapi.JsonObject(result.Metadata)
+			entry.Metadata = &metadata
 		}
 		results = append(results, entry)
 	}
-	return map[string]any{
-		"id":            run.ID,
-		"monitor_id":    run.MonitorID,
-		"run_id":        run.RunID,
-		"ok":            run.OK,
-		"checked_count": run.CheckedCount,
-		"ok_count":      run.OKCount,
-		"latency_ms":    run.LatencyMS,
-		"trigger":       run.Trigger,
-		"results":       results,
-		"created_at":    run.CreatedAt.UTC(),
+	return apiopenapi.ChannelMonitorRun{
+		Id:           int64(run.ID),
+		MonitorId:    int64(run.MonitorID),
+		RunId:        run.RunID,
+		Ok:           run.OK,
+		CheckedCount: int64(run.CheckedCount),
+		OkCount:      int64(run.OKCount),
+		LatencyMs:    int64(run.LatencyMS),
+		Trigger:      run.Trigger,
+		Results:      results,
+		CreatedAt:    run.CreatedAt.UTC(),
 	}
 }
 
@@ -67,9 +68,9 @@ func (s *Server) handleRunAdminChannelMonitor(w http.ResponseWriter, r *http.Req
 		"checked": run.CheckedCount,
 		"ok":      run.OKCount,
 	}))
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       toChannelMonitorRunPayload(run),
-		"request_id": requestID,
+	writeJSONAny(w, http.StatusOK, apiopenapi.ChannelMonitorRunResponse{
+		Data:      toAPIChannelMonitorRun(run),
+		RequestId: requestID,
 	})
 }
 

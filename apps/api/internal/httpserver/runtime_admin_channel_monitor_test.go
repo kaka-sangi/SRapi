@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/srapi/srapi/apps/api/internal/config"
+	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
 func channelMonitorDo(t *testing.T, handler http.Handler, method, path, csrf string, cookie *http.Cookie, body string) *httptest.ResponseRecorder {
@@ -76,29 +77,23 @@ func TestChannelMonitorCRUDAndRun(t *testing.T) {
 	if createRec.Code != http.StatusCreated {
 		t.Fatalf("expected monitor create 201, got %d body=%s", createRec.Code, createRec.Body.String())
 	}
-	var created struct {
-		Data struct {
-			ID              int    `json:"id"`
-			Name            string `json:"name"`
-			Scope           string `json:"scope"`
-			IntervalSeconds int    `json:"interval_seconds"`
-			Request         struct {
-				Method              string `json:"method"`
-				ExpectedStatusCodes []int  `json:"expected_status_codes"`
-				ResponseContains    string `json:"response_contains"`
-			} `json:"request"`
-		} `json:"data"`
-	}
+	var created apiopenapi.ChannelMonitorResponse
 	if err := json.NewDecoder(createRec.Body).Decode(&created); err != nil {
 		t.Fatalf("decode create: %v", err)
 	}
-	if created.Data.ID == 0 || created.Data.Scope != "account" {
+	if created.Data.Id == 0 || created.Data.Scope != apiopenapi.ChannelMonitorScope("account") {
 		t.Fatalf("unexpected created monitor: %+v", created.Data)
 	}
-	if created.Data.Request.Method != "GET" || created.Data.Request.ResponseContains != "data" {
+	if created.Data.Request.Method == nil || *created.Data.Request.Method != "GET" {
+		t.Fatalf("custom method not persisted: %+v", created.Data.Request)
+	}
+	if created.Data.Request.ResponseContains == nil || *created.Data.Request.ResponseContains != "data" {
 		t.Fatalf("custom request not persisted: %+v", created.Data.Request)
 	}
-	monitorID := created.Data.ID
+	if created.Data.Request.ExpectedStatusCodes == nil || len(*created.Data.Request.ExpectedStatusCodes) != 2 {
+		t.Fatalf("expected status codes not persisted: %+v", created.Data.Request)
+	}
+	monitorID := int(created.Data.Id)
 
 	// Update the monitor (disable).
 	updateRec := channelMonitorDo(t, handler, http.MethodPatch, fmt.Sprintf("/api/v1/admin/channel-monitors/%d", monitorID), csrf, cookie, `{"enabled":false,"interval_seconds":600}`)
@@ -120,22 +115,14 @@ func TestChannelMonitorCRUDAndRun(t *testing.T) {
 	if runRec.Code != http.StatusOK {
 		t.Fatalf("expected monitor run 200, got %d body=%s", runRec.Code, runRec.Body.String())
 	}
-	var runResp struct {
-		Data struct {
-			CheckedCount int `json:"checked_count"`
-			Results      []struct {
-				AccountID int    `json:"account_id"`
-				Model     string `json:"model"`
-			} `json:"results"`
-		} `json:"data"`
-	}
+	var runResp apiopenapi.ChannelMonitorRunResponse
 	if err := json.NewDecoder(runRec.Body).Decode(&runResp); err != nil {
 		t.Fatalf("decode run: %v", err)
 	}
 	if runResp.Data.CheckedCount != 1 || len(runResp.Data.Results) != 1 {
 		t.Fatalf("expected one per-model result, got checked=%d results=%d", runResp.Data.CheckedCount, len(runResp.Data.Results))
 	}
-	if runResp.Data.Results[0].AccountID != accountID || runResp.Data.Results[0].Model != "channel-monitor-model" {
+	if runResp.Data.Results[0].AccountId != int64(accountID) || runResp.Data.Results[0].Model != "channel-monitor-model" {
 		t.Fatalf("unexpected check result: %+v", runResp.Data.Results[0])
 	}
 
@@ -144,15 +131,11 @@ func TestChannelMonitorCRUDAndRun(t *testing.T) {
 	if historyRec.Code != http.StatusOK {
 		t.Fatalf("expected runs list 200, got %d body=%s", historyRec.Code, historyRec.Body.String())
 	}
-	var historyResp struct {
-		Data []struct {
-			MonitorID int `json:"monitor_id"`
-		} `json:"data"`
-	}
+	var historyResp apiopenapi.ChannelMonitorRunListResponse
 	if err := json.NewDecoder(historyRec.Body).Decode(&historyResp); err != nil {
 		t.Fatalf("decode history: %v", err)
 	}
-	if len(historyResp.Data) != 1 || historyResp.Data[0].MonitorID != monitorID {
+	if len(historyResp.Data) != 1 || historyResp.Data[0].MonitorId != int64(monitorID) {
 		t.Fatalf("expected one run in history, got %+v", historyResp.Data)
 	}
 
@@ -176,15 +159,11 @@ func TestChannelMonitorTemplateApply(t *testing.T) {
 		if rec.Code != http.StatusCreated {
 			t.Fatalf("expected monitor create 201, got %d body=%s", rec.Code, rec.Body.String())
 		}
-		var resp struct {
-			Data struct {
-				ID int `json:"id"`
-			} `json:"data"`
-		}
+		var resp apiopenapi.ChannelMonitorResponse
 		if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 			t.Fatalf("decode monitor: %v", err)
 		}
-		return resp.Data.ID
+		return int(resp.Data.Id)
 	}
 	m1 := makeMonitor("mon-a")
 	m2 := makeMonitor("mon-b")
@@ -195,31 +174,18 @@ func TestChannelMonitorTemplateApply(t *testing.T) {
 	if tplRec.Code != http.StatusCreated {
 		t.Fatalf("expected template create 201, got %d body=%s", tplRec.Code, tplRec.Body.String())
 	}
-	var tpl struct {
-		Data struct {
-			ID int `json:"id"`
-		} `json:"data"`
-	}
+	var tpl apiopenapi.ChannelMonitorTemplateResponse
 	if err := json.NewDecoder(tplRec.Body).Decode(&tpl); err != nil {
 		t.Fatalf("decode template: %v", err)
 	}
 
 	// Apply the template to both monitors.
 	applyBody := fmt.Sprintf(`{"monitor_ids":[%d,%d]}`, m1, m2)
-	applyRec := channelMonitorDo(t, handler, http.MethodPost, fmt.Sprintf("/api/v1/admin/channel-monitor-templates/%d/apply", tpl.Data.ID), csrf, cookie, applyBody)
+	applyRec := channelMonitorDo(t, handler, http.MethodPost, fmt.Sprintf("/api/v1/admin/channel-monitor-templates/%d/apply", tpl.Data.Id), csrf, cookie, applyBody)
 	if applyRec.Code != http.StatusOK {
 		t.Fatalf("expected template apply 200, got %d body=%s", applyRec.Code, applyRec.Body.String())
 	}
-	var applied struct {
-		Data []struct {
-			ID      int `json:"id"`
-			Request struct {
-				Method           string `json:"method"`
-				Body             string `json:"body"`
-				ResponseJSONPath string `json:"response_json_path"`
-			} `json:"request"`
-		} `json:"data"`
-	}
+	var applied apiopenapi.ChannelMonitorListResponse
 	if err := json.NewDecoder(applyRec.Body).Decode(&applied); err != nil {
 		t.Fatalf("decode apply: %v", err)
 	}
@@ -227,8 +193,14 @@ func TestChannelMonitorTemplateApply(t *testing.T) {
 		t.Fatalf("expected two monitors updated, got %d", len(applied.Data))
 	}
 	for _, def := range applied.Data {
-		if def.Request.Method != "POST" || def.Request.ResponseJSONPath != "data.0.id" {
-			t.Fatalf("template request not applied to monitor %d: %+v", def.ID, def.Request)
+		if def.Request.Method == nil || *def.Request.Method != "POST" {
+			t.Fatalf("template method not applied to monitor %d: %+v", def.Id, def.Request)
+		}
+		if def.Request.ResponseJsonPath == nil || *def.Request.ResponseJsonPath != "data.0.id" {
+			t.Fatalf("template response path not applied to monitor %d: %+v", def.Id, def.Request)
+		}
+		if def.Request.Body == nil || *def.Request.Body == "" {
+			t.Fatalf("template body not applied to monitor %d: %+v", def.Id, def.Request)
 		}
 	}
 }

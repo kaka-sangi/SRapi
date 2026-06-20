@@ -3,43 +3,17 @@ package httpserver
 import (
 	"net/http"
 	"strconv"
-	"time"
 
 	channelmonitorscontract "github.com/srapi/srapi/apps/api/internal/modules/channel_monitors/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
-type channelMonitorTemplatePayload struct {
-	ID          int                          `json:"id"`
-	Name        string                       `json:"name"`
-	Description string                       `json:"description"`
-	Request     channelMonitorRequestPayload `json:"request"`
-	CreatedAt   time.Time                    `json:"created_at"`
-	UpdatedAt   time.Time                    `json:"updated_at"`
-}
-
-type createChannelMonitorTemplateRequest struct {
-	Name        string                        `json:"name"`
-	Description string                        `json:"description"`
-	Request     *channelMonitorRequestPayload `json:"request"`
-}
-
-type updateChannelMonitorTemplateRequest struct {
-	Name        *string                       `json:"name"`
-	Description *string                       `json:"description"`
-	Request     *channelMonitorRequestPayload `json:"request"`
-}
-
-type applyChannelMonitorTemplateRequest struct {
-	MonitorIDs []int `json:"monitor_ids"`
-}
-
-func toChannelMonitorTemplatePayload(tpl channelmonitorscontract.Template) channelMonitorTemplatePayload {
-	return channelMonitorTemplatePayload{
-		ID:          tpl.ID,
+func toAPIChannelMonitorTemplate(tpl channelmonitorscontract.Template) apiopenapi.ChannelMonitorTemplate {
+	return apiopenapi.ChannelMonitorTemplate{
+		Id:          int64(tpl.ID),
 		Name:        tpl.Name,
 		Description: tpl.Description,
-		Request:     toChannelMonitorRequestPayload(tpl.Request),
+		Request:     toAPIChannelMonitorRequest(tpl.Request),
 		CreatedAt:   tpl.CreatedAt.UTC(),
 		UpdatedAt:   tpl.UpdatedAt.UTC(),
 	}
@@ -56,15 +30,15 @@ func (s *Server) handleListAdminChannelMonitorTemplates(w http.ResponseWriter, r
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list channel monitor templates", requestID)
 		return
 	}
-	data := make([]channelMonitorTemplatePayload, 0, len(templates))
+	data := make([]apiopenapi.ChannelMonitorTemplate, 0, len(templates))
 	for _, tpl := range templates {
-		data = append(data, toChannelMonitorTemplatePayload(tpl))
+		data = append(data, toAPIChannelMonitorTemplate(tpl))
 	}
 	data, pg := paginate(r, data)
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       data,
-		"pagination": pg,
-		"request_id": requestID,
+	writeJSONAny(w, http.StatusOK, apiopenapi.ChannelMonitorTemplateListResponse{
+		Data:       data,
+		Pagination: pg,
+		RequestId:  requestID,
 	})
 }
 
@@ -79,24 +53,29 @@ func (s *Server) handleCreateAdminChannelMonitorTemplate(w http.ResponseWriter, 
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
 		return
 	}
-	var body createChannelMonitorTemplateRequest
+	var body apiopenapi.CreateChannelMonitorTemplateRequest
 	if err := s.decodeJSONBody(w, r, &body); err != nil {
 		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid channel monitor template request", requestID)
 		return
 	}
+	request, ok := fromAPIChannelMonitorRequest(body.Request)
+	if !ok {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid channel monitor template request", requestID)
+		return
+	}
 	tpl, err := s.runtime.channelMonitors.CreateTemplate(r.Context(), channelmonitorscontract.CreateTemplate{
 		Name:        body.Name,
-		Description: body.Description,
-		Request:     fromChannelMonitorRequestPayload(body.Request),
+		Description: openapiOptionalString(body.Description),
+		Request:     request,
 	})
 	if err != nil {
 		s.writeChannelMonitorError(w, err, requestID)
 		return
 	}
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "channel_monitor_template.create", "channel_monitor_template", strconv.Itoa(tpl.ID), nil, map[string]any{"name": tpl.Name}))
-	writeJSONAny(w, http.StatusCreated, map[string]any{
-		"data":       toChannelMonitorTemplatePayload(tpl),
-		"request_id": requestID,
+	writeJSONAny(w, http.StatusCreated, apiopenapi.ChannelMonitorTemplateResponse{
+		Data:      toAPIChannelMonitorTemplate(tpl),
+		RequestId: requestID,
 	})
 }
 
@@ -116,7 +95,7 @@ func (s *Server) handleUpdateAdminChannelMonitorTemplate(w http.ResponseWriter, 
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid channel monitor template id", requestID)
 		return
 	}
-	var body updateChannelMonitorTemplateRequest
+	var body apiopenapi.UpdateChannelMonitorTemplateRequest
 	if err := s.decodeJSONBody(w, r, &body); err != nil {
 		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid channel monitor template request", requestID)
 		return
@@ -126,7 +105,11 @@ func (s *Server) handleUpdateAdminChannelMonitorTemplate(w http.ResponseWriter, 
 		Description: body.Description,
 	}
 	if body.Request != nil {
-		req := fromChannelMonitorRequestPayload(body.Request)
+		req, ok := fromAPIChannelMonitorRequest(body.Request)
+		if !ok {
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid channel monitor template request", requestID)
+			return
+		}
 		input.Request = &req
 	}
 	tpl, err := s.runtime.channelMonitors.UpdateTemplate(r.Context(), id, input)
@@ -135,9 +118,9 @@ func (s *Server) handleUpdateAdminChannelMonitorTemplate(w http.ResponseWriter, 
 		return
 	}
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "channel_monitor_template.update", "channel_monitor_template", strconv.Itoa(tpl.ID), nil, map[string]any{"name": tpl.Name}))
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       toChannelMonitorTemplatePayload(tpl),
-		"request_id": requestID,
+	writeJSONAny(w, http.StatusOK, apiopenapi.ChannelMonitorTemplateResponse{
+		Data:      toAPIChannelMonitorTemplate(tpl),
+		RequestId: requestID,
 	})
 }
 
@@ -162,10 +145,7 @@ func (s *Server) handleDeleteAdminChannelMonitorTemplate(w http.ResponseWriter, 
 		return
 	}
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "channel_monitor_template.delete", "channel_monitor_template", strconv.Itoa(id), nil, nil))
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       map[string]any{"id": id, "deleted": true},
-		"request_id": requestID,
-	})
+	writeJSONAny(w, http.StatusOK, deleteResponse(true, requestID))
 }
 
 func (s *Server) handleApplyAdminChannelMonitorTemplate(w http.ResponseWriter, r *http.Request) {
@@ -184,25 +164,34 @@ func (s *Server) handleApplyAdminChannelMonitorTemplate(w http.ResponseWriter, r
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid channel monitor template id", requestID)
 		return
 	}
-	var body applyChannelMonitorTemplateRequest
+	var body apiopenapi.ApplyChannelMonitorTemplateRequest
 	if err := s.decodeJSONBody(w, r, &body); err != nil {
 		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid channel monitor template apply request", requestID)
 		return
 	}
-	defs, err := s.runtime.channelMonitors.ApplyTemplate(r.Context(), id, body.MonitorIDs)
+	monitorIDs := make([]int, 0, len(body.MonitorIds))
+	for _, monitorID := range body.MonitorIds {
+		converted, ok := positiveIntFromInt64(monitorID)
+		if !ok {
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid channel monitor template apply request", requestID)
+			return
+		}
+		monitorIDs = append(monitorIDs, converted)
+	}
+	defs, err := s.runtime.channelMonitors.ApplyTemplate(r.Context(), id, monitorIDs)
 	if err != nil {
 		s.writeChannelMonitorError(w, err, requestID)
 		return
 	}
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "channel_monitor_template.apply", "channel_monitor_template", strconv.Itoa(id), nil, map[string]any{"applied": len(defs)}))
-	data := make([]channelMonitorPayload, 0, len(defs))
+	data := make([]apiopenapi.ChannelMonitor, 0, len(defs))
 	for _, def := range defs {
-		data = append(data, toChannelMonitorPayload(def))
+		data = append(data, toAPIChannelMonitor(def))
 	}
 	data, pg := paginate(r, data)
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       data,
-		"pagination": pg,
-		"request_id": requestID,
+	writeJSONAny(w, http.StatusOK, apiopenapi.ChannelMonitorListResponse{
+		Data:       data,
+		Pagination: pg,
+		RequestId:  requestID,
 	})
 }
