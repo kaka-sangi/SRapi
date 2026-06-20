@@ -209,6 +209,36 @@ func (e AdminSettingsCopilotSource) Valid() bool {
 	}
 }
 
+// Defines values for AdminSettingsGatewayProtocolConversionRoutes.
+const (
+	ChatCompletionsToMessages  AdminSettingsGatewayProtocolConversionRoutes = "chat_completions_to_messages"
+	ChatCompletionsToResponses AdminSettingsGatewayProtocolConversionRoutes = "chat_completions_to_responses"
+	MessagesToChatCompletions  AdminSettingsGatewayProtocolConversionRoutes = "messages_to_chat_completions"
+	MessagesToResponses        AdminSettingsGatewayProtocolConversionRoutes = "messages_to_responses"
+	ResponsesToChatCompletions AdminSettingsGatewayProtocolConversionRoutes = "responses_to_chat_completions"
+	ResponsesToMessages        AdminSettingsGatewayProtocolConversionRoutes = "responses_to_messages"
+)
+
+// Valid indicates whether the value is a known member of the AdminSettingsGatewayProtocolConversionRoutes enum.
+func (e AdminSettingsGatewayProtocolConversionRoutes) Valid() bool {
+	switch e {
+	case ChatCompletionsToMessages:
+		return true
+	case ChatCompletionsToResponses:
+		return true
+	case MessagesToChatCompletions:
+		return true
+	case MessagesToResponses:
+		return true
+	case ResponsesToChatCompletions:
+		return true
+	case ResponsesToMessages:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AdminTestResultStatus.
 const (
 	AdminTestResultStatusFailed AdminTestResultStatus = "failed"
@@ -5087,8 +5117,11 @@ type AdminSettingsGateway struct {
 
 	// PassthroughUpstreamHeaders When enabled, allowlisted upstream response headers are forwarded to the client on both the streaming and buffered gateway response paths. Hop-by-hop headers and headers SRapi already sets are never forwarded. Default off so behavior is unchanged unless explicitly enabled.
 	PassthroughUpstreamHeaders *bool `json:"passthrough_upstream_headers,omitempty"`
-	RateLimitCooldownSeconds   int   `json:"rate_limit_cooldown_seconds"`
-	RequestShaperEnabled       bool  `json:"request_shaper_enabled"`
+
+	// ProtocolConversionRoutes Enabled text endpoint conversion routes between Chat Completions, Responses, and Anthropic Messages. Missing/null preserves the default full compatibility set; an empty list disables all cross-endpoint text conversions and keeps only provider-native endpoints schedulable.
+	ProtocolConversionRoutes *[]AdminSettingsGatewayProtocolConversionRoutes `json:"protocol_conversion_routes,omitempty"`
+	RateLimitCooldownSeconds int                                             `json:"rate_limit_cooldown_seconds"`
+	RequestShaperEnabled     bool                                            `json:"request_shaper_enabled"`
 
 	// RetryCount Maximum cross-candidate gateway attempts before failing a request. Bounds how many distinct credentials the failover loop may try.
 	RetryCount *int `json:"retry_count,omitempty"`
@@ -5105,6 +5138,9 @@ type AdminSettingsGateway struct {
 	SchedulerStrategyShadowStrategy *SchedulerStrategyName `json:"scheduler_strategy_shadow_strategy,omitempty"`
 	StreamTimeoutSeconds            int                    `json:"stream_timeout_seconds"`
 }
+
+// AdminSettingsGatewayProtocolConversionRoutes defines model for AdminSettingsGateway.ProtocolConversionRoutes.
+type AdminSettingsGatewayProtocolConversionRoutes string
 
 // AdminSettingsGeneral defines model for AdminSettingsGeneral.
 type AdminSettingsGeneral struct {

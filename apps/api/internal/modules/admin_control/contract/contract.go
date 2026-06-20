@@ -161,6 +161,7 @@ type AdminSettingsGateway struct {
 	RateLimitCooldownSeconds             int      `json:"rate_limit_cooldown_seconds"`
 	StreamTimeoutSeconds                 int      `json:"stream_timeout_seconds"`
 	RequestShaperEnabled                 bool     `json:"request_shaper_enabled"`
+	ProtocolConversionRoutes             []string `json:"protocol_conversion_routes"`
 	RetryCount                           int      `json:"retry_count"`
 	MaxRetryCredentials                  int      `json:"max_retry_credentials"`
 	MaxRetryIntervalMS                   int      `json:"max_retry_interval_ms"`

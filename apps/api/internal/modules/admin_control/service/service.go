@@ -111,7 +111,9 @@ func cloneStringSlice(values []string) []string {
 	if values == nil {
 		return nil
 	}
-	return append([]string(nil), values...)
+	out := make([]string, len(values))
+	copy(out, values)
+	return out
 }
 
 func cloneBoolPtr(value *bool) *bool {

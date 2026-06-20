@@ -2,7 +2,7 @@ import type { AdminSettingsDraft } from "@/lib/admin-settings-form";
 import { type SettingsTab } from "@/lib/admin-settings-form";
 
 /** Graphical controls for the list/map fields the draft tracks outside `value`. */
-export type SpecialKind = "tags" | "models" | "templates" | "json";
+export type SpecialKind = "tags" | "models" | "conversion-routes" | "templates" | "json";
 export interface SpecialField {
   key: keyof AdminSettingsDraft;
   kind: SpecialKind;
@@ -18,6 +18,11 @@ export const SPECIAL_FIELDS: Partial<Record<SettingsTab, SpecialField[]>> = {
       key: "schedulerRolloutApiKeyHashes",
       kind: "tags",
       skip: "scheduler_strategy_rollout_api_key_hashes",
+    },
+    {
+      key: "protocolConversionRoutes",
+      kind: "conversion-routes",
+      skip: "protocol_conversion_routes",
     },
     {
       key: "passthroughHeaderAllowlist",

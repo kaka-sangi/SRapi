@@ -26296,6 +26296,30 @@ components:
           minimum: 1
         request_shaper_enabled:
           type: boolean
+        protocol_conversion_routes:
+          type: array
+          items:
+            type: string
+            enum:
+              - chat_completions_to_responses
+              - chat_completions_to_messages
+              - responses_to_chat_completions
+              - responses_to_messages
+              - messages_to_chat_completions
+              - messages_to_responses
+          default:
+            - chat_completions_to_responses
+            - chat_completions_to_messages
+            - responses_to_chat_completions
+            - responses_to_messages
+            - messages_to_chat_completions
+            - messages_to_responses
+          description: >-
+            Enabled text endpoint conversion routes between Chat Completions,
+            Responses, and Anthropic Messages. Missing/null preserves the
+            default full compatibility set; an empty list disables all
+            cross-endpoint text conversions and keeps only provider-native
+            endpoints schedulable.
         scheduler_strategy_rollout_enabled:
           type: boolean
           default: false

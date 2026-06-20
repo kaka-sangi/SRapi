@@ -767,6 +767,7 @@ func toAPIAdminSettings(in admincontrol.AdminSettings) apiopenapi.AdminSettings 
 			OverloadCooldownSeconds:              in.Gateway.OverloadCooldownSeconds,
 			PassthroughHeaderAllowlist:           stringSlicePtr(in.Gateway.PassthroughHeaderAllowlist),
 			PassthroughUpstreamHeaders:           boolPtrValueForAPI(in.Gateway.PassthroughUpstreamHeaders),
+			ProtocolConversionRoutes:             apiProtocolConversionRoutesPtr(in.Gateway.ProtocolConversionRoutes),
 			RateLimitCooldownSeconds:             in.Gateway.RateLimitCooldownSeconds,
 			RequestShaperEnabled:                 in.Gateway.RequestShaperEnabled,
 			RetryCount:                           intPtrValueForAPI(in.Gateway.RetryCount),
@@ -867,6 +868,7 @@ func adminSettingsFromAPI(in apiopenapi.AdminSettings) admincontrol.AdminSetting
 			OverloadCooldownSeconds:              in.Gateway.OverloadCooldownSeconds,
 			PassthroughHeaderAllowlist:           stringSliceFromPtr(in.Gateway.PassthroughHeaderAllowlist),
 			PassthroughUpstreamHeaders:           boolFromPtr(in.Gateway.PassthroughUpstreamHeaders),
+			ProtocolConversionRoutes:             protocolConversionRoutesFromAPI(in.Gateway.ProtocolConversionRoutes),
 			RateLimitCooldownSeconds:             in.Gateway.RateLimitCooldownSeconds,
 			RequestShaperEnabled:                 in.Gateway.RequestShaperEnabled,
 			RetryCount:                           intFromPtr(in.Gateway.RetryCount),
@@ -984,6 +986,31 @@ func stringSliceFromPtr(values *[]string) []string {
 		return nil
 	}
 	return append([]string(nil), (*values)...)
+}
+
+func apiProtocolConversionRoutesPtr(values []string) *[]apiopenapi.AdminSettingsGatewayProtocolConversionRoutes {
+	if values == nil {
+		values = defaultGatewayProtocolConversionRoutes()
+	}
+	out := make([]apiopenapi.AdminSettingsGatewayProtocolConversionRoutes, 0, len(values))
+	for _, value := range values {
+		route := apiopenapi.AdminSettingsGatewayProtocolConversionRoutes(strings.TrimSpace(value))
+		if route.Valid() {
+			out = append(out, route)
+		}
+	}
+	return &out
+}
+
+func protocolConversionRoutesFromAPI(values *[]apiopenapi.AdminSettingsGatewayProtocolConversionRoutes) []string {
+	if values == nil {
+		return nil
+	}
+	out := make([]string, 0, len(*values))
+	for _, value := range *values {
+		out = append(out, string(value))
+	}
+	return out
 }
 
 func boolFromPtr(value *bool) bool {

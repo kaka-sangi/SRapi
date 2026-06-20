@@ -1,10 +1,15 @@
 import { useLanguage } from "@/context/LanguageContext";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { TagInput } from "@/components/ui/tag-input";
 import { MultiSelect, type MultiSelectOption } from "@/components/ui/multi-select";
 import { KeyValueEditor } from "@/components/ui/key-value-editor";
-import { type AdminSettingsDraft } from "@/lib/admin-settings-form";
+import {
+  PROTOCOL_CONVERSION_ROUTES,
+  type AdminSettingsDraft,
+  type ProtocolConversionRoute,
+} from "@/lib/admin-settings-form";
 import { type SpecialField, fieldLabel } from "./settings-fields";
 
 /**
@@ -42,6 +47,39 @@ export function SpecialFieldRow({
         {hint !== hintId ? (
           <p className="mt-1 text-2xs text-srapi-text-tertiary">{hint}</p>
         ) : null}
+      </div>
+    );
+  }
+
+  if (field.kind === "conversion-routes") {
+    const selected = new Set(Array.isArray(value) ? (value as ProtocolConversionRoute[]) : []);
+    const routes = protocolConversionRouteOptions(t);
+    return (
+      <div>
+        <Label>{label}</Label>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          {routes.map((route) => {
+            const checked = selected.has(route.value);
+            return (
+              <label
+                key={route.value}
+                className="flex min-h-10 cursor-pointer items-center gap-3 rounded-md border border-srapi-border bg-srapi-surface/40 px-3 py-2 text-sm"
+              >
+                <Checkbox
+                  checked={checked}
+                  onChange={(e) => {
+                    const next = new Set(selected);
+                    if (e.target.checked) next.add(route.value);
+                    else next.delete(route.value);
+                    onChange(field.key, routes.map((item) => item.value).filter((item) => next.has(item)));
+                  }}
+                />
+                <span>{route.label}</span>
+              </label>
+            );
+          })}
+        </div>
+        <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("adminSettings.fields.protocol_conversion_routes_hint")}</p>
       </div>
     );
   }
@@ -103,4 +141,11 @@ export function SpecialFieldRow({
       <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("adminSettings.customMenusHint")}</p>
     </div>
   );
+}
+
+function protocolConversionRouteOptions(t: (key: string) => string): Array<{ value: ProtocolConversionRoute; label: string }> {
+  return PROTOCOL_CONVERSION_ROUTES.map((value) => ({
+    value,
+    label: t(`adminSettings.protocolConversionRoutes.${value}`),
+  }));
 }

@@ -191,6 +191,7 @@ func (rt *runtimeState) scheduleGatewayRequest(ctx context.Context, req schedule
 	// drive an account that would get banned for it.
 	candidates = filterCandidatesByAllowedClients(candidates, gatewayInboundClientFromContext(ctx))
 	candidates = rt.filterCandidatesByEnabledChannels(ctx, candidates)
+	candidates = rt.filterCandidatesByProtocolConversions(ctx, candidates)
 	var boundSessionAccountID *int
 	if req.StickyAccountID == nil && strings.TrimSpace(req.SessionAffinityKey) != "" {
 		// Prefer a persisted session→account binding (automatic stickiness across

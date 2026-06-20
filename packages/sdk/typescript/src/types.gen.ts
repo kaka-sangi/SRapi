@@ -3775,6 +3775,10 @@ export type AdminSettingsGateway = {
     stream_timeout_seconds: number;
     request_shaper_enabled: boolean;
     /**
+     * Enabled text endpoint conversion routes between Chat Completions, Responses, and Anthropic Messages. Missing/null preserves the default full compatibility set; an empty list disables all cross-endpoint text conversions and keeps only provider-native endpoints schedulable.
+     */
+    protocol_conversion_routes?: Array<'chat_completions_to_responses' | 'chat_completions_to_messages' | 'responses_to_chat_completions' | 'responses_to_messages' | 'messages_to_chat_completions' | 'messages_to_responses'>;
+    /**
      * Enables deterministic real-traffic Scheduler shadow strategy rollout.
      */
     scheduler_strategy_rollout_enabled?: boolean;

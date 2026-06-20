@@ -2833,6 +2833,9 @@ export const zh: Messages = {
       scheduler_strategy_rollout_enabled: "调度策略灰度",
       scheduler_strategy_shadow_strategy: "影子调度策略",
       scheduler_strategy_rollout_percent: "灰度比例（%）",
+      protocol_conversion_routes: "协议转换开关",
+      protocol_conversion_routes_hint:
+        "控制 /v1/chat/completions、/v1/responses、/v1/messages 之间哪些跨端点文本转换允许被调度。取消某个方向后，只保留目标提供商原生端点能力。",
       // payment / backup (shared key)
       enabled: "启用",
       subscription_plans_enabled: "启用订阅套餐",
@@ -2867,6 +2870,14 @@ export const zh: Messages = {
         "需要从上游响应透传给客户端的响应头名称（不区分大小写，如 retry-after、x-request-id、x-ratelimit-remaining）。结尾使用 * 可按前缀匹配（如 x-ratelimit-*）。逐跳响应头以及 SRapi 已设置的响应头永不透传。",
       providers: "支付提供方",
       templates: "邮件模板",
+    },
+    protocolConversionRoutes: {
+      chat_completions_to_responses: "Chat Completions → Responses",
+      chat_completions_to_messages: "Chat Completions → Messages",
+      responses_to_chat_completions: "Responses → Chat Completions",
+      responses_to_messages: "Responses → Messages",
+      messages_to_chat_completions: "Messages → Chat Completions",
+      messages_to_responses: "Messages → Responses",
     },
   },
   chat: {

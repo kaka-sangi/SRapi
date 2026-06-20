@@ -1,11 +1,24 @@
 import type {
   AdminSettings,
   AdminSettingsCopilotWritable,
+  AdminSettingsGateway,
 } from "../../../../packages/sdk/typescript/src/types.gen";
 
 // The write model carries the write-only `dedicated_api_key`; the copilot
 // settings form edits that field, so it works against the writable shape.
 export type AdminSettingsCopilot = AdminSettingsCopilotWritable;
+export type ProtocolConversionRoute = NonNullable<AdminSettingsGateway["protocol_conversion_routes"]>[number];
+
+export const PROTOCOL_CONVERSION_ROUTES = [
+  "chat_completions_to_responses",
+  "chat_completions_to_messages",
+  "responses_to_chat_completions",
+  "responses_to_messages",
+  "messages_to_chat_completions",
+  "messages_to_responses",
+] as const satisfies readonly ProtocolConversionRoute[];
+
+const protocolConversionRouteSet = new Set<string>(PROTOCOL_CONVERSION_ROUTES);
 
 export type SettingsTab =
   | "general"
@@ -39,6 +52,7 @@ export interface AdminSettingsDraft {
   oauthProviders: string[];
   schedulerRolloutModels: string[];
   schedulerRolloutApiKeyHashes: string[];
+  protocolConversionRoutes: ProtocolConversionRoute[];
   passthroughHeaderAllowlist: string[];
   paymentProviders: string[];
   emailTemplates: Record<string, string>;
@@ -58,6 +72,7 @@ export function createSettingsDraft(value: AdminSettings): AdminSettingsDraft {
     oauthProviders: [...(value.security.oauth_providers ?? [])],
     schedulerRolloutModels: [...(value.gateway.scheduler_strategy_rollout_models ?? [])],
     schedulerRolloutApiKeyHashes: [...(value.gateway.scheduler_strategy_rollout_api_key_hashes ?? [])],
+    protocolConversionRoutes: cleanProtocolConversionRoutes(value.gateway.protocol_conversion_routes),
     passthroughHeaderAllowlist: [...(value.gateway.passthrough_header_allowlist ?? [])],
     paymentProviders: [...(value.payment.providers ?? [])],
     emailTemplates: { ...(value.email.templates ?? {}) },
@@ -84,6 +99,7 @@ export function materializeSettingsDraft(draft: AdminSettingsDraft): AdminSettin
       ...draft.value.gateway,
       scheduler_strategy_rollout_models: cleanList(draft.schedulerRolloutModels),
       scheduler_strategy_rollout_api_key_hashes: cleanList(draft.schedulerRolloutApiKeyHashes),
+      protocol_conversion_routes: cleanProtocolConversionRoutes(draft.protocolConversionRoutes),
       passthrough_header_allowlist: cleanList(draft.passthroughHeaderAllowlist),
     },
     payment: {
@@ -144,6 +160,16 @@ export function cleanList(items: string[] | undefined): string[] {
     if (trimmed && !out.includes(trimmed)) out.push(trimmed);
   }
   return out;
+}
+
+/** Keep only known endpoint conversion routes while preserving display order. */
+export function cleanProtocolConversionRoutes(items: readonly string[] | undefined): ProtocolConversionRoute[] {
+  const selected = new Set<string>();
+  for (const item of items ?? []) {
+    const trimmed = item.trim();
+    if (protocolConversionRouteSet.has(trimmed)) selected.add(trimmed);
+  }
+  return PROTOCOL_CONVERSION_ROUTES.filter((route) => selected.has(route));
 }
 
 /** Drop blank keys and coerce values to strings for the email-template map. */

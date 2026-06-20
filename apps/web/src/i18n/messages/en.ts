@@ -2896,6 +2896,9 @@ export const en = {
       scheduler_strategy_rollout_enabled: "Scheduler rollout",
       scheduler_strategy_shadow_strategy: "Shadow strategy",
       scheduler_strategy_rollout_percent: "Rollout percent (%)",
+      protocol_conversion_routes: "Protocol conversions",
+      protocol_conversion_routes_hint:
+        "Controls which cross-endpoint text conversions may be scheduled between /v1/chat/completions, /v1/responses, and /v1/messages. Clearing a route keeps only provider-native endpoint support for that direction.",
       enabled: "Enabled",
       subscription_plans_enabled: "Subscription plans",
       smtp_configured: "SMTP configured",
@@ -2926,6 +2929,14 @@ export const en = {
         "Case-insensitive header names to forward from the upstream response (e.g. retry-after, x-request-id, x-ratelimit-remaining). A trailing * matches by prefix (x-ratelimit-*). Hop-by-hop headers and headers SRapi already sets are never forwarded.",
       providers: "Payment providers",
       templates: "Email templates",
+    },
+    protocolConversionRoutes: {
+      chat_completions_to_responses: "Chat Completions → Responses",
+      chat_completions_to_messages: "Chat Completions → Messages",
+      responses_to_chat_completions: "Responses → Chat Completions",
+      responses_to_messages: "Responses → Messages",
+      messages_to_chat_completions: "Messages → Chat Completions",
+      messages_to_responses: "Messages → Responses",
     },
   },
   chat: {

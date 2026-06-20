@@ -569,6 +569,63 @@ func TestUpdateAdminSettingsNormalizesGatewayRetryKnobs(t *testing.T) {
 	}
 }
 
+func TestUpdateAdminSettingsNormalizesProtocolConversionRoutes(t *testing.T) {
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.June, 21, 10, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	settings, err := svc.GetAdminSettings(context.Background())
+	if err != nil {
+		t.Fatalf("get admin settings: %v", err)
+	}
+	if len(settings.Gateway.ProtocolConversionRoutes) != 6 {
+		t.Fatalf("expected default conversion routes, got %+v", settings.Gateway.ProtocolConversionRoutes)
+	}
+	settings.Gateway.ProtocolConversionRoutes = []string{
+		"Messages_To_Responses",
+		"unknown",
+		" messages_to_responses ",
+		"chat_completions_to_messages",
+		"",
+	}
+
+	updated, err := svc.UpdateAdminSettings(context.Background(), settings, 1)
+	if err != nil {
+		t.Fatalf("update admin settings: %v", err)
+	}
+	want := []string{"messages_to_responses", "chat_completions_to_messages"}
+	if len(updated.Gateway.ProtocolConversionRoutes) != len(want) {
+		t.Fatalf("routes = %v, want %v", updated.Gateway.ProtocolConversionRoutes, want)
+	}
+	for idx, value := range want {
+		if updated.Gateway.ProtocolConversionRoutes[idx] != value {
+			t.Fatalf("routes[%d] = %q, want %q (%v)", idx, updated.Gateway.ProtocolConversionRoutes[idx], value, updated.Gateway.ProtocolConversionRoutes)
+		}
+	}
+}
+
+func TestUpdateAdminSettingsPreservesEmptyProtocolConversionRoutes(t *testing.T) {
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.June, 21, 10, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	settings, err := svc.GetAdminSettings(context.Background())
+	if err != nil {
+		t.Fatalf("get admin settings: %v", err)
+	}
+	settings.Gateway.ProtocolConversionRoutes = []string{}
+
+	updated, err := svc.UpdateAdminSettings(context.Background(), settings, 1)
+	if err != nil {
+		t.Fatalf("update admin settings: %v", err)
+	}
+	if updated.Gateway.ProtocolConversionRoutes == nil || len(updated.Gateway.ProtocolConversionRoutes) != 0 {
+		t.Fatalf("expected explicit empty conversion routes to persist, got %#v", updated.Gateway.ProtocolConversionRoutes)
+	}
+}
+
 func TestBatchEnableRedeemCodesFlipsDisabledBackToActive(t *testing.T) {
 	now := time.Date(2026, time.June, 9, 9, 0, 0, 0, time.UTC)
 	store := admincontrolmemory.New()

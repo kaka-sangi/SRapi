@@ -53,6 +53,15 @@ var defaultGatewayPassthroughHeaderAllowlist = []string{
 	"x-codex-primary-over-secondary-limit-percent",
 }
 
+var defaultGatewayProtocolConversionRoutes = []string{
+	"chat_completions_to_responses",
+	"chat_completions_to_messages",
+	"responses_to_chat_completions",
+	"responses_to_messages",
+	"messages_to_chat_completions",
+	"messages_to_responses",
+}
+
 func (s *Service) GetAdminSettings(ctx context.Context) (admincontrol.AdminSettings, error) {
 	settings, err := s.settingsCache.Get(ctx, s.loadAdminSettings)
 	if err != nil {
@@ -126,6 +135,7 @@ func defaultAdminSettings(now time.Time) admincontrol.AdminSettings {
 			RateLimitCooldownSeconds:             30,
 			StreamTimeoutSeconds:                 600,
 			RequestShaperEnabled:                 true,
+			ProtocolConversionRoutes:             cloneStringSlice(defaultGatewayProtocolConversionRoutes),
 			RetryCount:                           3,
 			MaxRetryCredentials:                  0,
 			MaxRetryIntervalMS:                   2000,
@@ -203,6 +213,7 @@ func normalizeAdminSettings(settings admincontrol.AdminSettings) (admincontrol.A
 	settings.Security.OAuthProviderConfigs = oauthProviderConfigs
 	settings.Gateway.SchedulerStrategyRolloutModels = uniqueTrimmedStrings(settings.Gateway.SchedulerStrategyRolloutModels)
 	settings.Gateway.SchedulerStrategyRolloutAPIKeyHashes = uniqueTrimmedStrings(settings.Gateway.SchedulerStrategyRolloutAPIKeyHashes)
+	settings.Gateway.ProtocolConversionRoutes = normalizeGatewayProtocolConversionRoutes(settings.Gateway.ProtocolConversionRoutes)
 	settings.Gateway.RetryCount = normalizeGatewayRetryCount(settings.Gateway.RetryCount)
 	settings.Gateway.MaxRetryCredentials = normalizeGatewayMaxRetryCredentials(settings.Gateway.MaxRetryCredentials)
 	settings.Gateway.MaxRetryIntervalMS = normalizeGatewayMaxRetryIntervalMS(settings.Gateway.MaxRetryIntervalMS)
@@ -280,6 +291,9 @@ func normalizeAdminSettings(settings admincontrol.AdminSettings) (admincontrol.A
 	if settings.Gateway.SchedulerStrategyRolloutAPIKeyHashes == nil {
 		settings.Gateway.SchedulerStrategyRolloutAPIKeyHashes = []string{}
 	}
+	if settings.Gateway.ProtocolConversionRoutes == nil {
+		settings.Gateway.ProtocolConversionRoutes = cloneStringSlice(defaultGatewayProtocolConversionRoutes)
+	}
 	settings.Copilot.Source = strings.TrimSpace(strings.ToLower(settings.Copilot.Source))
 	if settings.Copilot.Source != "dedicated" {
 		settings.Copilot.Source = "account"
@@ -332,6 +346,33 @@ func normalizeGatewayMaxRetryIntervalMS(value int) int {
 		return gatewayMaxRetryIntervalDefault
 	}
 	return value
+}
+
+func normalizeGatewayProtocolConversionRoutes(values []string) []string {
+	if values == nil {
+		return nil
+	}
+	allowed := map[string]struct{}{}
+	for _, route := range defaultGatewayProtocolConversionRoutes {
+		allowed[route] = struct{}{}
+	}
+	out := make([]string, 0, len(values))
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		normalized := strings.ToLower(strings.TrimSpace(value))
+		if normalized == "" {
+			continue
+		}
+		if _, ok := allowed[normalized]; !ok {
+			continue
+		}
+		if _, ok := seen[normalized]; ok {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		out = append(out, normalized)
+	}
+	return out
 }
 
 func normalizeOAuthProviderConfigs(values []admincontrol.OAuthProviderConfig) ([]admincontrol.OAuthProviderConfig, error) {
@@ -560,6 +601,7 @@ func cloneAdminSettings(settings admincontrol.AdminSettings) admincontrol.AdminS
 	settings.Security.RegistrationEmailSuffixAllowlist = cloneStringSlice(settings.Security.RegistrationEmailSuffixAllowlist)
 	settings.Security.OAuthProviders = cloneStringSlice(settings.Security.OAuthProviders)
 	settings.Security.OAuthProviderConfigs = cloneOAuthProviderConfigs(settings.Security.OAuthProviderConfigs)
+	settings.Gateway.ProtocolConversionRoutes = cloneStringSlice(settings.Gateway.ProtocolConversionRoutes)
 	settings.Gateway.SchedulerStrategyRolloutModels = cloneStringSlice(settings.Gateway.SchedulerStrategyRolloutModels)
 	settings.Gateway.SchedulerStrategyRolloutAPIKeyHashes = cloneStringSlice(settings.Gateway.SchedulerStrategyRolloutAPIKeyHashes)
 	settings.Gateway.PassthroughHeaderAllowlist = cloneStringSlice(settings.Gateway.PassthroughHeaderAllowlist)
