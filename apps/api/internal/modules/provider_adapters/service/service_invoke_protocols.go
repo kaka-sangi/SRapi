@@ -937,6 +937,7 @@ func openAIResponsesBody(req contract.ConversationRequest) ([]byte, error) {
 		normalizeOpenAIResponsesServiceTier(payload)
 		normalizeOpenAIResponsesImageGenerationTools(payload)
 		applyDisableImageGenerationToResponsesPayload(req, payload)
+		normalizeOpenAIResponsesReasoning(req, payload)
 		return json.Marshal(payload)
 	}
 	payload := openAICanonicalResponsesPayload(req)
@@ -947,6 +948,7 @@ func openAIResponsesBody(req contract.ConversationRequest) ([]byte, error) {
 	normalizeOpenAIResponsesServiceTier(payload)
 	normalizeOpenAIResponsesImageGenerationTools(payload)
 	applyDisableImageGenerationToResponsesPayload(req, payload)
+	normalizeOpenAIResponsesReasoning(req, payload)
 	return json.Marshal(payload)
 }
 
@@ -984,6 +986,27 @@ func openAICanonicalResponsesPayload(req contract.ConversationRequest) map[strin
 		payload["reasoning"] = cloneMap(req.Reasoning)
 	}
 	return payload
+}
+
+func normalizeOpenAIResponsesReasoning(req contract.ConversationRequest, payload map[string]any) {
+	if len(payload) == 0 || !isKimiCompatibleProvider(req) {
+		return
+	}
+	reasoning, _ := payload["reasoning"].(map[string]any)
+	if !kimiReasoningDisabled(req.Reasoning) && !kimiReasoningDisabled(reasoning) {
+		if effort := kimiReasoningEffort(req.Reasoning); effort != "" {
+			if reasoning == nil {
+				reasoning = map[string]any{}
+				payload["reasoning"] = reasoning
+			}
+			reasoning["effort"] = effort
+			delete(reasoning, "budget_tokens")
+			delete(reasoning, "type")
+		}
+		return
+	}
+	delete(payload, "reasoning")
+	payload["thinking"] = map[string]any{"type": "disabled"}
 }
 
 func openAIApplyResponsesPayloadDefaults(req contract.ConversationRequest, payload map[string]any) {

@@ -351,6 +351,80 @@ func isBedrockCompatible(req contract.ConversationRequest) bool {
 	return false
 }
 
+func isKimiCompatibleProvider(req contract.ConversationRequest) bool {
+	for _, value := range []string{
+		req.Provider.Name,
+		req.Provider.AdapterType,
+		requestSetting(req, "provider_key", "provider", "platform", "vendor", "model_catalog_owner"),
+	} {
+		value = strings.ToLower(strings.TrimSpace(value))
+		if value == "kimi" || value == "moonshot" || strings.Contains(value, "moonshot") {
+			return true
+		}
+	}
+	baseURL := strings.ToLower(requestSetting(req, "base_url", "default_base_url"))
+	return strings.Contains(baseURL, "api.moonshot.ai")
+}
+
+func kimiReasoningDisabled(reasoning map[string]any) bool {
+	if len(reasoning) == 0 {
+		return false
+	}
+	if strings.EqualFold(strings.TrimSpace(metadataString(reasoning, "type")), "disabled") {
+		return true
+	}
+	effort := strings.ToLower(strings.TrimSpace(firstNonEmpty(
+		metadataString(reasoning, "effort"),
+		metadataString(reasoning, "level"),
+	)))
+	if effort == "none" {
+		return true
+	}
+	if budget, ok := intFromAny(reasoning["budget_tokens"]); ok && budget == 0 {
+		return true
+	}
+	return false
+}
+
+func kimiReasoningEffort(reasoning map[string]any) string {
+	if len(reasoning) == 0 {
+		return ""
+	}
+	effort := strings.ToLower(strings.TrimSpace(firstNonEmpty(
+		metadataString(reasoning, "effort"),
+		metadataString(reasoning, "level"),
+	)))
+	if effort != "" {
+		return effort
+	}
+	if budget, ok := intFromAny(reasoning["budget_tokens"]); ok {
+		if budget == -1 {
+			return "auto"
+		}
+		return kimiReasoningLevelForBudget(budget)
+	}
+	return ""
+}
+
+func kimiReasoningLevelForBudget(budget int) string {
+	switch {
+	case budget < 0:
+		return ""
+	case budget == 0:
+		return "none"
+	case budget <= 512:
+		return "minimal"
+	case budget <= 1024:
+		return "low"
+	case budget <= 8192:
+		return "medium"
+	case budget <= 24576:
+		return "high"
+	default:
+		return "xhigh"
+	}
+}
+
 func unsupportedPresetOAuthRuntime(req contract.ConversationRequest) error {
 	runtimeClass := strings.ToLower(strings.TrimSpace(string(req.Account.RuntimeClass)))
 	if runtimeClass != string(accountcontract.RuntimeClassOauthRefresh) && runtimeClass != string(accountcontract.RuntimeClassOauthDeviceCode) {

@@ -635,6 +635,217 @@ func TestOpenAICompatibleAdapterSendsCanonicalReasoningEffort(t *testing.T) {
 	}
 }
 
+func TestKimiCompatibleAdapterDisablesThinkingWithProviderShape(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if _, ok := payload["reasoning_effort"]; ok {
+			t.Fatalf("Kimi disabled thinking must not use reasoning_effort, got %+v", payload)
+		}
+		thinking, _ := payload["thinking"].(map[string]any)
+		if thinking["type"] != "disabled" {
+			t.Fatalf("expected Kimi disabled thinking object, got %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"kimi disabled ok"}}],"usage":{"prompt_tokens":2,"completion_tokens":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_kimi_reasoning_disabled",
+		Model:      "kimi-local",
+		InputParts: textParts("answer directly"),
+		Reasoning:  map[string]any{"effort": "none", "type": "disabled", "budget_tokens": 0},
+		Provider:   providercontract.Provider{Name: "kimi", AdapterType: "openai-compatible", Protocol: "openai-compatible"},
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "kimi-upstream"},
+		Credential: map[string]any{"api_key": "upstream-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke Kimi upstream: %v", err)
+	}
+	if conversationResponseText(resp) != "kimi disabled ok" {
+		t.Fatalf("unexpected Kimi response: %+v", resp)
+	}
+}
+
+func TestKimiCompatibleAdapterMapsReasoningBudgetToEffort(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if payload["reasoning_effort"] != "medium" {
+			t.Fatalf("expected Kimi budget to become reasoning_effort=medium, got %+v", payload)
+		}
+		if _, ok := payload["thinking"]; ok {
+			t.Fatalf("enabled Kimi thinking should not carry disabled thinking object, got %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"kimi medium ok"}}],"usage":{"prompt_tokens":2,"completion_tokens":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_kimi_reasoning_budget",
+		Model:      "kimi-local",
+		InputParts: textParts("think"),
+		Reasoning:  map[string]any{"type": "enabled", "budget_tokens": 8192},
+		Provider:   providercontract.Provider{Name: "kimi", AdapterType: "openai-compatible", Protocol: "openai-compatible"},
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "kimi-upstream"},
+		Credential: map[string]any{"api_key": "upstream-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke Kimi upstream: %v", err)
+	}
+	if conversationResponseText(resp) != "kimi medium ok" {
+		t.Fatalf("unexpected Kimi response: %+v", resp)
+	}
+}
+
+func TestOpenAICompatibleAdapterKeepsNoneReasoningEffortForGenericProvider(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if payload["reasoning_effort"] != "none" {
+			t.Fatalf("generic OpenAI-compatible provider should keep reasoning_effort=none, got %+v", payload)
+		}
+		if _, ok := payload["thinking"]; ok {
+			t.Fatalf("generic OpenAI-compatible provider must not receive Kimi thinking object, got %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"generic none ok"}}],"usage":{"prompt_tokens":2,"completion_tokens":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_generic_reasoning_none",
+		Model:      "generic-local",
+		InputParts: textParts("answer directly"),
+		Reasoning:  map[string]any{"effort": "none", "type": "disabled", "budget_tokens": 0},
+		Provider:   providercontract.Provider{AdapterType: "openai-compatible", Protocol: "openai-compatible"},
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "generic-upstream"},
+		Credential: map[string]any{"api_key": "upstream-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke generic upstream: %v", err)
+	}
+	if conversationResponseText(resp) != "generic none ok" {
+		t.Fatalf("unexpected generic response: %+v", resp)
+	}
+}
+
+func TestKimiCompatibleResponsesPayloadNormalizesDisabledThinking(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/responses" {
+			t.Fatalf("expected /v1/responses path, got %s", r.URL.Path)
+		}
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if _, ok := payload["reasoning"]; ok {
+			t.Fatalf("Kimi disabled responses thinking must not keep reasoning object, got %+v", payload)
+		}
+		thinking, _ := payload["thinking"].(map[string]any)
+		if thinking["type"] != "disabled" {
+			t.Fatalf("expected Kimi disabled thinking object, got %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"resp_kimi_disabled","object":"response","output":[{"type":"message","content":[{"type":"output_text","text":"kimi responses disabled ok"}]}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_kimi_responses_disabled",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		Model:          "kimi-local",
+		RawBody:        []byte(`{"model":"kimi-local","input":"hello","reasoning":{"effort":"none"},"stream":false}`),
+		Reasoning:      map[string]any{"effort": "none", "type": "disabled", "budget_tokens": 0},
+		Provider:       providercontract.Provider{Name: "kimi", AdapterType: "openai-compatible", Protocol: "openai-compatible", ConfigSchema: map[string]any{"responses_passthrough": true}},
+		Account:        accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:        modelcontract.ModelProviderMapping{UpstreamModelName: "kimi-upstream"},
+		Credential:     map[string]any{"api_key": "upstream-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke Kimi responses upstream: %v", err)
+	}
+	if conversationResponseText(resp) != "kimi responses disabled ok" {
+		t.Fatalf("unexpected Kimi responses result: %+v", resp)
+	}
+}
+
+func TestKimiCompatibleResponsesPayloadMapsReasoningBudgetToEffort(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/responses" {
+			t.Fatalf("expected /v1/responses path, got %s", r.URL.Path)
+		}
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		reasoning, _ := payload["reasoning"].(map[string]any)
+		if reasoning["effort"] != "medium" {
+			t.Fatalf("expected Kimi budget to become reasoning.effort=medium, got %+v", payload)
+		}
+		if _, ok := reasoning["budget_tokens"]; ok {
+			t.Fatalf("expected Kimi responses reasoning budget to be removed, got %+v", payload)
+		}
+		if _, ok := payload["thinking"]; ok {
+			t.Fatalf("enabled Kimi responses should not carry disabled thinking object, got %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"resp_kimi_budget","object":"response","output":[{"type":"message","content":[{"type":"output_text","text":"kimi responses budget ok"}]}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_kimi_responses_budget",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		Model:          "kimi-local",
+		InputParts:     textParts("think"),
+		Reasoning:      map[string]any{"type": "enabled", "budget_tokens": 8192},
+		Provider:       providercontract.Provider{Name: "kimi", AdapterType: "openai-compatible", Protocol: "openai-compatible", ConfigSchema: map[string]any{"responses_passthrough": true}},
+		Account:        accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:        modelcontract.ModelProviderMapping{UpstreamModelName: "kimi-upstream"},
+		Credential:     map[string]any{"api_key": "upstream-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke Kimi responses upstream: %v", err)
+	}
+	if conversationResponseText(resp) != "kimi responses budget ok" {
+		t.Fatalf("unexpected Kimi responses result: %+v", resp)
+	}
+}
+
 func TestOpenAICompatibleAdapterDoesNotUseResponsesRawBodyForChatUpstream(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/chat/completions" {

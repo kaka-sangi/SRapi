@@ -15,6 +15,7 @@ type openAIChatCompletionRequest struct {
 	Stream          bool                 `json:"stream"`
 	StreamOptions   *openAIStreamOptions `json:"stream_options,omitempty"`
 	ReasoningEffort string               `json:"reasoning_effort,omitempty"`
+	Thinking        map[string]any       `json:"thinking,omitempty"`
 	Temperature     *float32             `json:"temperature,omitempty"`
 	TopP            *float32             `json:"top_p,omitempty"`
 	MaxTokens       *int                 `json:"max_tokens,omitempty"`
@@ -84,6 +85,7 @@ func openAICompatiblePayload(req contract.ConversationRequest) openAIChatComplet
 	if effort := strings.TrimSpace(metadataString(req.Reasoning, "effort")); effort != "" {
 		payload.ReasoningEffort = effort
 	}
+	normalizeOpenAICompatibleReasoning(req, &payload)
 	if req.Stream {
 		payload.StreamOptions = &openAIStreamOptions{IncludeUsage: true}
 	}
@@ -106,6 +108,7 @@ func openAICompatibleRequestBodyRaw(req contract.ConversationRequest) ([]byte, e
 		if req.Stream {
 			ensureOpenAIStreamOptions(payload)
 		}
+		normalizeRawOpenAICompatibleReasoning(req, payload)
 		normalizeOpenAICompatibleServiceTier(payload)
 		return json.Marshal(payload)
 	}
@@ -114,6 +117,36 @@ func openAICompatibleRequestBodyRaw(req contract.ConversationRequest) ([]byte, e
 		payload.StreamOptions = &openAIStreamOptions{IncludeUsage: true}
 	}
 	return json.Marshal(payload)
+}
+
+func normalizeOpenAICompatibleReasoning(req contract.ConversationRequest, payload *openAIChatCompletionRequest) {
+	if payload == nil || !isKimiCompatibleProvider(req) {
+		return
+	}
+	if kimiReasoningDisabled(req.Reasoning) {
+		payload.ReasoningEffort = ""
+		payload.Thinking = map[string]any{"type": "disabled"}
+		return
+	}
+	if effort := kimiReasoningEffort(req.Reasoning); effort != "" {
+		payload.ReasoningEffort = effort
+		payload.Thinking = nil
+	}
+}
+
+func normalizeRawOpenAICompatibleReasoning(req contract.ConversationRequest, payload map[string]any) {
+	if len(payload) == 0 || !isKimiCompatibleProvider(req) {
+		return
+	}
+	if kimiReasoningDisabled(req.Reasoning) || strings.EqualFold(strings.TrimSpace(mapString(payload, "reasoning_effort")), "none") {
+		delete(payload, "reasoning_effort")
+		payload["thinking"] = map[string]any{"type": "disabled"}
+		return
+	}
+	if effort := kimiReasoningEffort(req.Reasoning); effort != "" {
+		payload["reasoning_effort"] = effort
+		delete(payload, "thinking")
+	}
 }
 
 func normalizeOpenAICompatibleServiceTier(payload map[string]any) {
