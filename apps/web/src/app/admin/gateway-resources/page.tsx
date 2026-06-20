@@ -21,7 +21,12 @@ import {
 import { ADMIN_ROUTES } from "@/lib/routes";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAdminGatewayResources } from "@/hooks/admin-queries";
-import type { GatewayModelResourceRow, GatewayProviderResourceRow } from "@/lib/sdk-types";
+import type {
+  GatewayModelResourceRow,
+  GatewayPricingCoverage,
+  GatewayProviderResourceRow,
+  GatewayRouteResourceRow,
+} from "@/lib/sdk-types";
 
 export default function AdminGatewayResourcesPage() {
   return (
@@ -173,6 +178,40 @@ function GatewayResourcesContent() {
               </TableScroll>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("adminGatewayResources.routeMatrix")}</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <TableScroll minWidth={1040}>
+                <Table>
+                  <TableHeader>
+                    <tr>
+                      <TableHead>{t("adminGatewayResources.model")}</TableHead>
+                      <TableHead>{t("adminGatewayResources.provider")}</TableHead>
+                      <TableHead>{t("adminGatewayResources.upstreamModel")}</TableHead>
+                      <TableHead className="text-right">
+                        {t("adminGatewayResources.routableAccountsShort")}
+                      </TableHead>
+                      <TableHead>{t("adminGatewayResources.endpoints")}</TableHead>
+                      <TableHead>{t("adminGatewayResources.pricing")}</TableHead>
+                      <TableHead className="text-right">
+                        {t("adminGatewayResources.apiKeys")}
+                      </TableHead>
+                      <TableHead>{t("adminCommon.status")}</TableHead>
+                      <TableHead>{t("adminGatewayResources.blockers")}</TableHead>
+                    </tr>
+                  </TableHeader>
+                  <TableBody>
+                    {(summary?.route_rows ?? []).map((row) => (
+                      <RouteResourceRow key={`${row.mapping_id}`} row={row} />
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableScroll>
+            </CardContent>
+          </Card>
         </div>
       ) : null}
     </>
@@ -290,7 +329,100 @@ function ModelResourceRow({ row }: { row: GatewayModelResourceRow }) {
   );
 }
 
-function PricingCoverageBadge({ pricing }: { pricing: GatewayModelResourceRow["pricing"] }) {
+function RouteResourceRow({ row }: { row: GatewayRouteResourceRow }) {
+  const { t } = useLanguage();
+  const status =
+    row.status === "ready"
+      ? { quiet: "active" as const, label: t("adminGatewayResources.ready"), icon: CheckCircle2 }
+      : row.status === "limited"
+        ? {
+            quiet: "limited" as const,
+            label: t("adminGatewayResources.limited"),
+            icon: AlertTriangle,
+          }
+        : {
+            quiet: "error" as const,
+            label: t("adminGatewayResources.blocked"),
+            icon: AlertTriangle,
+          };
+  const StatusIcon = status.icon;
+  return (
+    <TableRow>
+      <TableCell>
+        <div className="min-w-0">
+          <Link
+            href={ADMIN_ROUTES.models}
+            className="text-srapi-text-primary hover:text-srapi-accent truncate transition-colors"
+          >
+            {row.model.display_name || row.model.canonical_name}
+          </Link>
+          <div className="text-2xs text-srapi-text-tertiary truncate font-mono">
+            {row.model.canonical_name}
+          </div>
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="min-w-0">
+          <Link
+            href={ADMIN_ROUTES.providers}
+            className="text-srapi-text-primary hover:text-srapi-accent truncate transition-colors"
+          >
+            {row.provider.display_name || row.provider.name}
+          </Link>
+          <div className="text-2xs text-srapi-text-tertiary truncate font-mono">
+            {row.provider.adapter_type}
+          </div>
+        </div>
+      </TableCell>
+      <TableCell className="text-2xs text-srapi-text-secondary max-w-[220px] truncate font-mono">
+        {row.upstream_model}
+      </TableCell>
+      <TableCell className="text-2xs tabular text-right font-mono">
+        <span className={row.routable_accounts > 0 ? "text-srapi-success" : "text-srapi-error"}>
+          {row.routable_accounts}
+        </span>
+      </TableCell>
+      <TableCell>
+        <EndpointMatrix row={row} />
+      </TableCell>
+      <TableCell>
+        <PricingCoverageBadge pricing={row.pricing} />
+      </TableCell>
+      <TableCell className="text-2xs tabular text-right font-mono">
+        <span className={row.api_key_count > 0 ? "text-srapi-text-primary" : "text-srapi-error"}>
+          {row.api_key_count}
+        </span>
+        {row.scoped_key_count > 0 ? (
+          <span className="text-srapi-text-tertiary"> · {row.scoped_key_count}</span>
+        ) : null}
+      </TableCell>
+      <TableCell>
+        <span className="inline-flex items-center gap-1.5">
+          <StatusIcon className="text-srapi-text-tertiary size-3.5" />
+          <QuietBadge status={status.quiet} label={status.label} />
+        </span>
+      </TableCell>
+      <TableCell>
+        {row.reasons.length > 0 ? (
+          <div className="flex max-w-md flex-wrap gap-1">
+            {row.reasons.map((reason) => (
+              <span
+                key={reason}
+                className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded-md border px-1.5 py-0.5 font-mono"
+              >
+                {t(`adminGatewayResources.reason.${reason}`)}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <span className="text-2xs text-srapi-text-tertiary">-</span>
+        )}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function PricingCoverageBadge({ pricing }: { pricing: GatewayPricingCoverage }) {
   const { t } = useLanguage();
   const status =
     pricing.status === "priced"
@@ -325,7 +457,11 @@ function PricingCoverageBadge({ pricing }: { pricing: GatewayModelResourceRow["p
   );
 }
 
-function EndpointMatrix({ row }: { row: GatewayModelResourceRow }) {
+function EndpointMatrix({
+  row,
+}: {
+  row: Pick<GatewayModelResourceRow, "endpoints"> | Pick<GatewayRouteResourceRow, "endpoints">;
+}) {
   const { t } = useLanguage();
   return (
     <div className="grid min-w-[260px] grid-cols-2 gap-1 lg:grid-cols-4">

@@ -21917,6 +21917,51 @@ components:
           items:
             $ref: "#/components/schemas/GatewayProviderResourceReason"
 
+    GatewayRouteResourceRow:
+      type: object
+      required:
+        - model
+        - provider
+        - mapping_id
+        - upstream_model
+        - routable_accounts
+        - endpoints
+        - pricing
+        - api_key_count
+        - scoped_key_count
+        - status
+        - reasons
+      properties:
+        model:
+          $ref: "#/components/schemas/Model"
+        provider:
+          $ref: "#/components/schemas/Provider"
+        mapping_id:
+          $ref: "#/components/schemas/Id"
+        upstream_model:
+          type: string
+        routable_accounts:
+          type: integer
+          minimum: 0
+        endpoints:
+          type: array
+          items:
+            $ref: "#/components/schemas/GatewayEndpointResourceRow"
+        pricing:
+          $ref: "#/components/schemas/GatewayPricingCoverage"
+        api_key_count:
+          type: integer
+          minimum: 0
+        scoped_key_count:
+          type: integer
+          minimum: 0
+        status:
+          $ref: "#/components/schemas/GatewayProviderResourceStatus"
+        reasons:
+          type: array
+          items:
+            $ref: "#/components/schemas/GatewayProviderResourceReason"
+
     GatewayResourceSummary:
       type: object
       required:
@@ -21935,6 +21980,7 @@ components:
         - scoped_api_keys
         - rows
         - model_rows
+        - route_rows
       properties:
         providers:
           type: integer
@@ -21983,6 +22029,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/GatewayModelResourceRow"
+        route_rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/GatewayRouteResourceRow"
 
     GatewayResourceSummaryResponse:
       type: object

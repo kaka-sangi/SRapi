@@ -1749,6 +1749,20 @@ export type GatewayModelResourceRow = {
     reasons: Array<GatewayProviderResourceReason>;
 };
 
+export type GatewayRouteResourceRow = {
+    model: Model;
+    provider: Provider;
+    mapping_id: Id;
+    upstream_model: string;
+    routable_accounts: number;
+    endpoints: Array<GatewayEndpointResourceRow>;
+    pricing: GatewayPricingCoverage;
+    api_key_count: number;
+    scoped_key_count: number;
+    status: GatewayProviderResourceStatus;
+    reasons: Array<GatewayProviderResourceReason>;
+};
+
 export type GatewayResourceSummary = {
     providers: number;
     active_providers: number;
@@ -1765,6 +1779,7 @@ export type GatewayResourceSummary = {
     scoped_api_keys: number;
     rows: Array<GatewayProviderResourceRow>;
     model_rows: Array<GatewayModelResourceRow>;
+    route_rows: Array<GatewayRouteResourceRow>;
 };
 
 export type GatewayResourceSummaryResponse = {

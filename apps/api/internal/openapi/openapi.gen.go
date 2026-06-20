@@ -8041,6 +8041,7 @@ type GatewayResourceSummary struct {
 	ProxiedAccounts        int                          `json:"proxied_accounts"`
 	ProxyAttentionAccounts int                          `json:"proxy_attention_accounts"`
 	RoutableAccounts       int                          `json:"routable_accounts"`
+	RouteRows              []GatewayRouteResourceRow    `json:"route_rows"`
 	Rows                   []GatewayProviderResourceRow `json:"rows"`
 	ScopedApiKeys          int                          `json:"scoped_api_keys"`
 }
@@ -8049,6 +8050,21 @@ type GatewayResourceSummary struct {
 type GatewayResourceSummaryResponse struct {
 	Data      GatewayResourceSummary `json:"data"`
 	RequestId RequestId              `json:"request_id"`
+}
+
+// GatewayRouteResourceRow defines model for GatewayRouteResourceRow.
+type GatewayRouteResourceRow struct {
+	ApiKeyCount      int                             `json:"api_key_count"`
+	Endpoints        []GatewayEndpointResourceRow    `json:"endpoints"`
+	MappingId        Id                              `json:"mapping_id"`
+	Model            Model                           `json:"model"`
+	Pricing          GatewayPricingCoverage          `json:"pricing"`
+	Provider         Provider                        `json:"provider"`
+	Reasons          []GatewayProviderResourceReason `json:"reasons"`
+	RoutableAccounts int                             `json:"routable_accounts"`
+	ScopedKeyCount   int                             `json:"scoped_key_count"`
+	Status           GatewayProviderResourceStatus   `json:"status"`
+	UpstreamModel    string                          `json:"upstream_model"`
 }
 
 // GatewayUsageModel defines model for GatewayUsageModel.
