@@ -275,6 +275,7 @@ type ImageEditRequest struct {
 	SourceEndpoint  string
 	Model           string
 	Prompt          string
+	Stream          bool
 	Images          []ImageInput
 	Mask            *ImageInput
 	Count           int
@@ -809,6 +810,7 @@ type VideoAdapter interface {
 // ImageEditAdapter invokes provider image editing.
 type ImageEditAdapter interface {
 	InvokeImageEdit(ctx context.Context, req ImageEditRequest) (ImageGenerationResponse, error)
+	StreamImageEdit(ctx context.Context, req ImageEditRequest) (ImageGenerationResponse, error)
 }
 
 // ImageVariationAdapter invokes provider image variation generation.

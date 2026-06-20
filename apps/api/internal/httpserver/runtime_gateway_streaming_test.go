@@ -895,6 +895,76 @@ func TestGatewayCodexImageGenerationStreamsTransformedEventsIncrementally(t *tes
 	}
 }
 
+func TestGatewayCodexImageEditStreamsTransformedEventsIncrementally(t *testing.T) {
+	partial := "data: {\"type\":\"response.image_generation_call.partial_image\",\"partial_image_b64\":\"cGFydGlhbA==\",\"partial_image_index\":0,\"output_format\":\"png\",\"background\":\"transparent\"}\n\n"
+	completed := "data: {\"type\":\"response.completed\",\"response\":{\"created_at\":1710000001,\"usage\":{\"input_tokens\":5,\"output_tokens\":9,\"total_tokens\":14},\"tools\":[{\"type\":\"image_generation\",\"model\":\"gpt-image-2\",\"action\":\"edit\",\"background\":\"transparent\",\"output_format\":\"png\",\"quality\":\"high\",\"size\":\"1024x1024\"}],\"output\":[{\"type\":\"image_generation_call\",\"result\":\"ZmluYWw=\",\"output_format\":\"png\",\"revised_prompt\":\"edit a cat, revised\"}]}}\n\n"
+	done := "data: [DONE]\n\n"
+
+	release := make(chan struct{})
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/backend-api/codex/responses" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		flusher, _ := w.(http.Flusher)
+		_, _ = io.WriteString(w, partial)
+		if flusher != nil {
+			flusher.Flush()
+		}
+		select {
+		case <-release:
+		case <-time.After(2 * time.Second):
+		}
+		_, _ = io.WriteString(w, completed+done)
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"codex-image-edit-stream-provider","display_name":"Codex Image Edit Stream","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active","capabilities":{"image_edits":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"codex-image-edit-stream-model","display_name":"Codex Image Edit Stream Model","status":"active","capabilities":[{"key":"image_edits","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"gpt-image-2","status":"active","capability_override":[{"key":"image_edits","level":"required","status":"stable","version":"v1"},{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"codex-image-edit-stream-account","runtime_class":"cli_client_token","upstream_client":"codex_cli","credential":{"cli_client_token":"codex-token"},"metadata":{"base_url":"`+upstream.URL+`/backend-api/codex"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	reqBody := `{"model":"codex-image-edit-stream-model","prompt":"edit a cat","stream":true,"response_format":"url","images":[{"image_url":"data:image/png;base64,UE5HLXNvdXJjZQ=="}],"mask":{"image_url":"data:image/png;base64,UE5HLW1hc2s="},"background":"transparent","input_fidelity":"high"}`
+	req := httptest.NewRequest(http.MethodPost, "/v1/images/edits", strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	rec := &flushCapturingWriter{header: http.Header{}, release: release}
+	handler.ServeHTTP(rec, req)
+
+	if rec.code != 0 && rec.code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.code, rec.body.String())
+	}
+	if got := rec.header.Get("Content-Type"); got != "text/event-stream" {
+		t.Fatalf("expected text/event-stream content type, got %q", got)
+	}
+	body := rec.body.String()
+	for _, expected := range []string{
+		"event: image_generation.partial_image",
+		`"url":"data:image/png;base64,cGFydGlhbA=="`,
+		"event: image_generation.completed",
+		`"url":"data:image/png;base64,ZmluYWw="`,
+		`"revised_prompt":"edit a cat, revised"`,
+		"data: [DONE]",
+	} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("expected transformed image edit stream to contain %q, got %s", expected, body)
+		}
+	}
+	if !rec.flushed || !strings.Contains(rec.firstFlushBody, "image_generation.partial_image") {
+		t.Fatalf("expected partial image edit event in first flush, got %q", rec.firstFlushBody)
+	}
+	if strings.Contains(rec.firstFlushBody, "image_generation.completed") || strings.Contains(rec.firstFlushBody, "image.generation.result") {
+		t.Fatalf("image edit stream was buffered or final-wrapped: first flush=%q", rec.firstFlushBody)
+	}
+}
+
 func TestGatewayImageGenerationStreamEmitsKeepaliveDuringUpstreamGap(t *testing.T) {
 	partial := "data: {\"type\":\"response.image_generation_call.partial_image\",\"partial_image_b64\":\"cGFydGlhbA==\",\"partial_image_index\":0,\"output_format\":\"png\"}\n\n"
 	completed := "data: {\"type\":\"response.completed\",\"response\":{\"usage\":{\"input_tokens\":5,\"output_tokens\":9,\"total_tokens\":14},\"output\":[{\"type\":\"image_generation_call\",\"result\":\"ZmluYWw=\",\"output_format\":\"png\"}]}}\n\n"

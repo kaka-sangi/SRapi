@@ -8041,7 +8041,7 @@ type ImageEditJsonRequest struct {
 	// OutputFormat Provider-specific encoded output format such as `png`, `jpeg`, or `webp`.
 	OutputFormat *string `json:"output_format,omitempty"`
 
-	// PartialImages Forwarded to upstream when provided; the current v1 renderer emits only the final image.generation.result chunk.
+	// PartialImages Forwarded to upstream when provided. Codex reverse-proxy image edits can use it for progressive image_generation partial events.
 	PartialImages *int   `json:"partial_images,omitempty"`
 	Prompt        string `json:"prompt"`
 
@@ -8052,7 +8052,7 @@ type ImageEditJsonRequest struct {
 	// Size Provider-specific output size such as `1024x1024`, `1024x1536`, `1536x1024`, or `auto`.
 	Size *string `json:"size,omitempty"`
 
-	// Stream When true, returns text/event-stream with a final image.generation.result chunk.
+	// Stream When true, returns text/event-stream. Codex reverse-proxy image edits can relay progressive image_generation events; other providers return a final image.generation.result event.
 	Stream               *bool                  `json:"stream,omitempty"`
 	User                 *string                `json:"user,omitempty"`
 	AdditionalProperties map[string]interface{} `json:"-"`
@@ -8079,7 +8079,7 @@ type ImageEditRequest struct {
 	// OutputFormat Provider-specific encoded output format such as `png`, `jpeg`, or `webp`.
 	OutputFormat *string `json:"output_format,omitempty"`
 
-	// PartialImages Forwarded to upstream when provided; the current v1 renderer emits only the final image.generation.result chunk.
+	// PartialImages Forwarded to upstream when provided. Codex reverse-proxy image edits can use it for progressive image_generation partial events.
 	PartialImages *int   `json:"partial_images,omitempty"`
 	Prompt        string `json:"prompt"`
 
@@ -8090,7 +8090,7 @@ type ImageEditRequest struct {
 	// Size Provider-specific output size such as `1024x1024`, `1024x1536`, `1536x1024`, or `auto`.
 	Size *string `json:"size,omitempty"`
 
-	// Stream When true, returns text/event-stream with a final image.generation.result chunk.
+	// Stream When true, returns text/event-stream. Codex reverse-proxy image edits can relay progressive image_generation events; other providers return a final image.generation.result event.
 	Stream               *bool                  `json:"stream,omitempty"`
 	User                 *string                `json:"user,omitempty"`
 	AdditionalProperties map[string]interface{} `json:"-"`

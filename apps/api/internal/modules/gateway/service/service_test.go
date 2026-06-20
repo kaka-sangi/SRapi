@@ -205,6 +205,7 @@ func TestNormalizeImageEditRequiresImageEditCapability(t *testing.T) {
 		Model:  "gpt-image-2",
 		Prompt: "replace the background",
 		Image:  []openapi_types.File{file},
+		Stream: boolPtr(true),
 	}
 
 	canonical, err := svc.NormalizeImageEdit(req, RequestMeta{SourceEndpoint: "/v1/images/edits"})
@@ -217,6 +218,9 @@ func TestNormalizeImageEditRequiresImageEditCapability(t *testing.T) {
 	if requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyImageGenerations) ||
 		requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyImageVariations) {
 		t.Fatalf("image edit endpoint should only require image_edits, got %+v", canonical.RequestCapabilities)
+	}
+	if !canonical.ImageStream {
+		t.Fatalf("expected image edit stream flag to be normalized")
 	}
 }
 
@@ -3282,4 +3286,8 @@ func openapiTestFile(t *testing.T, filename string, data []byte) openapi_types.F
 	var file openapi_types.File
 	file.InitFromBytes(data, filename)
 	return file
+}
+
+func boolPtr(value bool) *bool {
+	return &value
 }

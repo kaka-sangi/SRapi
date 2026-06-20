@@ -316,6 +316,10 @@ func (s *Server) handleCreateImageEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	providerResp := failover.Response
+	if providerResp.StreamBody != nil {
+		s.writeImageGenerationStreamPassthrough(w, r, authed, canonical, result, providerResp, admission, model.ID, startedAt)
+		return
+	}
 	usage := gatewayUsageFromImageProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalImageGenerationResponse(canonical, gatewayImagesFromProvider(providerResp), providerResp.Created, usage)
 	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequestForCanonical(model.ID, result.Candidate, canonical, canonicalResp.Usage), ptrInt(result.Candidate.Account.ID), canonicalResp.Usage.Estimated)

@@ -102,6 +102,55 @@ func (s *Service) invokeReverseProxyCodexImageEdit(ctx context.Context, req cont
 	return parsed, nil
 }
 
+func (s *Service) streamReverseProxyCodexImageEdit(ctx context.Context, req contract.ImageEditRequest, baseURL string) (contract.ImageGenerationResponse, error) {
+	streamer, ok := s.reverseProxy.(reverseproxycontract.StreamRuntime)
+	if !ok {
+		return contract.ImageGenerationResponse{}, contract.ErrStreamingUnsupported
+	}
+	imageReq := imageGenerationRequestFromEdit(req)
+	if codexImageGenerationRuntimeIsAPIKey(imageReq) {
+		return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "codex reverse proxy requires OAuth/session/client-token runtime credentials"}
+	}
+	payload, err := codexImageEditResponsesPayload(req)
+	if err != nil {
+		return contract.ImageGenerationResponse{}, err
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return contract.ImageGenerationResponse{}, err
+	}
+	headers := codexImageGenerationHeaders(imageReq, payload)
+	raw, outboundState := codexApplyOutboundWiring(req.Account, headers, raw)
+	runtimeResp, err := streamer.DoStream(ctx, reverseproxycontract.Request{
+		Account:      codexImageGenerationReverseProxyAccount(imageReq),
+		Method:       http.MethodPost,
+		URL:          strings.TrimRight(baseURL, "/") + "/responses",
+		Headers:      headers,
+		Body:         raw,
+		ExpectStream: true,
+	})
+	if err != nil {
+		return contract.ImageGenerationResponse{}, providerErrorFromReverseProxy(err)
+	}
+	return contract.ImageGenerationResponse{
+		StatusCode:   runtimeResp.StatusCode,
+		Headers:      runtimeResp.Headers,
+		QuotaSignals: codexQuotaSignalsFromHeaders(runtimeResp.Headers, time.Now().UTC()),
+		StreamBody:   newCodexImageGenerationStreamBody(codexExposeStreamBody(runtimeResp.Body, outboundState, nil), imageReq),
+		StreamParse: func(body []byte, statusCode int) (contract.ImageGenerationResponse, error) {
+			parsed, err := parseCodexImageGenerationRenderedStream(body, statusCode, imageReq)
+			if err != nil {
+				return contract.ImageGenerationResponse{}, err
+			}
+			if parsed.Usage.Estimated {
+				parsed.Usage = imageEditUsage(req)
+			}
+			parsed.QuotaSignals = codexQuotaSignalsFromHeaders(runtimeResp.Headers, time.Now().UTC())
+			return parsed, nil
+		},
+	}, nil
+}
+
 func (s *Service) StreamImageGeneration(ctx context.Context, req contract.ImageGenerationRequest) (contract.ImageGenerationResponse, error) {
 	if !req.Stream || !isCodexImageGenerationReverseProxy(req) {
 		return contract.ImageGenerationResponse{}, contract.ErrStreamingUnsupported

@@ -6300,11 +6300,11 @@ export type ImageEditRequest = {
     moderation?: string;
     input_fidelity?: string;
     /**
-     * When true, returns text/event-stream with a final image.generation.result chunk.
+     * When true, returns text/event-stream. Codex reverse-proxy image edits can relay progressive image_generation events; other providers return a final image.generation.result event.
      */
     stream?: boolean;
     /**
-     * Forwarded to upstream when provided; the current v1 renderer emits only the final image.generation.result chunk.
+     * Forwarded to upstream when provided. Codex reverse-proxy image edits can use it for progressive image_generation partial events.
      */
     partial_images?: number;
     user?: string;
@@ -6339,11 +6339,11 @@ export type ImageEditJsonRequest = {
     moderation?: string;
     input_fidelity?: string;
     /**
-     * When true, returns text/event-stream with a final image.generation.result chunk.
+     * When true, returns text/event-stream. Codex reverse-proxy image edits can relay progressive image_generation events; other providers return a final image.generation.result event.
      */
     stream?: boolean;
     /**
-     * Forwarded to upstream when provided; the current v1 renderer emits only the final image.generation.result chunk.
+     * Forwarded to upstream when provided. Codex reverse-proxy image edits can use it for progressive image_generation partial events.
      */
     partial_images?: number;
     user?: string;
@@ -21836,7 +21836,7 @@ export type CreateImageEditError = CreateImageEditErrors[keyof CreateImageEditEr
 
 export type CreateImageEditResponses = {
     /**
-     * OpenAI-compatible image edit response, or SSE stream when stream is true.
+     * OpenAI-compatible image edit response, or SSE stream when stream is true. Codex reverse-proxy image edits can relay progressive image_generation events; other providers return a final image.generation.result event.
      */
     200: ImageGenerationResponse;
 };
@@ -23405,7 +23405,7 @@ export type CreateOpenAiCompatibleImageEditAliasError = CreateOpenAiCompatibleIm
 
 export type CreateOpenAiCompatibleImageEditAliasResponses = {
     /**
-     * OpenAI-compatible image edit response, or SSE stream when stream is true.
+     * OpenAI-compatible image edit response, or SSE stream when stream is true. Codex reverse-proxy image edits can relay progressive image_generation events; other providers return a final image.generation.result event.
      */
     200: ImageGenerationResponse;
 };

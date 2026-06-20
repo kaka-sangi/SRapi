@@ -8788,6 +8788,116 @@ func TestReverseProxyCodexCLIAdapterImageEditEstimatesUsageWithInputImages(t *te
 	}
 }
 
+func TestReverseProxyCodexCLIAdapterStreamsImageEditEvents(t *testing.T) {
+	runtime := capturingRuntime{
+		streamResponse: reverseproxycontract.StreamResponse{
+			StatusCode: http.StatusOK,
+			Headers: http.Header{
+				"X-Codex-Primary-Used-Percent":        {"22"},
+				"X-Codex-Primary-Window-Minutes":      {"300"},
+				"X-Codex-Primary-Reset-After-Seconds": {"3600"},
+			},
+			Body: io.NopCloser(strings.NewReader(
+				"data: {\"type\":\"response.created\",\"response\":{\"created_at\":1710000001,\"tools\":[{\"type\":\"image_generation\",\"model\":\"gpt-image-2\",\"action\":\"edit\",\"background\":\"transparent\",\"output_format\":\"png\",\"quality\":\"high\",\"size\":\"1024x1024\"}]}}\n\n" +
+					"data: {\"type\":\"response.image_generation_call.partial_image\",\"partial_image_b64\":\"cGFydGlhbA==\",\"partial_image_index\":0,\"output_format\":\"png\"}\n\n" +
+					"data: {\"type\":\"response.completed\",\"response\":{\"created_at\":1710000001,\"usage\":{\"input_tokens\":5,\"output_tokens\":9,\"total_tokens\":14,\"output_tokens_details\":{\"image_tokens\":7}},\"output\":[{\"type\":\"image_generation_call\",\"result\":\"ZmluYWw=\",\"output_format\":\"png\",\"revised_prompt\":\"replace background, revised\"}]}}\n\n" +
+					"data: [DONE]\n\n",
+			)),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.StreamImageEdit(context.Background(), contract.ImageEditRequest{
+		RequestID:      "req_codex_image_edit_stream",
+		Model:          "gpt-image-2",
+		Prompt:         "replace background",
+		Stream:         true,
+		Images:         []contract.ImageInput{{FileName: "source.png", ContentType: "image/png", Bytes: []byte("PNG-source")}},
+		Mask:           &contract.ImageInput{FileName: "mask.png", ContentType: "image/png", Bytes: []byte("PNG-mask")},
+		Size:           "1024x1024",
+		Quality:        "high",
+		ResponseFormat: "url",
+		Extra: map[string]any{
+			"background":     "transparent",
+			"output_format":  "png",
+			"input_fidelity": "high",
+		},
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://upstream.example/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-5.4"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+	})
+	if err != nil {
+		t.Fatalf("stream codex image edit bridge: %v", err)
+	}
+	raw, err := io.ReadAll(resp.StreamBody)
+	if err != nil {
+		t.Fatalf("read codex image edit stream: %v", err)
+	}
+	body := string(raw)
+	for _, expected := range []string{
+		"event: image_generation.partial_image",
+		`"type":"image_generation.partial_image"`,
+		`"b64_json":"cGFydGlhbA=="`,
+		`"url":"data:image/png;base64,cGFydGlhbA=="`,
+		"event: image_generation.completed",
+		`"b64_json":"ZmluYWw="`,
+		`"url":"data:image/png;base64,ZmluYWw="`,
+		`"revised_prompt":"replace background, revised"`,
+		`"input_tokens":5`,
+		`"output_tokens":9`,
+		"data: [DONE]",
+	} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("expected transformed image edit stream to contain %q, got %s", expected, body)
+		}
+	}
+	parsed, err := resp.StreamParse(raw, resp.StatusCode)
+	if err != nil {
+		t.Fatalf("parse rendered image edit stream: %v", err)
+	}
+	if len(parsed.Data) != 1 || parsed.Data[0].URL != "data:image/png;base64,ZmluYWw=" || parsed.Data[0].Base64JSON != "ZmluYWw=" || parsed.Usage.InputTokens != 5 || parsed.Usage.OutputTokens != 9 || parsed.Usage.ImageOutputTokens != 7 || parsed.Usage.Estimated {
+		t.Fatalf("unexpected parsed image edit stream: %+v", parsed)
+	}
+	if !runtime.request.ExpectStream || runtime.request.URL != "https://upstream.example/backend-api/codex/responses" {
+		t.Fatalf("expected codex image edit DoStream request, got %+v", runtime.request)
+	}
+	var payload struct {
+		Input []struct {
+			Content []struct {
+				Type     string `json:"type"`
+				ImageURL string `json:"image_url"`
+			} `json:"content"`
+		} `json:"input"`
+		Tools []struct {
+			Action         string `json:"action"`
+			InputFidelity  string `json:"input_fidelity"`
+			InputImageMask struct {
+				ImageURL string `json:"image_url"`
+			} `json:"input_image_mask"`
+		} `json:"tools"`
+	}
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode codex image edit stream payload: %v", err)
+	}
+	if len(payload.Input) != 1 || len(payload.Input[0].Content) != 2 || payload.Input[0].Content[1].Type != "input_image" || payload.Input[0].Content[1].ImageURL != "data:image/png;base64,UE5HLXNvdXJjZQ==" {
+		t.Fatalf("unexpected stream edit input: %+v", payload.Input)
+	}
+	if len(payload.Tools) != 1 || payload.Tools[0].Action != "edit" || payload.Tools[0].InputFidelity != "high" || payload.Tools[0].InputImageMask.ImageURL != "data:image/png;base64,UE5HLW1hc2s=" {
+		t.Fatalf("unexpected stream edit tool: %+v", payload.Tools)
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterImageGenerationConfusesSessionIdentity(t *testing.T) {
 	runtime := codexImageIdentityRuntime{}
 	svc, err := service.NewWithReverseProxy(nil, &runtime)

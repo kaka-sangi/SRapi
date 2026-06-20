@@ -5372,7 +5372,7 @@ export const createImageGeneration = <ThrowOnError extends boolean = false>(opti
 /**
  * Create OpenAI-compatible image edits.
  *
- * OpenAI-compatible image edit route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account with image_edits effective capability, forwards image edit inputs to the selected OpenAI-compatible provider adapter as multipart upstream requests, and records media usage and Scheduler evidence. JSON bodies may use local data URL or base64 source image and mask references; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
+ * OpenAI-compatible image edit route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account with image_edits effective capability, and records media usage and Scheduler evidence. OpenAI-compatible API-key and ordinary reverse-proxy accounts use multipart `/images/edits`; reverse-proxy-codex-cli accounts convert edits to Codex `/responses` image_generation tool `action=edit` requests. JSON bodies may use local data URL or base64 source image and mask references; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
  */
 export const createImageEdit = <ThrowOnError extends boolean = false>(options: Options<CreateImageEditData, ThrowOnError>) => (options.client ?? client).post<CreateImageEditResponses, CreateImageEditErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

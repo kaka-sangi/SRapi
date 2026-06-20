@@ -225,6 +225,7 @@ func providerImageEditRequest(req gatewaycontract.CanonicalRequest, candidate sc
 		SourceEndpoint:  req.SourceEndpoint,
 		Model:           req.CanonicalModel,
 		Prompt:          req.ImagePrompt,
+		Stream:          req.ImageStream,
 		Images:          providerImageInputs(req.ImageInputs),
 		Mask:            providerImageInputPtr(req.ImageMask),
 		Count:           req.ImageCount,

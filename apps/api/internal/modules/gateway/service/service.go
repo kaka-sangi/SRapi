@@ -328,6 +328,7 @@ func (s *Service) NormalizeImageEdit(req apiopenapi.ImageEditRequest, meta Reque
 	canonical.ImagePrompt = prompt
 	canonical.ImageInputs = cloneImageInputs(images)
 	canonical.ImageMask = imageInputFromOpenAPI(req.Mask)
+	canonical.ImageStream = imageEditStreamValue(req)
 	canonical.ImageCount = count
 	canonical.ImageSize = stringPtrValue(req.Size)
 	canonical.ImageQuality = stringPtrValue(req.Quality)
@@ -1292,6 +1293,10 @@ func imageEditExtra(req apiopenapi.ImageEditRequest) map[string]any {
 		return nil
 	}
 	return extra
+}
+
+func imageEditStreamValue(req apiopenapi.ImageEditRequest) bool {
+	return req.Stream != nil && *req.Stream
 }
 
 func setOptionalString(values map[string]any, key string, value *string) {

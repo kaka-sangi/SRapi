@@ -46,6 +46,28 @@ func (s *Service) InvokeImageEdit(ctx context.Context, req contract.ImageEditReq
 	return synthesizeLocalImageEdit(req), nil
 }
 
+func (s *Service) StreamImageEdit(ctx context.Context, req contract.ImageEditRequest) (contract.ImageGenerationResponse, error) {
+	if !req.Stream || !isCodexImageEditReverseProxy(req) {
+		return contract.ImageGenerationResponse{}, contract.ErrStreamingUnsupported
+	}
+	if strings.TrimSpace(req.RequestID) == "" || strings.TrimSpace(req.Model) == "" || strings.TrimSpace(req.Mapping.UpstreamModelName) == "" || strings.TrimSpace(req.Prompt) == "" || len(req.Images) == 0 {
+		return contract.ImageGenerationResponse{}, ErrInvalidInput
+	}
+	if imageGenerationDisabledForImageEdit(req) {
+		return contract.ImageGenerationResponse{}, imageGenerationDisabledError()
+	}
+	for _, image := range req.Images {
+		if len(image.Bytes) == 0 {
+			return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "image edit input image is empty"}
+		}
+	}
+	baseURL := upstreamBaseURLImageEdits(req)
+	if baseURL == "" {
+		return contract.ImageGenerationResponse{}, contract.ErrStreamingUnsupported
+	}
+	return s.streamReverseProxyCodexImageEdit(ctx, req, baseURL)
+}
+
 func (s *Service) invokeOpenAICompatibleImageEdit(ctx context.Context, req contract.ImageEditRequest, baseURL string) (contract.ImageGenerationResponse, error) {
 	apiKey := credentialString(req.Credential, "api_key")
 	if apiKey == "" {
@@ -214,6 +236,7 @@ func imageGenerationRequestFromEdit(req contract.ImageEditRequest) contract.Imag
 		SourceEndpoint:  req.SourceEndpoint,
 		Model:           req.Model,
 		Prompt:          req.Prompt,
+		Stream:          req.Stream,
 		Count:           req.Count,
 		Size:            req.Size,
 		Quality:         req.Quality,
