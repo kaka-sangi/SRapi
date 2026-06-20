@@ -21,7 +21,7 @@ import {
 import { ADMIN_ROUTES } from "@/lib/routes";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAdminGatewayResources } from "@/hooks/admin-queries";
-import type { GatewayProviderResourceRow } from "@/lib/sdk-types";
+import type { GatewayModelResourceRow, GatewayProviderResourceRow } from "@/lib/sdk-types";
 
 export default function AdminGatewayResourcesPage() {
   return (
@@ -110,10 +110,18 @@ function GatewayResourcesContent() {
                     <tr>
                       <TableHead>{t("adminProviders.name")}</TableHead>
                       <TableHead>{t("adminProviders.adapterType")}</TableHead>
-                      <TableHead className="text-right">{t("adminGatewayResources.modelMappings")}</TableHead>
-                      <TableHead className="text-right">{t("adminGatewayResources.accounts")}</TableHead>
-                      <TableHead className="text-right">{t("adminGatewayResources.proxies")}</TableHead>
-                      <TableHead className="text-right">{t("adminGatewayResources.apiKeys")}</TableHead>
+                      <TableHead className="text-right">
+                        {t("adminGatewayResources.modelMappings")}
+                      </TableHead>
+                      <TableHead className="text-right">
+                        {t("adminGatewayResources.accounts")}
+                      </TableHead>
+                      <TableHead className="text-right">
+                        {t("adminGatewayResources.proxies")}
+                      </TableHead>
+                      <TableHead className="text-right">
+                        {t("adminGatewayResources.apiKeys")}
+                      </TableHead>
                       <TableHead>{t("adminCommon.status")}</TableHead>
                       <TableHead>{t("adminGatewayResources.blockers")}</TableHead>
                     </tr>
@@ -121,6 +129,42 @@ function GatewayResourcesContent() {
                   <TableBody>
                     {(summary?.rows ?? []).map((row) => (
                       <ProviderResourceRow key={row.provider.id} row={row} />
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableScroll>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("adminGatewayResources.modelMatrix")}</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <TableScroll minWidth={760}>
+                <Table>
+                  <TableHeader>
+                    <tr>
+                      <TableHead>{t("adminGatewayResources.model")}</TableHead>
+                      <TableHead className="text-right">
+                        {t("adminGatewayResources.providers")}
+                      </TableHead>
+                      <TableHead className="text-right">
+                        {t("adminGatewayResources.modelMappings")}
+                      </TableHead>
+                      <TableHead className="text-right">
+                        {t("adminGatewayResources.routableAccountsShort")}
+                      </TableHead>
+                      <TableHead className="text-right">
+                        {t("adminGatewayResources.apiKeys")}
+                      </TableHead>
+                      <TableHead>{t("adminCommon.status")}</TableHead>
+                      <TableHead>{t("adminGatewayResources.blockers")}</TableHead>
+                    </tr>
+                  </TableHeader>
+                  <TableBody>
+                    {(summary?.model_rows ?? []).map((row) => (
+                      <ModelResourceRow key={row.model.id} row={row} />
                     ))}
                   </TableBody>
                 </Table>
@@ -145,67 +189,76 @@ function ResourceKpi({
   return (
     <Card className="p-5">
       <div className="flex items-center justify-between gap-3">
-        <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">{label}</span>
-        <Icon className="size-4 text-srapi-text-tertiary" />
+        <span className="text-2xs text-srapi-text-tertiary font-mono uppercase">{label}</span>
+        <Icon className="text-srapi-text-tertiary size-4" />
       </div>
-      <div className="mt-3 font-serif text-3xl leading-none text-srapi-text-primary tabular">
+      <div className="text-srapi-text-primary tabular mt-3 font-serif text-3xl leading-none">
         {value}
       </div>
     </Card>
   );
 }
 
-function ProviderResourceRow({ row }: { row: GatewayProviderResourceRow }) {
+function ModelResourceRow({ row }: { row: GatewayModelResourceRow }) {
   const { t } = useLanguage();
   const status =
     row.status === "ready"
       ? { quiet: "active" as const, label: t("adminGatewayResources.ready"), icon: CheckCircle2 }
       : row.status === "limited"
-        ? { quiet: "limited" as const, label: t("adminGatewayResources.limited"), icon: AlertTriangle }
-        : { quiet: "error" as const, label: t("adminGatewayResources.blocked"), icon: AlertTriangle };
+        ? {
+            quiet: "limited" as const,
+            label: t("adminGatewayResources.limited"),
+            icon: AlertTriangle,
+          }
+        : {
+            quiet: "error" as const,
+            label: t("adminGatewayResources.blocked"),
+            icon: AlertTriangle,
+          };
   const StatusIcon = status.icon;
   return (
     <TableRow>
       <TableCell>
         <div className="min-w-0">
           <Link
-            href={ADMIN_ROUTES.providers}
-            className="truncate text-srapi-text-primary transition-colors hover:text-srapi-accent"
+            href={ADMIN_ROUTES.models}
+            className="text-srapi-text-primary hover:text-srapi-accent truncate transition-colors"
           >
-            {row.provider.display_name || row.provider.name}
+            {row.model.display_name || row.model.canonical_name}
           </Link>
-          <div className="truncate font-mono text-2xs text-srapi-text-tertiary">{row.provider.name}</div>
+          <div className="text-2xs text-srapi-text-tertiary truncate font-mono">
+            {row.model.canonical_name}
+          </div>
         </div>
       </TableCell>
-      <TableCell className="font-mono text-2xs text-srapi-text-secondary">
-        {row.provider.adapter_type}
+      <TableCell className="text-2xs tabular text-right font-mono">
+        <span className={row.active_providers > 0 ? "text-srapi-text-primary" : "text-srapi-error"}>
+          {row.active_providers}
+        </span>
       </TableCell>
-      <TableCell className="text-right font-mono text-2xs tabular">
-        <span className={row.active_model_mappings > 0 ? "text-srapi-text-primary" : "text-srapi-error"}>
+      <TableCell className="text-2xs tabular text-right font-mono">
+        <span
+          className={row.active_model_mappings > 0 ? "text-srapi-text-primary" : "text-srapi-error"}
+        >
           {row.active_model_mappings}
         </span>
       </TableCell>
-      <TableCell className="text-right font-mono text-2xs tabular">
-        <span className="text-srapi-success">{row.routable_accounts}</span>
-        <span className="text-srapi-text-tertiary"> / {row.total_accounts}</span>
-      </TableCell>
-      <TableCell className="text-right font-mono text-2xs tabular">
-        <span className={row.proxy_attention_accounts > 0 ? "text-srapi-error" : "text-srapi-text-primary"}>
-          {row.proxied_accounts}
+      <TableCell className="text-2xs tabular text-right font-mono">
+        <span className={row.routable_accounts > 0 ? "text-srapi-success" : "text-srapi-error"}>
+          {row.routable_accounts}
         </span>
-        {row.proxy_attention_accounts > 0 ? (
-          <span className="text-srapi-text-tertiary"> · {row.proxy_attention_accounts}</span>
-        ) : null}
       </TableCell>
-      <TableCell className="text-right font-mono text-2xs tabular">
-        <span className="text-srapi-text-primary">{row.api_key_count}</span>
+      <TableCell className="text-2xs tabular text-right font-mono">
+        <span className={row.api_key_count > 0 ? "text-srapi-text-primary" : "text-srapi-error"}>
+          {row.api_key_count}
+        </span>
         {row.scoped_key_count > 0 ? (
           <span className="text-srapi-text-tertiary"> · {row.scoped_key_count}</span>
         ) : null}
       </TableCell>
       <TableCell>
         <span className="inline-flex items-center gap-1.5">
-          <StatusIcon className="size-3.5 text-srapi-text-tertiary" />
+          <StatusIcon className="text-srapi-text-tertiary size-3.5" />
           <QuietBadge status={status.quiet} label={status.label} />
         </span>
       </TableCell>
@@ -215,7 +268,97 @@ function ProviderResourceRow({ row }: { row: GatewayProviderResourceRow }) {
             {row.reasons.map((reason) => (
               <span
                 key={reason}
-                className="rounded-md border border-srapi-border bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary"
+                className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded-md border px-1.5 py-0.5 font-mono"
+              >
+                {t(`adminGatewayResources.reason.${reason}`)}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <span className="text-2xs text-srapi-text-tertiary">-</span>
+        )}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function ProviderResourceRow({ row }: { row: GatewayProviderResourceRow }) {
+  const { t } = useLanguage();
+  const status =
+    row.status === "ready"
+      ? { quiet: "active" as const, label: t("adminGatewayResources.ready"), icon: CheckCircle2 }
+      : row.status === "limited"
+        ? {
+            quiet: "limited" as const,
+            label: t("adminGatewayResources.limited"),
+            icon: AlertTriangle,
+          }
+        : {
+            quiet: "error" as const,
+            label: t("adminGatewayResources.blocked"),
+            icon: AlertTriangle,
+          };
+  const StatusIcon = status.icon;
+  return (
+    <TableRow>
+      <TableCell>
+        <div className="min-w-0">
+          <Link
+            href={ADMIN_ROUTES.providers}
+            className="text-srapi-text-primary hover:text-srapi-accent truncate transition-colors"
+          >
+            {row.provider.display_name || row.provider.name}
+          </Link>
+          <div className="text-2xs text-srapi-text-tertiary truncate font-mono">
+            {row.provider.name}
+          </div>
+        </div>
+      </TableCell>
+      <TableCell className="text-2xs text-srapi-text-secondary font-mono">
+        {row.provider.adapter_type}
+      </TableCell>
+      <TableCell className="text-2xs tabular text-right font-mono">
+        <span
+          className={row.active_model_mappings > 0 ? "text-srapi-text-primary" : "text-srapi-error"}
+        >
+          {row.active_model_mappings}
+        </span>
+      </TableCell>
+      <TableCell className="text-2xs tabular text-right font-mono">
+        <span className="text-srapi-success">{row.routable_accounts}</span>
+        <span className="text-srapi-text-tertiary"> / {row.total_accounts}</span>
+      </TableCell>
+      <TableCell className="text-2xs tabular text-right font-mono">
+        <span
+          className={
+            row.proxy_attention_accounts > 0 ? "text-srapi-error" : "text-srapi-text-primary"
+          }
+        >
+          {row.proxied_accounts}
+        </span>
+        {row.proxy_attention_accounts > 0 ? (
+          <span className="text-srapi-text-tertiary"> · {row.proxy_attention_accounts}</span>
+        ) : null}
+      </TableCell>
+      <TableCell className="text-2xs tabular text-right font-mono">
+        <span className="text-srapi-text-primary">{row.api_key_count}</span>
+        {row.scoped_key_count > 0 ? (
+          <span className="text-srapi-text-tertiary"> · {row.scoped_key_count}</span>
+        ) : null}
+      </TableCell>
+      <TableCell>
+        <span className="inline-flex items-center gap-1.5">
+          <StatusIcon className="text-srapi-text-tertiary size-3.5" />
+          <QuietBadge status={status.quiet} label={status.label} />
+        </span>
+      </TableCell>
+      <TableCell>
+        {row.reasons.length > 0 ? (
+          <div className="flex max-w-md flex-wrap gap-1">
+            {row.reasons.map((reason) => (
+              <span
+                key={reason}
+                className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded-md border px-1.5 py-0.5 font-mono"
               >
                 {t(`adminGatewayResources.reason.${reason}`)}
               </span>

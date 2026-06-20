@@ -145,6 +145,7 @@ func buildGatewayResourceSummary(input gatewayResourceSummaryInput) apiopenapi.G
 	providerAccounts := accountsByProvider(input.Accounts)
 	providerGroupIDs := groupIDsByProvider(input.Accounts, input.GroupIDsByAccount)
 	providerMappings := mappingsByProvider(activeModelMappings)
+	routableAccountsByProvider := make(map[int][]accountcontract.ProviderAccount, len(input.Providers))
 	rows := make([]apiopenapi.GatewayProviderResourceRow, 0, len(input.Providers))
 	for _, provider := range input.Providers {
 		accounts := providerAccounts[provider.ID]
@@ -157,6 +158,7 @@ func buildGatewayResourceSummary(input gatewayResourceSummaryInput) apiopenapi.G
 				routableAccounts = append(routableAccounts, account)
 			}
 		}
+		routableAccountsByProvider[provider.ID] = routableAccounts
 		proxiedAccounts := 0
 		proxyAttentionAccounts := 0
 		for _, account := range activeAccounts {
@@ -218,6 +220,7 @@ func buildGatewayResourceSummary(input gatewayResourceSummaryInput) apiopenapi.G
 		ActiveProxies:          activeProxies,
 		AvailableProxies:       availableProxies,
 		ExpiredProxies:         expiredProxies,
+		ModelRows:              buildGatewayModelResourceRows(activeModels, activeModelMappings, input.Providers, routableAccountsByProvider, activeKeys),
 		Providers:              len(input.Providers),
 		ProxiedAccounts:        sumProviderResourceRows(rows, func(row apiopenapi.GatewayProviderResourceRow) int { return row.ProxiedAccounts }),
 		ProxyAttentionAccounts: sumProviderResourceRows(rows, func(row apiopenapi.GatewayProviderResourceRow) int { return row.ProxyAttentionAccounts }),
@@ -259,6 +262,92 @@ func activeProviderModelMappings(mappings []modelcontract.ModelProviderMapping, 
 		out = append(out, mapping)
 	}
 	return out
+}
+
+func buildGatewayModelResourceRows(
+	models []modelcontract.Model,
+	mappings []modelcontract.ModelProviderMapping,
+	providers []providercontract.Provider,
+	routableAccountsByProvider map[int][]accountcontract.ProviderAccount,
+	activeKeys []apikeycontract.APIKey,
+) []apiopenapi.GatewayModelResourceRow {
+	activeProviderIDs := make(map[int]struct{}, len(providers))
+	for _, provider := range providers {
+		if provider.Status == providercontract.StatusActive {
+			activeProviderIDs[provider.ID] = struct{}{}
+		}
+	}
+	mappingsByModelID := make(map[int][]modelcontract.ModelProviderMapping)
+	for _, mapping := range mappings {
+		mappingsByModelID[mapping.ModelID] = append(mappingsByModelID[mapping.ModelID], mapping)
+	}
+
+	rows := make([]apiopenapi.GatewayModelResourceRow, 0, len(models))
+	for _, model := range models {
+		modelMappings := mappingsByModelID[model.ID]
+		activeProviderCount := 0
+		routableAccountCount := 0
+		seenProviders := make(map[int]struct{}, len(modelMappings))
+		for _, mapping := range modelMappings {
+			if _, ok := seenProviders[mapping.ProviderID]; ok {
+				continue
+			}
+			seenProviders[mapping.ProviderID] = struct{}{}
+			if _, ok := activeProviderIDs[mapping.ProviderID]; !ok {
+				continue
+			}
+			activeProviderCount++
+			routableAccountCount += len(routableAccountsByProvider[mapping.ProviderID])
+		}
+		apiKeyCount, scopedKeyCount := apiKeysForGatewayModel(activeKeys, model)
+		reasons := gatewayModelResourceReasons(len(modelMappings), activeProviderCount, routableAccountCount, apiKeyCount)
+		status := apiopenapi.GatewayProviderResourceStatusReady
+		if len(reasons) > 0 {
+			status = apiopenapi.GatewayProviderResourceStatusBlocked
+			if len(modelMappings) > 0 && (routableAccountCount > 0 || apiKeyCount > 0) {
+				status = apiopenapi.GatewayProviderResourceStatusLimited
+			}
+		}
+		rows = append(rows, apiopenapi.GatewayModelResourceRow{
+			ActiveModelMappings: len(modelMappings),
+			ActiveProviders:     activeProviderCount,
+			ApiKeyCount:         apiKeyCount,
+			Model:               toAPIModel(model),
+			Reasons:             reasons,
+			RoutableAccounts:    routableAccountCount,
+			ScopedKeyCount:      scopedKeyCount,
+			Status:              status,
+		})
+	}
+	return rows
+}
+
+func apiKeysForGatewayModel(keys []apikeycontract.APIKey, model modelcontract.Model) (int, int) {
+	count := 0
+	scoped := 0
+	for _, key := range keys {
+		if apiKeyAllowsModel(key.AllowedModels, model.CanonicalName) {
+			count++
+			if apiKeyIsScoped(key) {
+				scoped++
+			}
+		}
+	}
+	return count, scoped
+}
+
+func gatewayModelResourceReasons(activeMappings int, activeProviders int, routableAccounts int, apiKeys int) []apiopenapi.GatewayProviderResourceReason {
+	reasons := make([]apiopenapi.GatewayProviderResourceReason, 0, 3)
+	if activeMappings == 0 || activeProviders == 0 {
+		reasons = append(reasons, apiopenapi.NoModelMappings)
+	}
+	if routableAccounts == 0 {
+		reasons = append(reasons, apiopenapi.NoRoutableAccounts)
+	}
+	if apiKeys == 0 {
+		reasons = append(reasons, apiopenapi.NoApiKeys)
+	}
+	return reasons
 }
 
 func activeResourceInventoryAccounts(accounts []accountcontract.ProviderAccount) []accountcontract.ProviderAccount {

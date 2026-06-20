@@ -21807,6 +21807,42 @@ components:
           items:
             $ref: "#/components/schemas/GatewayProviderResourceReason"
 
+    GatewayModelResourceRow:
+      type: object
+      required:
+        - model
+        - active_providers
+        - active_model_mappings
+        - routable_accounts
+        - api_key_count
+        - scoped_key_count
+        - status
+        - reasons
+      properties:
+        model:
+          $ref: "#/components/schemas/Model"
+        active_providers:
+          type: integer
+          minimum: 0
+        active_model_mappings:
+          type: integer
+          minimum: 0
+        routable_accounts:
+          type: integer
+          minimum: 0
+        api_key_count:
+          type: integer
+          minimum: 0
+        scoped_key_count:
+          type: integer
+          minimum: 0
+        status:
+          $ref: "#/components/schemas/GatewayProviderResourceStatus"
+        reasons:
+          type: array
+          items:
+            $ref: "#/components/schemas/GatewayProviderResourceReason"
+
     GatewayResourceSummary:
       type: object
       required:
@@ -21824,6 +21860,7 @@ components:
         - proxy_attention_accounts
         - scoped_api_keys
         - rows
+        - model_rows
       properties:
         providers:
           type: integer
@@ -21868,6 +21905,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/GatewayProviderResourceRow"
+        model_rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/GatewayModelResourceRow"
 
     GatewayResourceSummaryResponse:
       type: object

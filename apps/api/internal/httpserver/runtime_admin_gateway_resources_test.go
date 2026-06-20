@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -109,6 +110,74 @@ func TestBuildGatewayResourceSummaryAggregatesReadiness(t *testing.T) {
 		}) {
 		t.Fatalf("unexpected limited provider row: %+v", limitedRow)
 	}
+
+	modelRow := findGatewayModelResourceRow(t, summary, "model-1000")
+	if modelRow.Status != apiopenapi.GatewayProviderResourceStatusReady ||
+		modelRow.ActiveProviders != 1 ||
+		modelRow.ActiveModelMappings != 1 ||
+		modelRow.RoutableAccounts != 1 ||
+		modelRow.ApiKeyCount != 1 ||
+		modelRow.ScopedKeyCount != 1 ||
+		len(modelRow.Reasons) != 0 {
+		t.Fatalf("unexpected model resource row: %+v", modelRow)
+	}
+}
+
+func TestBuildGatewayResourceSummaryReportsBlockedModels(t *testing.T) {
+	now := time.Date(2026, 6, 20, 12, 0, 0, 0, time.UTC)
+	providers := []providercontract.Provider{
+		testGatewayResourceProvider(1, "ready-provider", providercontract.StatusActive),
+		testGatewayResourceProvider(2, "disabled-provider", providercontract.StatusDisabled),
+	}
+
+	summary := buildGatewayResourceSummary(gatewayResourceSummaryInput{
+		Providers: providers,
+		Accounts: []accountcontract.ProviderAccount{
+			testGatewayResourceAccount(10, 1, accountcontract.StatusActive, nil),
+		},
+		Models: []modelcontract.Model{
+			testGatewayResourceModel(1000, modelcontract.StatusActive),
+			testGatewayResourceModel(2000, modelcontract.StatusActive),
+			testGatewayResourceModel(3000, modelcontract.StatusActive),
+		},
+		ModelMappings: []modelcontract.ModelProviderMapping{
+			{ID: 500, ModelID: 1000, ProviderID: 1, Status: modelcontract.StatusActive},
+			{ID: 501, ModelID: 2000, ProviderID: 2, Status: modelcontract.StatusActive},
+		},
+		APIKeys: []apikeycontract.APIKey{
+			{ID: 1, Status: apikeycontract.StatusActive, AllowedModels: []string{"model-1000"}},
+		},
+		Now: now,
+	})
+
+	ready := findGatewayModelResourceRow(t, summary, "model-1000")
+	if ready.Status != apiopenapi.GatewayProviderResourceStatusReady || len(ready.Reasons) != 0 {
+		t.Fatalf("unexpected ready model row: %+v", ready)
+	}
+
+	disabledProvider := findGatewayModelResourceRow(t, summary, "model-2000")
+	if disabledProvider.Status != apiopenapi.GatewayProviderResourceStatusBlocked ||
+		disabledProvider.ActiveProviders != 0 ||
+		disabledProvider.RoutableAccounts != 0 ||
+		disabledProvider.ApiKeyCount != 0 ||
+		!slices.Equal(disabledProvider.Reasons, []apiopenapi.GatewayProviderResourceReason{
+			apiopenapi.NoModelMappings,
+			apiopenapi.NoRoutableAccounts,
+			apiopenapi.NoApiKeys,
+		}) {
+		t.Fatalf("unexpected disabled-provider model row: %+v", disabledProvider)
+	}
+
+	unmapped := findGatewayModelResourceRow(t, summary, "model-3000")
+	if unmapped.Status != apiopenapi.GatewayProviderResourceStatusBlocked ||
+		unmapped.ActiveModelMappings != 0 ||
+		!slices.Equal(unmapped.Reasons, []apiopenapi.GatewayProviderResourceReason{
+			apiopenapi.NoModelMappings,
+			apiopenapi.NoRoutableAccounts,
+			apiopenapi.NoApiKeys,
+		}) {
+		t.Fatalf("unexpected unmapped model row: %+v", unmapped)
+	}
 }
 
 func TestAdminGatewayResourcesEndpointReturnsSummary(t *testing.T) {
@@ -134,6 +203,9 @@ func TestAdminGatewayResourcesEndpointReturnsSummary(t *testing.T) {
 	if resp.Data.Providers == 0 || resp.Data.ActiveModels == 0 || resp.Data.ActiveApiKeys == 0 {
 		t.Fatalf("unexpected empty summary: %+v", resp.Data)
 	}
+	if len(resp.Data.ModelRows) == 0 {
+		t.Fatalf("expected model resource rows in summary: %+v", resp.Data)
+	}
 	row := findGatewayResourceRow(t, resp.Data, "gateway-resources-provider")
 	if row.Status != apiopenapi.GatewayProviderResourceStatusReady ||
 		row.RoutableAccounts != 1 ||
@@ -142,6 +214,17 @@ func TestAdminGatewayResourcesEndpointReturnsSummary(t *testing.T) {
 		len(row.Reasons) != 0 {
 		t.Fatalf("unexpected endpoint row: %+v", row)
 	}
+}
+
+func findGatewayModelResourceRow(t *testing.T, summary apiopenapi.GatewayResourceSummary, modelName string) apiopenapi.GatewayModelResourceRow {
+	t.Helper()
+	for _, row := range summary.ModelRows {
+		if row.Model.CanonicalName == modelName {
+			return row
+		}
+	}
+	t.Fatalf("model %q not found in %+v", modelName, summary.ModelRows)
+	return apiopenapi.GatewayModelResourceRow{}
 }
 
 func TestAdminGatewayResourcesEndpointRequiresAdmin(t *testing.T) {
@@ -267,8 +350,8 @@ func testGatewayResourceProvider(id int, name string, status providercontract.St
 func testGatewayResourceModel(id int, status modelcontract.Status) modelcontract.Model {
 	return modelcontract.Model{
 		ID:            id,
-		CanonicalName: "model",
-		DisplayName:   "Model",
+		CanonicalName: "model-" + strconv.Itoa(id),
+		DisplayName:   "Model " + strconv.Itoa(id),
 		Status:        status,
 	}
 }

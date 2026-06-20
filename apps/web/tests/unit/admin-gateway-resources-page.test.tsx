@@ -4,7 +4,7 @@ import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AdminGatewayResourcesPage from "@/app/admin/gateway-resources/page";
 import { LanguageProvider } from "@/context/LanguageContext";
-import type { GatewayResourceSummary, Provider } from "@/lib/sdk-types";
+import type { GatewayResourceSummary, Model, Provider } from "@/lib/sdk-types";
 
 const storage = new Map<string, string>([["srapi_lang", "zh"]]);
 Object.defineProperty(window, "localStorage", {
@@ -40,10 +40,12 @@ describe("AdminGatewayResourcesPage", () => {
 
     expect(screen.getByRole("heading", { name: "网关资源" })).toBeInTheDocument();
     expect(screen.getByText("可用代理")).toBeInTheDocument();
-    expect(screen.getByText("模型映射")).toBeInTheDocument();
+    expect(screen.getAllByText("模型映射").length).toBeGreaterThan(0);
     expect(screen.getAllByText("1/1").length).toBeGreaterThan(0);
     expect(screen.getByText("OpenAI")).toBeInTheDocument();
-    expect(screen.getByText("就绪")).toBeInTheDocument();
+    expect(screen.getByText("模型可服务性")).toBeInTheDocument();
+    expect(screen.getByText("gpt-4.1")).toBeInTheDocument();
+    expect(screen.getAllByText("就绪").length).toBeGreaterThan(0);
   });
 });
 
@@ -90,6 +92,18 @@ function summary(): GatewayResourceSummary {
         reasons: [],
       },
     ],
+    model_rows: [
+      {
+        model: model({ id: "m1", canonical_name: "gpt-4.1", display_name: "GPT 4.1" }),
+        active_providers: 1,
+        active_model_mappings: 1,
+        routable_accounts: 1,
+        api_key_count: 1,
+        scoped_key_count: 1,
+        status: "ready",
+        reasons: [],
+      },
+    ],
   };
 }
 
@@ -101,6 +115,18 @@ function provider(overrides: Partial<Provider> = {}): Provider {
     adapter_type: "openai-compatible",
     protocol: "openai-compatible",
     status: "active",
+    created_at: "2026-06-20T00:00:00Z",
+    ...overrides,
+  };
+}
+
+function model(overrides: Partial<Model> = {}): Model {
+  return {
+    id: "m1",
+    canonical_name: "model",
+    display_name: "Model",
+    status: "active",
+    capabilities: [],
     created_at: "2026-06-20T00:00:00Z",
     ...overrides,
   };

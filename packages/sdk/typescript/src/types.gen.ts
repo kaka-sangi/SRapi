@@ -1716,6 +1716,17 @@ export type GatewayProviderResourceRow = {
     reasons: Array<GatewayProviderResourceReason>;
 };
 
+export type GatewayModelResourceRow = {
+    model: Model;
+    active_providers: number;
+    active_model_mappings: number;
+    routable_accounts: number;
+    api_key_count: number;
+    scoped_key_count: number;
+    status: GatewayProviderResourceStatus;
+    reasons: Array<GatewayProviderResourceReason>;
+};
+
 export type GatewayResourceSummary = {
     providers: number;
     active_providers: number;
@@ -1731,6 +1742,7 @@ export type GatewayResourceSummary = {
     proxy_attention_accounts: number;
     scoped_api_keys: number;
     rows: Array<GatewayProviderResourceRow>;
+    model_rows: Array<GatewayModelResourceRow>;
 };
 
 export type GatewayResourceSummaryResponse = {

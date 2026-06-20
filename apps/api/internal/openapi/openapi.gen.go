@@ -7883,6 +7883,18 @@ type GatewayErrorResponse struct {
 	Error GatewayErrorObject `json:"error"`
 }
 
+// GatewayModelResourceRow defines model for GatewayModelResourceRow.
+type GatewayModelResourceRow struct {
+	ActiveModelMappings int                             `json:"active_model_mappings"`
+	ActiveProviders     int                             `json:"active_providers"`
+	ApiKeyCount         int                             `json:"api_key_count"`
+	Model               Model                           `json:"model"`
+	Reasons             []GatewayProviderResourceReason `json:"reasons"`
+	RoutableAccounts    int                             `json:"routable_accounts"`
+	ScopedKeyCount      int                             `json:"scoped_key_count"`
+	Status              GatewayProviderResourceStatus   `json:"status"`
+}
+
 // GatewayProviderResourceReason defines model for GatewayProviderResourceReason.
 type GatewayProviderResourceReason string
 
@@ -7914,6 +7926,7 @@ type GatewayResourceSummary struct {
 	ActiveProxies          int                          `json:"active_proxies"`
 	AvailableProxies       int                          `json:"available_proxies"`
 	ExpiredProxies         int                          `json:"expired_proxies"`
+	ModelRows              []GatewayModelResourceRow    `json:"model_rows"`
 	Providers              int                          `json:"providers"`
 	ProxiedAccounts        int                          `json:"proxied_accounts"`
 	ProxyAttentionAccounts int                          `json:"proxy_attention_accounts"`
