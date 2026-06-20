@@ -2704,9 +2704,10 @@ func (e ProxyDefinitionStatus) Valid() bool {
 
 // Defines values for ProxyDefinitionType.
 const (
-	Http   ProxyDefinitionType = "http"
-	Https  ProxyDefinitionType = "https"
-	Socks5 ProxyDefinitionType = "socks5"
+	Http    ProxyDefinitionType = "http"
+	Https   ProxyDefinitionType = "https"
+	Socks5  ProxyDefinitionType = "socks5"
+	Socks5h ProxyDefinitionType = "socks5h"
 )
 
 // Valid indicates whether the value is a known member of the ProxyDefinitionType enum.
@@ -2717,6 +2718,8 @@ func (e ProxyDefinitionType) Valid() bool {
 	case Https:
 		return true
 	case Socks5:
+		return true
+	case Socks5h:
 		return true
 	default:
 		return false
@@ -7305,7 +7308,9 @@ type CreateProxyDefinitionRequest struct {
 	Metadata    *JsonObject            `json:"metadata,omitempty"`
 	Name        string                 `json:"name"`
 	Status      *ProxyDefinitionStatus `json:"status,omitempty"`
-	Type        ProxyDefinitionType    `json:"type"`
+
+	// Type Proxy transport type. Use socks5h when DNS resolution must happen through the proxy.
+	Type ProxyDefinitionType `json:"type"`
 
 	// Url Proxy URL with credentials if needed. Stored encrypted and never returned.
 	Url *string `json:"url,omitempty"`
@@ -8256,7 +8261,9 @@ type ImportProxyDefinition struct {
 	Metadata    *JsonObject            `json:"metadata,omitempty"`
 	Name        string                 `json:"name"`
 	Status      *ProxyDefinitionStatus `json:"status,omitempty"`
-	Type        ProxyDefinitionType    `json:"type"`
+
+	// Type Proxy transport type. Use socks5h when DNS resolution must happen through the proxy.
+	Type ProxyDefinitionType `json:"type"`
 
 	// Url Proxy URL with credentials if needed. Required to create a proxy that does not already exist; omit to keep an existing encrypted URL.
 	Url *string `json:"url,omitempty"`
@@ -10104,8 +10111,10 @@ type ProxyDefinition struct {
 	// ProbeSuccessPct7d Rolling availability percentage. Null when never probed since last reset.
 	ProbeSuccessPct7d *int                  `json:"probe_success_pct_7d,omitempty"`
 	Status            ProxyDefinitionStatus `json:"status"`
-	Type              ProxyDefinitionType   `json:"type"`
-	UpdatedAt         Timestamp             `json:"updated_at"`
+
+	// Type Proxy transport type. Use socks5h when DNS resolution must happen through the proxy.
+	Type      ProxyDefinitionType `json:"type"`
+	UpdatedAt Timestamp           `json:"updated_at"`
 
 	// UrlConfigured True when an encrypted proxy URL is stored. Raw URLs are never returned.
 	UrlConfigured bool `json:"url_configured"`
@@ -10127,7 +10136,7 @@ type ProxyDefinitionResponse struct {
 // ProxyDefinitionStatus defines model for ProxyDefinitionStatus.
 type ProxyDefinitionStatus string
 
-// ProxyDefinitionType defines model for ProxyDefinitionType.
+// ProxyDefinitionType Proxy transport type. Use socks5h when DNS resolution must happen through the proxy.
 type ProxyDefinitionType string
 
 // ProxyTestResult defines model for ProxyTestResult.
@@ -11272,7 +11281,9 @@ type SnapshotProxyDefinition struct {
 	Metadata    *JsonObject           `json:"metadata,omitempty"`
 	Name        string                `json:"name"`
 	Status      ProxyDefinitionStatus `json:"status"`
-	Type        ProxyDefinitionType   `json:"type"`
+
+	// Type Proxy transport type. Use socks5h when DNS resolution must happen through the proxy.
+	Type ProxyDefinitionType `json:"type"`
 
 	// UrlConfigured True when an encrypted proxy URL exists in the source environment. Raw URLs are never exported.
 	UrlConfigured bool `json:"url_configured"`
@@ -11708,7 +11719,9 @@ type UpdateProxyDefinitionRequest struct {
 	Metadata    *JsonObject            `json:"metadata,omitempty"`
 	Name        *string                `json:"name,omitempty"`
 	Status      *ProxyDefinitionStatus `json:"status,omitempty"`
-	Type        *ProxyDefinitionType   `json:"type,omitempty"`
+
+	// Type Proxy transport type. Use socks5h when DNS resolution must happen through the proxy.
+	Type *ProxyDefinitionType `json:"type,omitempty"`
 
 	// Url Replacement proxy URL. Omit to keep the existing encrypted URL.
 	Url *string `json:"url,omitempty"`

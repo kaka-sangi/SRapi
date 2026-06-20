@@ -22634,10 +22634,12 @@ components:
 
     ProxyDefinitionType:
       type: string
+      description: Proxy transport type. Use socks5h when DNS resolution must happen through the proxy.
       enum:
         - http
         - https
         - socks5
+        - socks5h
 
     ProxyDefinitionStatus:
       type: string

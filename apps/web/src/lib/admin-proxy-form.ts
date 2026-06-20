@@ -6,7 +6,7 @@ import type {
   UpdateAdminProxyData,
 } from "../../../../packages/sdk/typescript/src/types.gen";
 
-export const PROXY_TYPES: ProxyDefinitionType[] = ["http", "https", "socks5"];
+export const PROXY_TYPES: ProxyDefinitionType[] = ["http", "https", "socks5", "socks5h"];
 
 export const PROXY_STATUSES: ProxyDefinitionStatus[] = ["active", "disabled"];
 

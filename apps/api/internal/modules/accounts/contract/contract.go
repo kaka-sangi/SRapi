@@ -66,9 +66,10 @@ const (
 type ProxyType string
 
 const (
-	ProxyTypeHTTP   ProxyType = "http"
-	ProxyTypeHTTPS  ProxyType = "https"
-	ProxyTypeSOCKS5 ProxyType = "socks5"
+	ProxyTypeHTTP    ProxyType = "http"
+	ProxyTypeHTTPS   ProxyType = "https"
+	ProxyTypeSOCKS5  ProxyType = "socks5"
+	ProxyTypeSOCKS5H ProxyType = "socks5h"
 )
 
 type ProxyStatus string

@@ -2008,7 +2008,7 @@ func (s *Service) decryptProxyURL(proxy contract.ProxyDefinition) (string, error
 
 func validProxyType(proxyType contract.ProxyType) bool {
 	switch proxyType {
-	case contract.ProxyTypeHTTP, contract.ProxyTypeHTTPS, contract.ProxyTypeSOCKS5:
+	case contract.ProxyTypeHTTP, contract.ProxyTypeHTTPS, contract.ProxyTypeSOCKS5, contract.ProxyTypeSOCKS5H:
 		return true
 	default:
 		return false

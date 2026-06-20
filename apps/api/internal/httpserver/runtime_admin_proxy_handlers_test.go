@@ -60,6 +60,49 @@ func TestAdminProxyRegistryDoesNotExposeRawURL(t *testing.T) {
 	}
 }
 
+func TestAdminProxyRegistrySupportsSOCKS5H(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+
+	createReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/proxies", strings.NewReader(`{"name":"remote-dns-egress","type":"socks5h","url":"socks5h://proxy-user:proxy-pass@example.invalid:1080","status":"active"}`))
+	createReq.Header.Set("Content-Type", "application/json")
+	createReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	createReq.AddCookie(sessionCookie)
+	createRec := httptest.NewRecorder()
+	handler.ServeHTTP(createRec, createReq)
+	if createRec.Code != http.StatusCreated {
+		t.Fatalf("expected proxy create 201, got %d body=%s", createRec.Code, createRec.Body.String())
+	}
+	if strings.Contains(createRec.Body.String(), "proxy-pass") {
+		t.Fatalf("proxy response leaked raw url: %s", createRec.Body.String())
+	}
+	var created apiopenapi.ProxyDefinitionResponse
+	if err := json.NewDecoder(createRec.Body).Decode(&created); err != nil {
+		t.Fatalf("decode create proxy response: %v", err)
+	}
+	if created.Data.Name != "remote-dns-egress" || !created.Data.UrlConfigured || created.Data.Type != apiopenapi.Socks5h {
+		t.Fatalf("unexpected created proxy: %+v", created.Data)
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/proxies", nil)
+	listReq.AddCookie(sessionCookie)
+	listRec := httptest.NewRecorder()
+	handler.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("expected proxy list 200, got %d body=%s", listRec.Code, listRec.Body.String())
+	}
+	if strings.Contains(listRec.Body.String(), "proxy-pass") {
+		t.Fatalf("proxy list leaked raw url: %s", listRec.Body.String())
+	}
+	var listed apiopenapi.ProxyDefinitionListResponse
+	if err := json.NewDecoder(listRec.Body).Decode(&listed); err != nil {
+		t.Fatalf("decode list proxy response: %v", err)
+	}
+	if len(listed.Data) != 1 || listed.Data[0].Type != apiopenapi.Socks5h || !listed.Data[0].UrlConfigured {
+		t.Fatalf("unexpected proxy list: %+v", listed.Data)
+	}
+}
+
 func TestAdminProxyRegistryPaginatesListAndUsesDeleteResponse(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)

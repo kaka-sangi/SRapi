@@ -2181,7 +2181,10 @@ export type BindProviderAccountProxyRequest = {
     proxy_id: string | null;
 };
 
-export type ProxyDefinitionType = 'http' | 'https' | 'socks5';
+/**
+ * Proxy transport type. Use socks5h when DNS resolution must happen through the proxy.
+ */
+export type ProxyDefinitionType = 'http' | 'https' | 'socks5' | 'socks5h';
 
 export type ProxyDefinitionStatus = 'active' | 'disabled';
 

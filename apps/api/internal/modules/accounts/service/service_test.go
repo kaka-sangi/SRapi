@@ -153,6 +153,34 @@ func TestProxyRegistryEncryptsURLAndResolvesRuntimeURL(t *testing.T) {
 	}
 }
 
+func TestProxyRegistrySupportsSOCKS5H(t *testing.T) {
+	svc, err := New(accountmemory.New(), "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := context.Background()
+
+	proxy, err := svc.CreateProxy(ctx, contract.CreateProxyRequest{
+		Name: "remote-dns-egress",
+		Type: contract.ProxyTypeSOCKS5H,
+		URL:  "socks5h://proxy-user:proxy-pass@example.invalid:1080",
+	})
+	if err != nil {
+		t.Fatalf("create socks5h proxy: %v", err)
+	}
+	if proxy.Type != contract.ProxyTypeSOCKS5H {
+		t.Fatalf("unexpected proxy type: %+v", proxy)
+	}
+	proxyID := strconv.Itoa(proxy.ID)
+	runtimeURL, err := svc.ResolveProxyURL(ctx, &proxyID)
+	if err != nil {
+		t.Fatalf("resolve socks5h proxy url: %v", err)
+	}
+	if runtimeURL == nil || *runtimeURL != "socks5h://proxy-user:proxy-pass@example.invalid:1080" {
+		t.Fatalf("unexpected runtime proxy url: %v", runtimeURL)
+	}
+}
+
 func TestDeleteProxySoftDeletesAndUnbindsAccounts(t *testing.T) {
 	store := accountmemory.New()
 	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
@@ -221,13 +249,24 @@ func TestProxyRegistryRejectsMismatchedScheme(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new service: %v", err)
 	}
-	_, err = svc.CreateProxy(context.Background(), contract.CreateProxyRequest{
-		Name: "bad-proxy",
-		Type: contract.ProxyTypeSOCKS5,
-		URL:  "https://example.invalid:8443",
-	})
-	if !errors.Is(err, ErrInvalidInput) {
-		t.Fatalf("expected invalid input, got %v", err)
+	for _, tc := range []struct {
+		name      string
+		proxyType contract.ProxyType
+		rawURL    string
+	}{
+		{name: "socks5 with https url", proxyType: contract.ProxyTypeSOCKS5, rawURL: "https://example.invalid:8443"},
+		{name: "socks5h with socks5 url", proxyType: contract.ProxyTypeSOCKS5H, rawURL: "socks5://example.invalid:1080"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := svc.CreateProxy(context.Background(), contract.CreateProxyRequest{
+				Name: "bad-proxy",
+				Type: tc.proxyType,
+				URL:  tc.rawURL,
+			})
+			if !errors.Is(err, ErrInvalidInput) {
+				t.Fatalf("expected invalid input, got %v", err)
+			}
+		})
 	}
 }
 
