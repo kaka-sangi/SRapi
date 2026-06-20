@@ -22,8 +22,12 @@ describe("capabilityKeysToDescriptors", () => {
   });
 
   it("preserves caller order so the saved descriptor list is deterministic", () => {
-    const out = capabilityKeysToDescriptors(["images", "embeddings", "chat_completions"]);
-    expect(out.map((d) => d.key)).toEqual(["images", "embeddings", "chat_completions"]);
+    const out = capabilityKeysToDescriptors(["image_generations", "embeddings", "chat_completions"]);
+    expect(out.map((d) => d.key)).toEqual([
+      "image_generations",
+      "embeddings",
+      "chat_completions",
+    ]);
   });
 
   it("returns an empty array for no keys", () => {
@@ -35,10 +39,10 @@ describe("descriptorsToCapabilityKeys", () => {
   it("extracts .key from each descriptor, preserving order", () => {
     expect(
       descriptorsToCapabilityKeys([
-        { key: "images", version: "v1", status: "stable", level: "required" },
+        { key: "image_variations", version: "v1", status: "stable", level: "required" },
         { key: "rerank", version: "v2", status: "experimental", level: "optional" },
       ]),
-    ).toEqual(["images", "rerank"]);
+    ).toEqual(["image_variations", "rerank"]);
   });
 
   it("treats undefined as 'no descriptors' rather than throwing", () => {
@@ -75,7 +79,9 @@ describe("MODEL_CAPABILITY_OPTIONS", () => {
       "gemini_generate_content",
       "gemini_count_tokens",
       "embeddings",
-      "images",
+      "image_generations",
+      "image_edits",
+      "image_variations",
       "videos",
       "audio_transcriptions",
       "audio_speech",

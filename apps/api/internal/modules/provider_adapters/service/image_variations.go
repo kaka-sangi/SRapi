@@ -24,6 +24,9 @@ func (s *Service) InvokeImageVariation(ctx context.Context, req contract.ImageVa
 	}
 	if baseURL := upstreamBaseURLImageVariations(req); baseURL != "" {
 		if isReverseProxyImageVariationRuntime(req) {
+			if isCodexImageVariationReverseProxy(req) {
+				return s.invokeReverseProxyCodexImageVariation(ctx, req, baseURL)
+			}
 			return s.invokeReverseProxyOpenAICompatibleImageVariation(ctx, req, baseURL)
 		}
 		return s.invokeOpenAICompatibleImageVariation(ctx, req, baseURL)
@@ -167,20 +170,21 @@ func parseOpenAICompatibleImageVariation(body []byte, statusCode int, req contra
 
 func imageGenerationRequestFromVariation(req contract.ImageVariationRequest) contract.ImageGenerationRequest {
 	return contract.ImageGenerationRequest{
-		RequestID:      req.RequestID,
-		SourceProtocol: req.SourceProtocol,
-		SourceEndpoint: req.SourceEndpoint,
-		Model:          req.Model,
-		Prompt:         "",
-		Count:          req.Count,
-		Size:           req.Size,
-		ResponseFormat: req.ResponseFormat,
-		User:           req.User,
-		Extra:          cloneMap(req.Extra),
-		Provider:       req.Provider,
-		Account:        req.Account,
-		Mapping:        req.Mapping,
-		Credential:     cloneMap(req.Credential),
+		RequestID:       req.RequestID,
+		SourceProtocol:  req.SourceProtocol,
+		SourceEndpoint:  req.SourceEndpoint,
+		Model:           req.Model,
+		Prompt:          "",
+		Count:           req.Count,
+		Size:            req.Size,
+		ResponseFormat:  req.ResponseFormat,
+		User:            req.User,
+		Extra:           cloneMap(req.Extra),
+		Provider:        req.Provider,
+		Account:         req.Account,
+		Mapping:         req.Mapping,
+		Credential:      cloneMap(req.Credential),
+		RequestSettings: cloneMap(req.RequestSettings),
 	}
 }
 
@@ -198,6 +202,10 @@ func upstreamBaseURLImageVariations(req contract.ImageVariationRequest) string {
 
 func isReverseProxyImageVariationRuntime(req contract.ImageVariationRequest) bool {
 	return isReverseProxyImageRuntime(imageGenerationRequestFromVariation(req))
+}
+
+func isCodexImageVariationReverseProxy(req contract.ImageVariationRequest) bool {
+	return isCodexImageGenerationReverseProxy(imageGenerationRequestFromVariation(req))
 }
 
 func synthesizeLocalImageVariation(req contract.ImageVariationRequest) contract.ImageGenerationResponse {

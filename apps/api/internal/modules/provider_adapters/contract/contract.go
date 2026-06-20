@@ -292,20 +292,21 @@ type ImageEditRequest struct {
 }
 
 type ImageVariationRequest struct {
-	RequestID      string
-	SourceProtocol string
-	SourceEndpoint string
-	Model          string
-	Image          ImageInput
-	Count          int
-	Size           string
-	ResponseFormat string
-	User           string
-	Extra          map[string]any
-	Provider       providercontract.Provider
-	Account        accountcontract.ProviderAccount
-	Mapping        modelcontract.ModelProviderMapping
-	Credential     map[string]any
+	RequestID       string
+	SourceProtocol  string
+	SourceEndpoint  string
+	Model           string
+	Image           ImageInput
+	Count           int
+	Size            string
+	ResponseFormat  string
+	User            string
+	Extra           map[string]any
+	Provider        providercontract.Provider
+	Account         accountcontract.ProviderAccount
+	Mapping         modelcontract.ModelProviderMapping
+	Credential      map[string]any
+	RequestSettings map[string]any
 }
 
 type AudioTranscriptionRequest struct {

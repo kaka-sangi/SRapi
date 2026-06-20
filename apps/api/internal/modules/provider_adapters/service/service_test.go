@@ -8746,6 +8746,124 @@ func TestReverseProxyCodexCLIAdapterBridgesImageEditToResponses(t *testing.T) {
 	}
 }
 
+func TestReverseProxyCodexCLIAdapterBridgesImageVariationToResponses(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				"data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"ig_1\",\"type\":\"image_generation_call\",\"status\":\"completed\",\"result\":\"dmFyaWF0aW9u\",\"revised_prompt\":\"variation, revised\",\"output_format\":\"png\"}}\n\n" +
+					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_img_variation\",\"status\":\"completed\",\"model\":\"gpt-5.4\",\"usage\":{\"input_tokens\":14,\"output_tokens\":7,\"output_tokens_details\":{\"image_tokens\":5}},\"output\":[]}}\n\n" +
+					"data: [DONE]\n\n",
+			),
+			Headers: http.Header{
+				"X-Codex-Primary-Used-Percent": {"19"},
+			},
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeImageVariation(context.Background(), contract.ImageVariationRequest{
+		RequestID:      "req_codex_image_variation",
+		Model:          "gpt-image-2",
+		Image:          contract.ImageInput{FileName: "source.png", ContentType: "image/png", Bytes: []byte("PNG-source")},
+		Count:          2,
+		Size:           "1024x1024",
+		ResponseFormat: "b64_json",
+		User:           "user-123",
+		Extra: map[string]any{
+			"background":                             "transparent",
+			"output_format":                          "png",
+			"output_compression":                     float64(80),
+			"partial_images":                         float64(2),
+			"input_fidelity":                         "high",
+			"codex_image_generation_responses_model": "gpt-5.4",
+		},
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://upstream.example/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-5.4"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+		RequestSettings: map[string]any{
+			"chatgpt_account_id":      "account-request",
+			"codex_client_request_id": "client-request",
+			"accept-language":         "fr-FR",
+		},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex image variation bridge: %v", err)
+	}
+	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://upstream.example/backend-api/codex/responses" {
+		t.Fatalf("unexpected codex image variation runtime request: %+v", runtime.request)
+	}
+	if runtime.request.Headers.Get("Accept") != "text/event-stream" ||
+		runtime.request.Headers.Get("ChatGPT-Account-ID") != "account-request" ||
+		runtime.request.Headers.Get("X-Client-Request-Id") != "client-request" ||
+		runtime.request.Headers.Get("Accept-Language") != "fr-FR" {
+		t.Fatalf("unexpected codex image variation headers: %+v", runtime.request.Headers)
+	}
+	var payload struct {
+		Model  string `json:"model"`
+		Stream bool   `json:"stream"`
+		Input  []struct {
+			Role    string `json:"role"`
+			Content []struct {
+				Type     string `json:"type"`
+				ImageURL string `json:"image_url"`
+			} `json:"content"`
+		} `json:"input"`
+		Tools []struct {
+			Type              string `json:"type"`
+			Action            string `json:"action"`
+			Model             string `json:"model"`
+			Count             int    `json:"n"`
+			Size              string `json:"size"`
+			Background        string `json:"background"`
+			OutputFormat      string `json:"output_format"`
+			OutputCompression int    `json:"output_compression"`
+			PartialImages     int    `json:"partial_images"`
+			InputFidelity     string `json:"input_fidelity"`
+		} `json:"tools"`
+	}
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode codex image variation payload: %v", err)
+	}
+	if payload.Model != "gpt-5.4" || !payload.Stream || len(payload.Input) != 1 || payload.Input[0].Role != "user" || len(payload.Input[0].Content) != 1 {
+		t.Fatalf("unexpected codex image variation payload: %+v", payload)
+	}
+	if payload.Input[0].Content[0].Type != "input_image" ||
+		payload.Input[0].Content[0].ImageURL != "data:image/png;base64,UE5HLXNvdXJjZQ==" {
+		t.Fatalf("unexpected codex image variation input: %+v", payload.Input[0].Content)
+	}
+	if len(payload.Tools) != 1 ||
+		payload.Tools[0].Type != "image_generation" ||
+		payload.Tools[0].Action != "edit" ||
+		payload.Tools[0].Model != "gpt-image-2" ||
+		payload.Tools[0].Count != 2 ||
+		payload.Tools[0].Size != "1024x1024" ||
+		payload.Tools[0].Background != "transparent" ||
+		payload.Tools[0].OutputFormat != "png" ||
+		payload.Tools[0].OutputCompression != 80 ||
+		payload.Tools[0].PartialImages != 2 ||
+		payload.Tools[0].InputFidelity != "high" {
+		t.Fatalf("unexpected codex image variation tool: %+v", payload.Tools)
+	}
+	if len(resp.Data) != 1 || resp.Data[0].Base64JSON != "dmFyaWF0aW9u" || resp.Data[0].RevisedPrompt != "variation, revised" || resp.Model != "gpt-5.4" || resp.Usage.InputTokens != 14 || resp.Usage.OutputTokens != 7 || resp.Usage.ImageOutputTokens != 5 {
+		t.Fatalf("unexpected codex image variation response: %+v", resp)
+	}
+	if len(resp.QuotaSignals) != 1 {
+		t.Fatalf("expected codex quota signal, got %+v", resp.QuotaSignals)
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterImageEditEstimatesUsageWithInputImages(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{

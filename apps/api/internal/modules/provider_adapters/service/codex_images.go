@@ -102,6 +102,50 @@ func (s *Service) invokeReverseProxyCodexImageEdit(ctx context.Context, req cont
 	return parsed, nil
 }
 
+func (s *Service) invokeReverseProxyCodexImageVariation(ctx context.Context, req contract.ImageVariationRequest, baseURL string) (contract.ImageGenerationResponse, error) {
+	if s.reverseProxy == nil {
+		return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "reverse proxy runtime unavailable"}
+	}
+	imageReq := imageGenerationRequestFromVariation(req)
+	if codexImageGenerationRuntimeIsAPIKey(imageReq) {
+		return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "codex reverse proxy requires OAuth/session/client-token runtime credentials"}
+	}
+	payload, err := codexImageVariationResponsesPayload(req)
+	if err != nil {
+		return contract.ImageGenerationResponse{}, err
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return contract.ImageGenerationResponse{}, err
+	}
+	headers := codexImageGenerationHeaders(imageReq, payload)
+	raw, outboundState := codexApplyOutboundWiring(req.Account, headers, raw)
+	runtimeResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
+		Account: codexImageGenerationReverseProxyAccount(imageReq),
+		Method:  http.MethodPost,
+		URL:     strings.TrimRight(baseURL, "/") + "/responses",
+		Headers: headers,
+		Body:    raw,
+	})
+	if err != nil {
+		return contract.ImageGenerationResponse{}, providerErrorFromReverseProxy(err)
+	}
+	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
+		return contract.ImageGenerationResponse{}, classifyCodexProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
+	}
+	body := codexCaptureInboundWiring(outboundState, codexReasoningReplayScope{}, runtimeResp.Body)
+	parsed, err := parseCodexImageGenerationResponse(body, runtimeResp.StatusCode, imageReq)
+	if err != nil {
+		return contract.ImageGenerationResponse{}, err
+	}
+	if parsed.Usage.Estimated {
+		parsed.Usage = imageVariationUsage(req)
+	}
+	parsed.Headers = cloneGenericHeaders(runtimeResp.Headers)
+	parsed.QuotaSignals = codexQuotaSignalsFromHeaders(runtimeResp.Headers, time.Now().UTC())
+	return parsed, nil
+}
+
 func (s *Service) streamReverseProxyCodexImageEdit(ctx context.Context, req contract.ImageEditRequest, baseURL string) (contract.ImageGenerationResponse, error) {
 	streamer, ok := s.reverseProxy.(reverseproxycontract.StreamRuntime)
 	if !ok {
@@ -292,6 +336,32 @@ func codexImageEditResponsesPayload(req contract.ImageEditRequest) (map[string]a
 	return payload, nil
 }
 
+func codexImageVariationResponsesPayload(req contract.ImageVariationRequest) (map[string]any, error) {
+	imageReq := imageGenerationRequestFromVariation(req)
+	payload, err := codexImageGenerationResponsesPayload(imageReq)
+	if err != nil {
+		return nil, err
+	}
+	tools, _ := payload["tools"].([]any)
+	if len(tools) == 0 {
+		return nil, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "codex image variation tool missing"}
+	}
+	tool, ok := tools[0].(map[string]any)
+	if !ok {
+		return nil, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "codex image variation tool invalid"}
+	}
+	tool["action"] = "edit"
+	if value := strings.TrimSpace(codexStringValue(req.Extra["input_fidelity"])); value != "" {
+		tool["input_fidelity"] = value
+	}
+	input, err := codexImageVariationInput(req)
+	if err != nil {
+		return nil, err
+	}
+	payload["input"] = input
+	return payload, nil
+}
+
 func codexImageEditInput(req contract.ImageEditRequest) ([]any, error) {
 	content := make([]any, 0, 1+len(req.Images))
 	if prompt := strings.TrimSpace(req.Prompt); prompt != "" {
@@ -314,6 +384,21 @@ func codexImageEditInput(req contract.ImageEditRequest) ([]any, error) {
 		"type":    "message",
 		"role":    "user",
 		"content": content,
+	}}, nil
+}
+
+func codexImageVariationInput(req contract.ImageVariationRequest) ([]any, error) {
+	imageURL, err := codexImageInputDataURL(req.Image, "image")
+	if err != nil {
+		return nil, err
+	}
+	return []any{map[string]any{
+		"type": "message",
+		"role": "user",
+		"content": []any{map[string]any{
+			"type":      "input_image",
+			"image_url": imageURL,
+		}},
 	}}, nil
 }
 

@@ -241,21 +241,22 @@ func providerImageEditRequest(req gatewaycontract.CanonicalRequest, candidate sc
 	}
 }
 
-func providerImageVariationRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate) provideradaptercontract.ImageVariationRequest {
+func providerImageVariationRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate, source ...*http.Request) provideradaptercontract.ImageVariationRequest {
 	return provideradaptercontract.ImageVariationRequest{
-		RequestID:      req.RequestID,
-		SourceProtocol: string(req.SourceProtocol),
-		SourceEndpoint: req.SourceEndpoint,
-		Model:          req.CanonicalModel,
-		Image:          providerImageInputValue(req.ImageInputs),
-		Count:          req.ImageCount,
-		Size:           req.ImageSize,
-		ResponseFormat: req.ImageResponseFormat,
-		User:           req.ImageUser,
-		Extra:          cloneAnyMap(req.ImageExtra),
-		Provider:       candidate.Provider,
-		Account:        candidate.Account,
-		Mapping:        candidate.Mapping,
+		RequestID:       req.RequestID,
+		SourceProtocol:  string(req.SourceProtocol),
+		SourceEndpoint:  req.SourceEndpoint,
+		Model:           req.CanonicalModel,
+		Image:           providerImageInputValue(req.ImageInputs),
+		Count:           req.ImageCount,
+		Size:            req.ImageSize,
+		ResponseFormat:  req.ImageResponseFormat,
+		User:            req.ImageUser,
+		Extra:           cloneAnyMap(req.ImageExtra),
+		Provider:        candidate.Provider,
+		Account:         candidate.Account,
+		Mapping:         candidate.Mapping,
+		RequestSettings: gatewayProviderRequestSettings(sourceHTTPRequest(source), req),
 	}
 }
 

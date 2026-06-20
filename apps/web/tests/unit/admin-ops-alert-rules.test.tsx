@@ -146,6 +146,19 @@ vi.mock("@/hooks/admin-queries", () => ({
   useOpsAlerts: () => ({ data: { data: [] }, isLoading: false, isError: false }),
   useAcknowledgeAlert: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useOpsThroughput: () => ({ data: { points: [] }, isLoading: false }),
+  useOpsRealtimeTraffic: () => ({
+    data: {
+      window: { start: "2026-06-18T09:55:00Z", end: "2026-06-18T10:00:00Z" },
+      requests_per_min: { current: 0, peak: 0, average: 0 },
+      tokens_per_min: { current: 0, peak: 0, average: 0 },
+      total_requests: 0,
+      error_count: 0,
+      error_rate: 0,
+      usage_log_count: 0,
+      ops_error_log_count: 0,
+    },
+    isLoading: false,
+  }),
   useOpsErrorTrend: () => ({ data: { points: [] }, isLoading: false }),
   useUpdateOpsSettings: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useOpsAlertRules: () => ({
