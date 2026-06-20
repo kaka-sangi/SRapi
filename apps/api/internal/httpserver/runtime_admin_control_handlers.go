@@ -24,6 +24,44 @@ import (
 
 const maxBulkPricingRuleImportItems = 500
 
+type pricingPreset struct {
+	Family       string
+	Input        string
+	Output       string
+	CacheRead    string
+	CacheWrite   string
+	CacheWrite5m string
+	CacheWrite1h string
+	ImageOutput  string
+	Source       string
+}
+
+var builtInPricingPresets = []pricingPreset{
+	{Family: "gpt-5.5", Input: "2.00000000", Output: "8.00000000", CacheRead: "0.50000000", CacheWrite: "2.00000000", Source: "built_in_litellm_fallback"},
+	{Family: "gpt-5.4", Input: "1.25000000", Output: "10.00000000", CacheRead: "0.12500000", CacheWrite: "1.25000000", Source: "built_in_litellm_fallback"},
+	{Family: "gpt-5.4-mini", Input: "0.25000000", Output: "2.00000000", CacheRead: "0.02500000", CacheWrite: "0.25000000", Source: "built_in_litellm_fallback"},
+	{Family: "gpt-4.1", Input: "2.00000000", Output: "8.00000000", CacheRead: "0.50000000", CacheWrite: "2.00000000", Source: "built_in_litellm_fallback"},
+	{Family: "gpt-4.1-mini", Input: "0.40000000", Output: "1.60000000", CacheRead: "0.10000000", CacheWrite: "0.40000000", Source: "built_in_litellm_fallback"},
+	{Family: "gpt-4.1-nano", Input: "0.10000000", Output: "0.40000000", CacheRead: "0.02500000", CacheWrite: "0.10000000", Source: "built_in_litellm_fallback"},
+	{Family: "o4-mini", Input: "1.10000000", Output: "4.40000000", CacheRead: "0.27500000", CacheWrite: "1.10000000", Source: "built_in_litellm_fallback"},
+	{Family: "o3", Input: "2.00000000", Output: "8.00000000", CacheRead: "0.50000000", CacheWrite: "2.00000000", Source: "built_in_litellm_fallback"},
+	{Family: "o3-pro", Input: "20.00000000", Output: "80.00000000", CacheRead: "5.00000000", CacheWrite: "20.00000000", Source: "built_in_litellm_fallback"},
+	{Family: "codex-auto-review", Input: "0.25000000", Output: "2.00000000", CacheRead: "0.02500000", CacheWrite: "0.25000000", Source: "built_in_litellm_fallback"},
+	{Family: "codex-mini-latest", Input: "0.25000000", Output: "2.00000000", CacheRead: "0.02500000", CacheWrite: "0.25000000", Source: "built_in_litellm_fallback"},
+	{Family: "claude-opus-4-6", Input: "15.00000000", Output: "75.00000000", CacheRead: "1.50000000", CacheWrite: "18.75000000", CacheWrite1h: "30.00000000", Source: "built_in_litellm_fallback"},
+	{Family: "claude-sonnet-4-6", Input: "3.00000000", Output: "15.00000000", CacheRead: "0.30000000", CacheWrite: "3.75000000", CacheWrite1h: "6.00000000", Source: "built_in_litellm_fallback"},
+	{Family: "claude-haiku-4-5", Input: "0.80000000", Output: "4.00000000", CacheRead: "0.08000000", CacheWrite: "1.00000000", Source: "built_in_litellm_fallback"},
+	{Family: "gemini-3-pro-preview", Input: "2.00000000", Output: "12.00000000", CacheRead: "0.50000000", CacheWrite: "2.00000000", Source: "built_in_litellm_fallback"},
+	{Family: "gemini-2.5-pro", Input: "1.25000000", Output: "10.00000000", CacheRead: "0.31000000", CacheWrite: "1.25000000", Source: "built_in_litellm_fallback"},
+	{Family: "gemini-2.5-flash", Input: "0.30000000", Output: "2.50000000", CacheRead: "0.07500000", CacheWrite: "0.30000000", Source: "built_in_litellm_fallback"},
+	{Family: "gemini-2.5-flash-lite", Input: "0.10000000", Output: "0.40000000", CacheRead: "0.02500000", CacheWrite: "0.10000000", Source: "built_in_litellm_fallback"},
+	{Family: "deepseek-chat", Input: "0.27000000", Output: "1.10000000", CacheRead: "0.07000000", CacheWrite: "0.27000000", Source: "built_in_litellm_fallback"},
+	{Family: "deepseek-reasoner", Input: "0.55000000", Output: "2.19000000", CacheRead: "0.14000000", CacheWrite: "0.55000000", Source: "built_in_litellm_fallback"},
+	{Family: "grok-4.3", Input: "3.00000000", Output: "15.00000000", CacheRead: "0.75000000", CacheWrite: "3.00000000", Source: "built_in_litellm_fallback"},
+	{Family: "grok-4.3-latest", Input: "3.00000000", Output: "15.00000000", CacheRead: "0.75000000", CacheWrite: "3.00000000", Source: "built_in_litellm_fallback"},
+	{Family: "grok-latest", Input: "3.00000000", Output: "15.00000000", CacheRead: "0.75000000", CacheWrite: "3.00000000", Source: "built_in_litellm_fallback"},
+}
+
 func (s *Server) handleListAdminUsageLogs(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireAdminSession(r); err != nil {
@@ -985,6 +1023,200 @@ func (s *Server) handleBulkImportAdminPricingRules(w http.ResponseWriter, r *htt
 	})
 }
 
+func (s *Server) handleListAdminPricingRulePresets(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	data := make([]apiopenapi.PricingRulePreset, 0, len(builtInPricingPresets))
+	for _, preset := range builtInPricingPresets {
+		data = append(data, pricingPresetToAPI(preset))
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.PricingRulePresetListResponse{
+		Data:      data,
+		RequestId: requestID,
+	})
+}
+
+func (s *Server) handleInstallAdminPricingRulePresets(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	var body apiopenapi.InstallPricingRulePresetsRequest
+	if r.Body != nil {
+		if err := s.decodeJSONBodyAllowEmpty(w, r, &body); err != nil {
+			writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid pricing preset request", requestID)
+			return
+		}
+	}
+	dryRun := body.DryRun != nil && *body.DryRun
+	presets := filterPricingPresets(body.Families)
+	if len(presets) == 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "no pricing presets matched", requestID)
+		return
+	}
+	errorsOut := make([]apiopenapi.BulkPricingRuleImportError, 0)
+	rules := make([]apiopenapi.PricingRule, 0, len(presets))
+	validated := 0
+	created := 0
+	for idx, preset := range presets {
+		req := pricingPresetToCreateRequest(preset)
+		if err := s.runtime.billing.ValidatePricingRule(req); err != nil {
+			errorsOut = append(errorsOut, apiopenapi.BulkPricingRuleImportError{Index: idx, Message: "invalid pricing preset"})
+			continue
+		}
+		validated++
+		if dryRun {
+			continue
+		}
+		rule, err := s.upsertPricingPreset(r.Context(), req)
+		if err != nil {
+			errorsOut = append(errorsOut, apiopenapi.BulkPricingRuleImportError{Index: idx, Message: "invalid pricing preset"})
+			continue
+		}
+		created++
+		rules = append(rules, toAPIPricingRule(rule))
+	}
+	if created > 0 {
+		s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "pricing_rule.presets_install", "pricing_rule", "presets", nil, map[string]any{
+			"requested": len(presets),
+			"validated": validated,
+			"created":   created,
+			"errors":    len(errorsOut),
+			"dry_run":   dryRun,
+		}))
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.PricingRulePresetInstallResponse{
+		Data: apiopenapi.BulkPricingRuleImportResult{
+			Created:   created,
+			DryRun:    dryRun,
+			Errors:    errorsOut,
+			Requested: len(presets),
+			Rules:     rules,
+			Validated: validated,
+		},
+		RequestId: requestID,
+	})
+}
+
+func (s *Server) decodeJSONBodyAllowEmpty(w http.ResponseWriter, r *http.Request, dst any) error {
+	limited := http.MaxBytesReader(w, r.Body, s.cfg.Gateway.MaxBodySize)
+	payload, err := io.ReadAll(limited)
+	if err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			return errRequestTooLarge
+		}
+		return err
+	}
+	if strings.TrimSpace(string(payload)) == "" {
+		return nil
+	}
+	return decodeStrictJSON(payload, dst)
+}
+
+func filterPricingPresets(families *[]string) []pricingPreset {
+	if families == nil || len(*families) == 0 {
+		return append([]pricingPreset(nil), builtInPricingPresets...)
+	}
+	allowed := make(map[string]struct{}, len(*families))
+	for _, family := range *families {
+		if family = strings.ToLower(strings.TrimSpace(family)); family != "" {
+			allowed[family] = struct{}{}
+		}
+	}
+	out := make([]pricingPreset, 0, len(allowed))
+	for _, preset := range builtInPricingPresets {
+		if _, ok := allowed[strings.ToLower(strings.TrimSpace(preset.Family))]; ok {
+			out = append(out, preset)
+		}
+	}
+	return out
+}
+
+func pricingPresetToAPI(preset pricingPreset) apiopenapi.PricingRulePreset {
+	return apiopenapi.PricingRulePreset{
+		BillingMode:                       apiopenapi.Token,
+		CacheReadPricePerMillionTokens:    preset.CacheRead,
+		CacheWrite1hPricePerMillionTokens: optionalString(preset.CacheWrite1h),
+		CacheWrite5mPricePerMillionTokens: optionalString(preset.CacheWrite5m),
+		CacheWritePricePerMillionTokens:   preset.CacheWrite,
+		Currency:                          "USD",
+		ImageOutputPricePerMillionTokens:  optionalString(preset.ImageOutput),
+		InputPricePerMillionTokens:        preset.Input,
+		ModelFamily:                       preset.Family,
+		OutputPricePerMillionTokens:       preset.Output,
+		PerRequestPrice:                   optionalString("0.00000000"),
+		Source:                            optionalString(preset.Source),
+	}
+}
+
+func pricingPresetToCreateRequest(preset pricingPreset) billingcontract.CreatePricingRuleRequest {
+	return billingcontract.CreatePricingRuleRequest{
+		ModelID:                           0,
+		ModelFamily:                       strings.ToLower(strings.TrimSpace(preset.Family)),
+		ProviderID:                        0,
+		BillingMode:                       billingcontract.BillingModeToken,
+		InputPricePerMillionTokens:        preset.Input,
+		OutputPricePerMillionTokens:       preset.Output,
+		CacheReadPricePerMillionTokens:    preset.CacheRead,
+		CacheWritePricePerMillionTokens:   preset.CacheWrite,
+		CacheWrite5mPricePerMillionTokens: preset.CacheWrite5m,
+		CacheWrite1hPricePerMillionTokens: preset.CacheWrite1h,
+		ImageOutputPricePerMillionTokens:  preset.ImageOutput,
+		PerRequestPrice:                   "0",
+		Currency:                          "USD",
+	}
+}
+
+func (s *Server) upsertPricingPreset(ctx context.Context, req billingcontract.CreatePricingRuleRequest) (billingcontract.PricingRule, error) {
+	existing, err := s.runtime.billing.ListPricingRules(ctx)
+	if err != nil {
+		return billingcontract.PricingRule{}, err
+	}
+	for _, rule := range existing {
+		if samePricingRuleNaturalKey(rule, req) {
+			return s.runtime.billing.UpdatePricingRule(ctx, rule.ID, billingcontract.UpdatePricingRuleRequest{
+				BillingMode:                       &req.BillingMode,
+				InputPricePerMillionTokens:        &req.InputPricePerMillionTokens,
+				OutputPricePerMillionTokens:       &req.OutputPricePerMillionTokens,
+				CacheReadPricePerMillionTokens:    &req.CacheReadPricePerMillionTokens,
+				CacheWritePricePerMillionTokens:   &req.CacheWritePricePerMillionTokens,
+				CacheWrite5mPricePerMillionTokens: &req.CacheWrite5mPricePerMillionTokens,
+				CacheWrite1hPricePerMillionTokens: &req.CacheWrite1hPricePerMillionTokens,
+				ImageOutputPricePerMillionTokens:  &req.ImageOutputPricePerMillionTokens,
+				PerRequestPrice:                   &req.PerRequestPrice,
+				ServiceTierMultipliers:            &req.ServiceTierMultipliers,
+				LongContextThresholdTokens:        &req.LongContextThresholdTokens,
+				LongContextMultiplier:             &req.LongContextMultiplier,
+				Intervals:                         &req.Intervals,
+				Currency:                          &req.Currency,
+				EffectiveFrom:                     &req.EffectiveFrom,
+				EffectiveTo:                       &req.EffectiveTo,
+			})
+		}
+	}
+	return s.runtime.billing.CreatePricingRule(ctx, req)
+}
+
+func samePricingRuleNaturalKey(rule billingcontract.PricingRule, req billingcontract.CreatePricingRuleRequest) bool {
+	if rule.ProviderID != req.ProviderID {
+		return false
+	}
+	if req.ModelID > 0 {
+		return rule.ModelID == req.ModelID
+	}
+	return rule.ModelID == 0 && strings.EqualFold(strings.TrimSpace(rule.ModelFamily), strings.TrimSpace(req.ModelFamily))
+}
+
 func (s *Server) decodeBulkPricingRuleImport(w http.ResponseWriter, r *http.Request) (apiopenapi.BulkPricingRuleImportRequest, error) {
 	limited := http.MaxBytesReader(w, r.Body, s.cfg.Gateway.MaxBodySize)
 	dryRun, err := parseBoolQuery(r.URL.Query().Get("dry_run"))
@@ -1027,15 +1259,21 @@ func decodeStrictJSON(payload []byte, dst any) error {
 
 func (s *Server) pricingRuleRequestFromAPI(ctx context.Context, body apiopenapi.CreatePricingRuleRequest) (billingcontract.CreatePricingRuleRequest, string) {
 	modelID, err := strconv.Atoi(string(body.ModelId))
-	if err != nil || modelID <= 0 {
+	if err != nil || modelID < 0 {
 		return billingcontract.CreatePricingRuleRequest{}, "invalid model id"
+	}
+	modelFamily := strings.ToLower(strings.TrimSpace(optionalStringValue(body.ModelFamily)))
+	if modelID == 0 && modelFamily == "" {
+		return billingcontract.CreatePricingRuleRequest{}, "model_family is required when model_id is 0"
 	}
 	providerID, err := strconv.Atoi(string(body.ProviderId))
 	if err != nil || providerID < 0 {
 		return billingcontract.CreatePricingRuleRequest{}, "invalid provider id"
 	}
-	if _, err := s.runtime.models.FindByID(ctx, modelID); err != nil {
-		return billingcontract.CreatePricingRuleRequest{}, "model not found"
+	if modelID > 0 {
+		if _, err := s.runtime.models.FindByID(ctx, modelID); err != nil {
+			return billingcontract.CreatePricingRuleRequest{}, "model not found"
+		}
 	}
 	if providerID > 0 {
 		if _, err := s.runtime.providers.FindByID(ctx, providerID); err != nil {
@@ -1044,6 +1282,7 @@ func (s *Server) pricingRuleRequestFromAPI(ctx context.Context, body apiopenapi.
 	}
 	return billingcontract.CreatePricingRuleRequest{
 		ModelID:                           modelID,
+		ModelFamily:                       modelFamily,
 		ProviderID:                        providerID,
 		BillingMode:                       billingModeFromAPI(body.BillingMode),
 		InputPricePerMillionTokens:        body.InputPricePerMillionTokens,

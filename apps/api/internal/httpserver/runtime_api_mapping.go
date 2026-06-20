@@ -587,6 +587,7 @@ func toAPIPricingRule(rule billingcontract.PricingRule) apiopenapi.PricingRule {
 		LongContextMultiplier:             optionalString(rule.LongContextMultiplier),
 		LongContextThresholdTokens:        cloneIntPtr(rule.LongContextThresholdTokens),
 		ModelId:                           apiopenapi.Id(strconv.Itoa(rule.ModelID)),
+		ModelFamily:                       optionalString(rule.ModelFamily),
 		OutputPricePerMillionTokens:       rule.OutputPricePerMillionTokens,
 		PerRequestPrice:                   rule.PerRequestPrice,
 		ProviderId:                        apiopenapi.Id(strconv.Itoa(rule.ProviderID)),

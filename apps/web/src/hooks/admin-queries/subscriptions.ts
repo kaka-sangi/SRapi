@@ -27,6 +27,13 @@ export function useAdminPricingRules(params?: P<typeof adminApi.listPricingRules
   });
 }
 
+export function useAdminPricingRulePresets() {
+  return useQuery({
+    queryKey: queryKeys.admin.pricingRulePresets(),
+    queryFn: () => adminApi.listPricingRulePresets(),
+  });
+}
+
 // Subscription plans & user subscriptions
 export function useCreateSubscriptionPlan() {
   return useAdminMutation(
@@ -89,6 +96,13 @@ export function useUpdatePricingRule() {
 export function useBulkImportPricingRules() {
   return useAdminMutation(
     (body: P<typeof adminApi.bulkImportPricingRules>) => adminApi.bulkImportPricingRules(body),
+    ["admin", "pricing-rules"],
+  );
+}
+export function useInstallPricingRulePresets() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.installPricingRulePresets> | undefined) =>
+      adminApi.installPricingRulePresets(body),
     ["admin", "pricing-rules"],
   );
 }

@@ -9519,6 +9519,69 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/pricing-rules/presets:
+    get:
+      tags:
+        - AdminSubscriptions
+      operationId: listAdminPricingRulePresets
+      summary: List built-in pricing presets.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      responses:
+        "200":
+          description: Built-in family-level pricing presets.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PricingRulePresetListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - AdminSubscriptions
+      operationId: installAdminPricingRulePresets
+      summary: Install built-in family-level pricing presets.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InstallPricingRulePresetsRequest"
+      responses:
+        "200":
+          description: Pricing presets validated or installed.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PricingRulePresetInstallResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/ops/events/outbox:
     get:
       tags:
@@ -20532,6 +20595,10 @@ components:
           $ref: "#/components/schemas/Id"
         model_id:
           $ref: "#/components/schemas/Id"
+        model_family:
+          type: string
+          description: Family-level rule key used when model_id is "0".
+          example: gpt-5.4
         provider_id:
           $ref: "#/components/schemas/Id"
         billing_mode:
@@ -20610,6 +20677,10 @@ components:
       properties:
         model_id:
           $ref: "#/components/schemas/Id"
+        model_family:
+          type: string
+          description: Family-level rule key. Required when model_id is "0".
+          example: gpt-5.4
         provider_id:
           $ref: "#/components/schemas/Id"
         billing_mode:
@@ -20892,6 +20963,91 @@ components:
             $ref: "#/components/schemas/PricingRule"
 
     BulkPricingRuleImportResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/BulkPricingRuleImportResult"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    PricingRulePreset:
+      type: object
+      required:
+        - model_family
+        - billing_mode
+        - input_price_per_million_tokens
+        - output_price_per_million_tokens
+        - cache_read_price_per_million_tokens
+        - cache_write_price_per_million_tokens
+        - currency
+      properties:
+        model_family:
+          type: string
+          example: gpt-5.4
+        billing_mode:
+          $ref: "#/components/schemas/BillingMode"
+        input_price_per_million_tokens:
+          type: string
+          example: "1.25000000"
+        output_price_per_million_tokens:
+          type: string
+          example: "2.50000000"
+        cache_read_price_per_million_tokens:
+          type: string
+          example: "0.10000000"
+        cache_write_price_per_million_tokens:
+          type: string
+          example: "0.20000000"
+        cache_write_5m_price_per_million_tokens:
+          type: string
+          example: "0.20000000"
+        cache_write_1h_price_per_million_tokens:
+          type: string
+          example: "0.40000000"
+        image_output_price_per_million_tokens:
+          type: string
+          example: "5.00000000"
+        per_request_price:
+          type: string
+          example: "0.05000000"
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 12
+          example: USD
+        source:
+          type: string
+          example: litellm-fallback
+
+    PricingRulePresetListResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PricingRulePreset"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    InstallPricingRulePresetsRequest:
+      type: object
+      properties:
+        dry_run:
+          type: boolean
+          default: false
+        families:
+          type: array
+          items:
+            type: string
+          description: Optional subset of model families to install. Empty installs all built-in presets.
+
+    PricingRulePresetInstallResponse:
       type: object
       required:
         - data

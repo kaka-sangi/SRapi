@@ -33,12 +33,21 @@ export const PROVIDER_PROTOCOLS: ProviderProtocol[] = [
   "rerank-compatible",
 ];
 
-export const RESOURCE_STATUSES: ResourceStatus[] = [
-  "active",
-  "disabled",
-  "pending",
-  "archived",
-];
+export const RESOURCE_STATUSES: ResourceStatus[] = ["active", "disabled", "pending", "archived"];
+
+export type ProviderEndpointCapabilityMode = "auto" | "on" | "off";
+
+const ENDPOINT_CAPABILITY_KEYS = {
+  chatCompletionsCapability: "chat_completions",
+  responsesCapability: "responses",
+  responsesCompactCapability: "responses_compact",
+  responsesInputItemsCapability: "responses_input_items",
+  messagesCapability: "messages",
+} as const satisfies Record<string, string>;
+
+const ENDPOINT_CAPABILITY_FIELDS = Object.keys(
+  ENDPOINT_CAPABILITY_KEYS,
+) as (keyof typeof ENDPOINT_CAPABILITY_KEYS)[];
 
 export interface ProviderFormState {
   name: string;
@@ -46,6 +55,11 @@ export interface ProviderFormState {
   adapterType: ProviderAdapterType;
   protocol: ProviderProtocol;
   status: ResourceStatus;
+  chatCompletionsCapability: ProviderEndpointCapabilityMode;
+  responsesCapability: ProviderEndpointCapabilityMode;
+  responsesCompactCapability: ProviderEndpointCapabilityMode;
+  responsesInputItemsCapability: ProviderEndpointCapabilityMode;
+  messagesCapability: ProviderEndpointCapabilityMode;
   capabilities: Record<string, unknown>;
   configSchema: Record<string, unknown>;
 }
@@ -60,48 +74,75 @@ export function emptyProviderForm(): ProviderFormState {
     // Quick Setup wizard (which creates providers active). A disabled default
     // silently breaks every account created under the new provider.
     status: "active",
+    chatCompletionsCapability: "auto",
+    responsesCapability: "auto",
+    responsesCompactCapability: "auto",
+    responsesInputItemsCapability: "auto",
+    messagesCapability: "auto",
     capabilities: {},
     configSchema: {},
   };
 }
 
 export function providerFormFromProvider(provider: Provider): ProviderFormState {
+  const capabilities = (provider.capabilities ?? {}) as Record<string, unknown>;
   return {
     name: provider.name,
     displayName: provider.display_name,
     adapterType: provider.adapter_type,
     protocol: provider.protocol,
     status: provider.status,
-    capabilities: (provider.capabilities ?? {}) as Record<string, unknown>,
+    chatCompletionsCapability: capabilityMode(capabilities.chat_completions),
+    responsesCapability: capabilityMode(capabilities.responses),
+    responsesCompactCapability: capabilityMode(capabilities.responses_compact),
+    responsesInputItemsCapability: capabilityMode(capabilities.responses_input_items),
+    messagesCapability: capabilityMode(capabilities.messages),
+    capabilities,
     configSchema: (provider.config_schema ?? {}) as Record<string, unknown>,
   };
 }
 
-export function buildCreateProviderBody(
-  form: ProviderFormState,
-): CreateAdminProviderData["body"] {
+export function buildCreateProviderBody(form: ProviderFormState): CreateAdminProviderData["body"] {
   return {
     name: parseProviderName(form.name),
     display_name: requiredText(form.displayName, "Display name"),
     adapter_type: form.adapterType,
     protocol: form.protocol,
     status: form.status,
-    capabilities: form.capabilities,
+    capabilities: composeProviderCapabilities(form),
     config_schema: form.configSchema,
   };
 }
 
-export function buildUpdateProviderBody(
-  form: ProviderFormState,
-): UpdateAdminProviderData["body"] {
+export function buildUpdateProviderBody(form: ProviderFormState): UpdateAdminProviderData["body"] {
   return {
     display_name: requiredText(form.displayName, "Display name"),
     adapter_type: form.adapterType,
     protocol: form.protocol,
     status: form.status,
-    capabilities: form.capabilities,
+    capabilities: composeProviderCapabilities(form),
     config_schema: form.configSchema,
   };
+}
+
+function composeProviderCapabilities(form: ProviderFormState): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...form.capabilities };
+  for (const field of ENDPOINT_CAPABILITY_FIELDS) {
+    const key = ENDPOINT_CAPABILITY_KEYS[field];
+    const mode = form[field];
+    if (mode === "auto") {
+      delete next[key];
+      continue;
+    }
+    next[key] = mode === "on";
+  }
+  return next;
+}
+
+function capabilityMode(value: unknown): ProviderEndpointCapabilityMode {
+  if (value === true) return "on";
+  if (value === false) return "off";
+  return "auto";
 }
 
 function parseProviderName(value: string): string {

@@ -13,11 +13,13 @@ import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
 import {
   useAdminPricingRules,
+  useAdminPricingRulePresets,
   useAdminModels,
   useAdminProviders,
   useCreatePricingRule,
   useUpdatePricingRule,
   useBulkImportPricingRules,
+  useInstallPricingRulePresets,
   useDeletePricingRule,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
@@ -57,11 +59,13 @@ function PricingContent() {
   const list = useAdminList();
   const colVis = useColumnVisibility("admin-channel-pricing", []);
   const rules = useAdminPricingRules({ page: list.page, page_size: list.pageSize });
+  const presets = useAdminPricingRulePresets();
   const models = useAdminModels();
   const providers = useAdminProviders();
   const createMut = useCreatePricingRule();
   const updateMut = useUpdatePricingRule();
   const bulkImportMut = useBulkImportPricingRules();
+  const installPresetsMut = useInstallPricingRulePresets();
   const deleteMut = useDeletePricingRule();
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<PricingRule | null>(null);
@@ -103,6 +107,22 @@ function PricingContent() {
     }
   }
 
+  async function installBuiltInPresets() {
+    try {
+      const result = await installPresetsMut.mutateAsync(undefined);
+      toast({
+        title: t("adminPricing.presetsInstalled", { count: result.created }),
+        description: t("adminPricing.presetsInstalledHint", {
+          requested: String(result.requested),
+          validated: String(result.validated),
+        }),
+        tone: result.errors.length > 0 ? "warning" : "success",
+      });
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+    }
+  }
+
   const modelList = models.data?.data ?? [];
   const providerList = providers.data?.data ?? [];
   const modelMap = new Map(modelList.map((m) => [String(m.id), m.canonical_name ?? m.id]));
@@ -122,21 +142,73 @@ function PricingContent() {
   ];
 
   const priceFields: FieldConfig<PricingRuleFormState>[] = [
-    { name: "billingMode", label: t("adminPricing.billingMode"), type: "select", options: billingModeOptions },
-    { name: "inputPricePerMillionTokens", label: t("adminPricing.inputPrice"), help: t("adminPricing.inputPriceHelp") },
-    { name: "outputPricePerMillionTokens", label: t("adminPricing.outputPrice"), help: t("adminPricing.outputPriceHelp") },
-    { name: "cacheReadPricePerMillionTokens", label: t("adminPricing.cacheReadPrice"), help: t("adminPricing.cacheReadPriceHelp") },
-    { name: "cacheWritePricePerMillionTokens", label: t("adminPricing.cacheWritePrice"), help: t("adminPricing.cacheWritePriceHelp") },
-    { name: "perRequestPrice", label: t("adminPricing.perRequestPrice"), help: t("adminPricing.perRequestPriceHelp") },
-    { name: "intervalsJson", label: t("adminPricing.intervals"), type: "textarea", help: t("adminPricing.intervalsHelp") },
+    {
+      name: "billingMode",
+      label: t("adminPricing.billingMode"),
+      type: "select",
+      options: billingModeOptions,
+    },
+    {
+      name: "inputPricePerMillionTokens",
+      label: t("adminPricing.inputPrice"),
+      help: t("adminPricing.inputPriceHelp"),
+    },
+    {
+      name: "outputPricePerMillionTokens",
+      label: t("adminPricing.outputPrice"),
+      help: t("adminPricing.outputPriceHelp"),
+    },
+    {
+      name: "cacheReadPricePerMillionTokens",
+      label: t("adminPricing.cacheReadPrice"),
+      help: t("adminPricing.cacheReadPriceHelp"),
+    },
+    {
+      name: "cacheWritePricePerMillionTokens",
+      label: t("adminPricing.cacheWritePrice"),
+      help: t("adminPricing.cacheWritePriceHelp"),
+    },
+    {
+      name: "perRequestPrice",
+      label: t("adminPricing.perRequestPrice"),
+      help: t("adminPricing.perRequestPriceHelp"),
+    },
+    {
+      name: "intervalsJson",
+      label: t("adminPricing.intervals"),
+      type: "textarea",
+      help: t("adminPricing.intervalsHelp"),
+    },
     { name: "currency", label: t("adminCommon.currency") },
-    { name: "effectiveFromLocal", label: t("adminPricing.effectiveFrom"), help: t("adminPricing.effectiveFromHelp"), type: "datetime" },
-    { name: "effectiveToLocal", label: t("adminPricing.effectiveTo"), help: t("adminPricing.effectiveToHelp"), type: "datetime" },
+    {
+      name: "effectiveFromLocal",
+      label: t("adminPricing.effectiveFrom"),
+      help: t("adminPricing.effectiveFromHelp"),
+      type: "datetime",
+    },
+    {
+      name: "effectiveToLocal",
+      label: t("adminPricing.effectiveTo"),
+      help: t("adminPricing.effectiveToHelp"),
+      type: "datetime",
+    },
   ];
 
   const fields: FieldConfig<PricingRuleFormState>[] = [
-    { name: "modelId", label: t("adminPricing.model"), type: "select", options: modelOptions, required: true },
-    { name: "providerId", label: t("adminPricing.provider"), type: "select", options: providerOptions, required: true },
+    {
+      name: "modelId",
+      label: t("adminPricing.model"),
+      type: "select",
+      options: modelOptions,
+      required: true,
+    },
+    {
+      name: "providerId",
+      label: t("adminPricing.provider"),
+      type: "select",
+      options: providerOptions,
+      required: true,
+    },
     ...priceFields,
   ];
 
@@ -147,11 +219,18 @@ function PricingContent() {
       key: "model",
       header: t("adminPricing.model"),
       pinned: true,
-      sortValue: (r) => modelMap.get(String(r.model_id)) ?? String(r.model_id),
+      sortValue: (r) => pricingRuleModelLabel(r, modelMap, t),
       render: (r) => (
-        <span className="text-2xs text-srapi-text-primary">
-          {modelMap.get(String(r.model_id)) ?? r.model_id}
-        </span>
+        <div className="min-w-0">
+          <div className="text-2xs text-srapi-text-primary truncate">
+            {pricingRuleModelLabel(r, modelMap, t)}
+          </div>
+          {String(r.model_id) === "0" ? (
+            <div className="text-srapi-text-tertiary truncate text-[10px] tracking-wide uppercase">
+              {t("adminPricing.modelFamily")}
+            </div>
+          ) : null}
+        </div>
       ),
     },
     {
@@ -163,7 +242,7 @@ function PricingContent() {
         <span className="text-2xs text-srapi-text-secondary">
           {String(r.provider_id) === "0"
             ? t("adminPricing.anyProvider")
-            : providerMap.get(String(r.provider_id)) ?? r.provider_id}
+            : (providerMap.get(String(r.provider_id)) ?? r.provider_id)}
         </span>
       ),
     },
@@ -183,7 +262,7 @@ function PricingContent() {
       header: t("adminPricing.inputPrice"),
       align: "right",
       render: (r) => (
-        <span className="font-mono text-srapi-text-secondary tabular">
+        <span className="text-srapi-text-secondary tabular font-mono">
           {formatMoney(r.input_price_per_million_tokens, r.currency)}
         </span>
       ),
@@ -194,7 +273,7 @@ function PricingContent() {
       align: "right",
       hideOnMobile: true,
       render: (r) => (
-        <span className="font-mono text-srapi-text-secondary tabular">
+        <span className="text-srapi-text-secondary tabular font-mono">
           {formatMoney(r.output_price_per_million_tokens, r.currency)}
         </span>
       ),
@@ -205,7 +284,7 @@ function PricingContent() {
       align: "right",
       hideOnMobile: true,
       render: (r) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-2xs text-srapi-text-tertiary tabular font-mono">
           {r.intervals.length}
         </span>
       ),
@@ -224,9 +303,22 @@ function PricingContent() {
               <ListCount total={rules.data.pagination?.total ?? rules.data.data.length} />
             ) : null}
             <ColumnToggle
-              columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
+              columns={columns
+                .filter((c) => !c.pinned)
+                .map((c) => ({ key: c.key, label: c.header }))}
               visibility={colVis}
             />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void installBuiltInPresets()}
+              loading={installPresetsMut.isPending}
+              disabled={presets.isLoading || installPresetsMut.isPending}
+            >
+              {installPresetsMut.isPending
+                ? t("adminPricing.installingPresets")
+                : t("adminPricing.installPresets")}
+            </Button>
             <Button variant="outline" size="sm" onClick={() => openImport(true)}>
               {t("adminPricing.bulkImport")}
             </Button>
@@ -279,7 +371,9 @@ function PricingContent() {
       {editing ? (
         <ResourceFormDialog
           open
-          onOpenChange={(open) => { if (!open) setEditing(null); }}
+          onOpenChange={(open) => {
+            if (!open) setEditing(null);
+          }}
           title={t("adminPricing.edit")}
           fields={editFields}
           initial={pricingRuleFormFromRule(editing)}
@@ -315,11 +409,11 @@ function PricingContent() {
             value={importText}
             onChange={(e) => setImportText(e.target.value)}
             placeholder={`[\n  { "model_id": "...", "provider_id": "..." }\n]`}
-            className="min-h-48 font-mono text-2xs"
+            className="text-2xs min-h-48 font-mono"
             spellCheck={false}
           />
           {importError ? (
-            <p role="alert" className="text-sm text-srapi-error">
+            <p role="alert" className="text-srapi-error text-sm">
               {importError}
             </p>
           ) : null}
@@ -346,4 +440,15 @@ function formatBillingMode(mode: PricingRule["billing_mode"], t: (key: string) =
   if (mode === "per_request") return t("adminPricing.billingModePerRequest");
   if (mode === "image") return t("adminPricing.billingModeImage");
   return t("adminPricing.billingModeToken");
+}
+
+function pricingRuleModelLabel(
+  rule: PricingRule,
+  modelMap: Map<string, string>,
+  t: (key: string) => string,
+): string {
+  if (String(rule.model_id) === "0") {
+    return rule.model_family || t("adminPricing.anyModelFamily");
+  }
+  return modelMap.get(String(rule.model_id)) ?? String(rule.model_id);
 }

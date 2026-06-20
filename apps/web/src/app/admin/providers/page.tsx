@@ -109,8 +109,7 @@ function ProvidersContent() {
       toast({
         title: result.ok ? t("feedback.acknowledged") : t("feedback.failed"),
         description:
-          result.message ??
-          (result.latency_ms != null ? `${result.latency_ms} ms` : undefined),
+          result.message ?? (result.latency_ms != null ? `${result.latency_ms} ms` : undefined),
         tone: result.ok ? "success" : "error",
       });
     } catch {
@@ -130,6 +129,12 @@ function ProvidersContent() {
       toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
     }
   }
+
+  const endpointCapabilityOptions = [
+    { value: "auto", label: t("adminProviders.capabilityAuto") },
+    { value: "on", label: t("adminProviders.capabilityOn") },
+    { value: "off", label: t("adminProviders.capabilityOff") },
+  ];
 
   // The provider slug (`name`) is immutable after creation, so it only appears
   // on the create form; edits keep the identity stable.
@@ -155,8 +160,55 @@ function ProvidersContent() {
       type: "select",
       options: enumOptions(RESOURCE_STATUSES),
     },
-    { name: "capabilities", label: t("adminProviders.capabilities"), help: t("adminProviders.capabilitiesHelp"), type: "keyvalue", advanced: true },
-    { name: "configSchema", label: t("adminProviders.configSchema"), help: t("adminProviders.configSchemaHelp"), type: "keyvalue", advanced: true },
+    {
+      name: "chatCompletionsCapability",
+      label: t("adminProviders.endpointChatCompletions"),
+      type: "select",
+      options: endpointCapabilityOptions,
+      hint: t("adminProviders.endpointCapabilityHint"),
+    },
+    {
+      name: "responsesCapability",
+      label: t("adminProviders.endpointResponses"),
+      type: "select",
+      options: endpointCapabilityOptions,
+      hint: t("adminProviders.endpointCapabilityHint"),
+    },
+    {
+      name: "responsesCompactCapability",
+      label: t("adminProviders.endpointResponsesCompact"),
+      type: "select",
+      options: endpointCapabilityOptions,
+      hint: t("adminProviders.endpointCapabilityHint"),
+    },
+    {
+      name: "responsesInputItemsCapability",
+      label: t("adminProviders.endpointResponsesInputItems"),
+      type: "select",
+      options: endpointCapabilityOptions,
+      hint: t("adminProviders.endpointCapabilityHint"),
+    },
+    {
+      name: "messagesCapability",
+      label: t("adminProviders.endpointMessages"),
+      type: "select",
+      options: endpointCapabilityOptions,
+      hint: t("adminProviders.endpointCapabilityHint"),
+    },
+    {
+      name: "capabilities",
+      label: t("adminProviders.capabilities"),
+      help: t("adminProviders.capabilitiesHelp"),
+      type: "keyvalue",
+      advanced: true,
+    },
+    {
+      name: "configSchema",
+      label: t("adminProviders.configSchema"),
+      help: t("adminProviders.configSchemaHelp"),
+      type: "keyvalue",
+      advanced: true,
+    },
   ];
 
   const createFields: FieldConfig<ProviderFormState>[] = [
@@ -177,8 +229,8 @@ function ProvidersContent() {
       sortValue: (p) => p.display_name || p.name,
       render: (p) => (
         <div className="min-w-0">
-          <div className="truncate text-srapi-text-primary">{p.display_name || p.name}</div>
-          <div className="truncate font-mono text-2xs text-srapi-text-tertiary">{p.name}</div>
+          <div className="text-srapi-text-primary truncate">{p.display_name || p.name}</div>
+          <div className="text-2xs text-srapi-text-tertiary truncate font-mono">{p.name}</div>
         </div>
       ),
     },
@@ -187,7 +239,7 @@ function ProvidersContent() {
       header: t("adminProviders.adapterType"),
       hideOnMobile: true,
       render: (p) => (
-        <span className="font-mono text-2xs text-srapi-text-secondary">{p.adapter_type}</span>
+        <span className="text-2xs text-srapi-text-secondary font-mono">{p.adapter_type}</span>
       ),
     },
     {
@@ -195,7 +247,7 @@ function ProvidersContent() {
       header: t("adminProviders.protocol"),
       hideOnMobile: true,
       render: (p) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary">{p.protocol}</span>
+        <span className="text-2xs text-srapi-text-tertiary font-mono">{p.protocol}</span>
       ),
     },
     {
@@ -207,7 +259,7 @@ function ProvidersContent() {
         const counts = accountCountByProvider.get(p.id);
         if (!counts) return <span className="text-2xs text-srapi-text-tertiary">0</span>;
         return (
-          <span className="flex items-center gap-1.5 font-mono text-2xs">
+          <span className="text-2xs flex items-center gap-1.5 font-mono">
             <span className="text-srapi-success">{counts.active}</span>
             <span className="text-srapi-text-tertiary">/ {counts.total}</span>
           </span>
@@ -339,7 +391,9 @@ function ProvidersContent() {
           if (!open) setToDelete(null);
         }}
         title={t("adminProviders.deleteTitle")}
-        body={t("adminProviders.deleteBody", { name: toDelete?.display_name || toDelete?.name || "" })}
+        body={t("adminProviders.deleteBody", {
+          name: toDelete?.display_name || toDelete?.name || "",
+        })}
         confirmLabel={t("common.delete")}
         successMessage={t("feedback.deleted")}
         isPending={deleteMut.isPending}

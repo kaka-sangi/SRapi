@@ -708,6 +708,8 @@ func (s *Server) registerAdminBillingRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/admin/pricing-rules", s.handleListAdminPricingRules)
 	mux.HandleFunc("POST /api/v1/admin/pricing-rules", s.handleCreateAdminPricingRule)
 	mux.HandleFunc("POST /api/v1/admin/pricing-rules:bulk", s.handleBulkImportAdminPricingRules)
+	mux.HandleFunc("GET /api/v1/admin/pricing-rules/presets", s.handleListAdminPricingRulePresets)
+	mux.HandleFunc("POST /api/v1/admin/pricing-rules/presets", s.handleInstallAdminPricingRulePresets)
 	mux.HandleFunc("PATCH /api/v1/admin/pricing-rules/{id}", s.handleUpdateAdminPricingRule)
 	mux.HandleFunc("DELETE /api/v1/admin/pricing-rules/{id}", s.handleDeleteAdminPricingRule)
 	s.registerAdminOpsRoutes(mux)

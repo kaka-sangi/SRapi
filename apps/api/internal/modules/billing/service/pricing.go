@@ -254,7 +254,8 @@ func priceGatewayCost(req contract.GatewayCostRequest) contract.GatewayPricingRe
 }
 
 func PricingRuleFromRequest(req contract.CreatePricingRuleRequest) (contract.PricingRule, error) {
-	if req.ModelID <= 0 || req.ProviderID < 0 {
+	modelFamily := strings.ToLower(strings.TrimSpace(req.ModelFamily))
+	if req.ModelID < 0 || (req.ModelID == 0 && modelFamily == "") || req.ProviderID < 0 {
 		return contract.PricingRule{}, ErrInvalidInput
 	}
 	mode, ok := normalizeBillingMode(req.BillingMode)
@@ -309,6 +310,7 @@ func PricingRuleFromRequest(req contract.CreatePricingRuleRequest) (contract.Pri
 	}
 	return contract.PricingRule{
 		ModelID:                           req.ModelID,
+		ModelFamily:                       modelFamily,
 		ProviderID:                        req.ProviderID,
 		BillingMode:                       mode,
 		InputPricePerMillionTokens:        input,

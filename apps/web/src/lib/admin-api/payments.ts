@@ -7,6 +7,8 @@ import {
   deleteAdminPaymentProvider,
   getAdminPaymentDashboard,
   createAdminPricingRule,
+  installAdminPricingRulePresets,
+  listAdminPricingRulePresets,
   updateAdminPricingRule,
   deleteAdminPricingRule,
   createAdminPromoCode,
@@ -51,6 +53,7 @@ import type {
   BulkImportAdminPricingRulesData,
   BulkPricingRuleImportResult,
   CreateAdminPaymentProviderData,
+  InstallAdminPricingRulePresetsData,
   UpdateAdminPaymentProviderData,
   CreateAdminPricingRuleData,
   UpdateAdminPricingRuleData,
@@ -69,6 +72,7 @@ import type {
   PaymentAuditLog,
   PaymentProviderInstance,
   PricingRule,
+  PricingRulePreset,
   PromoCode,
   RedeemCode,
   RedeemCodeStats,
@@ -202,6 +206,16 @@ export const paymentsApi = {
     body: BulkImportAdminPricingRulesData["body"],
   ): Promise<BulkPricingRuleImportResult> {
     return unwrapData(() => bulkImportAdminPricingRules({ body, throwOnError: true }));
+  },
+
+  listPricingRulePresets(): Promise<PricingRulePreset[]> {
+    return unwrapData(() => listAdminPricingRulePresets({ throwOnError: true }));
+  },
+
+  installPricingRulePresets(
+    body?: InstallAdminPricingRulePresetsData["body"],
+  ): Promise<BulkPricingRuleImportResult> {
+    return unwrapData(() => installAdminPricingRulePresets({ body, throwOnError: true }));
   },
 
   listRedeemCodes(query?: ListAdminRedeemCodesData["query"]): Promise<AdminListResult<RedeemCode>> {

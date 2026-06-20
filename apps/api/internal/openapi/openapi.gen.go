@@ -7368,11 +7368,14 @@ type CreatePricingRuleRequest struct {
 	Intervals                         *[]PricingIntervalInput `json:"intervals,omitempty"`
 	LongContextMultiplier             *string                 `json:"long_context_multiplier,omitempty"`
 	LongContextThresholdTokens        *int                    `json:"long_context_threshold_tokens,omitempty"`
-	ModelId                           Id                      `json:"model_id"`
-	OutputPricePerMillionTokens       string                  `json:"output_price_per_million_tokens"`
-	PerRequestPrice                   *string                 `json:"per_request_price,omitempty"`
-	ProviderId                        Id                      `json:"provider_id"`
-	ServiceTierMultipliers            *map[string]string      `json:"service_tier_multipliers,omitempty"`
+
+	// ModelFamily Family-level rule key. Required when model_id is "0".
+	ModelFamily                 *string            `json:"model_family,omitempty"`
+	ModelId                     Id                 `json:"model_id"`
+	OutputPricePerMillionTokens string             `json:"output_price_per_million_tokens"`
+	PerRequestPrice             *string            `json:"per_request_price,omitempty"`
+	ProviderId                  Id                 `json:"provider_id"`
+	ServiceTierMultipliers      *map[string]string `json:"service_tier_multipliers,omitempty"`
 }
 
 // CreatePromoCodeRequest defines model for CreatePromoCodeRequest.
@@ -8493,6 +8496,14 @@ type ImportScheduledTestPlanScopeType string
 type ImportSectionResult struct {
 	Created int64 `json:"created"`
 	Updated int64 `json:"updated"`
+}
+
+// InstallPricingRulePresetsRequest defines model for InstallPricingRulePresetsRequest.
+type InstallPricingRulePresetsRequest struct {
+	DryRun *bool `json:"dry_run,omitempty"`
+
+	// Families Optional subset of model families to install. Empty installs all built-in presets.
+	Families *[]string `json:"families,omitempty"`
 }
 
 // JsonObject defines model for JsonObject.
@@ -10000,27 +10011,30 @@ type PricingIntervalInput struct {
 
 // PricingRule defines model for PricingRule.
 type PricingRule struct {
-	BillingMode                       BillingMode        `json:"billing_mode"`
-	CacheReadPricePerMillionTokens    string             `json:"cache_read_price_per_million_tokens"`
-	CacheWrite1hPricePerMillionTokens *string            `json:"cache_write_1h_price_per_million_tokens,omitempty"`
-	CacheWrite5mPricePerMillionTokens *string            `json:"cache_write_5m_price_per_million_tokens,omitempty"`
-	CacheWritePricePerMillionTokens   string             `json:"cache_write_price_per_million_tokens"`
-	CreatedAt                         Timestamp          `json:"created_at"`
-	Currency                          string             `json:"currency"`
-	EffectiveFrom                     *time.Time         `json:"effective_from,omitempty"`
-	EffectiveTo                       *time.Time         `json:"effective_to,omitempty"`
-	Id                                Id                 `json:"id"`
-	ImageOutputPricePerMillionTokens  *string            `json:"image_output_price_per_million_tokens,omitempty"`
-	InputPricePerMillionTokens        string             `json:"input_price_per_million_tokens"`
-	Intervals                         []PricingInterval  `json:"intervals"`
-	LongContextMultiplier             *string            `json:"long_context_multiplier,omitempty"`
-	LongContextThresholdTokens        *int               `json:"long_context_threshold_tokens,omitempty"`
-	ModelId                           Id                 `json:"model_id"`
-	OutputPricePerMillionTokens       string             `json:"output_price_per_million_tokens"`
-	PerRequestPrice                   string             `json:"per_request_price"`
-	ProviderId                        Id                 `json:"provider_id"`
-	ServiceTierMultipliers            *map[string]string `json:"service_tier_multipliers,omitempty"`
-	UpdatedAt                         Timestamp          `json:"updated_at"`
+	BillingMode                       BillingMode       `json:"billing_mode"`
+	CacheReadPricePerMillionTokens    string            `json:"cache_read_price_per_million_tokens"`
+	CacheWrite1hPricePerMillionTokens *string           `json:"cache_write_1h_price_per_million_tokens,omitempty"`
+	CacheWrite5mPricePerMillionTokens *string           `json:"cache_write_5m_price_per_million_tokens,omitempty"`
+	CacheWritePricePerMillionTokens   string            `json:"cache_write_price_per_million_tokens"`
+	CreatedAt                         Timestamp         `json:"created_at"`
+	Currency                          string            `json:"currency"`
+	EffectiveFrom                     *time.Time        `json:"effective_from,omitempty"`
+	EffectiveTo                       *time.Time        `json:"effective_to,omitempty"`
+	Id                                Id                `json:"id"`
+	ImageOutputPricePerMillionTokens  *string           `json:"image_output_price_per_million_tokens,omitempty"`
+	InputPricePerMillionTokens        string            `json:"input_price_per_million_tokens"`
+	Intervals                         []PricingInterval `json:"intervals"`
+	LongContextMultiplier             *string           `json:"long_context_multiplier,omitempty"`
+	LongContextThresholdTokens        *int              `json:"long_context_threshold_tokens,omitempty"`
+
+	// ModelFamily Family-level rule key used when model_id is "0".
+	ModelFamily                 *string            `json:"model_family,omitempty"`
+	ModelId                     Id                 `json:"model_id"`
+	OutputPricePerMillionTokens string             `json:"output_price_per_million_tokens"`
+	PerRequestPrice             string             `json:"per_request_price"`
+	ProviderId                  Id                 `json:"provider_id"`
+	ServiceTierMultipliers      *map[string]string `json:"service_tier_multipliers,omitempty"`
+	UpdatedAt                   Timestamp          `json:"updated_at"`
 }
 
 // PricingRuleListResponse defines model for PricingRuleListResponse.
@@ -10028,6 +10042,34 @@ type PricingRuleListResponse struct {
 	Data       []PricingRule `json:"data"`
 	Pagination Pagination    `json:"pagination"`
 	RequestId  RequestId     `json:"request_id"`
+}
+
+// PricingRulePreset defines model for PricingRulePreset.
+type PricingRulePreset struct {
+	BillingMode                       BillingMode `json:"billing_mode"`
+	CacheReadPricePerMillionTokens    string      `json:"cache_read_price_per_million_tokens"`
+	CacheWrite1hPricePerMillionTokens *string     `json:"cache_write_1h_price_per_million_tokens,omitempty"`
+	CacheWrite5mPricePerMillionTokens *string     `json:"cache_write_5m_price_per_million_tokens,omitempty"`
+	CacheWritePricePerMillionTokens   string      `json:"cache_write_price_per_million_tokens"`
+	Currency                          string      `json:"currency"`
+	ImageOutputPricePerMillionTokens  *string     `json:"image_output_price_per_million_tokens,omitempty"`
+	InputPricePerMillionTokens        string      `json:"input_price_per_million_tokens"`
+	ModelFamily                       string      `json:"model_family"`
+	OutputPricePerMillionTokens       string      `json:"output_price_per_million_tokens"`
+	PerRequestPrice                   *string     `json:"per_request_price,omitempty"`
+	Source                            *string     `json:"source,omitempty"`
+}
+
+// PricingRulePresetInstallResponse defines model for PricingRulePresetInstallResponse.
+type PricingRulePresetInstallResponse struct {
+	Data      BulkPricingRuleImportResult `json:"data"`
+	RequestId RequestId                   `json:"request_id"`
+}
+
+// PricingRulePresetListResponse defines model for PricingRulePresetListResponse.
+type PricingRulePresetListResponse struct {
+	Data      []PricingRulePreset `json:"data"`
+	RequestId RequestId           `json:"request_id"`
 }
 
 // PricingRuleResponse defines model for PricingRuleResponse.
@@ -14079,6 +14121,9 @@ type UpdateAdminPaymentProviderJSONRequestBody = UpdatePaymentProviderInstanceRe
 
 // CreateAdminPricingRuleJSONRequestBody defines body for CreateAdminPricingRule for application/json ContentType.
 type CreateAdminPricingRuleJSONRequestBody = CreatePricingRuleRequest
+
+// InstallAdminPricingRulePresetsJSONRequestBody defines body for InstallAdminPricingRulePresets for application/json ContentType.
+type InstallAdminPricingRulePresetsJSONRequestBody = InstallPricingRulePresetsRequest
 
 // UpdateAdminPricingRuleJSONRequestBody defines body for UpdateAdminPricingRule for application/json ContentType.
 type UpdateAdminPricingRuleJSONRequestBody = UpdatePricingRuleRequest
@@ -22990,6 +23035,12 @@ type ServerInterface interface {
 	// Create a decimal-safe pricing rule.
 	// (POST /api/v1/admin/pricing-rules)
 	CreateAdminPricingRule(w http.ResponseWriter, r *http.Request)
+	// List built-in pricing presets.
+	// (GET /api/v1/admin/pricing-rules/presets)
+	ListAdminPricingRulePresets(w http.ResponseWriter, r *http.Request)
+	// Install built-in family-level pricing presets.
+	// (POST /api/v1/admin/pricing-rules/presets)
+	InstallAdminPricingRulePresets(w http.ResponseWriter, r *http.Request)
 	// Delete a pricing rule.
 	// (DELETE /api/v1/admin/pricing-rules/{id})
 	DeleteAdminPricingRule(w http.ResponseWriter, r *http.Request, id Id)
@@ -32525,6 +32576,48 @@ func (siw *ServerInterfaceWrapper) CreateAdminPricingRule(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
+// ListAdminPricingRulePresets operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminPricingRulePresets(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminPricingRulePresets(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// InstallAdminPricingRulePresets operation middleware
+func (siw *ServerInterfaceWrapper) InstallAdminPricingRulePresets(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.InstallAdminPricingRulePresets(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // DeleteAdminPricingRule operation middleware
 func (siw *ServerInterfaceWrapper) DeleteAdminPricingRule(w http.ResponseWriter, r *http.Request) {
 
@@ -40223,6 +40316,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/permission-catalog", wrapper.GetAdminPermissionCatalog)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/pricing-rules", wrapper.ListAdminPricingRules)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/pricing-rules", wrapper.CreateAdminPricingRule)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/pricing-rules/presets", wrapper.ListAdminPricingRulePresets)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/pricing-rules/presets", wrapper.InstallAdminPricingRulePresets)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/pricing-rules/{id}", wrapper.DeleteAdminPricingRule)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/pricing-rules/{id}", wrapper.UpdateAdminPricingRule)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/pricing-rules:bulk", wrapper.BulkImportAdminPricingRules)

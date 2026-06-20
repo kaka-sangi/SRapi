@@ -123,6 +123,7 @@ export const queryKeys = {
     subscriptionPlans: (params?: unknown) => ["admin", "subscription-plans", params ?? {}] as const,
     userSubscriptions: (params?: unknown) => ["admin", "user-subscriptions", params ?? {}] as const,
     pricingRules: (params?: unknown) => ["admin", "pricing-rules", params ?? {}] as const,
+    pricingRulePresets: () => ["admin", "pricing-rule-presets"] as const,
     announcements: (params?: unknown) => ["admin", "announcements", params ?? {}] as const,
     announcementReads: (id: string) => ["admin", "announcement-reads", id] as const,
     redeemCodes: (params?: unknown) => ["admin", "redeem-codes", params ?? {}] as const,

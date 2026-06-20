@@ -85,6 +85,7 @@ type PricingInterval struct {
 
 type CreatePricingRuleRequest struct {
 	ModelID                           int
+	ModelFamily                       string
 	ProviderID                        int
 	BillingMode                       BillingMode
 	InputPricePerMillionTokens        string

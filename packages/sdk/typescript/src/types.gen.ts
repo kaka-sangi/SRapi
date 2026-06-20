@@ -1255,6 +1255,10 @@ export type UserSubscriptionListResponse = {
 export type PricingRule = {
     id: Id;
     model_id: Id;
+    /**
+     * Family-level rule key used when model_id is "0".
+     */
+    model_family?: string;
     provider_id: Id;
     billing_mode: BillingMode;
     input_price_per_million_tokens: string;
@@ -1280,6 +1284,10 @@ export type PricingRule = {
 
 export type CreatePricingRuleRequest = {
     model_id: Id;
+    /**
+     * Family-level rule key. Required when model_id is "0".
+     */
+    model_family?: string;
     provider_id: Id;
     billing_mode?: BillingMode;
     input_price_per_million_tokens: string;
@@ -1380,6 +1388,39 @@ export type BulkPricingRuleImportResult = {
 };
 
 export type BulkPricingRuleImportResponse = {
+    data: BulkPricingRuleImportResult;
+    request_id: RequestId;
+};
+
+export type PricingRulePreset = {
+    model_family: string;
+    billing_mode: BillingMode;
+    input_price_per_million_tokens: string;
+    output_price_per_million_tokens: string;
+    cache_read_price_per_million_tokens: string;
+    cache_write_price_per_million_tokens: string;
+    cache_write_5m_price_per_million_tokens?: string;
+    cache_write_1h_price_per_million_tokens?: string;
+    image_output_price_per_million_tokens?: string;
+    per_request_price?: string;
+    currency: string;
+    source?: string;
+};
+
+export type PricingRulePresetListResponse = {
+    data: Array<PricingRulePreset>;
+    request_id: RequestId;
+};
+
+export type InstallPricingRulePresetsRequest = {
+    dry_run?: boolean;
+    /**
+     * Optional subset of model families to install. Empty installs all built-in presets.
+     */
+    families?: Array<string>;
+};
+
+export type PricingRulePresetInstallResponse = {
     data: BulkPricingRuleImportResult;
     request_id: RequestId;
 };
@@ -17776,6 +17817,76 @@ export type BulkImportAdminPricingRulesResponses = {
 };
 
 export type BulkImportAdminPricingRulesResponse = BulkImportAdminPricingRulesResponses[keyof BulkImportAdminPricingRulesResponses];
+
+export type ListAdminPricingRulePresetsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/pricing-rules/presets';
+};
+
+export type ListAdminPricingRulePresetsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminPricingRulePresetsError = ListAdminPricingRulePresetsErrors[keyof ListAdminPricingRulePresetsErrors];
+
+export type ListAdminPricingRulePresetsResponses = {
+    /**
+     * Built-in family-level pricing presets.
+     */
+    200: PricingRulePresetListResponse;
+};
+
+export type ListAdminPricingRulePresetsResponse = ListAdminPricingRulePresetsResponses[keyof ListAdminPricingRulePresetsResponses];
+
+export type InstallAdminPricingRulePresetsData = {
+    body?: InstallPricingRulePresetsRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/pricing-rules/presets';
+};
+
+export type InstallAdminPricingRulePresetsErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type InstallAdminPricingRulePresetsError = InstallAdminPricingRulePresetsErrors[keyof InstallAdminPricingRulePresetsErrors];
+
+export type InstallAdminPricingRulePresetsResponses = {
+    /**
+     * Pricing presets validated or installed.
+     */
+    200: PricingRulePresetInstallResponse;
+};
+
+export type InstallAdminPricingRulePresetsResponse = InstallAdminPricingRulePresetsResponses[keyof InstallAdminPricingRulePresetsResponses];
 
 export type ListAdminOutboxEventsData = {
     body?: never;

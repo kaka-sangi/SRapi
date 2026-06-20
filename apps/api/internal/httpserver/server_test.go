@@ -2016,6 +2016,73 @@ func TestAdminSubscriptionPricingControlPlane(t *testing.T) {
 		t.Fatalf("expected normalized bulk pricing rule, got %+v", bulkResp.Data.Rules[0])
 	}
 
+	presetListReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/pricing-rules/presets", nil)
+	presetListReq.AddCookie(sessionCookie)
+	presetListRec := httptest.NewRecorder()
+	handler.ServeHTTP(presetListRec, presetListReq)
+	if presetListRec.Code != http.StatusOK {
+		t.Fatalf("expected pricing preset list 200, got %d body=%s", presetListRec.Code, presetListRec.Body.String())
+	}
+	var presetListResp apiopenapi.PricingRulePresetListResponse
+	if err := json.NewDecoder(presetListRec.Body).Decode(&presetListResp); err != nil {
+		t.Fatalf("decode pricing preset list: %v", err)
+	}
+	if len(presetListResp.Data) == 0 || presetListResp.Data[0].ModelFamily == "" {
+		t.Fatalf("expected built-in pricing presets, got %+v", presetListResp.Data)
+	}
+
+	presetDryRunReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/pricing-rules/presets", strings.NewReader(`{"dry_run":true,"families":["gpt-5.4"]}`))
+	presetDryRunReq.Header.Set("Content-Type", "application/json")
+	presetDryRunReq.AddCookie(sessionCookie)
+	presetDryRunReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	presetDryRunRec := httptest.NewRecorder()
+	handler.ServeHTTP(presetDryRunRec, presetDryRunReq)
+	if presetDryRunRec.Code != http.StatusOK {
+		t.Fatalf("expected pricing preset dry-run 200, got %d body=%s", presetDryRunRec.Code, presetDryRunRec.Body.String())
+	}
+	var presetDryRunResp apiopenapi.PricingRulePresetInstallResponse
+	if err := json.NewDecoder(presetDryRunRec.Body).Decode(&presetDryRunResp); err != nil {
+		t.Fatalf("decode pricing preset dry-run: %v", err)
+	}
+	if !presetDryRunResp.Data.DryRun || presetDryRunResp.Data.Requested != 1 || presetDryRunResp.Data.Validated != 1 || presetDryRunResp.Data.Created != 0 || len(presetDryRunResp.Data.Rules) != 0 {
+		t.Fatalf("unexpected pricing preset dry-run response: %+v", presetDryRunResp.Data)
+	}
+
+	presetInstallReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/pricing-rules/presets", strings.NewReader(`{"families":["gpt-5.4"]}`))
+	presetInstallReq.Header.Set("Content-Type", "application/json")
+	presetInstallReq.AddCookie(sessionCookie)
+	presetInstallReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	presetInstallRec := httptest.NewRecorder()
+	handler.ServeHTTP(presetInstallRec, presetInstallReq)
+	if presetInstallRec.Code != http.StatusOK {
+		t.Fatalf("expected pricing preset install 200, got %d body=%s", presetInstallRec.Code, presetInstallRec.Body.String())
+	}
+	var presetInstallResp apiopenapi.PricingRulePresetInstallResponse
+	if err := json.NewDecoder(presetInstallRec.Body).Decode(&presetInstallResp); err != nil {
+		t.Fatalf("decode pricing preset install: %v", err)
+	}
+	if presetInstallResp.Data.Created != 1 || len(presetInstallResp.Data.Rules) != 1 || presetInstallResp.Data.Rules[0].ModelId != "0" || optionalStringValue(presetInstallResp.Data.Rules[0].ModelFamily) != "gpt-5.4" {
+		t.Fatalf("unexpected pricing preset install response: %+v", presetInstallResp.Data)
+	}
+	presetRuleID := presetInstallResp.Data.Rules[0].Id
+
+	presetReinstallReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/pricing-rules/presets", strings.NewReader(`{"families":["gpt-5.4"]}`))
+	presetReinstallReq.Header.Set("Content-Type", "application/json")
+	presetReinstallReq.AddCookie(sessionCookie)
+	presetReinstallReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	presetReinstallRec := httptest.NewRecorder()
+	handler.ServeHTTP(presetReinstallRec, presetReinstallReq)
+	if presetReinstallRec.Code != http.StatusOK {
+		t.Fatalf("expected pricing preset reinstall 200, got %d body=%s", presetReinstallRec.Code, presetReinstallRec.Body.String())
+	}
+	var presetReinstallResp apiopenapi.PricingRulePresetInstallResponse
+	if err := json.NewDecoder(presetReinstallRec.Body).Decode(&presetReinstallResp); err != nil {
+		t.Fatalf("decode pricing preset reinstall: %v", err)
+	}
+	if presetReinstallResp.Data.Created != 1 || len(presetReinstallResp.Data.Rules) != 1 || presetReinstallResp.Data.Rules[0].Id != presetRuleID {
+		t.Fatalf("expected preset reinstall to update the same family rule, got %+v", presetReinstallResp.Data)
+	}
+
 	plansReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/subscription-plans", nil)
 	plansReq.AddCookie(sessionCookie)
 	plansRec := httptest.NewRecorder()
@@ -2072,7 +2139,10 @@ func TestAdminSubscriptionPricingControlPlane(t *testing.T) {
 	if err := json.NewDecoder(rulesRec.Body).Decode(&rulesResp); err != nil {
 		t.Fatalf("decode pricing rule list: %v", err)
 	}
-	if len(rulesResp.Data) != 2 || !pricingRuleListHasID(rulesResp.Data, pricingResp.Data.Id) || !pricingRuleListHasID(rulesResp.Data, bulkResp.Data.Rules[0].Id) {
+	if len(rulesResp.Data) != 3 ||
+		!pricingRuleListHasID(rulesResp.Data, pricingResp.Data.Id) ||
+		!pricingRuleListHasID(rulesResp.Data, bulkResp.Data.Rules[0].Id) ||
+		!pricingRuleListHasID(rulesResp.Data, presetRuleID) {
 		t.Fatalf("unexpected pricing rule list: %+v", rulesResp.Data)
 	}
 
@@ -2087,7 +2157,7 @@ func TestAdminSubscriptionPricingControlPlane(t *testing.T) {
 	if err := json.NewDecoder(auditRec.Body).Decode(&auditResp); err != nil {
 		t.Fatalf("decode audit logs: %v", err)
 	}
-	for _, action := range []string{"subscription_plan.create", "user_subscription.create", "pricing_rule.create", "pricing_rule.bulk_import"} {
+	for _, action := range []string{"subscription_plan.create", "user_subscription.create", "pricing_rule.create", "pricing_rule.bulk_import", "pricing_rule.presets_install"} {
 		if !auditLogHasAction(auditResp.Data, action) {
 			t.Fatalf("expected audit action %s in %+v", action, auditResp.Data)
 		}
