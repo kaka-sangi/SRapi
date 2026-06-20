@@ -730,6 +730,7 @@ export const zh: Messages = {
     modelsExcluded: "排除 {count} 个",
     modelsMapped: "映射 {count} 个",
     routing: "路由",
+    identity: "身份",
     createdAt: "创建时间",
     factEmail: "邮箱",
     factPlan: "套餐",

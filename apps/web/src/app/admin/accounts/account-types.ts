@@ -161,3 +161,25 @@ export function accountMetadataFacts(
 
   return facts;
 }
+
+export interface AccountIdentitySummary {
+  primary: string;
+  secondary: string[];
+}
+
+export function accountIdentitySummary(
+  t: Translate,
+  account: ProviderAccount,
+): AccountIdentitySummary {
+  const facts = accountMetadataFacts(t, account);
+  const email = facts.find((fact) => fact.key === "email")?.value;
+  const plan = facts.find((fact) => fact.key === "plan")?.value;
+  const upstreamID = facts.find((fact) => fact.key === "upstream-id")?.value;
+  const client = facts.find((fact) => fact.key === "client")?.value;
+  return {
+    primary: email || upstreamID || account.name,
+    secondary: [plan, client, upstreamID && email ? upstreamID : ""].filter(
+      (value): value is string => Boolean(value),
+    ),
+  };
+}

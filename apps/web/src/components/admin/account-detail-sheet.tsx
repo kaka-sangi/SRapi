@@ -28,6 +28,7 @@ import { cn } from "@/lib/cn";
 import { StatCard } from "@/components/ui/stat-card";
 import { Sparkline } from "@/components/charts/sparkline";
 import {
+  accountIdentitySummary,
   accountMetadataFacts,
   accountModelPolicyLabel,
 } from "@/app/admin/accounts/account-types";
@@ -395,6 +396,7 @@ export function AccountDetailSheet({
   const usageToday = useAccountUsageToday(id);
   const usageDaily = useAccountUsageDaily(id);
   const fetchQuota = useFetchAccountQuota();
+  const identity = account ? accountIdentitySummary(t, account) : null;
 
   async function refreshQuota() {
     if (!id) return;
@@ -446,6 +448,16 @@ export function AccountDetailSheet({
 
         {account ? (
           <div className="mt-3 grid grid-cols-2 gap-2">
+            {identity ? (
+              <DetailMetric
+                label={t("adminAccounts.identity")}
+                value={
+                  <span className="inline-block max-w-full truncate" title={identity.primary}>
+                    {identity.primary}
+                  </span>
+                }
+              />
+            ) : null}
             <DetailMetric
               label={t("adminAccounts.provider")}
               value={providerName ?? account.provider_id}
@@ -466,11 +478,8 @@ export function AccountDetailSheet({
               label={t("adminAccounts.routing")}
               value={`P${account.priority ?? 0} / W${account.weight ?? 1}`}
             />
-            <DetailMetric
-              label={t("adminAccounts.createdAt")}
-              value={formatDate(account.created_at)}
-            />
             {accountMetadataFacts(t, account)
+              .filter((fact) => !["email", "upstream-id"].includes(fact.key))
               .slice(0, 4)
               .map((fact) => (
                 <DetailMetric key={fact.key} label={fact.label} value={fact.value} />

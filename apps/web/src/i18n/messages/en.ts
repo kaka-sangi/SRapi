@@ -742,6 +742,7 @@ export const en = {
     modelsExcluded: "{count} excluded",
     modelsMapped: "{count} mapped",
     routing: "Routing",
+    identity: "Identity",
     createdAt: "Created",
     factEmail: "Email",
     factPlan: "Plan",

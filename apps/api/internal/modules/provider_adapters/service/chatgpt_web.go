@@ -738,8 +738,11 @@ func chatGPTWebPoWGenerate(seed string, difficulty string, config []any, limit i
 	if difficulty == "" || len(difficulty) > 8 || !chatGPTWebPoWHexDifficulty(difficulty) {
 		return chatGPTWebPoWFallback(seed), false
 	}
+	if limit <= 0 {
+		return chatGPTWebPoWFallback(seed), false
+	}
 	start := time.Now()
-	for nonce := range limit {
+	for nonce := 0; nonce < limit; nonce++ {
 		answer, err := chatGPTWebPoWRunCheck(start, seed, difficulty, config, nonce)
 		if err != nil {
 			return chatGPTWebPoWFallback(seed), false
@@ -835,8 +838,8 @@ func chatGPTWebPoWConfig(req contract.ConversationRequest, scriptSources []strin
 		0,
 		"en-US,es-US,en,es",
 		0.0,
-		"_reactListeningo743lnnpvdg",
-		"window",
+		"",
+		"",
 		nowSeconds,
 		chatGPTWebStableID(req, fmt.Sprintf("pow-%d", now.UnixNano())),
 		"",

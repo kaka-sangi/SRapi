@@ -76,6 +76,7 @@ import { AccountImportDialog } from "@/components/admin/account-import-dialog";
 import { BulkAddAccountsDialog } from "./bulk-add-dialog";
 import type { Provider, ProviderAccount, ProviderAccountStatus } from "@/lib/sdk-types";
 import {
+  accountIdentitySummary,
   accountMetadataFacts,
   accountModelPolicyLabel,
   metadataString,
@@ -554,7 +555,20 @@ function AccountsContent() {
       header: t("adminAccounts.name"),
       pinned: true,
       sortValue: (a) => a.name,
-      render: (a) => <span className="text-srapi-text-primary">{a.name}</span>,
+      render: (a) => {
+        const identity = accountIdentitySummary(t, a);
+        const hasIdentity = identity.primary !== a.name || identity.secondary.length > 0;
+        return (
+          <div className="flex min-w-[12rem] flex-col gap-0.5">
+            <span className="truncate text-srapi-text-primary">{a.name}</span>
+            {hasIdentity ? (
+              <span className="max-w-[16rem] truncate font-mono text-2xs text-srapi-text-tertiary" title={[identity.primary, ...identity.secondary].join(" · ")}>
+                {[identity.primary, ...identity.secondary.slice(0, 2)].join(" · ")}
+              </span>
+            ) : null}
+          </div>
+        );
+      },
     },
     {
       key: "provider",
@@ -583,7 +597,9 @@ function AccountsContent() {
       hideOnMobile: true,
       sortValue: (a) => accountMetadataFacts(t, a).map((fact) => fact.value).join(" "),
       render: (a) => {
-        const facts = accountMetadataFacts(t, a).slice(0, 4);
+        const facts = accountMetadataFacts(t, a)
+          .filter((fact) => !["email", "plan", "upstream-id", "client"].includes(fact.key))
+          .slice(0, 4);
         if (facts.length === 0) {
           return <span className="font-mono text-2xs text-srapi-text-tertiary">—</span>;
         }
@@ -729,7 +745,7 @@ function AccountsContent() {
               {formatInteger(today.requests)} · {formatMoney(today.cost, today.currency)}
             </span>
             <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
-              {formatPercent(today.success_rate)}
+              {formatInteger(today.total_tokens || today.input_tokens + today.output_tokens)} {t("adminAccounts.usageTokens").toLowerCase()} · {formatPercent(today.success_rate)}
             </span>
           </div>
         );

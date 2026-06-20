@@ -172,9 +172,11 @@ describe("AccountDetailSheet", () => {
 
     expect(screen.queryByText("https://internal-upstream.example/v1")).not.toBeInTheDocument();
     expect(screen.getByText("Codex")).toBeInTheDocument();
+    expect(screen.getAllByText("ada@example.com").length).toBeGreaterThan(0);
     expect(screen.getByText("允许 1 个")).toBeInTheDocument();
     expect(screen.getByText("Pooled accounts")).toBeInTheDocument();
     expect(screen.getAllByText("已绑定代理").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/2026年6月10日|Jun 10, 2026/)).not.toBeInTheDocument();
     const usageTable = screen.getByRole("table");
     expect(within(usageTable).queryByText(/2026年5月18日|May 18, 2026/)).not.toBeInTheDocument();
     expect(within(usageTable).queryByText(/2026年6月10日|Jun 10, 2026/)).not.toBeInTheDocument();

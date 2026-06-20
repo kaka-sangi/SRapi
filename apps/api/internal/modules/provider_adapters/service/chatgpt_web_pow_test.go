@@ -6,6 +6,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
+	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 )
 
 func TestChatGPTWebPoWGenerateUsesSentinelFNVAnswerShape(t *testing.T) {
@@ -112,5 +115,27 @@ func TestChatGPTWebPoWRunCheckMatchesSentinelAlgorithm(t *testing.T) {
 	}
 	if _, ok := fp[9].(float64); !ok {
 		t.Fatalf("elapsed slot = %#v, want numeric", fp[9])
+	}
+}
+
+func TestChatGPTWebPoWConfigUsesCompactPlaceholderFingerprint(t *testing.T) {
+	config := chatGPTWebPoWConfig(contractConversationRequestForPoWTest(), nil, "")
+	if len(config) != 23 {
+		t.Fatalf("fingerprint length = %d, want 23", len(config))
+	}
+	if config[12] != "" {
+		t.Fatalf("random object-key slot = %#v, want empty placeholder", config[12])
+	}
+	if config[13] != "" {
+		t.Fatalf("random window-property slot = %#v, want empty placeholder", config[13])
+	}
+}
+
+func contractConversationRequestForPoWTest() contract.ConversationRequest {
+	return contract.ConversationRequest{
+		RequestID: "pow-test",
+		Account: accountcontract.ProviderAccount{
+			Metadata: map[string]any{"user_agent": "Mozilla/5.0 Test"},
+		},
 	}
 }

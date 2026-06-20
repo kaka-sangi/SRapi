@@ -16,6 +16,7 @@ import type { ProviderAccount, AccountHealthSnapshot, AccountUsageToday } from "
 import { cn } from "@/lib/cn";
 import { AccountHealthCell, AccountQuotaCell } from "./account-health-cells";
 import {
+  accountIdentitySummary,
   accountMetadataFacts,
   accountModelPolicyLabel,
   type AccountSelection,
@@ -220,13 +221,18 @@ function AccountCard({
   status: ReactNode;
 }) {
   const { t } = useLanguage();
+  const identity = accountIdentitySummary(t, account);
   const modelPolicy = accountModelPolicyLabel(t, account.metadata);
   const metadataFacts = accountMetadataFacts(t, account);
+  const operationalFacts = metadataFacts
+    .filter((fact) => !["email", "plan", "upstream-id", "client"].includes(fact.key))
+    .slice(0, 3);
   const proxyLabel = account.proxy_id ? t("adminAccounts.proxyConfigured") : t("adminAccounts.noProxy");
   const groups = account.group_ids ?? [];
   const visibleGroups = groups.slice(0, 3).map((id) => groupNameById.get(String(id)) ?? `#${id}`);
   const extraGroupCount = Math.max(0, groups.length - visibleGroups.length);
   const hasTodayUsage = Boolean(today && today.requests > 0);
+  const hasIdentity = identity.primary !== account.name || identity.secondary.length > 0;
   return (
     <article
       className={cn(
@@ -262,6 +268,22 @@ function AccountCard({
             <span className="shrink-0 text-srapi-border">·</span>
             <span className="truncate text-2xs text-srapi-text-tertiary">{runtimeClassLabel(t, account.runtime_class)}</span>
           </div>
+          {hasIdentity ? (
+            <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 font-mono text-2xs">
+              <span className="min-w-0 max-w-[13rem] truncate text-srapi-text-secondary" title={identity.primary}>
+                {identity.primary}
+              </span>
+              {identity.secondary.slice(0, 2).map((item) => (
+                <span
+                  key={item}
+                  className="max-w-[8rem] truncate text-srapi-text-tertiary"
+                  title={item}
+                >
+                  {item}
+                </span>
+              ))}
+            </div>
+          ) : null}
           <div className="mt-2 flex flex-wrap gap-1">
             <span className="rounded-md bg-srapi-bg-muted px-1.5 py-0.5 font-mono text-[10px] text-srapi-text-tertiary">
               {modelPolicy}
@@ -289,7 +311,7 @@ function AccountCard({
                 +{extraGroupCount}
               </span>
             ) : null}
-            {metadataFacts.slice(0, 3).map((fact) => (
+            {operationalFacts.map((fact) => (
               <span
                 key={fact.key}
                 className="max-w-[10rem] truncate rounded-md bg-srapi-bg-muted px-1.5 py-0.5 font-mono text-[10px] text-srapi-text-tertiary"
