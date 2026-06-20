@@ -1386,7 +1386,7 @@ export type BulkPricingRuleImportResponse = {
 
 export type ProviderProtocol = 'openai-compatible' | 'anthropic-compatible' | 'gemini-compatible' | 'rerank-compatible';
 
-export type ProviderAdapterType = 'openai-compatible' | 'generic-reverse-proxy' | 'anthropic-compatible' | 'gemini-compatible' | 'rerank-compatible' | 'native-openai' | 'native-anthropic' | 'native-gemini' | 'openrouter' | 'reverse-proxy-chatgpt-web' | 'reverse-proxy-codex-cli' | 'reverse-proxy-claude-web' | 'reverse-proxy-claude-code-cli' | 'reverse-proxy-gemini-cli' | 'reverse-proxy-antigravity' | 'custom';
+export type ProviderAdapterType = 'openai-compatible' | 'generic-reverse-proxy' | 'anthropic-compatible' | 'gemini-compatible' | 'rerank-compatible' | 'native-openai' | 'native-anthropic' | 'native-gemini' | 'native-grok' | 'openrouter' | 'reverse-proxy-chatgpt-web' | 'reverse-proxy-codex-cli' | 'reverse-proxy-claude-web' | 'reverse-proxy-claude-code-cli' | 'reverse-proxy-gemini-cli' | 'reverse-proxy-antigravity' | 'custom';
 
 export type Provider = {
     id: Id;
@@ -1672,7 +1672,7 @@ export type RuntimeClass = 'api_key' | 'oauth_refresh' | 'oauth_device_code' | '
 /**
  * Upstream protocol/platform family a provider preset belongs to.
  */
-export type PlatformFamily = 'openai_compatible' | 'anthropic_compatible' | 'gemini_compatible' | 'bedrock_anthropic' | 'reverse_proxy_antigravity' | 'rerank_compatible';
+export type PlatformFamily = 'openai_compatible' | 'anthropic_compatible' | 'gemini_compatible' | 'bedrock_anthropic' | 'xai_compatible' | 'reverse_proxy_antigravity' | 'rerank_compatible';
 
 export type ProviderAccountStatus = 'active' | 'disabled' | 'needs_reauth' | 'suspended' | 'dead' | 'archived';
 

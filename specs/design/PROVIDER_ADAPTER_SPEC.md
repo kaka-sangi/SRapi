@@ -65,7 +65,7 @@ reverse-proxy-copilot
 reverse-proxy-antigravity
 ```
 
-> 说明：`openai-compatible`、`generic-reverse-proxy`、`anthropic-compatible`、`bedrock`、`gemini-compatible`、`native-openai`/`native-anthropic`/`native-gemini`、`openrouter`、`reverse-proxy-chatgpt-web`、`reverse-proxy-codex-cli`、`reverse-proxy-claude-code-cli`、`reverse-proxy-gemini-cli`、`reverse-proxy-antigravity` 均已在 Provider Adapter Service 中接线并有测试覆盖。`native-grok`、`reverse-proxy-claude-web`、`reverse-proxy-grok-web`、`reverse-proxy-cursor`、`reverse-proxy-augment`、`reverse-proxy-copilot` 为预留类型（Roadmap / 尚未实现），目前没有专属 dispatch 实现。OpenAPI 暴露的 `ProviderAdapterType` 枚举为当前管理面允许配置的子集（见 `packages/openapi/openapi.yaml` `ProviderAdapterType`），`bedrock` 等通过账号 metadata 进入 dispatch。
+> 说明：`openai-compatible`、`generic-reverse-proxy`、`anthropic-compatible`、`bedrock`、`gemini-compatible`、`native-openai`/`native-anthropic`/`native-gemini`、`native-grok`、`openrouter`、`reverse-proxy-chatgpt-web`、`reverse-proxy-codex-cli`、`reverse-proxy-claude-code-cli`、`reverse-proxy-gemini-cli`、`reverse-proxy-antigravity` 均已在 Provider Adapter Service 中接线并有测试覆盖。`native-grok` 使用 xAI/Grok 独立 preset family，REST 复用 OpenAI-compatible wire shape，并支持 `/v1/responses/ws` 上游 Responses WebSocket relay。`reverse-proxy-claude-web`、`reverse-proxy-grok-web`、`reverse-proxy-cursor`、`reverse-proxy-augment`、`reverse-proxy-copilot` 为预留类型（Roadmap / 尚未实现），目前没有专属 dispatch 实现。OpenAPI 暴露的 `ProviderAdapterType` 枚举为当前管理面允许配置的子集（见 `packages/openapi/openapi.yaml` `ProviderAdapterType`），`bedrock` 等通过账号 metadata 进入 dispatch。
 
 `reverse-proxy-*` 类 Adapter 必须经由 `REVERSE_PROXY_SPEC.md` 定义的 Reverse Proxy Runtime 发起上游请求。
 `reverse-proxy-*` 是 2api / official-client simulation 路径，必须使用 OAuth、session、desktop、CLI 或 IDE token 等非 API-key 运行时身份；`runtime_class = api_key` 必须使用对应官方 API-key Adapter，不得作为 2api 反代账号进入 Reverse Proxy Runtime。
@@ -106,6 +106,7 @@ anthropic-compatible    -> /messages
 bedrock                 -> AWS Bedrock Runtime InvokeModel / InvokeModelWithResponseStream with Anthropic Messages body
 gemini-compatible       -> /models/{model}:generateContent 或 :streamGenerateContent
 native-gemini           -> /models/{model}:generateContent 或 :streamGenerateContent
+native-grok             -> xAI/Grok OpenAI-compatible `/responses`、`/responses/compact`、`/responses` WebSocket、images/videos 等 provider preset 声明的资源
 reverse-proxy-chatgpt-web -> Reverse Proxy Runtime + ChatGPT Web /backend-api/conversation payload
 reverse-proxy-gemini-cli -> Reverse Proxy Runtime + Gemini GenerateContent payload
 reverse-proxy-antigravity -> Reverse Proxy Runtime + Antigravity / Google Cloud Code v1internal payload
@@ -635,7 +636,7 @@ latency_ms
 已超出该基线并落地的能力：
 
 - OAuth refresh / Device Code（§15；reverse-proxy adapter 通过 Reverse Proxy Runtime 的统一 OAuth 接口完成凭证轮换，Codex / Claude Code / Antigravity 的 token endpoint 与 client id 见 `reverse_proxy/service`）。
-- Realtime（OpenAI-compatible Realtime 与 Codex Responses WebSocket session，经 `PrepareRealtime` 构造，relay 走 Reverse Proxy Runtime 的 `WebSocketRuntime.RelayWebSocket`）。
+- Realtime（OpenAI-compatible Realtime、Codex Responses WebSocket session 与 xAI/Grok Responses WebSocket session，经 `PrepareRealtime` 构造；API-key xAI/Grok WS 由 Gateway 用选中账号凭证直连，非 API-key 反代身份继续走 Reverse Proxy Runtime 的 `WebSocketRuntime.RelayWebSocket`）。
 - Prompt cache / context cache usage 解析（§13）。
 - embeddings、images（generations / edits / variations）、moderations、rerank、audio transcriptions / speech 等扩展端点（§6、§22）。
 
@@ -710,6 +711,7 @@ Audio speech dispatch must send JSON with mapped upstream `model`, `input`, `voi
 - Provider Account metadata 可以声明 `same_candidate_retry_enabled` / `same_candidate_retry_count` / `same_candidate_retry_base_delay_ms` / `same_candidate_retry_max_delay_ms`（兼容 `same_account_*`、`transient_retry_count`、`pool_mode_retry_count`）。Gateway 在同一 Scheduler decision 内对 transient 429、529、5xx、timeout、network、stream interruption、empty completion 做有界同候选 retry；`pool_mode=true` 默认启用并允许对 401/403 做同候选 retry。retry 过程只记录低敏日志，最终成功或最终失败才写 usage / scheduler feedback；失败后仍进入现有 ranked-candidate failover，不新增 provider-specific scheduler 状态。
 - 该同候选 retry / ranked-candidate failover 语义适用于文本、Responses、Messages、Embeddings、Responses input_items，以及 direct-dispatch 的 images、audio、moderations、rerank、Anthropic count_tokens 和 Gemini countTokens；各端点仍保留自己的响应渲染和成功 usage/price 规则。
 - `reverse-proxy-codex-cli` realtime 请求必须通过 `PrepareRealtime` 构造 Codex Responses WebSocket session：从 Codex base URL 派生 `ws/wss` `/responses`，设置 Codex official-client headers，并继续拒绝 `runtime_class = api_key`。首帧必须是 SRapi 规范化后的 Codex Responses `response.create`：强制 mapped upstream model、`stream=true`、OAuth/session 默认 `store=false`，补齐默认 instructions，复用普通 `/responses` 的 input/tool/service_tier/image_generation 规范化，并移除 live WebSocket 不适用的 `background`。
+- `native-grok` Responses WebSocket 请求必须通过 `PrepareRealtime` 构造 xAI/Grok `ws/wss` `/responses` session。首帧必须是 SRapi 规范化后的 Responses `response.create`：强制 mapped upstream model，移除 `stream` 和 `background`，规范化 service tier / image generation tool 字段；`prompt_cache_key` 或显式 `x_grok_conv_id` 会作为 `x-grok-conv-id` 上游会话头。API-key 账号由 Gateway 直连并注入选中账号 `api_key`，非 API-key / custom reverse proxy 账号通过 Reverse Proxy Runtime 注入选中账号身份。
 - OpenAI-compatible Realtime 请求必须通过 `PrepareRealtime` 构造上游 Realtime WebSocket session：从 OpenAI-compatible base URL 派生 `ws/wss` `/realtime?model=<mapped_upstream_model>`，只转发显式允许的 Realtime handshake headers（当前为 `OpenAI-Safety-Identifier`）。`runtime_class = api_key` 的官方 API-key Realtime 由 Gateway 用选中账号 `api_key`/`openai_api_key` 直连上游；`runtime_class != api_key` 的 OpenAI-compatible Realtime 通过 Reverse Proxy Runtime 使用选中账号 OAuth/session/client-token credential 注入上游身份。SRapi 2api Realtime 路径继续拒绝 `runtime_class = api_key`。
 - `reverse-proxy-*` 和 `runtime_class != api_key` 上游请求必须通过 Reverse Proxy Runtime 发起，不得使用裸 `net/http` 默认客户端；官方 API-key Adapter 路径可使用普通 upstream client，但认证材料仍只能来自选中账号 credential。
 - TLS / HTTP/2 / Header / cookie / User-Agent / 出口 IP 必须由 Egress Profile 决定，不得在 Adapter 内硬编码。

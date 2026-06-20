@@ -20844,6 +20844,7 @@ components:
         - native-openai
         - native-anthropic
         - native-gemini
+        - native-grok
         - openrouter
         - reverse-proxy-chatgpt-web
         - reverse-proxy-codex-cli
@@ -21555,6 +21556,7 @@ components:
         - anthropic_compatible
         - gemini_compatible
         - bedrock_anthropic
+        - xai_compatible
         - reverse_proxy_antigravity
         - rerank_compatible
 

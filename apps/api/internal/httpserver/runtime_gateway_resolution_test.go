@@ -105,6 +105,14 @@ func TestEffectiveCapabilitiesResponsesCompactRequiresExplicitCapability(t *test
 			wantCompact: true,
 		},
 		{
+			name: "native-grok preset advertises compact",
+			provider: providercontract.Provider{
+				Name:        "grok",
+				AdapterType: "native-grok",
+			},
+			wantCompact: true,
+		},
+		{
 			name: "ordinary responses capability does not imply compact",
 			provider: providercontract.Provider{
 				AdapterType:  "unknown-provider",
@@ -192,6 +200,13 @@ func TestEffectiveCapabilitiesResponsesInputItemsRequiresNativeSubresource(t *te
 				Name:         "deepseek",
 				AdapterType:  "openai-compatible",
 				ConfigSchema: map[string]any{"provider_key": "deepseek"},
+			},
+		},
+		{
+			name: "native-grok preset does not inherit OpenAI input_items",
+			provider: providercontract.Provider{
+				Name:        "grok",
+				AdapterType: "native-grok",
 			},
 		},
 		{
@@ -298,6 +313,14 @@ func TestEffectiveCapabilitiesImageSubresourcesRequireExplicitCapability(t *test
 			},
 		},
 		{
+			name: "native-grok preset advertises image generation only",
+			provider: providercontract.Provider{
+				Name:        "grok",
+				AdapterType: "native-grok",
+			},
+			wantGeneration: true,
+		},
+		{
 			name: "provider override can enable image edits",
 			provider: providercontract.Provider{
 				AdapterType:  "unknown-provider",
@@ -383,6 +406,21 @@ func TestEffectiveCapabilitiesImageSubresourcesRequireExplicitCapability(t *test
 	}
 }
 
+func TestEffectiveCapabilitiesGrokMediaResources(t *testing.T) {
+	got := effectiveCapabilities(
+		modelcontract.Model{},
+		modelcontract.ModelProviderMapping{},
+		providercontract.Provider{Name: "grok", AdapterType: "native-grok"},
+		accountcontract.ProviderAccount{},
+	)
+	if !hasCapability(got, capabilitiescontract.KeyImageGenerations) || !hasCapability(got, capabilitiescontract.KeyVideos) {
+		t.Fatalf("expected native-grok preset to advertise image generation and videos, got %+v", got)
+	}
+	if hasCapability(got, capabilitiescontract.KeyImageEdits) || hasCapability(got, capabilitiescontract.KeyImageVariations) || hasCapability(got, capabilitiescontract.KeyResponsesInputItems) {
+		t.Fatalf("native-grok should not inherit unsupported OpenAI subresources, got %+v", got)
+	}
+}
+
 func TestEffectiveCapabilitiesResponsesWebSocketIsCodexAccountScoped(t *testing.T) {
 	model := modelcontract.Model{}
 	mapping := modelcontract.ModelProviderMapping{}
@@ -409,6 +447,32 @@ func TestEffectiveCapabilitiesResponsesWebSocketIsCodexAccountScoped(t *testing.
 				Metadata: map[string]any{"codex_responses_websocket": true},
 			},
 			want: true,
+		},
+		{
+			name: "native-grok preset enables capability",
+			provider: providercontract.Provider{
+				Name:        "grok",
+				AdapterType: "native-grok",
+			},
+			want: true,
+		},
+		{
+			name: "native-grok account can opt out",
+			provider: providercontract.Provider{
+				Name:        "grok",
+				AdapterType: "native-grok",
+			},
+			account: accountcontract.ProviderAccount{
+				Metadata: map[string]any{"disable_responses_websocket": true},
+			},
+		},
+		{
+			name: "native-grok provider can opt out",
+			provider: providercontract.Provider{
+				Name:         "grok",
+				AdapterType:  "native-grok",
+				Capabilities: map[string]any{capabilitiescontract.KeyResponsesWebSocket: false},
+			},
 		},
 		{
 			name: "non codex account metadata does not enable capability",

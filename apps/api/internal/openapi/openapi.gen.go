@@ -2419,6 +2419,7 @@ const (
 	PlatformFamilyOpenaiCompatible        PlatformFamily = "openai_compatible"
 	PlatformFamilyRerankCompatible        PlatformFamily = "rerank_compatible"
 	PlatformFamilyReverseProxyAntigravity PlatformFamily = "reverse_proxy_antigravity"
+	PlatformFamilyXaiCompatible           PlatformFamily = "xai_compatible"
 )
 
 // Valid indicates whether the value is a known member of the PlatformFamily enum.
@@ -2435,6 +2436,8 @@ func (e PlatformFamily) Valid() bool {
 	case PlatformFamilyRerankCompatible:
 		return true
 	case PlatformFamilyReverseProxyAntigravity:
+		return true
+	case PlatformFamilyXaiCompatible:
 		return true
 	default:
 		return false
@@ -2602,6 +2605,7 @@ const (
 	ProviderAdapterTypeGenericReverseProxy       ProviderAdapterType = "generic-reverse-proxy"
 	ProviderAdapterTypeNativeAnthropic           ProviderAdapterType = "native-anthropic"
 	ProviderAdapterTypeNativeGemini              ProviderAdapterType = "native-gemini"
+	ProviderAdapterTypeNativeGrok                ProviderAdapterType = "native-grok"
 	ProviderAdapterTypeNativeOpenai              ProviderAdapterType = "native-openai"
 	ProviderAdapterTypeOpenaiCompatible          ProviderAdapterType = "openai-compatible"
 	ProviderAdapterTypeOpenrouter                ProviderAdapterType = "openrouter"
@@ -2628,6 +2632,8 @@ func (e ProviderAdapterType) Valid() bool {
 	case ProviderAdapterTypeNativeAnthropic:
 		return true
 	case ProviderAdapterTypeNativeGemini:
+		return true
+	case ProviderAdapterTypeNativeGrok:
 		return true
 	case ProviderAdapterTypeNativeOpenai:
 		return true

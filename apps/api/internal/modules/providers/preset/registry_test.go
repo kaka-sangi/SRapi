@@ -340,6 +340,35 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 		t.Fatalf("expected groq preset to include bearer api_key support")
 	}
 
+	grokPreset, ok := registry.Lookup("grok")
+	if !ok {
+		t.Fatalf("missing grok preset")
+	}
+	if grokPreset.DefaultBaseURL != "https://api.x.ai/v1" {
+		t.Fatalf("unexpected grok base url: %s", grokPreset.DefaultBaseURL)
+	}
+	if grokPreset.PlatformFamily != PlatformFamilyXAICompatible {
+		t.Fatalf("expected grok to use xAI platform family, got %s", grokPreset.PlatformFamily)
+	}
+	if !grokPreset.MatchesPath("/api/provider/xai/v1/responses") {
+		t.Fatalf("expected xai route alias to map to grok preset")
+	}
+	if !grokPreset.Capabilities["responses"] ||
+		!grokPreset.Capabilities["responses_compact"] ||
+		!grokPreset.Capabilities["responses_websocket"] ||
+		!grokPreset.Capabilities["image_generations"] ||
+		!grokPreset.Capabilities["videos"] ||
+		grokPreset.Capabilities["image_edits"] ||
+		grokPreset.Capabilities["image_variations"] ||
+		grokPreset.Capabilities["responses_input_items"] {
+		t.Fatalf("unexpected grok capabilities: %+v", grokPreset.Capabilities)
+	}
+	if grokPreset.AccountTemplate == nil ||
+		!containsString(grokPreset.AccountTemplate.ModelCatalog, "grok-4") ||
+		!containsString(grokPreset.AccountTemplate.ModelCatalog, "grok-imagine-video") {
+		t.Fatalf("expected grok model catalog to expose text/image/video models, got %+v", grokPreset.AccountTemplate)
+	}
+
 	togetherPreset, ok := registry.Lookup("together")
 	if !ok {
 		t.Fatalf("missing together preset")

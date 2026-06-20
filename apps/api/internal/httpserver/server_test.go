@@ -6683,6 +6683,27 @@ func TestAdminInstallProviderPresetsIsIdempotent(t *testing.T) {
 	if togetherSchema == nil || (*togetherSchema)["default_base_url"] != "https://api.together.ai/v1" {
 		t.Fatalf("expected together preset default base url, got %+v", togetherSchema)
 	}
+	grokProvider := providersByName["grok"]
+	if grokProvider.AdapterType != "native-grok" || grokProvider.Protocol != "openai-compatible" {
+		t.Fatalf("expected grok preset to install native-grok/openai-compatible provider, got adapter=%s protocol=%s", grokProvider.AdapterType, grokProvider.Protocol)
+	}
+	if grokProvider.PlatformFamily == nil || *grokProvider.PlatformFamily != "xai_compatible" {
+		t.Fatalf("expected grok preset platform family xai_compatible, got %+v", grokProvider.PlatformFamily)
+	}
+	if grokProvider.ConfigSchema == nil || (*grokProvider.ConfigSchema)["default_base_url"] != "https://api.x.ai/v1" {
+		t.Fatalf("expected grok preset default base url, got %+v", grokProvider.ConfigSchema)
+	}
+	if grokProvider.Capabilities == nil ||
+		(*grokProvider.Capabilities)["responses_compact"] != true ||
+		(*grokProvider.Capabilities)["responses_websocket"] != true ||
+		(*grokProvider.Capabilities)["image_generations"] != true ||
+		(*grokProvider.Capabilities)["videos"] != true {
+		t.Fatalf("expected grok preset to advertise compact, websocket, image, and video capabilities, got %+v", grokProvider.Capabilities)
+	}
+	grokRouteAliases, _ := (*grokProvider.ConfigSchema)["route_aliases"].([]any)
+	if !stringAnySliceContains(grokRouteAliases, "/api/provider/xai/v1") {
+		t.Fatalf("expected grok preset to expose xai route alias, got %+v", grokProvider.ConfigSchema)
+	}
 	anthropicProvider, ok := providersByName["anthropic"]
 	if !ok {
 		t.Fatalf("expected installed anthropic provider")

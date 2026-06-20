@@ -92,7 +92,7 @@ func effectiveCapabilities(model modelcontract.Model, mapping modelcontract.Mode
 			delete(providerScoped, canonicalKey)
 		}
 	}
-	if strings.EqualFold(strings.TrimSpace(provider.AdapterType), "reverse-proxy-codex-cli") && accountCodexWebSocketEnabled(account.Metadata) {
+	if responsesWebSocketEnabled(provider, account) {
 		merged[capabilitiescontract.KeyResponsesWebSocket] = capabilityRequirement(capabilitiescontract.KeyResponsesWebSocket)
 		providerScoped[capabilitiescontract.KeyResponsesWebSocket] = capabilityRequirement(capabilitiescontract.KeyResponsesWebSocket)
 	} else {
@@ -202,6 +202,8 @@ func adapterTypeToPresetKey(adapterType string) string {
 		return "anthropic-compatible"
 	case "gemini-compatible", "native-gemini", "reverse-proxy-gemini-cli":
 		return "gemini"
+	case "native-grok", "xai-compatible":
+		return "grok"
 	case "reverse-proxy-claude-code-cli":
 		return "anthropic-compatible"
 	case "reverse-proxy-chatgpt-web":
@@ -223,6 +225,8 @@ func adapterTypeToPlatformFamily(adapterType string) providerpreset.PlatformFami
 		return providerpreset.PlatformFamilyAnthropicCompatible
 	case "gemini-compatible", "native-gemini", "reverse-proxy-gemini-cli":
 		return providerpreset.PlatformFamilyGeminiCompatible
+	case "native-grok", "xai-compatible":
+		return providerpreset.PlatformFamilyXAICompatible
 	case "reverse-proxy-antigravity":
 		return providerpreset.PlatformFamilyReverseProxyAntigravity
 	case "rerank-compatible":

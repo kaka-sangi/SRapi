@@ -16,6 +16,7 @@ const (
 	PlatformFamilyAnthropicCompatible     PlatformFamily = "anthropic_compatible"
 	PlatformFamilyGeminiCompatible        PlatformFamily = "gemini_compatible"
 	PlatformFamilyBedrockAnthropic        PlatformFamily = "bedrock_anthropic"
+	PlatformFamilyXAICompatible           PlatformFamily = "xai_compatible"
 	PlatformFamilyReverseProxyAntigravity PlatformFamily = "reverse_proxy_antigravity"
 	PlatformFamilyRerankCompatible        PlatformFamily = "rerank_compatible"
 	PlatformFamilyCodexCLI                PlatformFamily = "codex_cli"
@@ -110,7 +111,7 @@ func Default() *Registry {
 		openAIPreset("cerebras", "Cerebras", "https://api.cerebras.ai/v1", providerAliases("cerebras")),
 		openAIPreset("deepseek", "DeepSeek", "https://api.deepseek.com", providerAliases("deepseek")),
 		openAIPreset("groq", "Groq", "https://api.groq.com/openai/v1", providerAliases("groq")),
-		openAIPreset("grok", "Grok", "https://api.x.ai/v1", []string{"/api/provider/grok", "/api/provider/grok/v1"}),
+		xAIPreset(),
 		openAIPreset("kimi", "Kimi", "https://api.moonshot.ai/v1", providerAliases("kimi")),
 		openAIPreset("mistral", "Mistral", "https://api.mistral.ai/v1", providerAliases("mistral")),
 		openAIPreset("moonshot", "Moonshot", "https://api.moonshot.ai/v1", providerAliases("moonshot")),
@@ -123,6 +124,31 @@ func Default() *Registry {
 		openAIPreset("zai", "Z.AI", "https://api.z.ai/api/paas/v4", providerAliases("zai")),
 		openAIPreset("zhipu", "Zhipu", "https://open.bigmodel.cn/api/paas/v4", providerAliases("zhipu")),
 	)
+}
+
+func xAIPreset() Preset {
+	capabilities := openAICapabilities()
+	capabilities[capabilitiescontract.KeyResponsesCompact] = true
+	capabilities[capabilitiescontract.KeyResponsesWebSocket] = true
+	capabilities[capabilitiescontract.KeyImageGenerations] = true
+	capabilities[capabilitiescontract.KeyVideos] = true
+	return Preset{
+		ProviderKey:       "grok",
+		PlatformFamily:    PlatformFamilyXAICompatible,
+		DisplayName:       "Grok",
+		RouteAliases:      []string{"/api/provider/grok", "/api/provider/grok/v1", "/api/provider/xai", "/api/provider/xai/v1"},
+		DefaultBaseURL:    "https://api.x.ai/v1",
+		AuthModes:         []AuthMode{AuthModeBearer, AuthModeCustomHeader},
+		ModelCatalogOwner: "grok",
+		RuntimeClassAllowlist: []accountscontract.RuntimeClass{
+			accountscontract.RuntimeClassAPIKey,
+			accountscontract.RuntimeClassCustomReverseProxy,
+		},
+		Capabilities: capabilities,
+		AccountTemplate: &AccountTemplate{
+			ModelCatalog: []string{"grok-4.3", "grok-4.3-latest", "grok-latest", "grok-4", "grok-4-latest", "grok-420-reasoning", "grok-imagine-image", "grok-imagine-image-quality", "grok-imagine-video"},
+		},
+	}
 }
 
 func openAIPreset(providerKey string, displayName string, defaultBaseURL string, routeAliases []string) Preset {

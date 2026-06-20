@@ -219,6 +219,8 @@ provider.adapter_type 表示代码适配器类型，例如 native-openai、nativ
 provider.protocol  表示协议风格，例如 openai-compatible、anthropic-compatible。
 ```
 
+Grok/xAI 使用 `adapter_type=native-grok`、`protocol=openai-compatible`、`platform_family=xai_compatible`。它复用 OpenAI-compatible REST wire shape，但 provider capability baseline 必须由 Grok preset 定义；Responses WebSocket relay 也归属该 provider family，调度前要求 `responses_websocket` effective capability。
+
 `anthropic-compatible` 是统一名称，不使用 `claude-compatible`。
 
 关键属性：

@@ -123,6 +123,8 @@ func presetAdapterType(preset providerpreset.Preset) string {
 		return "anthropic-compatible"
 	case providerpreset.PlatformFamilyGeminiCompatible:
 		return "gemini-compatible"
+	case providerpreset.PlatformFamilyXAICompatible:
+		return "native-grok"
 	case providerpreset.PlatformFamilyReverseProxyAntigravity:
 		return "reverse-proxy-antigravity"
 	case providerpreset.PlatformFamilyRerankCompatible:
@@ -140,6 +142,8 @@ func presetProtocol(preset providerpreset.Preset) string {
 		return "anthropic-compatible"
 	case providerpreset.PlatformFamilyGeminiCompatible:
 		return "gemini-compatible"
+	case providerpreset.PlatformFamilyXAICompatible:
+		return "openai-compatible"
 	case providerpreset.PlatformFamilyRerankCompatible:
 		return "rerank-compatible"
 	default:

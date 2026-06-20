@@ -714,6 +714,136 @@ func TestGatewayResponsesWebSocketRelaysCodexUpstreamWebSocket(t *testing.T) {
 	}
 }
 
+func TestGatewayResponsesWebSocketRelaysGrokAPIKeyUpstreamWebSocket(t *testing.T) {
+	type upstreamObservation struct {
+		Path           string
+		Authorization  string
+		ConversationID string
+		InitialFrame   []byte
+	}
+	observations := make(chan upstreamObservation, 1)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{CompressionMode: websocket.CompressionDisabled})
+		if err != nil {
+			t.Errorf("accept xai upstream websocket: %v", err)
+			return
+		}
+		defer conn.Close(websocket.StatusNormalClosure, "")
+
+		msgType, payload, err := conn.Read(r.Context())
+		if err != nil {
+			t.Errorf("read xai upstream frame: %v", err)
+			return
+		}
+		if msgType != websocket.MessageText {
+			t.Errorf("expected xai upstream text frame, got %v", msgType)
+			return
+		}
+		observations <- upstreamObservation{
+			Path:           r.URL.Path,
+			Authorization:  r.Header.Get("Authorization"),
+			ConversationID: r.Header.Get("x-grok-conv-id"),
+			InitialFrame:   append([]byte(nil), payload...),
+		}
+		if err := conn.Write(r.Context(), websocket.MessageText, []byte(`{"type":"response.created","response":{"id":"resp_xai_ws","model":"grok-upstream"}}`)); err != nil {
+			t.Errorf("write xai created frame: %v", err)
+			return
+		}
+		if err := conn.Write(r.Context(), websocket.MessageText, []byte(`{"type":"response.completed","response":{"id":"resp_xai_ws","model":"grok-upstream","output":[{"type":"message","content":[{"type":"output_text","text":"grok websocket ok"}]}],"usage":{"input_tokens":5,"output_tokens":6}}}`)); err != nil {
+			t.Errorf("write xai completed frame: %v", err)
+			return
+		}
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"grok","display_name":"Grok","adapter_type":"native-grok","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"grok-ws-model","display_name":"Grok WS Model","status":"active","capabilities":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"grok-upstream","status":"active","capability_override":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"grok-ws-account","runtime_class":"api_key","credential":{"api_key":"xai-ws-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	conn := mustDialResponsesWebSocket(t, server.URL+"/v1/responses/ws?model=grok-ws-model&upstream_ws=true", apiKey)
+	defer conn.Close(websocket.StatusNormalClosure, "")
+
+	writeWebSocketJSON(t, conn, map[string]any{
+		"type": "response.create",
+		"response": map[string]any{
+			"input":            "hello grok websocket",
+			"stream":           false,
+			"background":       true,
+			"service_tier":     "fast",
+			"prompt_cache_key": "grok-cache",
+		},
+	})
+	created := readWebSocketEvent(t, conn)
+	completed := readWebSocketEvent(t, conn)
+	if created["type"] != "response.created" || completed["type"] != "response.completed" {
+		t.Fatalf("unexpected xai websocket events: created=%+v completed=%+v", created, completed)
+	}
+	if !strings.Contains(mustMarshalString(t, completed), "grok websocket ok") {
+		t.Fatalf("expected xai upstream completion payload, got %+v", completed)
+	}
+
+	var obs upstreamObservation
+	select {
+	case obs = <-observations:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for xai upstream observation")
+	}
+	if obs.Path != "/v1/responses" || obs.Authorization != "Bearer xai-ws-secret" || obs.ConversationID != "grok-cache" {
+		t.Fatalf("unexpected xai upstream request: %+v", obs)
+	}
+	var initialFrame map[string]any
+	if err := json.Unmarshal(obs.InitialFrame, &initialFrame); err != nil {
+		t.Fatalf("decode xai initial frame: %v", err)
+	}
+	if initialFrame["type"] != "response.create" ||
+		initialFrame["model"] != "grok-upstream" ||
+		initialFrame["input"] != "hello grok websocket" ||
+		initialFrame["service_tier"] != "priority" ||
+		initialFrame["prompt_cache_key"] != "grok-cache" {
+		t.Fatalf("unexpected xai initial frame: %+v", initialFrame)
+	}
+	if _, ok := initialFrame["stream"]; ok {
+		t.Fatalf("stream should not be forwarded to xai websocket upstream: %+v", initialFrame)
+	}
+	if _, ok := initialFrame["background"]; ok {
+		t.Fatalf("background should not be forwarded to xai websocket upstream: %+v", initialFrame)
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=grok-ws-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected scheduler decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 {
+		t.Fatalf("expected one scheduler decision, got %+v", decisionsResp.Data)
+	}
+	decision := decisionsResp.Data[0]
+	if decision.SourceEndpoint != responsesWebSocketSourceEndpoint || decision.SelectedAccountId == nil || *decision.SelectedAccountId != string(accountResp.Data.Id) {
+		t.Fatalf("expected xai websocket scheduler evidence, got %+v", decision)
+	}
+
+	usageResp := waitForRealtimeUsageLog(t, handler, sessionCookie, "grok-ws-model")
+	if len(usageResp.Data) != 1 ||
+		!usageResp.Data[0].Success ||
+		usageResp.Data[0].SourceEndpoint != responsesWebSocketSourceEndpoint ||
+		usageResp.Data[0].TotalTokens != 11 ||
+		usageResp.Data[0].UsageEstimated {
+		t.Fatalf("unexpected xai websocket usage record: %+v", usageResp.Data)
+	}
+}
+
 func TestGatewayResponsesWebSocketSkipsAccountsWithoutResponsesWebSocketCapability(t *testing.T) {
 	var (
 		mu            sync.Mutex

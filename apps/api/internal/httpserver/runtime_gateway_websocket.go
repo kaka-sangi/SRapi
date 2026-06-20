@@ -16,6 +16,7 @@ import (
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
 	gatewayservice "github.com/srapi/srapi/apps/api/internal/modules/gateway/service"
 	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
+	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	realtimecontract "github.com/srapi/srapi/apps/api/internal/modules/realtime/contract"
 	realtimeservice "github.com/srapi/srapi/apps/api/internal/modules/realtime/service"
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
@@ -156,8 +157,8 @@ func (s *Server) handleResponsesWebSocket(w http.ResponseWriter, r *http.Request
 			}
 			continue
 		}
-		if s.shouldUseCodexWebSocketRelay(r, requestPayload) {
-			relayed, turnState, err := s.relayCodexResponsesWebSocket(r, conn, requestPayload, authed, idleSession)
+		if s.shouldUseResponsesWebSocketRelay(r, requestPayload) {
+			relayed, turnState, err := s.relayProviderResponsesWebSocket(r, conn, requestPayload, authed, idleSession)
 			if err != nil {
 				status, code, message := responsesWebSocketRelayError(err)
 				if err := writeResponsesWebSocketError(r.Context(), conn, status, code, message, nil); err != nil {
@@ -662,7 +663,7 @@ func readRealtimeWebSocketClient(ctx context.Context, conn *websocket.Conn, clie
 	}
 }
 
-func (s *Server) shouldUseCodexWebSocketRelay(r *http.Request, payload []byte) bool {
+func (s *Server) shouldUseResponsesWebSocketRelay(r *http.Request, payload []byte) bool {
 	if !responsesWebSocketRelayRequested(r) {
 		return false
 	}
@@ -672,13 +673,17 @@ func (s *Server) shouldUseCodexWebSocketRelay(r *http.Request, payload []byte) b
 func responsesWebSocketRelayRequested(r *http.Request) bool {
 	return boolValue(firstNonEmpty(
 		r.URL.Query().Get("upstream_ws"),
+		r.URL.Query().Get("responses_websocket"),
 		r.URL.Query().Get("codex_responses_websocket"),
+		r.URL.Query().Get("xai_responses_websocket"),
 		r.Header.Get("X-SRapi-Upstream-WS"),
+		r.Header.Get("X-SRapi-Responses-WebSocket"),
 		r.Header.Get("X-SRapi-Codex-Responses-WebSocket"),
+		r.Header.Get("X-SRapi-XAI-Responses-WebSocket"),
 	))
 }
 
-func (s *Server) relayCodexResponsesWebSocket(r *http.Request, conn *websocket.Conn, payload []byte, authed apikeycontract.AuthResult, idleSession *wsIdleSession) (bool, responsesWebSocketTurnState, error) {
+func (s *Server) relayProviderResponsesWebSocket(r *http.Request, conn *websocket.Conn, payload []byte, authed apikeycontract.AuthResult, idleSession *wsIdleSession) (bool, responsesWebSocketTurnState, error) {
 	startedAt := time.Now()
 	requestID := requestIDFromContext(r.Context())
 	sourceEndpoint := responsesWebSocketSourceEndpoint
@@ -720,10 +725,10 @@ func (s *Server) relayCodexResponsesWebSocket(r *http.Request, conn *websocket.C
 		s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, nil, false, "no_available_account", http.StatusServiceUnavailable, elapsedMillis(startedAt), admission, nil, ""))
 		return false, responsesWebSocketTurnState{}, err
 	}
-	if !strings.EqualFold(strings.TrimSpace(result.Candidate.Provider.AdapterType), "reverse-proxy-codex-cli") || !accountCodexWebSocketEnabled(result.Candidate.Account.Metadata) {
+	if !responsesWebSocketEnabled(result.Candidate.Provider, result.Candidate.Account) {
 		s.runtime.releaseGatewaySchedulerLease(r.Context(), result, "responses_websocket_unsupported")
 		s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, &result.Candidate, false, "invalid_request", http.StatusBadRequest, elapsedMillis(startedAt), admission, nil, ""))
-		return true, responsesWebSocketTurnState{}, errors.New("selected account does not support Codex Responses WebSocket reverse proxy")
+		return true, responsesWebSocketTurnState{}, errors.New("selected account does not support Responses WebSocket relay")
 	}
 	if err := s.reserveGatewayAccountQuotaForScheduledRequest(r.Context(), r, authed, canonical, result, admission, startedAt); err != nil {
 		return true, responsesWebSocketTurnState{}, err
@@ -737,11 +742,28 @@ func (s *Server) relayCodexResponsesWebSocket(r *http.Request, conn *websocket.C
 		return true, responsesWebSocketTurnState{}, err
 	}
 	session.Account.Credential = credential
-	clientToUpstream := make(chan reverseproxycontract.WebSocketMessage, 32)
-	upstreamToClient := make(chan reverseproxycontract.WebSocketMessage, 32)
-	relayCtx, cancelRelay := context.WithCancel(r.Context())
+	upstreamToClient, relayDone, cancelRelay := s.startResponsesWebSocketProviderRelay(r.Context(), session)
 	defer cancelRelay()
+	success, errorClass, statusCode, usage, terminalForwarded, turnState := s.bridgeResponsesWebSocketRelay(r.Context(), conn, upstreamToClient, relayDone, idleSession, session.ResponseReplacements)
+	if !success {
+		s.runtime.releaseGatewayAccountQuota(r.Context(), admission.EstimatedUsage, result.Candidate)
+	}
+	s.recordResponsesWebSocketUsage(r.Context(), authed, canonical, model.ID, result, success, errorClass, statusCode, elapsedMillis(startedAt), admission, usage, "")
+	if !success && errorClass != "client_closed" && !terminalForwarded {
+		return true, turnState, provideradaptercontract.ProviderError{Class: errorClass, StatusCode: statusCode, Message: providerGatewayMessage(errorClass)}
+	}
+	return true, turnState, nil
+}
+
+func (s *Server) startResponsesWebSocketProviderRelay(ctx context.Context, session providerRealtimeSession) (<-chan reverseproxycontract.WebSocketMessage, <-chan responsesWebSocketRelayResult, context.CancelFunc) {
+	upstreamToClient := make(chan reverseproxycontract.WebSocketMessage, 32)
 	relayDone := make(chan responsesWebSocketRelayResult, 1)
+	relayCtx, cancelRelay := context.WithCancel(ctx)
+	if strings.EqualFold(strings.TrimSpace(session.Account.RuntimeClass), string(accountcontract.RuntimeClassAPIKey)) {
+		go s.relayResponsesWebSocketAPIKey(relayCtx, session, upstreamToClient, relayDone)
+		return upstreamToClient, relayDone, cancelRelay
+	}
+	clientToUpstream := make(chan reverseproxycontract.WebSocketMessage, 1)
 	go func() {
 		result, err := s.runtime.reverseProxy.RelayWebSocket(relayCtx, reverseproxycontract.WebSocketRelayRequest{
 			Account:          session.Account,
@@ -754,15 +776,82 @@ func (s *Server) relayCodexResponsesWebSocket(r *http.Request, conn *websocket.C
 	}()
 	clientToUpstream <- reverseproxycontract.WebSocketMessage{Type: reverseproxycontract.WebSocketMessageText, Data: session.InitialFrame}
 	close(clientToUpstream)
-	success, errorClass, statusCode, usage, terminalForwarded, turnState := s.bridgeResponsesWebSocketRelay(r.Context(), conn, upstreamToClient, relayDone, idleSession, session.ResponseReplacements)
-	if !success {
-		s.runtime.releaseGatewayAccountQuota(r.Context(), admission.EstimatedUsage, result.Candidate)
+	return upstreamToClient, relayDone, cancelRelay
+}
+
+func (s *Server) relayResponsesWebSocketAPIKey(ctx context.Context, session providerRealtimeSession, upstreamToClient chan<- reverseproxycontract.WebSocketMessage, relayDone chan<- responsesWebSocketRelayResult) {
+	defer close(upstreamToClient)
+	result := reverseproxycontract.WebSocketRelayResult{StartedAt: time.Now().UTC()}
+	apiKey := firstNonEmpty(
+		mapString(session.Account.Credential, "api_key"),
+		mapString(session.Account.Credential, "openai_api_key"),
+	)
+	if apiKey == "" {
+		relayDone <- responsesWebSocketRelayResult{result: result, err: provideradaptercontract.ProviderError{Class: "auth_failed", StatusCode: http.StatusUnauthorized, Message: "provider api key missing"}}
+		return
 	}
-	s.recordResponsesWebSocketUsage(r.Context(), authed, canonical, model.ID, result, success, errorClass, statusCode, elapsedMillis(startedAt), admission, usage, "")
-	if !success && errorClass != "client_closed" && !terminalForwarded {
-		return true, turnState, provideradaptercontract.ProviderError{Class: errorClass, StatusCode: statusCode, Message: providerGatewayMessage(errorClass)}
+	headers := cloneHTTPHeader(session.Headers)
+	if headers == nil {
+		headers = http.Header{}
 	}
-	return true, turnState, nil
+	headers.Set("Authorization", "Bearer "+apiKey)
+	if headers.Get("User-Agent") == "" {
+		if userAgent := mapString(session.Account.Metadata, "user_agent"); userAgent != "" {
+			headers.Set("User-Agent", userAgent)
+		}
+	}
+	client, err := realtimeAPIKeyHTTPClient(session.Account)
+	if err != nil {
+		relayDone <- responsesWebSocketRelayResult{result: result, err: provideradaptercontract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "provider websocket client unavailable"}}
+		return
+	}
+	dialCtx, cancelDial := context.WithTimeout(ctx, 30*time.Second)
+	upstream, resp, err := websocket.Dial(dialCtx, session.URL, &websocket.DialOptions{
+		HTTPClient:      client,
+		HTTPHeader:      headers,
+		CompressionMode: websocket.CompressionDisabled,
+	})
+	cancelDial()
+	if resp != nil && resp.StatusCode > 0 {
+		result.UpstreamStatusCode = resp.StatusCode
+	}
+	if err != nil {
+		relayDone <- responsesWebSocketRelayResult{result: result, err: provideradaptercontract.ProviderError{Class: realtimeWebSocketDialErrorClass(dialCtx, err), StatusCode: realtimeWebSocketDialStatus(dialCtx, resp), Message: "provider responses websocket dial failed"}}
+		return
+	}
+	defer upstream.Close(websocket.StatusNormalClosure, "")
+	result.UpstreamStatusCode = http.StatusSwitchingProtocols
+	if err := upstream.Write(ctx, websocket.MessageText, session.InitialFrame); err != nil {
+		relayDone <- responsesWebSocketRelayResult{result: result, err: provideradaptercontract.ProviderError{Class: realtimeWebSocketRelayErrorClass(ctx, err), StatusCode: realtimeWebSocketRelayStatus(ctx, err), Message: "provider responses websocket write failed"}}
+		return
+	}
+	result.MessagesUpstream = 1
+	result.BytesUpstream = len(session.InitialFrame)
+	for {
+		messageType, payload, err := upstream.Read(ctx)
+		if err != nil {
+			result.EndedAt = time.Now().UTC()
+			if status := websocket.CloseStatus(err); status == websocket.StatusNormalClosure || status == websocket.StatusGoingAway || errors.Is(err, context.Canceled) {
+				relayDone <- responsesWebSocketRelayResult{result: result}
+				return
+			}
+			relayDone <- responsesWebSocketRelayResult{result: result, err: provideradaptercontract.ProviderError{Class: realtimeWebSocketRelayErrorClass(ctx, err), StatusCode: realtimeWebSocketRelayStatus(ctx, err), Message: "provider responses websocket read failed"}}
+			return
+		}
+		msgType := reverseproxycontract.WebSocketMessageText
+		if messageType == websocket.MessageBinary {
+			msgType = reverseproxycontract.WebSocketMessageBinary
+		}
+		result.MessagesDownstream++
+		result.BytesDownstream += len(payload)
+		select {
+		case upstreamToClient <- reverseproxycontract.WebSocketMessage{Type: msgType, Data: payload}:
+		case <-ctx.Done():
+			result.EndedAt = time.Now().UTC()
+			relayDone <- responsesWebSocketRelayResult{result: result}
+			return
+		}
+	}
 }
 
 func responsesWebSocketRelayError(err error) (int, string, string) {
@@ -1148,6 +1237,35 @@ func providerStatusFromError(err error) int {
 		return providerErr.StatusCode
 	}
 	return http.StatusBadGateway
+}
+
+func responsesWebSocketEnabled(provider providercontract.Provider, account accountcontract.ProviderAccount) bool {
+	if responsesWebSocketDisabled(provider, account) {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(provider.AdapterType)) {
+	case "reverse-proxy-codex-cli":
+		return accountCodexWebSocketEnabled(account.Metadata)
+	case "native-grok", "xai-compatible":
+		return true
+	default:
+		return false
+	}
+}
+
+func responsesWebSocketDisabled(provider providercontract.Provider, account accountcontract.ProviderAccount) bool {
+	if metadataBool(account.Metadata, "disable_responses_websocket") {
+		return true
+	}
+	if value, ok := provider.Capabilities[capabilitiescontract.KeyResponsesWebSocket]; ok && !boolValue(value) {
+		return true
+	}
+	for _, source := range []map[string]any{provider.Capabilities, provider.ConfigSchema} {
+		if metadataBool(source, "disable_responses_websocket") {
+			return true
+		}
+	}
+	return false
 }
 
 func accountCodexWebSocketEnabled(metadata map[string]any) bool {

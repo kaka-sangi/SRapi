@@ -157,6 +157,9 @@ func (s *Service) PrepareRealtime(ctx context.Context, req contract.RealtimeRequ
 	if isCodexRealtimeReverseProxy(req) {
 		return s.prepareCodexRealtime(ctx, req, baseURL)
 	}
+	if isXAIResponsesWebSocket(req) {
+		return s.prepareXAIResponsesWebSocket(ctx, req, baseURL)
+	}
 	if isOpenAIRealtimeCompatible(req) {
 		return s.prepareOpenAIRealtime(ctx, req, baseURL)
 	}
@@ -351,7 +354,7 @@ func unsupportedPresetOAuthRuntime(req contract.ConversationRequest) error {
 		return nil
 	}
 	switch strings.ToLower(strings.TrimSpace(req.Provider.Name)) {
-	case "openai", "gemini":
+	case "openai", "gemini", "grok":
 		return contract.ProviderError{
 			Class:      "not_supported",
 			StatusCode: http.StatusBadRequest,

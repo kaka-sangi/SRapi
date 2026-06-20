@@ -52,7 +52,7 @@
 
 ### 2.5 Provider 兼容注册表
 
-- `openai-compatible` 和 `anthropic-compatible` 必须有显式 preset。
+- `openai-compatible`、`anthropic-compatible` 和 `grok` 必须有显式 preset；Grok/xAI 不得只作为通用 OpenAI-compatible provider 的别名处理。
 - preset 必须包含 route alias、默认 base URL、auth mode、模型目录所有者和账号 allowlist。
 - preset 新增必须回写文档。
 

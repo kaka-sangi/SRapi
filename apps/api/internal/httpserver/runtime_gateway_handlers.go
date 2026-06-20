@@ -1117,6 +1117,8 @@ func sameProtocolRawConversationResponse(req gatewaycontract.CanonicalRequest, t
 		if strings.HasSuffix(sourceEndpoint, "/responses/compact") {
 			return adapterType == "openai-compatible" ||
 				adapterType == "native-openai" ||
+				adapterType == "native-grok" ||
+				adapterType == "xai-compatible" ||
 				adapterType == "reverse-proxy-openai-compatible" ||
 				adapterType == "reverse-proxy-codex-cli"
 		}
@@ -1171,7 +1173,7 @@ func sameProtocolRawConversationStream(req gatewaycontract.CanonicalRequest, tar
 }
 
 func openAIResponsesRawPassthroughEnabled(adapterType, providerName string, providerConfig, providerCapabilities, accountMetadata map[string]any) bool {
-	if adapterType == "native-openai" || providerName == "openai" {
+	if adapterType == "native-openai" || adapterType == "native-grok" || adapterType == "xai-compatible" || providerName == "openai" || providerName == "grok" {
 		return true
 	}
 	for _, values := range []map[string]any{accountMetadata, providerConfig, providerCapabilities} {

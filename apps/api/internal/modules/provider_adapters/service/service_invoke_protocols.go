@@ -887,10 +887,11 @@ func openAIResponsesRequest(req contract.ConversationRequest) bool {
 
 func openAIResponsesNativeEnabled(req contract.ConversationRequest) bool {
 	adapterType := strings.ToLower(strings.TrimSpace(req.Provider.AdapterType))
-	if adapterType == "native-openai" {
+	if adapterType == "native-openai" || adapterType == "native-grok" || adapterType == "xai-compatible" {
 		return true
 	}
-	if strings.EqualFold(strings.TrimSpace(req.Provider.Name), "openai") {
+	switch strings.ToLower(strings.TrimSpace(req.Provider.Name)) {
+	case "openai", "grok":
 		return true
 	}
 	for _, values := range []map[string]any{req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {
@@ -906,7 +907,10 @@ func openAIResponsesNativeEnabled(req contract.ConversationRequest) bool {
 
 func openAIResponsesRequireTerminalEvent(req contract.ConversationRequest) bool {
 	if strings.EqualFold(strings.TrimSpace(req.Provider.AdapterType), "native-openai") ||
-		strings.EqualFold(strings.TrimSpace(req.Provider.Name), "openai") {
+		strings.EqualFold(strings.TrimSpace(req.Provider.AdapterType), "native-grok") ||
+		strings.EqualFold(strings.TrimSpace(req.Provider.AdapterType), "xai-compatible") ||
+		strings.EqualFold(strings.TrimSpace(req.Provider.Name), "openai") ||
+		strings.EqualFold(strings.TrimSpace(req.Provider.Name), "grok") {
 		return true
 	}
 	for _, values := range []map[string]any{req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {

@@ -11440,6 +11440,91 @@ func TestOpenAICompatiblePrepareRealtimeBuildsRealtimeWebSocketSession(t *testin
 	}
 }
 
+func TestXAICompatiblePrepareRealtimeBuildsResponsesWebSocketSession(t *testing.T) {
+	svc, err := service.New(nil)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	session, err := svc.PrepareRealtime(context.Background(), contract.RealtimeRequest{
+		RequestID:      "req_xai_ws",
+		SourceEndpoint: "/v1/responses/ws",
+		Model:          "grok-local",
+		RequestPayload: []byte(`{
+			"model":"grok-local",
+			"input":"hello grok ws",
+			"stream":false,
+			"background":true,
+			"service_tier":"fast",
+			"prompt_cache_key":"grok-cache"
+		}`),
+		Provider: providercontract.Provider{
+			Name:        "grok",
+			AdapterType: "native-grok",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:           12,
+			RuntimeClass: accountcontract.RuntimeClassAPIKey,
+			Metadata: map[string]any{
+				"base_url": "https://api.x.ai/v1",
+			},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "grok-4.3"},
+		Credential: map[string]any{"api_key": "xai-secret"},
+	})
+	if err != nil {
+		t.Fatalf("prepare xai responses websocket: %v", err)
+	}
+	if session.URL != "wss://api.x.ai/v1/responses" {
+		t.Fatalf("unexpected xai responses websocket URL %q", session.URL)
+	}
+	if session.Headers.Get("Authorization") != "" || session.Headers.Get("x-grok-conv-id") != "grok-cache" {
+		t.Fatalf("unexpected xai responses websocket headers: %+v", session.Headers)
+	}
+	var frame map[string]any
+	if err := json.Unmarshal(session.InitialFrame, &frame); err != nil {
+		t.Fatalf("decode xai initial frame: %v", err)
+	}
+	if frame["type"] != "response.create" ||
+		frame["model"] != "grok-4.3" ||
+		frame["input"] != "hello grok ws" ||
+		frame["service_tier"] != "priority" ||
+		frame["prompt_cache_key"] != "grok-cache" {
+		t.Fatalf("unexpected xai responses websocket initial frame: %+v", frame)
+	}
+	for _, removed := range []string{"stream", "background"} {
+		if _, ok := frame[removed]; ok {
+			t.Fatalf("expected %q to be removed from xai responses websocket initial frame: %+v", removed, frame)
+		}
+	}
+}
+
+func TestXAICompatiblePrepareRealtimeDoesNotClaimOpenAIRealtime(t *testing.T) {
+	svc, err := service.New(nil)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.PrepareRealtime(context.Background(), contract.RealtimeRequest{
+		RequestID:      "req_xai_realtime_rejected",
+		SourceEndpoint: "/v1/realtime",
+		Model:          "grok-local",
+		RequestPayload: []byte(`{"model":"grok-local"}`),
+		Provider: providercontract.Provider{
+			Name:        "grok",
+			AdapterType: "native-grok",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:           12,
+			RuntimeClass: accountcontract.RuntimeClassAPIKey,
+			Metadata:     map[string]any{"base_url": "https://api.x.ai/v1"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "grok-4.3"},
+		Credential: map[string]any{"api_key": "xai-secret"},
+	})
+	assertProviderError(t, err, "invalid_request", http.StatusBadRequest)
+}
+
 func TestOpenAICompatiblePrepareRealtimeAllowsAPIKeyRuntime(t *testing.T) {
 	svc, err := service.New(nil)
 	if err != nil {

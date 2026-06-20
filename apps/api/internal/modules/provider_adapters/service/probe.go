@@ -270,7 +270,7 @@ func probeSource(req contract.ProbeRequest) string {
 			return "anthropic"
 		case "gemini-compatible", "native-gemini":
 			return "gemini"
-		case "openai-compatible", "native-openai", genericReverseProxyAdapterType:
+		case "openai-compatible", "native-openai", "native-grok", "xai-compatible", genericReverseProxyAdapterType:
 			return "openai"
 		}
 	}
