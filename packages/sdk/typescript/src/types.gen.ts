@@ -6207,6 +6207,59 @@ export type OpenAiModelList = {
     data: Array<OpenAiModel>;
 };
 
+export type CodexClientModel = {
+    slug: string;
+    display_name: string;
+    description: string;
+    /**
+     * Codex client visibility value such as `list` or `hide`.
+     */
+    visibility: string;
+    minimal_client_version?: string;
+    supported_in_api: boolean;
+    prefer_websockets?: boolean;
+    support_verbosity?: boolean;
+    default_verbosity?: string;
+    apply_patch_tool_type?: string;
+    web_search_tool_type?: string;
+    input_modalities?: Array<string>;
+    supports_image_detail_original?: boolean;
+    truncation_policy?: {
+        mode?: string;
+        limit?: number;
+    };
+    supports_parallel_tool_calls?: boolean;
+    context_window?: number;
+    max_context_window?: number;
+    auto_compact_token_limit?: number | null;
+    reasoning_summary_format?: string;
+    default_reasoning_summary?: string;
+    default_reasoning_level?: string;
+    supported_reasoning_levels?: Array<{
+        effort?: string;
+        description?: string;
+    }>;
+    shell_type?: string;
+    base_instructions?: string;
+    available_in_plans?: Array<string>;
+    service_tiers?: Array<{
+        id?: string;
+        name?: string;
+        description?: string;
+    }>;
+    availability_nux?: {
+        message?: string;
+    } | null;
+    upgrade?: {
+        [key: string]: unknown;
+    } | null;
+    priority?: number;
+};
+
+export type CodexClientModelList = {
+    models: Array<CodexClientModel>;
+};
+
 export type GatewayUsageResponse = {
     object: 'usage';
     mode: 'unrestricted' | 'quota_limited';
@@ -21260,7 +21313,12 @@ export type ReplaySchedulerStrategyResponse = ReplaySchedulerStrategyResponses[k
 export type ListModelsData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * When present, returns the Codex CLI client model catalog shape instead of the OpenAI-compatible object/data list.
+         */
+        client_version?: string;
+    };
     url: '/v1/models';
 };
 
@@ -21283,9 +21341,9 @@ export type ListModelsError = ListModelsErrors[keyof ListModelsErrors];
 
 export type ListModelsResponses = {
     /**
-     * OpenAI-compatible model list.
+     * OpenAI-compatible model list, or Codex CLI client model catalog when `client_version` is present.
      */
-    200: OpenAiModelList;
+    200: OpenAiModelList | CodexClientModelList;
 };
 
 export type ListModelsResponse = ListModelsResponses[keyof ListModelsResponses];

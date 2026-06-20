@@ -32,6 +32,10 @@ func (s *Server) handleListModels(w http.ResponseWriter, r *http.Request) {
 	if len(hidden) > 0 {
 		gatewayModels = hideGatewayModels(gatewayModels, hidden)
 	}
+	if _, ok := r.URL.Query()["client_version"]; ok {
+		writeJSONAny(w, http.StatusOK, codexClientModelsResponse(models, gatewayModels))
+		return
+	}
 	writeJSONAny(w, http.StatusOK, apiopenapi.OpenAIModelList{
 		Object: apiopenapi.OpenAIModelListObjectList,
 		Data:   gatewayModels,

@@ -43,3 +43,10 @@ func codexBaseInstructionsForModel(model string) string {
 	}
 	return codexBaseInstructions
 }
+
+// CodexBaseInstructionsForModel returns the Codex CLI base prompt selected for
+// a model. It is exported for gateway discovery responses that need to describe
+// the same client catalog SRapi later accepts at the provider-adapter boundary.
+func CodexBaseInstructionsForModel(model string) string {
+	return codexBaseInstructionsForModel(model)
+}

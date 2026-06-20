@@ -6783,6 +6783,58 @@ type ChatToolCall struct {
 	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
+// CodexClientModel defines model for CodexClientModel.
+type CodexClientModel struct {
+	ApplyPatchToolType    *string `json:"apply_patch_tool_type,omitempty"`
+	AutoCompactTokenLimit *int    `json:"auto_compact_token_limit,omitempty"`
+	AvailabilityNux       *struct {
+		Message *string `json:"message,omitempty"`
+	} `json:"availability_nux,omitempty"`
+	AvailableInPlans        *[]string `json:"available_in_plans,omitempty"`
+	BaseInstructions        *string   `json:"base_instructions,omitempty"`
+	ContextWindow           *int      `json:"context_window,omitempty"`
+	DefaultReasoningLevel   *string   `json:"default_reasoning_level,omitempty"`
+	DefaultReasoningSummary *string   `json:"default_reasoning_summary,omitempty"`
+	DefaultVerbosity        *string   `json:"default_verbosity,omitempty"`
+	Description             string    `json:"description"`
+	DisplayName             string    `json:"display_name"`
+	InputModalities         *[]string `json:"input_modalities,omitempty"`
+	MaxContextWindow        *int      `json:"max_context_window,omitempty"`
+	MinimalClientVersion    *string   `json:"minimal_client_version,omitempty"`
+	PreferWebsockets        *bool     `json:"prefer_websockets,omitempty"`
+	Priority                *int      `json:"priority,omitempty"`
+	ReasoningSummaryFormat  *string   `json:"reasoning_summary_format,omitempty"`
+	ServiceTiers            *[]struct {
+		Description *string `json:"description,omitempty"`
+		Id          *string `json:"id,omitempty"`
+		Name        *string `json:"name,omitempty"`
+	} `json:"service_tiers,omitempty"`
+	ShellType                *string `json:"shell_type,omitempty"`
+	Slug                     string  `json:"slug"`
+	SupportVerbosity         *bool   `json:"support_verbosity,omitempty"`
+	SupportedInApi           bool    `json:"supported_in_api"`
+	SupportedReasoningLevels *[]struct {
+		Description *string `json:"description,omitempty"`
+		Effort      *string `json:"effort,omitempty"`
+	} `json:"supported_reasoning_levels,omitempty"`
+	SupportsImageDetailOriginal *bool `json:"supports_image_detail_original,omitempty"`
+	SupportsParallelToolCalls   *bool `json:"supports_parallel_tool_calls,omitempty"`
+	TruncationPolicy            *struct {
+		Limit *int    `json:"limit,omitempty"`
+		Mode  *string `json:"mode,omitempty"`
+	} `json:"truncation_policy,omitempty"`
+	Upgrade *map[string]interface{} `json:"upgrade,omitempty"`
+
+	// Visibility Codex client visibility value such as `list` or `hide`.
+	Visibility        string  `json:"visibility"`
+	WebSearchToolType *string `json:"web_search_tool_type,omitempty"`
+}
+
+// CodexClientModelList defines model for CodexClientModelList.
+type CodexClientModelList struct {
+	Models []CodexClientModel `json:"models"`
+}
+
 // CodexSessionImportItem defines model for CodexSessionImportItem.
 type CodexSessionImportItem struct {
 	AccountId *Id                          `json:"account_id,omitempty"`
@@ -13511,6 +13563,17 @@ type CreateEmbeddingParams struct {
 type CreateMessageParams struct {
 	// IdempotencyKey Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
 	IdempotencyKey *GatewayIdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// ListModelsParams defines parameters for ListModels.
+type ListModelsParams struct {
+	// ClientVersion When present, returns the Codex CLI client model catalog shape instead of the OpenAI-compatible object/data list.
+	ClientVersion *string `form:"client_version,omitempty" json:"client_version,omitempty"`
+}
+
+// ListModels200JSONResponseBody defines parameters for ListModels.
+type ListModels200JSONResponseBody struct {
+	union json.RawMessage
 }
 
 // ConnectRealtimeWebSocketParams defines parameters for ConnectRealtimeWebSocket.
@@ -22072,6 +22135,68 @@ func (t *BulkImportAdminPricingRulesJSONBody) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+// AsOpenAIModelList returns the union data inside the ListModels200JSONResponseBody as a OpenAIModelList
+func (t ListModels200JSONResponseBody) AsOpenAIModelList() (OpenAIModelList, error) {
+	var body OpenAIModelList
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromOpenAIModelList overwrites any union data inside the ListModels200JSONResponseBody as the provided OpenAIModelList
+func (t *ListModels200JSONResponseBody) FromOpenAIModelList(v OpenAIModelList) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeOpenAIModelList performs a merge with any union data inside the ListModels200JSONResponseBody, using the provided OpenAIModelList
+func (t *ListModels200JSONResponseBody) MergeOpenAIModelList(v OpenAIModelList) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsCodexClientModelList returns the union data inside the ListModels200JSONResponseBody as a CodexClientModelList
+func (t ListModels200JSONResponseBody) AsCodexClientModelList() (CodexClientModelList, error) {
+	var body CodexClientModelList
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCodexClientModelList overwrites any union data inside the ListModels200JSONResponseBody as the provided CodexClientModelList
+func (t *ListModels200JSONResponseBody) FromCodexClientModelList(v CodexClientModelList) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCodexClientModelList performs a merge with any union data inside the ListModels200JSONResponseBody, using the provided CodexClientModelList
+func (t *ListModels200JSONResponseBody) MergeCodexClientModelList(v CodexClientModelList) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t ListModels200JSONResponseBody) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *ListModels200JSONResponseBody) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// Create an Anthropic Messages-compatible message with anthropic-compatible provider context.
@@ -23348,7 +23473,7 @@ type ServerInterface interface {
 	CountAnthropicMessageTokens(w http.ResponseWriter, r *http.Request)
 	// List models available to the gateway API key.
 	// (GET /v1/models)
-	ListModels(w http.ResponseWriter, r *http.Request)
+	ListModels(w http.ResponseWriter, r *http.Request, params ListModelsParams)
 	// Create OpenAI-compatible moderation classifications.
 	// (POST /v1/moderations)
 	CreateModeration(w http.ResponseWriter, r *http.Request)
@@ -38764,14 +38889,33 @@ func (siw *ServerInterfaceWrapper) CountAnthropicMessageTokens(w http.ResponseWr
 // ListModels operation middleware
 func (siw *ServerInterfaceWrapper) ListModels(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
 	ctx := r.Context()
 
 	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListModelsParams
+
+	// ------------- Optional query parameter "client_version" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "client_version", r.URL.Query(), &params.ClientVersion, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "client_version"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "client_version", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListModels(w, r)
+		siw.Handler.ListModels(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {

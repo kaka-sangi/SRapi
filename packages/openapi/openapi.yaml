@@ -13051,16 +13051,25 @@ paths:
       summary: List models available to the gateway API key.
       security:
         - gatewayBearerAuth: []
+      parameters:
+        - name: client_version
+          in: query
+          required: false
+          schema:
+            type: string
+          description: When present, returns the Codex CLI client model catalog shape instead of the OpenAI-compatible object/data list.
       responses:
         "200":
-          description: OpenAI-compatible model list.
+          description: OpenAI-compatible model list, or Codex CLI client model catalog when `client_version` is present.
           headers:
             X-Request-ID:
               $ref: "#/components/headers/RequestIdHeader"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/OpenAIModelList"
+                oneOf:
+                  - $ref: "#/components/schemas/OpenAIModelList"
+                  - $ref: "#/components/schemas/CodexClientModelList"
         "401":
           $ref: "#/components/responses/GatewayUnauthorized"
         "403":
@@ -31887,6 +31896,116 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/OpenAIModel"
+
+    CodexClientModel:
+      type: object
+      required:
+        - slug
+        - display_name
+        - description
+        - visibility
+        - supported_in_api
+      properties:
+        slug:
+          type: string
+        display_name:
+          type: string
+        description:
+          type: string
+        visibility:
+          type: string
+          description: Codex client visibility value such as `list` or `hide`.
+        minimal_client_version:
+          type: string
+        supported_in_api:
+          type: boolean
+        prefer_websockets:
+          type: boolean
+        support_verbosity:
+          type: boolean
+        default_verbosity:
+          type: string
+        apply_patch_tool_type:
+          type: string
+        web_search_tool_type:
+          type: string
+        input_modalities:
+          type: array
+          items:
+            type: string
+        supports_image_detail_original:
+          type: boolean
+        truncation_policy:
+          type: object
+          properties:
+            mode:
+              type: string
+            limit:
+              type: integer
+        supports_parallel_tool_calls:
+          type: boolean
+        context_window:
+          type: integer
+        max_context_window:
+          type: integer
+        auto_compact_token_limit:
+          type: integer
+          nullable: true
+        reasoning_summary_format:
+          type: string
+        default_reasoning_summary:
+          type: string
+        default_reasoning_level:
+          type: string
+        supported_reasoning_levels:
+          type: array
+          items:
+            type: object
+            properties:
+              effort:
+                type: string
+              description:
+                type: string
+        shell_type:
+          type: string
+        base_instructions:
+          type: string
+        available_in_plans:
+          type: array
+          items:
+            type: string
+        service_tiers:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              description:
+                type: string
+        availability_nux:
+          type: object
+          nullable: true
+          properties:
+            message:
+              type: string
+        upgrade:
+          type: object
+          nullable: true
+        priority:
+          type: integer
+
+    CodexClientModelList:
+      type: object
+      required:
+        - models
+      properties:
+        models:
+          type: array
+          items:
+            $ref: "#/components/schemas/CodexClientModel"
 
     GatewayUsageResponse:
       type: object
