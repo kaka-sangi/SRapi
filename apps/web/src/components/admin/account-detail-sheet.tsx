@@ -27,7 +27,10 @@ import { runtimeClassLabel } from "@/lib/admin-account-form";
 import { cn } from "@/lib/cn";
 import { StatCard } from "@/components/ui/stat-card";
 import { Sparkline } from "@/components/charts/sparkline";
-import { accountModelPolicyLabel } from "@/app/admin/accounts/account-types";
+import {
+  accountMetadataFacts,
+  accountModelPolicyLabel,
+} from "@/app/admin/accounts/account-types";
 import {
   Table,
   TableBody,
@@ -83,13 +86,6 @@ function DetailMetric({ label, value }: { label: string; value: React.ReactNode 
   );
 }
 
-function dayKeyFromTimestamp(value?: string | null): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toISOString().slice(0, 10);
-}
-
 function hasDailyTraffic(point: AccountUsageDailyPoint): boolean {
   const cost = Number(point.cost);
   return (
@@ -111,16 +107,11 @@ function accountGroupSummary(
   return extra > 0 ? `${names.join(", ")} +${extra}` : names.join(", ");
 }
 
-function compactDailyUsagePoints(
-  account: ProviderAccount,
-  points: AccountUsageDailyPoint[],
-): AccountUsageDailyPoint[] {
+function compactDailyUsagePoints(points: AccountUsageDailyPoint[]): AccountUsageDailyPoint[] {
   if (points.length === 0) return [];
   const firstTrafficDay = points.find(hasDailyTraffic)?.date ?? null;
-  const accountCreatedDay = dayKeyFromTimestamp(account.created_at);
-  const startDay = firstTrafficDay ?? accountCreatedDay;
-  if (!startDay) return points;
-  return points.filter((point) => point.date >= startDay);
+  if (!firstTrafficDay) return [];
+  return points.filter((point) => point.date >= firstTrafficDay);
 }
 
 function AccountHealthEvidenceLinks({ links }: { links: AccountHealthInvestigationLinks }) {
@@ -288,15 +279,9 @@ function UsageTodayBody({ today }: { today: AccountUsageToday }) {
 }
 
 /** Recent account usage as a requests sparkline above a dense mini-table. */
-function UsageDailyBody({
-  account,
-  points,
-}: {
-  account: ProviderAccount;
-  points: AccountUsageDailyPoint[];
-}) {
+function UsageDailyBody({ points }: { points: AccountUsageDailyPoint[] }) {
   const { t } = useLanguage();
-  const compactPoints = compactDailyUsagePoints(account, points);
+  const compactPoints = compactDailyUsagePoints(points);
   if (compactPoints.length === 0) {
     return <p className="text-2xs text-srapi-text-tertiary">{t("adminAccounts.detailNoData")}</p>;
   }
@@ -485,6 +470,11 @@ export function AccountDetailSheet({
               label={t("adminAccounts.createdAt")}
               value={formatDate(account.created_at)}
             />
+            {accountMetadataFacts(t, account)
+              .slice(0, 4)
+              .map((fact) => (
+                <DetailMetric key={fact.key} label={fact.label} value={fact.value} />
+              ))}
           </div>
         ) : null}
 
@@ -536,7 +526,7 @@ export function AccountDetailSheet({
           </Section>
 
           <Section title={t("adminAccounts.usageDailyTitle")} query={usageDaily}>
-            {(points) => account ? <UsageDailyBody account={account} points={points} /> : null}
+            {(points) => <UsageDailyBody points={points} />}
           </Section>
 
           <Section title={t("adminAccounts.rpmTitle")} query={rpm}>

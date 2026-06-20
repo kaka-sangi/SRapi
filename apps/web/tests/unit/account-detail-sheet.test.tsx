@@ -1,9 +1,46 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AccountDetailSheet } from "@/components/admin/account-detail-sheet";
 import { LanguageProvider } from "@/context/LanguageContext";
 import type { ProviderAccount } from "@/lib/sdk-types";
+
+const mocks = vi.hoisted(() => ({
+  dailyUsage: [
+    {
+      date: "2026-05-18",
+      requests: 0,
+      input_tokens: 0,
+      output_tokens: 0,
+      cost: "0.00",
+      currency: "USD",
+    },
+    {
+      date: "2026-06-10",
+      requests: 0,
+      input_tokens: 0,
+      output_tokens: 0,
+      cost: "0.00",
+      currency: "USD",
+    },
+    {
+      date: "2026-06-12",
+      requests: 4,
+      input_tokens: 40,
+      output_tokens: 8,
+      cost: "0.04",
+      currency: "USD",
+    },
+    {
+      date: "2026-06-13",
+      requests: 0,
+      input_tokens: 0,
+      output_tokens: 0,
+      cost: "0.00",
+      currency: "USD",
+    },
+  ],
+}));
 
 const storage = new Map<string, string>();
 Object.defineProperty(window, "localStorage", {
@@ -82,7 +119,19 @@ vi.mock("@/hooks/admin-queries", () => ({
     isError: false,
   }),
   useAccountUsageDaily: () => ({
-    data: [
+    data: mocks.dailyUsage,
+    isLoading: false,
+    isError: false,
+  }),
+}));
+
+vi.mock("@/context/ToastContext", () => ({
+  useToast: () => ({ toast: vi.fn() }),
+}));
+
+describe("AccountDetailSheet", () => {
+  beforeEach(() => {
+    mocks.dailyUsage = [
       {
         date: "2026-05-18",
         requests: 0,
@@ -115,17 +164,9 @@ vi.mock("@/hooks/admin-queries", () => ({
         cost: "0.00",
         currency: "USD",
       },
-    ],
-    isLoading: false,
-    isError: false,
-  }),
-}));
+    ];
+  });
 
-vi.mock("@/context/ToastContext", () => ({
-  useToast: () => ({ toast: vi.fn() }),
-}));
-
-describe("AccountDetailSheet", () => {
   it("starts daily usage at first real account usage and keeps identity compact", () => {
     renderSheet();
 
@@ -139,6 +180,33 @@ describe("AccountDetailSheet", () => {
     expect(within(usageTable).queryByText(/2026年6月10日|Jun 10, 2026/)).not.toBeInTheDocument();
     expect(within(usageTable).getByText(/2026年6月12日|Jun 12, 2026/)).toBeInTheDocument();
     expect(within(usageTable).getByText(/2026年6月13日|Jun 13, 2026/)).toBeInTheDocument();
+  });
+
+  it("does not treat account creation as usage when the daily series is empty", () => {
+    mocks.dailyUsage = [
+      {
+        date: "2026-05-18",
+        requests: 0,
+        input_tokens: 0,
+        output_tokens: 0,
+        cost: "0.00",
+        currency: "USD",
+      },
+      {
+        date: "2026-06-10",
+        requests: 0,
+        input_tokens: 0,
+        output_tokens: 0,
+        cost: "0.00",
+        currency: "USD",
+      },
+    ];
+
+    renderSheet();
+
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.getAllByText("暂无数据。").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/2026年5月18日|May 18, 2026/)).not.toBeInTheDocument();
   });
 });
 
@@ -161,6 +229,10 @@ function renderSheet() {
     proxy_id: "proxy-1",
     metadata: {
       base_url: "https://internal-upstream.example/v1",
+      email: "ada@example.com",
+      plan_type: "pro",
+      organization_id: "org-main",
+      max_concurrency: 4,
       supported_models: ["gpt-5"],
     },
     created_at: "2026-06-10T00:00:00Z",

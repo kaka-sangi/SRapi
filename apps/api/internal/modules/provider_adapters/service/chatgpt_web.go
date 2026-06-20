@@ -740,19 +740,40 @@ func chatGPTWebPoWGenerate(seed string, difficulty string, config []any, limit i
 	}
 	start := time.Now()
 	for nonce := range limit {
-		config[3] = nonce
-		config[9] = int64(math.Round(float64(time.Since(start)) / float64(time.Millisecond)))
-		raw, err := json.Marshal(config)
+		answer, err := chatGPTWebPoWRunCheck(start, seed, difficulty, config, nonce)
 		if err != nil {
 			return chatGPTWebPoWFallback(seed), false
 		}
-		encoded := base64.StdEncoding.EncodeToString(raw)
-		hash := chatGPTWebPoWFNV1aHex(seed + encoded)
-		if len(hash) >= len(difficulty) && hash[:len(difficulty)] <= difficulty {
-			return encoded + "~S", true
+		if answer != "" {
+			return answer, true
 		}
 	}
 	return chatGPTWebPoWFallback(seed), false
+}
+
+func chatGPTWebPoWRunCheck(start time.Time, seed string, difficulty string, config []any, nonce int) (string, error) {
+	if len(config) < 10 {
+		return "", nil
+	}
+	config[3] = nonce
+	config[9] = int64(math.Round(float64(time.Since(start)) / float64(time.Millisecond)))
+	encoded, err := chatGPTWebPoWEncodeFingerprint(config)
+	if err != nil {
+		return "", err
+	}
+	hash := chatGPTWebPoWFNV1aHex(seed + encoded)
+	if len(hash) >= len(difficulty) && hash[:len(difficulty)] <= difficulty {
+		return encoded + "~S", nil
+	}
+	return "", nil
+}
+
+func chatGPTWebPoWEncodeFingerprint(config []any) (string, error) {
+	raw, err := json.Marshal(config)
+	if err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(raw), nil
 }
 
 func chatGPTWebPoWHexDifficulty(difficulty string) bool {

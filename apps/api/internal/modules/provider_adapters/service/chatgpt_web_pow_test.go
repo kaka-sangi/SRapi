@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestChatGPTWebPoWGenerateUsesSentinelFNVAnswerShape(t *testing.T) {
@@ -56,6 +57,58 @@ func TestChatGPTWebPoWGenerateUsesSentinelFNVAnswerShape(t *testing.T) {
 	}
 	if fp[3] != float64(0) {
 		t.Fatalf("nonce slot = %#v, want 0", fp[3])
+	}
+	if _, ok := fp[9].(float64); !ok {
+		t.Fatalf("elapsed slot = %#v, want numeric", fp[9])
+	}
+}
+
+func TestChatGPTWebPoWRunCheckMatchesSentinelAlgorithm(t *testing.T) {
+	config := []any{
+		"0",
+		"",
+		"0",
+		99,
+		0.0,
+		"",
+		"",
+		"",
+		"en-US",
+		123,
+		"en-US",
+		0.0,
+		"",
+		"",
+		0.0,
+		"",
+		"",
+		"",
+		0,
+		0,
+		0,
+		0,
+		0,
+	}
+	answer, err := chatGPTWebPoWRunCheck(time.Now(), "seed", "ffffffff", config, 7)
+	if err != nil {
+		t.Fatalf("run check: %v", err)
+	}
+	if answer == "" {
+		t.Fatal("expected trivial difficulty to solve")
+	}
+	if !strings.HasSuffix(answer, "~S") {
+		t.Fatalf("answer suffix = %q, want ~S", answer)
+	}
+	raw, err := base64.StdEncoding.DecodeString(strings.TrimSuffix(answer, "~S"))
+	if err != nil {
+		t.Fatalf("decode answer: %v", err)
+	}
+	var fp []any
+	if err := json.Unmarshal(raw, &fp); err != nil {
+		t.Fatalf("decode fingerprint json: %v", err)
+	}
+	if fp[3] != float64(7) {
+		t.Fatalf("nonce slot = %#v, want 7", fp[3])
 	}
 	if _, ok := fp[9].(float64); !ok {
 		t.Fatalf("elapsed slot = %#v, want numeric", fp[9])

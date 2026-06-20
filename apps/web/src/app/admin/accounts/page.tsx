@@ -75,7 +75,12 @@ import {
 import { AccountImportDialog } from "@/components/admin/account-import-dialog";
 import { BulkAddAccountsDialog } from "./bulk-add-dialog";
 import type { Provider, ProviderAccount, ProviderAccountStatus } from "@/lib/sdk-types";
-import { accountModelPolicyLabel, metadataString, type AccountListMode } from "./account-types";
+import {
+  accountMetadataFacts,
+  accountModelPolicyLabel,
+  metadataString,
+  type AccountListMode,
+} from "./account-types";
 import { AccountHealthCell, AccountQuotaCell, HealthSummaryStrip } from "./account-health-cells";
 import type { AccountHealthMaintenanceAction, AccountHealthOpsGroup } from "@/lib/admin-account-health-ops";
 import { AccountStatusCell } from "./account-status-cell";
@@ -571,6 +576,31 @@ function AccountsContent() {
           {accountModelPolicyLabel(t, a.metadata)}
         </span>
       ),
+    },
+    {
+      key: "profile",
+      header: t("adminAccounts.profile"),
+      hideOnMobile: true,
+      sortValue: (a) => accountMetadataFacts(t, a).map((fact) => fact.value).join(" "),
+      render: (a) => {
+        const facts = accountMetadataFacts(t, a).slice(0, 4);
+        if (facts.length === 0) {
+          return <span className="font-mono text-2xs text-srapi-text-tertiary">—</span>;
+        }
+        return (
+          <div className="flex max-w-[18rem] flex-wrap gap-1">
+            {facts.map((fact) => (
+              <span
+                key={fact.key}
+                className="max-w-[8.5rem] truncate rounded-md border border-srapi-border bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary"
+                title={`${fact.label}: ${fact.value}`}
+              >
+                {fact.value}
+              </span>
+            ))}
+          </div>
+        );
+      },
     },
     {
       key: "type",
