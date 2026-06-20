@@ -31,6 +31,7 @@ import {
   Fingerprint,
   Receipt,
   BellRing,
+  Network,
   type LucideIcon,
 } from "lucide-react";
 import { ADMIN_ROUTES, USER_ROUTES, USER_HOME_ROUTE } from "@/lib/routes";
@@ -88,6 +89,7 @@ const ADMIN_OVERVIEW_SECTION: NavSection = {
 const ADMIN_GATEWAY_SECTION: NavSection = {
   titleKey: "nav.sectionAdminGateway",
   items: [
+    { href: ADMIN_ROUTES.gatewayResources, labelKey: "nav.adminGatewayResources", icon: Network },
     { href: ADMIN_ROUTES.quickSetup, labelKey: "nav.adminQuickSetup", icon: Sparkles },
     { href: ADMIN_ROUTES.providers, labelKey: "nav.adminProviders", icon: Cable },
     { href: ADMIN_ROUTES.models, labelKey: "nav.adminModels", icon: BrainCircuit },
@@ -95,6 +97,7 @@ const ADMIN_GATEWAY_SECTION: NavSection = {
     { href: ADMIN_ROUTES.gatewayPolicies, labelKey: "nav.adminGatewayPolicies", icon: ShieldCheck },
     { href: ADMIN_ROUTES.accounts, labelKey: "nav.adminAccounts", icon: CloudCog },
     { href: ADMIN_ROUTES.groups, labelKey: "nav.adminGroups", icon: Group },
+    { href: ADMIN_ROUTES.apiKeys, labelKey: "nav.adminApiKeys", icon: KeyRound },
   ],
 };
 
@@ -127,7 +130,6 @@ const ADMIN_SYSTEM_SECTION: NavSection = {
   items: [
     { href: ADMIN_ROUTES.proxies, labelKey: "nav.adminProxies", icon: Globe },
     { href: ADMIN_ROUTES.identity, labelKey: "nav.adminIdentity", icon: Fingerprint },
-    { href: ADMIN_ROUTES.apiKeys, labelKey: "nav.adminApiKeys", icon: KeyRound },
     { href: ADMIN_ROUTES.logs, labelKey: "nav.adminLogs", icon: FileSearch },
     {
       href: ADMIN_ROUTES.notificationTemplates,
