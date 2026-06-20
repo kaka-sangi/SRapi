@@ -1,11 +1,9 @@
 "use client";
 
 import type { UseQueryResult } from "@tanstack/react-query";
-import { Copy, Check, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { writeClipboard } from "@/components/ui/copy-button";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import {
   useAccountHealth,
@@ -29,6 +27,7 @@ import { runtimeClassLabel } from "@/lib/admin-account-form";
 import { cn } from "@/lib/cn";
 import { StatCard } from "@/components/ui/stat-card";
 import { Sparkline } from "@/components/charts/sparkline";
+import { accountModelPolicyLabel } from "@/app/admin/accounts/account-types";
 import {
   Table,
   TableBody,
@@ -53,6 +52,8 @@ import type {
   AccountUsageWindowsResult,
 } from "@/lib/sdk-types";
 
+const DAILY_USAGE_VISIBLE_ROWS = 14;
+
 function pct(ratio: number): string {
   return `${Math.round(ratio * 100)}%`;
 }
@@ -64,6 +65,62 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
       <span className="font-mono text-xs text-srapi-text-primary tabular">{value}</span>
     </div>
   );
+}
+
+function DetailMetric({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="min-w-0 rounded-md border border-srapi-border bg-srapi-bg-muted px-3 py-2">
+      <div className="font-mono text-[10px] uppercase tracking-wide text-srapi-text-tertiary">
+        {label}
+      </div>
+      <div
+        className="mt-1 truncate font-mono text-2xs text-srapi-text-secondary"
+        title={typeof value === "string" ? value : undefined}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function dayKeyFromTimestamp(value?: string | null): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().slice(0, 10);
+}
+
+function hasDailyTraffic(point: AccountUsageDailyPoint): boolean {
+  const cost = Number(point.cost);
+  return (
+    point.requests > 0 ||
+    point.input_tokens > 0 ||
+    point.output_tokens > 0 ||
+    (Number.isFinite(cost) && cost > 0)
+  );
+}
+
+function accountGroupSummary(
+  account: ProviderAccount,
+  groupNameById?: Map<string, string>,
+): string {
+  const ids = account.group_ids ?? [];
+  if (ids.length === 0) return "";
+  const names = ids.slice(0, 3).map((id) => groupNameById?.get(String(id)) ?? `#${id}`);
+  const extra = ids.length - names.length;
+  return extra > 0 ? `${names.join(", ")} +${extra}` : names.join(", ");
+}
+
+function compactDailyUsagePoints(
+  account: ProviderAccount,
+  points: AccountUsageDailyPoint[],
+): AccountUsageDailyPoint[] {
+  if (points.length === 0) return [];
+  const firstTrafficDay = points.find(hasDailyTraffic)?.date ?? null;
+  const accountCreatedDay = dayKeyFromTimestamp(account.created_at);
+  const startDay = firstTrafficDay ?? accountCreatedDay;
+  if (!startDay) return points;
+  return points.filter((point) => point.date >= startDay);
 }
 
 function AccountHealthEvidenceLinks({ links }: { links: AccountHealthInvestigationLinks }) {
@@ -230,16 +287,23 @@ function UsageTodayBody({ today }: { today: AccountUsageToday }) {
   );
 }
 
-/** 30-day series as a requests sparkline above a dense mini-table. */
-function UsageDailyBody({ points }: { points: AccountUsageDailyPoint[] }) {
+/** Recent account usage as a requests sparkline above a dense mini-table. */
+function UsageDailyBody({
+  account,
+  points,
+}: {
+  account: ProviderAccount;
+  points: AccountUsageDailyPoint[];
+}) {
   const { t } = useLanguage();
-  if (points.length === 0) {
+  const compactPoints = compactDailyUsagePoints(account, points);
+  if (compactPoints.length === 0) {
     return <p className="text-2xs text-srapi-text-tertiary">{t("adminAccounts.detailNoData")}</p>;
   }
   // The series arrives oldest→newest from the read model; render most-recent
   // first in the table but keep chronological order for the sparkline.
-  const spark = points.map((p) => p.requests);
-  const rows = [...points].reverse();
+  const spark = compactPoints.map((p) => p.requests);
+  const rows = [...compactPoints].reverse().slice(0, DAILY_USAGE_VISIBLE_ROWS);
   return (
     <div className="space-y-3">
       {spark.length >= 2 ? (
@@ -275,6 +339,14 @@ function UsageDailyBody({ points }: { points: AccountUsageDailyPoint[] }) {
           </TableBody>
         </Table>
       </TableScroll>
+      {compactPoints.length > rows.length ? (
+        <p className="font-mono text-2xs text-srapi-text-tertiary">
+          {t("adminAccounts.usageDailyRowsShown", {
+            shown: rows.length,
+            total: compactPoints.length,
+          })}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -318,9 +390,13 @@ function Section<T>({
  */
 export function AccountDetailSheet({
   account,
+  providerName,
+  groupNameById,
   onOpenChange,
 }: {
   account: ProviderAccount | null;
+  providerName?: string;
+  groupNameById?: Map<string, string>;
   onOpenChange: (open: boolean) => void;
 }) {
   const { t } = useLanguage();
@@ -361,12 +437,12 @@ export function AccountDetailSheet({
       <SheetContent side="right" className="w-[28rem] gap-0 overflow-y-auto p-6">
         <SheetTitle>{t("adminAccounts.detailTitle")}</SheetTitle>
         {account ? <SheetDescription className="text-sm text-srapi-text-secondary">{account.name}</SheetDescription> : null}
-        {account && typeof account.metadata?.base_url === "string" && account.metadata.base_url ? (
-          <CopyableUrl url={String(account.metadata.base_url)} />
-        ) : null}
 
         {account ? (
           <div className="mt-3 flex flex-wrap gap-1.5">
+            <span className="rounded-md bg-srapi-bg-muted px-2 py-0.5 font-mono text-2xs text-srapi-text-secondary">
+              {account.status}
+            </span>
             <span className="rounded-md bg-srapi-bg-muted px-2 py-0.5 text-2xs text-srapi-text-secondary">
               {runtimeClassLabel(t, account.runtime_class)}
             </span>
@@ -380,6 +456,35 @@ export function AccountDetailSheet({
                 W{account.weight}
               </span>
             ) : null}
+          </div>
+        ) : null}
+
+        {account ? (
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <DetailMetric
+              label={t("adminAccounts.provider")}
+              value={providerName ?? account.provider_id}
+            />
+            <DetailMetric
+              label={t("adminAccounts.models")}
+              value={accountModelPolicyLabel(t, account.metadata)}
+            />
+            <DetailMetric
+              label={t("adminAccounts.groups")}
+              value={accountGroupSummary(account, groupNameById) || t("adminAccounts.ungrouped")}
+            />
+            <DetailMetric
+              label={t("adminAccounts.proxy")}
+              value={account.proxy_id ? t("adminAccounts.proxyConfigured") : t("adminAccounts.noProxy")}
+            />
+            <DetailMetric
+              label={t("adminAccounts.routing")}
+              value={`P${account.priority ?? 0} / W${account.weight ?? 1}`}
+            />
+            <DetailMetric
+              label={t("adminAccounts.createdAt")}
+              value={formatDate(account.created_at)}
+            />
           </div>
         ) : null}
 
@@ -431,7 +536,7 @@ export function AccountDetailSheet({
           </Section>
 
           <Section title={t("adminAccounts.usageDailyTitle")} query={usageDaily}>
-            {(points) => <UsageDailyBody points={points} />}
+            {(points) => account ? <UsageDailyBody account={account} points={points} /> : null}
           </Section>
 
           <Section title={t("adminAccounts.rpmTitle")} query={rpm}>
@@ -489,30 +594,5 @@ export function AccountDetailSheet({
         </div>
       </SheetContent>
     </Sheet>
-  );
-}
-
-function CopyableUrl({ url }: { url: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        void writeClipboard(url).then((ok) => {
-          if (!ok) return;
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        });
-      }}
-      className="group mt-1 flex w-full items-center gap-1.5 truncate text-left font-mono text-2xs text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
-      title={url}
-    >
-      <span className="truncate">{url}</span>
-      {copied ? (
-        <Check className="size-3 shrink-0 text-srapi-success" />
-      ) : (
-        <Copy className="size-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
-      )}
-    </button>
   );
 }

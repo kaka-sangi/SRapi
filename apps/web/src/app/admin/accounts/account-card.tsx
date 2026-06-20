@@ -3,6 +3,7 @@ import type { UseQueryResult } from "@tanstack/react-query";
 import { SearchX, Server } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { runtimeClassLabel } from "@/lib/admin-account-form";
+import { formatCompactNumber, formatMoney, formatPercent } from "@/lib/admin-format";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -11,21 +12,24 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Pagination } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
 import { type AdminListResult } from "@/lib/admin-api";
-import type { ProviderAccount, AccountHealthSnapshot } from "@/lib/sdk-types";
+import type { ProviderAccount, AccountHealthSnapshot, AccountUsageToday } from "@/lib/sdk-types";
 import { cn } from "@/lib/cn";
 import { AccountHealthCell, AccountQuotaCell } from "./account-health-cells";
 import {
-  metadataString,
+  accountModelPolicyLabel,
   type AccountSelection,
   type AccountPagination,
 } from "./account-types";
 
 const EMPTY_FILL = "min-h-[55vh] justify-center";
+type AccountUsageTodayWithId = AccountUsageToday & { account_id: string };
 
 export function AccountsCardView({
   query,
   providerNameById,
+  groupNameById,
   healthById,
+  todayByAccountId,
   healthInvestigationHref,
   toolbar,
   selection,
@@ -39,7 +43,9 @@ export function AccountsCardView({
 }: {
   query: UseQueryResult<AdminListResult<ProviderAccount>>;
   providerNameById: Map<string, string>;
+  groupNameById: Map<string, string>;
   healthById: Map<string, AccountHealthSnapshot>;
+  todayByAccountId: Map<string, AccountUsageTodayWithId>;
   healthInvestigationHref: (health?: AccountHealthSnapshot) => string | null;
   toolbar: ReactNode;
   selection?: AccountSelection;
@@ -96,7 +102,9 @@ export function AccountsCardView({
             <AccountCardGrid
               accounts={data.data}
               providerNameById={providerNameById}
+              groupNameById={groupNameById}
               healthById={healthById}
+              todayByAccountId={todayByAccountId}
               healthInvestigationHref={healthInvestigationHref}
               selection={selection}
               onDetail={onDetail}
@@ -126,7 +134,9 @@ export function AccountsCardView({
 function AccountCardGrid({
   accounts,
   providerNameById,
+  groupNameById,
   healthById,
+  todayByAccountId,
   healthInvestigationHref,
   selection,
   onDetail,
@@ -135,7 +145,9 @@ function AccountCardGrid({
 }: {
   accounts: ProviderAccount[];
   providerNameById: Map<string, string>;
+  groupNameById: Map<string, string>;
   healthById: Map<string, AccountHealthSnapshot>;
+  todayByAccountId: Map<string, AccountUsageTodayWithId>;
   healthInvestigationHref: (health?: AccountHealthSnapshot) => string | null;
   selection?: AccountSelection;
   onDetail?: (account: ProviderAccount) => void;
@@ -164,7 +176,9 @@ function AccountCardGrid({
             key={account.id}
             account={account}
             providerName={providerNameById.get(String(account.provider_id)) || account.provider_id}
+            groupNameById={groupNameById}
             health={healthById.get(account.id)}
+            today={todayByAccountId.get(account.id)}
             investigationHref={healthInvestigationHref(healthById.get(account.id))}
             selected={selection?.selected.has(account.id) ?? false}
             onSelect={selection ? () => selection.onToggle(account.id) : undefined}
@@ -181,7 +195,9 @@ function AccountCardGrid({
 function AccountCard({
   account,
   providerName,
+  groupNameById,
   health,
+  today,
   investigationHref,
   selected,
   onSelect,
@@ -191,7 +207,9 @@ function AccountCard({
 }: {
   account: ProviderAccount;
   providerName: string;
+  groupNameById: Map<string, string>;
   health?: AccountHealthSnapshot;
+  today?: AccountUsageTodayWithId;
   investigationHref?: string | null;
   selected: boolean;
   onSelect?: () => void;
@@ -200,7 +218,12 @@ function AccountCard({
   status: ReactNode;
 }) {
   const { t } = useLanguage();
-  const baseUrl = metadataString(account.metadata, "base_url");
+  const modelPolicy = accountModelPolicyLabel(t, account.metadata);
+  const proxyLabel = account.proxy_id ? t("adminAccounts.proxyConfigured") : t("adminAccounts.noProxy");
+  const groups = account.group_ids ?? [];
+  const visibleGroups = groups.slice(0, 3).map((id) => groupNameById.get(String(id)) ?? `#${id}`);
+  const extraGroupCount = Math.max(0, groups.length - visibleGroups.length);
+  const hasTodayUsage = Boolean(today && today.requests > 0);
   return (
     <article
       className={cn(
@@ -236,11 +259,34 @@ function AccountCard({
             <span className="shrink-0 text-srapi-border">·</span>
             <span className="truncate text-2xs text-srapi-text-tertiary">{runtimeClassLabel(t, account.runtime_class)}</span>
           </div>
-          {baseUrl ? (
-            <p className="mt-1 truncate font-mono text-2xs text-srapi-text-tertiary" title={baseUrl}>
-              {baseUrl}
-            </p>
-          ) : null}
+          <div className="mt-2 flex flex-wrap gap-1">
+            <span className="rounded-md bg-srapi-bg-muted px-1.5 py-0.5 font-mono text-[10px] text-srapi-text-tertiary">
+              {modelPolicy}
+            </span>
+            <span className="rounded-md bg-srapi-bg-muted px-1.5 py-0.5 font-mono text-[10px] text-srapi-text-tertiary">
+              {proxyLabel}
+            </span>
+            {visibleGroups.length > 0 ? (
+              visibleGroups.map((name) => (
+                <span
+                  key={name}
+                  className="max-w-[7rem] truncate rounded-md bg-srapi-bg-muted px-1.5 py-0.5 font-mono text-[10px] text-srapi-text-tertiary"
+                  title={name}
+                >
+                  {name}
+                </span>
+              ))
+            ) : (
+              <span className="rounded-md bg-srapi-bg-muted px-1.5 py-0.5 font-mono text-[10px] text-srapi-text-tertiary">
+                {t("adminAccounts.ungrouped")}
+              </span>
+            )}
+            {extraGroupCount > 0 ? (
+              <span className="rounded-md bg-srapi-bg-muted px-1.5 py-0.5 font-mono text-[10px] text-srapi-text-tertiary">
+                +{extraGroupCount}
+              </span>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -252,6 +298,9 @@ function AccountCard({
         ) : null}
         {account.weight != null && account.weight !== 1 ? (
           <span className="font-mono text-2xs text-srapi-text-tertiary">W{account.weight}</span>
+        ) : null}
+        {account.risk_level ? (
+          <span className="font-mono text-2xs text-srapi-text-tertiary">{account.risk_level}</span>
         ) : null}
       </div>
 
@@ -265,6 +314,25 @@ function AccountCard({
           <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-srapi-text-tertiary">{t("adminAccounts.quotaTitle")}</div>
           <AccountQuotaCell health={health} />
         </div>
+      </div>
+      <div className="border-t border-srapi-border/50 px-4 py-2.5">
+        <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-srapi-text-tertiary">
+          {t("adminAccounts.today")}
+        </div>
+        {hasTodayUsage && today ? (
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-mono text-2xs tabular">
+            <span className="text-srapi-text-primary">
+              {formatCompactNumber(today.requests)} {t("adminAccounts.usageRequests").toLowerCase()}
+            </span>
+            <span className="text-srapi-text-secondary">
+              {formatCompactNumber(today.total_tokens || today.input_tokens + today.output_tokens)} {t("adminAccounts.usageTokens").toLowerCase()}
+            </span>
+            <span className="text-srapi-text-secondary">{formatMoney(today.cost, today.currency)}</span>
+            <span className="text-srapi-text-tertiary">{formatPercent(today.success_rate)}</span>
+          </div>
+        ) : (
+          <span className="font-mono text-2xs text-srapi-text-tertiary">{t("adminAccounts.todayIdle")}</span>
+        )}
       </div>
     </article>
   );

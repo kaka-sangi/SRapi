@@ -75,7 +75,7 @@ import {
 import { AccountImportDialog } from "@/components/admin/account-import-dialog";
 import { BulkAddAccountsDialog } from "./bulk-add-dialog";
 import type { Provider, ProviderAccount, ProviderAccountStatus } from "@/lib/sdk-types";
-import { type AccountListMode, metadataString } from "./account-types";
+import { accountModelPolicyLabel, metadataString, type AccountListMode } from "./account-types";
 import { AccountHealthCell, AccountQuotaCell, HealthSummaryStrip } from "./account-health-cells";
 import type { AccountHealthMaintenanceAction, AccountHealthOpsGroup } from "@/lib/admin-account-health-ops";
 import { AccountStatusCell } from "./account-status-cell";
@@ -562,16 +562,15 @@ function AccountsContent() {
       ),
     },
     {
-      key: "base_url",
-      header: t("adminAccounts.baseUrl"),
+      key: "models",
+      header: t("adminAccounts.models"),
       hideOnMobile: true,
-      sortValue: (a) => metadataString(a.metadata, "base_url"),
-      render: (a) => {
-        const url = metadataString(a.metadata, "base_url");
-        return url ? (
-          <span className="max-w-[12rem] truncate font-mono text-2xs text-srapi-text-tertiary" title={url}>{url}</span>
-        ) : <span className="text-2xs text-srapi-text-tertiary">—</span>;
-      },
+      sortValue: (a) => accountModelPolicyLabel(t, a.metadata),
+      render: (a) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary">
+          {accountModelPolicyLabel(t, a.metadata)}
+        </span>
+      ),
     },
     {
       key: "type",
@@ -606,6 +605,38 @@ function AccountsContent() {
           </div>
         );
       },
+    },
+    {
+      key: "proxy",
+      header: t("adminAccounts.proxy"),
+      hideOnMobile: true,
+      sortValue: (a) => a.proxy_id ?? "",
+      render: (a) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary">
+          {a.proxy_id ? t("adminAccounts.proxyConfigured") : t("adminAccounts.noProxy")}
+        </span>
+      ),
+    },
+    {
+      key: "routing",
+      header: t("adminAccounts.routing"),
+      hideOnMobile: true,
+      sortValue: (a) => `${a.priority}:${a.weight}:${a.risk_level ?? ""}`,
+      render: (a) => (
+        <div className="flex flex-wrap gap-1">
+          <span className="rounded-md bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary">
+            P{a.priority ?? 0}
+          </span>
+          <span className="rounded-md bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary">
+            W{a.weight ?? 1}
+          </span>
+          {a.risk_level ? (
+            <span className="rounded-md bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary">
+              {a.risk_level}
+            </span>
+          ) : null}
+        </div>
+      ),
     },
     {
       key: "status",
@@ -1000,7 +1031,9 @@ function AccountsContent() {
         <AccountsCardView
           query={accounts}
           providerNameById={providerNameById}
+          groupNameById={groupNameById}
           healthById={healthById}
+          todayByAccountId={todayByAccountId}
           healthInvestigationHref={adminAccountHealthInvestigationHref}
           toolbar={toolbar}
           selection={selection}
@@ -1127,6 +1160,12 @@ function AccountsContent() {
 
       <AccountDetailSheet
         account={detailTarget}
+        providerName={
+          detailTarget
+            ? providerNameById.get(String(detailTarget.provider_id)) || detailTarget.provider_id
+            : undefined
+        }
+        groupNameById={groupNameById}
         onOpenChange={(open) => {
           if (open) return;
           setManualDetailTarget(null);

@@ -70,6 +70,14 @@ const account = providerAccount({
   name: "codex-main",
   provider_id: "provider-1",
   runtime_class: "oauth_refresh",
+  group_ids: ["group-1"],
+  proxy_id: "proxy-1",
+  priority: 2,
+  weight: 3,
+  metadata: {
+    base_url: "https://internal-upstream.example/v1",
+    supported_models: ["gpt-5", "gpt-5-mini"],
+  },
 });
 
 vi.mock("@/hooks/admin-queries", async () => {
@@ -153,7 +161,24 @@ vi.mock("@/hooks/admin-queries", async () => {
       isLoading: false,
       isError: false,
     }),
-    useAccountsUsageTodayBatch: () => ({ data: [], isLoading: false, isError: false }),
+    useAccountsUsageTodayBatch: () => ({
+      data: [
+        {
+          account_id: "acct-1",
+          requests: 12,
+          input_tokens: 1200,
+          output_tokens: 300,
+          total_tokens: 1500,
+          cost: "0.42",
+          currency: "USD",
+          success_count: 11,
+          error_count: 1,
+          success_rate: 11 / 12,
+        },
+      ],
+      isLoading: false,
+      isError: false,
+    }),
     useDeleteAccount: () => ({ mutateAsync: vi.fn(), isPending: false }),
     useDiscoverAccountModels: () => ({ mutateAsync: vi.fn() }),
     useExportAccounts: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -185,6 +210,27 @@ describe("AdminAccountsPage", () => {
 
     expect(screen.getByRole("columnheader", { name: "名称" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "codex-main" })).not.toBeInTheDocument();
+  });
+
+  it("surfaces routing-critical account facts without exposing base URLs", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(screen.getByText("允许 2 个")).toBeInTheDocument();
+    expect(screen.getByText("已绑定代理")).toBeInTheDocument();
+    expect(screen.getByText("Pooled accounts")).toBeInTheDocument();
+    expect(screen.getByText(/12.*请求/i)).toBeInTheDocument();
+    expect(screen.queryByText("https://internal-upstream.example/v1")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /列表/ }));
+
+    expect(screen.getByRole("columnheader", { name: "模型" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "代理" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "路由" })).toBeInTheDocument();
+    expect(screen.getAllByText("允许 2 个").length).toBeGreaterThan(0);
+    expect(screen.getByText("P2")).toBeInTheDocument();
+    expect(screen.getByText("W3")).toBeInTheDocument();
+    expect(screen.queryByText("https://internal-upstream.example/v1")).not.toBeInTheDocument();
   });
 
   it("opens the focused account detail sheet from a health deep link", async () => {

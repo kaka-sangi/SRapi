@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -21,7 +22,6 @@ import (
 	_ "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/translator/translators"
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
 	"github.com/srapi/srapi/apps/api/internal/pkg/httputil"
-	"golang.org/x/crypto/sha3"
 )
 
 const (
@@ -734,41 +734,56 @@ func chatGPTWebProofToken(req contract.ConversationRequest, seed string, difficu
 }
 
 func chatGPTWebPoWGenerate(seed string, difficulty string, config []any, limit int) (string, bool) {
-	target, err := parseHexDifficulty(difficulty)
-	if err != nil || len(target) == 0 {
+	difficulty = strings.ToLower(strings.TrimSpace(difficulty))
+	if difficulty == "" || len(difficulty) > 8 || !chatGPTWebPoWHexDifficulty(difficulty) {
 		return chatGPTWebPoWFallback(seed), false
 	}
-	diffLen := len(target)
-	seedBytes := []byte(seed)
-	for i := range limit {
-		config[3] = i
-		config[9] = i >> 1
+	start := time.Now()
+	for nonce := range limit {
+		config[3] = nonce
+		config[9] = int64(math.Round(float64(time.Since(start)) / float64(time.Millisecond)))
 		raw, err := json.Marshal(config)
 		if err != nil {
 			return chatGPTWebPoWFallback(seed), false
 		}
 		encoded := base64.StdEncoding.EncodeToString(raw)
-		digest := sha3.Sum512(append(seedBytes, []byte(encoded)...))
-		if bytes.Compare(digest[:diffLen], target) <= 0 {
-			return encoded, true
+		hash := chatGPTWebPoWFNV1aHex(seed + encoded)
+		if len(hash) >= len(difficulty) && hash[:len(difficulty)] <= difficulty {
+			return encoded + "~S", true
 		}
 	}
 	return chatGPTWebPoWFallback(seed), false
 }
 
-func parseHexDifficulty(difficulty string) ([]byte, error) {
-	if len(difficulty)%2 != 0 {
-		difficulty = "0" + difficulty
-	}
-	out := make([]byte, len(difficulty)/2)
-	for i := range out {
-		parsed, err := strconv.ParseUint(difficulty[i*2:i*2+2], 16, 8)
-		if err != nil {
-			return nil, err
+func chatGPTWebPoWHexDifficulty(difficulty string) bool {
+	for _, ch := range difficulty {
+		if (ch < '0' || ch > '9') && (ch < 'a' || ch > 'f') {
+			return false
 		}
-		out[i] = byte(parsed)
 	}
-	return out, nil
+	return true
+}
+
+func chatGPTWebPoWFNV1a32(value string) uint32 {
+	const (
+		offset uint32 = 2166136261
+		prime  uint32 = 16777619
+	)
+	hash := offset
+	for i := 0; i < len(value); i++ {
+		hash ^= uint32(value[i])
+		hash *= prime
+	}
+	hash ^= hash >> 16
+	hash *= 2246822507
+	hash ^= hash >> 13
+	hash *= 3266489909
+	hash ^= hash >> 16
+	return hash
+}
+
+func chatGPTWebPoWFNV1aHex(value string) string {
+	return fmt.Sprintf("%08x", chatGPTWebPoWFNV1a32(value))
 }
 
 func chatGPTWebPoWFallback(seed string) string {
@@ -785,25 +800,31 @@ func chatGPTWebPoWConfig(req contract.ConversationRequest, scriptSources []strin
 		scriptSource = strings.TrimSpace(scriptSources[0])
 	}
 	now := time.Now()
+	nowSeconds := float64(now.UnixNano()/int64(time.Millisecond)) / 1000
 	return []any{
-		4000,
-		now.UTC().Format("Mon Jan 02 2006 15:04:05") + " GMT-0500 (Eastern Standard Time)",
-		4294705152,
+		"0",
+		now.Format(time.RubyDate),
+		"0",
 		0,
+		0.0,
 		chatGPTWebUserAgent(req),
 		scriptSource,
 		dataBuild,
 		"en-US",
-		"en-US,es-US,en,es",
 		0,
-		"webdriver-false",
+		"en-US,es-US,en,es",
+		0.0,
 		"_reactListeningo743lnnpvdg",
 		"window",
-		float64(now.UnixNano()/int64(time.Millisecond)) / 1000,
+		nowSeconds,
 		chatGPTWebStableID(req, fmt.Sprintf("pow-%d", now.UnixNano())),
 		"",
-		32,
-		float64(now.UnixNano()/int64(time.Millisecond)) / 1000,
+		"Win32",
+		nowSeconds,
+		0,
+		0,
+		0,
+		1,
 	}
 }
 
