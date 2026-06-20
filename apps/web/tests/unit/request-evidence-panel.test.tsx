@@ -203,6 +203,23 @@ describe("RequestEvidencePanel", () => {
     );
   });
 
+  it("does not leave a completed undefined list response on the skeleton", () => {
+    mocks.useOpsRequestEvidence.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isPending: false,
+      isError: false,
+      fetchStatus: "idle",
+      isFetching: false,
+      refetch: mocks.refetch,
+    });
+
+    render(<RequestEvidencePanel />, { wrapper: wrap });
+
+    expect(screen.getByText("出错了")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "重试" })).toBeInTheDocument();
+  });
+
   it("opens a request investigation from the request id", () => {
     render(<RequestEvidencePanel />, { wrapper: wrap });
 

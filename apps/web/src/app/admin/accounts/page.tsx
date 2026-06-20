@@ -162,7 +162,8 @@ function AccountsContent() {
   const batchRefresh = useBatchRefreshAccounts();
   const batchRotateCreds = useBatchUpdateAccountCredentials();
   // sub2api parity — bulk-edit superset (status / priority / weight /
-  // risk_level / max_concurrency) and batch quota-fetch (refresh-tier).
+  // risk_level / max_concurrency / group assignment) and batch quota-fetch
+  // (refresh-tier).
   const bulkUpdate = useBulkUpdateAccounts();
   const batchQuotaFetch = useBatchQuotaFetchAccounts();
   const deleteMut = useDeleteAccount();
@@ -241,7 +242,7 @@ function AccountsContent() {
       ? focusedAccountTarget ?? null
       : null;
   const detailTarget = manualDetailTarget ?? autoDetailTarget;
-  const isFiltered = Boolean(statusFilter || providerFilter);
+  const isFiltered = Boolean(statusFilter || providerFilter || groupFilter);
 
   function toastBatchResult({
     total,
@@ -1208,6 +1209,7 @@ function AccountsContent() {
           count={bulkEditOpen === "selected" ? list.selected.size : -1}
           isPending={bulkUpdate.isPending}
           proxyOptions={proxyOptions}
+          groupOptions={groupFilterOptions}
           onSubmit={async (body) => {
             if (bulkEditOpen === "filtered") {
               await applyBulkEdit({
@@ -1423,6 +1425,7 @@ function BulkEditAccountDialog({
   count,
   isPending,
   proxyOptions,
+  groupOptions,
   onSubmit,
   onClose,
 }: {
@@ -1430,6 +1433,7 @@ function BulkEditAccountDialog({
   count: number;
   isPending: boolean;
   proxyOptions: { value: string; label: string }[];
+  groupOptions: { value: string; label: string }[];
   onSubmit: (
     body: {
       name?: string;
@@ -1441,6 +1445,7 @@ function BulkEditAccountDialog({
       proxy_id?: string;
       upstream_client?: string;
       runtime_class?: string;
+      add_group_id?: string;
     },
   ) => void | Promise<void>;
   onClose: () => void;
@@ -1464,6 +1469,8 @@ function BulkEditAccountDialog({
   const [upstreamValue, setUpstreamValue] = useState("");
   const [runtimeClassEnabled, setRuntimeClassEnabled] = useState(false);
   const [runtimeClassValue, setRuntimeClassValue] = useState("api_key");
+  const [groupEnabled, setGroupEnabled] = useState(false);
+  const [groupValue, setGroupValue] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   function submit(event: React.FormEvent) {
@@ -1479,6 +1486,7 @@ function BulkEditAccountDialog({
       proxy_id?: string;
       upstream_client?: string;
       runtime_class?: string;
+      add_group_id?: string;
     } = {};
     if (nameEnabled) {
       const v = nameValue.trim();
@@ -1531,6 +1539,13 @@ function BulkEditAccountDialog({
     }
     if (runtimeClassEnabled) {
       body.runtime_class = runtimeClassValue;
+    }
+    if (groupEnabled) {
+      if (!groupValue) {
+        setError(t("adminAccounts.bulkEditGroupRequired"));
+        return;
+      }
+      body.add_group_id = groupValue;
     }
     if (Object.keys(body).length === 0) {
       setError(t("adminAccounts.bulkEditPickField"));
@@ -1693,6 +1708,31 @@ function BulkEditAccountDialog({
                 <option value="web_session_cookie">web_session_cookie</option>
                 <option value="cli_client_token">cli_client_token</option>
                 <option value="custom_reverse_proxy">custom_reverse_proxy</option>
+              </select>
+            </BulkEditRow>
+            <BulkEditRow
+              enabled={groupEnabled}
+              onToggle={(next) => {
+                setGroupEnabled(next);
+                if (next && !groupValue && groupOptions[0]) {
+                  setGroupValue(groupOptions[0].value);
+                }
+              }}
+              label={t("adminAccounts.bulkEditGroup")}
+              disabled={isPending || groupOptions.length === 0}
+            >
+              <select
+                className="w-full rounded-md border border-srapi-border bg-srapi-card px-2 py-1.5 text-2xs"
+                value={groupValue}
+                disabled={!groupEnabled || isPending || groupOptions.length === 0}
+                onChange={(e) => setGroupValue(e.target.value)}
+              >
+                <option value="">{t("adminAccounts.bulkEditGroupPlaceholder")}</option>
+                {groupOptions.map((g) => (
+                  <option key={g.value} value={g.value}>
+                    {g.label}
+                  </option>
+                ))}
               </select>
             </BulkEditRow>
             {error ? (

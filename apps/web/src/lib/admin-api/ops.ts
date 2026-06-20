@@ -132,6 +132,9 @@ export const opsApi = {
       path: { request_id: requestID },
       throwOnError: true,
     });
+    if (!response.data) {
+      throw new Error("Admin API returned an empty request evidence response.");
+    }
     return response.data;
   },
 

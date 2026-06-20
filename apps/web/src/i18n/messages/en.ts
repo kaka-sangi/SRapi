@@ -890,6 +890,9 @@ export const en = {
     bulkEditFilteredHint:
       "Apply edits to every account that matches the current filters — disabled until a filter is set.",
     bulkEditFilteredTitle: "Bulk-edit every account matching the current filters",
+    bulkEditGroup: "Account group",
+    bulkEditGroupPlaceholder: "Select a group",
+    bulkEditGroupRequired: "Select an account group.",
     runtimeClass: "Runtime class",
     upstreamClientPlaceholder: "Leave empty to clear",
     proxyNone: "No proxy",

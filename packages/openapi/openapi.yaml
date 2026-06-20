@@ -23571,6 +23571,14 @@ components:
             (matches sub2api).
         filters:
           $ref: "#/components/schemas/BulkUpdateProviderAccountsFilters"
+        add_group_id:
+          $ref: "#/components/schemas/Id"
+          description: |
+            Optional account group id to add every resolved account to.
+            This can be the only mutation in the request, so "bulk edit
+            filtered" can assign group membership without the client
+            round-tripping every matched account id. The operation is
+            idempotent for accounts that are already members.
         name:
           type: string
           description: |

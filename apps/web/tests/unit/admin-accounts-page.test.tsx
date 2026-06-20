@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   search: "",
   focusedAccount: undefined as ProviderAccount | undefined,
   accountDetailSheet: vi.fn(() => null),
+  bulkUpdateMutateAsync: vi.fn(),
 }));
 
 const storage = new Map<string, string>();
@@ -142,8 +143,16 @@ vi.mock("@/hooks/admin-queries", async () => {
     useBatchRefreshAccounts: () => ({ mutateAsync: vi.fn(), isPending: false }),
     useBatchUpdateAccountCredentials: () => ({ mutateAsync: vi.fn(), isPending: false }),
     useBatchUpdateAccounts: () => ({ mutateAsync: vi.fn(), isPending: false }),
+    useBulkUpdateAccounts: () => ({
+      mutateAsync: mocks.bulkUpdateMutateAsync,
+      isPending: false,
+    }),
     useBatchQuotaFetchAccounts: () => ({ mutateAsync: vi.fn(), isPending: false }),
-    useAdminGroups: () => ({ data: { data: [] }, isLoading: false, isError: false }),
+    useAdminGroups: () => ({
+      data: { data: [{ id: "group-1", name: "Pooled accounts" }] },
+      isLoading: false,
+      isError: false,
+    }),
     useAccountsUsageTodayBatch: () => ({ data: [], isLoading: false, isError: false }),
     useDeleteAccount: () => ({ mutateAsync: vi.fn(), isPending: false }),
     useDiscoverAccountModels: () => ({ mutateAsync: vi.fn() }),
@@ -156,6 +165,12 @@ describe("AdminAccountsPage", () => {
     mocks.search = "";
     mocks.focusedAccount = undefined;
     mocks.accountDetailSheet.mockClear();
+    mocks.bulkUpdateMutateAsync.mockReset();
+    mocks.bulkUpdateMutateAsync.mockResolvedValue({
+      updated_count: 1,
+      updated_ids: ["acct-1"],
+      errors: [],
+    });
     window.history.replaceState(null, "", "/admin/accounts");
   });
 
@@ -191,6 +206,24 @@ describe("AdminAccountsPage", () => {
         }),
         undefined,
       );
+    });
+  });
+
+  it("adds an account group from selected bulk edit", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByLabelText("select row"));
+    await user.click(screen.getByRole("button", { name: "批量编辑" }));
+    await user.click(screen.getByLabelText("账号组"));
+    await user.selectOptions(screen.getByDisplayValue("Pooled accounts"), "group-1");
+    await user.click(screen.getByRole("button", { name: "应用" }));
+
+    await waitFor(() => {
+      expect(mocks.bulkUpdateMutateAsync).toHaveBeenCalledWith({
+        account_ids: ["acct-1"],
+        add_group_id: "group-1",
+      });
     });
   });
 });

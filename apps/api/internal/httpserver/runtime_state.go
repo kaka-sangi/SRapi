@@ -1294,6 +1294,7 @@ func (rt *runtimeState) bootstrapGatewayCatalog(ctx context.Context) error {
 	}
 	if provider.Capabilities[capabilitiescontract.KeyResponses] != true || provider.Capabilities[capabilitiescontract.KeyEmbeddings] != true || provider.Capabilities[capabilitiescontract.KeyImageGenerations] != true || provider.Capabilities[capabilitiescontract.KeyImageEdits] != true || provider.Capabilities[capabilitiescontract.KeyImageVariations] != true || provider.Capabilities[capabilitiescontract.KeyAudioTranscriptions] != true || provider.Capabilities[capabilitiescontract.KeyAudioSpeech] != true || provider.Capabilities[capabilitiescontract.KeyModerations] != true {
 		capabilities := cloneAnyMap(provider.Capabilities)
+		delete(capabilities, "images")
 		capabilities[capabilitiescontract.KeyResponses] = true
 		capabilities[capabilitiescontract.KeyEmbeddings] = true
 		capabilities[capabilitiescontract.KeyImageGenerations] = true

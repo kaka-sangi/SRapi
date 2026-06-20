@@ -194,8 +194,8 @@ migration-check:
 api-test:
 	cd $(API_DIR) && packages="$$(go list ./... | grep -v '/internal/codequality$$')" && go test $$packages
 
-api-run:
-	cd $(API_DIR) && go run ./cmd/srapi
+api-run: bootstrap-env
+	@set -a; . ./.env; set +a; cd $(API_DIR) && go run ./cmd/srapi
 
 architecture-check:
 	cd $(API_DIR) && go test ./internal/config ./internal/architecture ./internal/app ./internal/platform/crypto ./internal/platform/db ./internal/platform/logger ./internal/platform/redis ./internal/modules/providers/preset ./internal/persistence/entstore/... ./internal/persistence/redisstore/... ./internal/workers/... ./internal/httpserver

@@ -6415,6 +6415,7 @@ type BulkUpdateProviderAccountsRequest struct {
 	// one or the other. When both are present, `account_ids` wins
 	// (matches sub2api).
 	AccountIds *[]Id `json:"account_ids,omitempty"`
+	AddGroupId *Id   `json:"add_group_id,omitempty"`
 
 	// Filters Server-side filter set for `BulkUpdateProviderAccountsRequest` —
 	// mirrors the GET /accounts list-query knobs. The handler resolves

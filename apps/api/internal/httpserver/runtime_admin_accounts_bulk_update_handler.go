@@ -58,23 +58,58 @@ func (s *Server) handleBulkUpdateAdminAccounts(w http.ResponseWriter, r *http.Re
 	}
 
 	updateReq, hasFields := bulkUpdateAccountsRequestFromAPI(body)
-	if !hasFields {
+	hasGroupAdd := body.AddGroupId != nil
+	if !hasFields && !hasGroupAdd {
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "bulk update requires at least one field", requestID)
 		return
 	}
+	addGroupID := 0
+	if hasGroupAdd {
+		parsed, parseErr := strconv.Atoi(string(*body.AddGroupId))
+		if parseErr != nil || parsed <= 0 {
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid add_group_id", requestID)
+			return
+		}
+		if _, findErr := s.runtime.accounts.FindGroupByID(r.Context(), parsed); findErr != nil {
+			writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, findErr.Error(), requestID)
+			return
+		}
+		addGroupID = parsed
+	}
 
-	result := s.runtime.accounts.BatchUpdateFields(r.Context(), accountIDs, updateReq)
+	updatedIDs := make([]apiopenapi.Id, 0, len(accountIDs))
+	errorMessages := make([]string, 0)
+	if hasFields {
+		result := s.runtime.accounts.BatchUpdateFields(r.Context(), accountIDs, updateReq)
+		for _, updated := range result.Updated {
+			updatedIDs = append(updatedIDs, apiopenapi.Id(strconv.Itoa(updated.ID)))
+		}
+		errorMessages = append(errorMessages, result.Errors...)
+	}
 
-	updatedIDs := make([]apiopenapi.Id, 0, len(result.Updated))
-	for _, updated := range result.Updated {
-		updatedIDs = append(updatedIDs, apiopenapi.Id(strconv.Itoa(updated.ID)))
+	if hasGroupAdd {
+		groupResults, groupErr := s.runtime.accounts.BatchAddAccountsToGroup(r.Context(), addGroupID, accountIDs)
+		if groupErr != nil {
+			s.writeBatchGroupMembersOuterError(w, groupErr, requestID)
+			return
+		}
+		groupUpdatedIDs := make([]apiopenapi.Id, 0, len(groupResults))
+		for _, row := range groupResults {
+			id := apiopenapi.Id(strconv.Itoa(row.AccountID))
+			if row.Error != "" {
+				errorMessages = append(errorMessages, "group "+string(id)+": "+row.Error)
+				continue
+			}
+			groupUpdatedIDs = append(groupUpdatedIDs, id)
+		}
+		updatedIDs = mergeAPIIDs(updatedIDs, groupUpdatedIDs)
 	}
 
 	auditDelta := map[string]any{
 		"account_ids":   accountIDs,
 		"updated_ids":   updatedIDs,
 		"updated_count": len(updatedIDs),
-		"errors":        result.Errors,
+		"errors":        errorMessages,
 		"fields":        bulkUpdateAuditFields(body),
 	}
 	if body.Filters != nil {
@@ -84,7 +119,7 @@ func (s *Server) handleBulkUpdateAdminAccounts(w http.ResponseWriter, r *http.Re
 
 	writeJSONAny(w, http.StatusOK, apiopenapi.BatchUpdateAccountsResponse{
 		Data: apiopenapi.BatchUpdateAccountsResult{
-			Errors:       result.Errors,
+			Errors:       errorMessages,
 			UpdatedCount: len(updatedIDs),
 			UpdatedIds:   updatedIDs,
 		},
@@ -264,6 +299,9 @@ func bulkUpdateAuditFields(body apiopenapi.BulkUpdateProviderAccountsRequest) ma
 	if body.MaxConcurrency != nil {
 		fields["max_concurrency"] = *body.MaxConcurrency
 	}
+	if body.AddGroupId != nil {
+		fields["add_group_id"] = *body.AddGroupId
+	}
 	return fields
 }
 
@@ -297,3 +335,23 @@ const (
 	errBulkUpdateInvalidGroupID   bulkUpdateError = "invalid group id in filters"
 	errBulkUpdateListFailed       bulkUpdateError = "failed to resolve bulk update selection"
 )
+
+func mergeAPIIDs(first []apiopenapi.Id, second []apiopenapi.Id) []apiopenapi.Id {
+	seen := make(map[apiopenapi.Id]struct{}, len(first)+len(second))
+	merged := make([]apiopenapi.Id, 0, len(first)+len(second))
+	for _, id := range first {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		merged = append(merged, id)
+	}
+	for _, id := range second {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		merged = append(merged, id)
+	}
+	return merged
+}

@@ -2651,6 +2651,7 @@ export type BulkUpdateProviderAccountsRequest = {
      */
     account_ids?: Array<Id>;
     filters?: BulkUpdateProviderAccountsFilters;
+    add_group_id?: Id;
     /**
      * Optional — rename every selected account. Almost never useful
      * for >1 account; included for sub2api parity.

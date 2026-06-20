@@ -59,11 +59,25 @@ export function PageQueryState<T>({
   }
 
   // No data and not an error: either still pending or the query is disabled
-  // (`enabled: false`, e.g. an on-demand detail fetch). Show the skeleton rather
-  // than a misleading error state — `isLoading` is false for a paused query, so
-  // a bare `data === undefined` check used to render the error EmptyState here.
+  // (`enabled: false`, e.g. an on-demand detail fetch). Only pending queries
+  // should keep a full skeleton; a completed query with undefined data is a
+  // contract bug and must surface a retryable state instead of looking stuck.
   if (query.data === undefined) {
-    return <>{skeleton ?? null}</>;
+    if (query.isPending || query.fetchStatus === "paused") {
+      return <>{skeleton ?? null}</>;
+    }
+    return (
+      <EmptyState
+        icon={AlertTriangle}
+        title={t("common.error")}
+        description={t("common.errorBody")}
+        action={
+          <Button variant="outline" size="sm" onClick={() => query.refetch()}>
+            {t("common.retry")}
+          </Button>
+        }
+      />
+    );
   }
 
   // Only short-circuit to the wrapper's own empty state when the caller supplied
