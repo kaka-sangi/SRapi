@@ -572,7 +572,7 @@ Images generations endpoint
 - 请求仍进入 API Key auth、模型可见性、entitlement、Scheduler、Provider Adapter、usage、billing 和 feedback 证据链。
 - Scheduler 使用 `image_generations` endpoint capability；Provider 或 account/mapping 必须显式声明 image generation 能力，text-only provider 不会被误选。
 - OpenAI-compatible provider alias（例如 `/api/provider/openai-compatible/v1/images/generations`）强制 provider context。
-- OpenAI-compatible API-key 和普通 reverse-proxy accounts 上游调用 `/images/generations` 并解析 `url`、`b64_json` 和 `revised_prompt`；`reverse-proxy-chatgpt-web` 账号使用 ChatGPT Web `/backend-api/f/conversation/prepare` + `/backend-api/f/conversation` official-client 图片流，解析 generated `file-service://` / `sediment://` references 并通过 ChatGPT Web download metadata 取图。`stream=true` 会向上游发送 OpenAI-compatible image stream 请求；当上游返回 `response.image_generation_call.partial_image` / `response.completed` 或原生 `image_generation.partial_image` / `image_generation.completed` SSE 时，Provider Adapter 会实时转换为下游 `image_generation.partial_image` / `image_generation.completed`，并从最终事件解析 usage。
+- OpenAI-compatible API-key 和普通 reverse-proxy accounts 上游调用 `/images/generations` 并解析 `url`、`b64_json` 和 `revised_prompt`；`reverse-proxy-chatgpt-web` 账号使用 ChatGPT Web `/backend-api/f/conversation/prepare` + `/backend-api/f/conversation` official-client 图片流，解析 generated `file-service://` / `sediment://` references 并通过 ChatGPT Web download metadata 取图。`stream=true` 会向上游发送 OpenAI-compatible image stream 请求；当上游返回 `response.image_generation_call.partial_image` / `response.completed` 或原生 `image_generation.partial_image` / `image_generation.completed` SSE 时，Provider Adapter 会实时转换为下游 `image_generation.partial_image` / `image_generation.completed`，并从最终事件解析 usage。ChatGPT Web image generation 当前为同步 bridge。
 - Image edits 和 variations 不在 WP-290 范围内。
 
 WP-480 已实现：
@@ -589,7 +589,7 @@ Images edits endpoint
 - 请求仍进入 API Key auth、模型可见性、entitlement、Scheduler、Provider Adapter、usage、billing 和 feedback 证据链。
 - Scheduler 使用 `image_edits` endpoint capability；Provider 或 account/mapping 必须显式声明 image edit 能力，generation-only provider 不会被误选。
 - OpenAI-compatible provider alias（例如 `/api/provider/openai-compatible/v1/images/edits`）强制 provider context。
-- OpenAI-compatible API-key 和普通 reverse-proxy accounts 上游调用 multipart `/images/edits`；`reverse-proxy-codex-cli` accounts 上游调用 `/responses`，使用 `image_generation` tool 的 `action=edit`。两条路径都解析 `url`、`b64_json` 和 `revised_prompt`。
+- OpenAI-compatible API-key 和普通 reverse-proxy accounts 上游调用 multipart `/images/edits`；`reverse-proxy-codex-cli` accounts 上游调用 `/responses`，使用 `image_generation` tool 的 `action=edit`；`reverse-proxy-chatgpt-web` accounts 上传 source images 到 `/backend-api/files`，把可选 `mask` 合成进上传 PNG alpha 后，通过 `/backend-api/f/conversation/prepare` + `/backend-api/f/conversation` official-client 图片流执行图生图。三条路径都解析 `url`、`b64_json` 和 `revised_prompt`。
 - Remote `image_url` 和 `file_id` references 仍明确拒绝，直到后续 Files API / remote-fetch 安全边界实现。
 
 WP-490 已实现：
@@ -605,7 +605,7 @@ Images variations endpoint
 - 请求仍进入 API Key auth、模型可见性、entitlement、Scheduler、Provider Adapter、usage、billing 和 feedback 证据链。
 - Scheduler 使用 `image_variations` endpoint capability；Provider 或 account/mapping 必须显式声明 image variation 能力，generation-only provider 不会被误选。
 - OpenAI-compatible provider alias（例如 `/api/provider/openai-compatible/v1/images/variations`）强制 provider context。
-- OpenAI-compatible API-key 和 reverse-proxy accounts 上游调用 multipart `/images/variations`，并解析 `url`、`b64_json` 和 `revised_prompt`。
+- OpenAI-compatible API-key 和普通 reverse-proxy accounts 上游调用 multipart `/images/variations`；`reverse-proxy-chatgpt-web` accounts 上传 source image 到 `/backend-api/files`，再通过 `/backend-api/f/conversation/prepare` + `/backend-api/f/conversation` official-client 图片流执行 variation prompt。两条路径都解析 `url`、`b64_json` 和 `revised_prompt`。
 - Remote `image_url`、`file_id` references、多图 variation、streaming image variation events 和 frontend visuals 留给后续 Files API / media compatibility 包。
 
 WP-310 已实现：

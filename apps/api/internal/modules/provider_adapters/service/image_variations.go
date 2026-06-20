@@ -27,6 +27,9 @@ func (s *Service) InvokeImageVariation(ctx context.Context, req contract.ImageVa
 			if isCodexImageVariationReverseProxy(req) {
 				return s.invokeReverseProxyCodexImageVariation(ctx, req, baseURL)
 			}
+			if isChatGPTWebImageVariationReverseProxy(req) {
+				return s.invokeReverseProxyChatGPTWebImageVariation(ctx, req, baseURL)
+			}
 			return s.invokeReverseProxyOpenAICompatibleImageVariation(ctx, req, baseURL)
 		}
 		return s.invokeOpenAICompatibleImageVariation(ctx, req, baseURL)
@@ -206,6 +209,10 @@ func isReverseProxyImageVariationRuntime(req contract.ImageVariationRequest) boo
 
 func isCodexImageVariationReverseProxy(req contract.ImageVariationRequest) bool {
 	return isCodexImageGenerationReverseProxy(imageGenerationRequestFromVariation(req))
+}
+
+func isChatGPTWebImageVariationReverseProxy(req contract.ImageVariationRequest) bool {
+	return isChatGPTWebImageGenerationReverseProxy(imageGenerationRequestFromVariation(req))
 }
 
 func synthesizeLocalImageVariation(req contract.ImageVariationRequest) contract.ImageGenerationResponse {

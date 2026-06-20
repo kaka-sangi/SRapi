@@ -8,6 +8,7 @@ import (
 	"errors"
 	"image"
 	"image/color"
+	"image/draw"
 	"image/png"
 	"net/http"
 	"net/http/httptest"
@@ -615,6 +616,228 @@ func TestChatGPTWebImageGenerationURLFormatDoesNotDownloadImageBytes(t *testing.
 	}
 }
 
+func TestChatGPTWebImageEditUsesOfficialConversationFlow(t *testing.T) {
+	inputImage := buildTestPNG(t, 3, 2)
+	maskImage := buildSolidAlphaPNG(t, 3, 2, 0)
+	generatedImage := buildTestPNG(t, 2, 2)
+	var conversationBody []byte
+	var paths []string
+	var imageDownloadURL string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		switch {
+		case r.URL.Path == "/backend-api/files" && r.Method == http.MethodPost:
+			var payload map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				t.Fatalf("decode upload register: %v", err)
+			}
+			if payload["use_case"] != "multimodal" || payload["file_name"] != "input.png" {
+				t.Fatalf("unexpected upload register payload: %+v", payload)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"file_id":"file_uploaded_edit","upload_url":"` + uploadBlobURL(r.Host, "/blob-edit") + `"}`))
+		case r.URL.Path == "/blob-edit" && r.Method == http.MethodPut:
+			if got := r.Header.Get("x-ms-blob-type"); got != "BlockBlob" {
+				t.Fatalf("expected blob upload header, got %q", got)
+			}
+			uploaded, err := readBody(r)
+			if err != nil {
+				t.Fatalf("read uploaded edit image: %v", err)
+			}
+			decoded, err := png.Decode(bytes.NewReader(uploaded))
+			if err != nil {
+				t.Fatalf("edit upload should be alpha-composited PNG: %v", err)
+			}
+			if _, _, _, a := decoded.At(0, 0).RGBA(); a != 0 {
+				t.Fatalf("expected mask alpha to be applied to edit upload, got alpha=%d", a)
+			}
+			w.WriteHeader(http.StatusCreated)
+		case r.URL.Path == "/backend-api/files/file_uploaded_edit/uploaded" && r.Method == http.MethodPost:
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"ok":true}`))
+		case r.URL.Path == "/backend-api/f/conversation/prepare" && r.Method == http.MethodPost:
+			if got := r.Header.Get("OpenAI-Sentinel-Chat-Requirements-Token"); got != "tok-edit" {
+				t.Fatalf("expected prepare sentinel token, got %q", got)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"conduit_token":"conduit-edit"}`))
+		case r.URL.Path == "/backend-api/f/conversation" && r.Method == http.MethodPost:
+			if got := r.Header.Get("X-Conduit-Token"); got != "conduit-edit" {
+				t.Fatalf("expected conduit token, got %q", got)
+			}
+			conversationBody, _ = readBody(r)
+			w.Header().Set("Content-Type", "text/event-stream")
+			_, _ = w.Write([]byte(
+				`data: {"conversation_id":"conv_edit","message":{"author":{"role":"user"},"content":{"content_type":"multimodal_text","parts":[{"content_type":"image_asset_pointer","asset_pointer":"file-service://file_uploaded_edit","width":3,"height":2,"size_bytes":77}]}}}` + "\n\n" +
+					`data: {"conversation_id":"conv_edit","message":{"author":{"role":"tool"},"content":{"content_type":"multimodal_text","parts":[{"content_type":"image_asset_pointer","asset_pointer":"file-service://file_generated_edit","width":2,"height":2,"size_bytes":77}]}}}` + "\n\ndata: [DONE]\n\n",
+			))
+		case r.URL.Path == "/backend-api/files/file_uploaded_edit/download" && r.Method == http.MethodGet:
+			t.Fatalf("input image reference must not be treated as generated output")
+		case r.URL.Path == "/backend-api/files/file_generated_edit/download" && r.Method == http.MethodGet:
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"download_url":` + strconv.Quote(imageDownloadURL) + `}`))
+		default:
+			t.Fatalf("unexpected upstream call %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	downloadServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write(generatedImage)
+	}))
+	defer upstream.Close()
+	defer downloadServer.Close()
+	imageDownloadURL = downloadServer.URL + "/generated.png"
+
+	runtime, err := reverseproxyservice.New(nil)
+	if err != nil {
+		t.Fatalf("create runtime: %v", err)
+	}
+	svc, err := service.NewWithReverseProxy(downloadServer.Client(), runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeImageEdit(context.Background(), contract.ImageEditRequest{
+		RequestID:      "req_chatgpt_web_edit",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/images/edits",
+		Model:          "chatgpt-image-local",
+		Prompt:         "make the object blue",
+		Images: []contract.ImageInput{{
+			FileName:    "input.png",
+			ContentType: "image/png",
+			Bytes:       inputImage,
+		}},
+		Mask: &contract.ImageInput{
+			FileName:    "mask.png",
+			ContentType: "image/png",
+			Bytes:       maskImage,
+		},
+		Count:          1,
+		ResponseFormat: "b64_json",
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-chatgpt-web",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:           68,
+			RuntimeClass: accountcontract.RuntimeClassOauthRefresh,
+			Metadata: map[string]any{
+				"base_url":                   upstream.URL,
+				"chatgpt_requirements_token": "tok-edit",
+			},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-image-web"},
+		Credential: map[string]any{"access_token": "tok-edit"},
+	})
+	if err != nil {
+		t.Fatalf("invoke chatgpt web image edit: %v", err)
+	}
+	if len(resp.Data) != 1 || resp.Data[0].Base64JSON != base64.StdEncoding.EncodeToString(generatedImage) {
+		t.Fatalf("unexpected edit response: %+v", resp)
+	}
+	if !bytes.Contains(conversationBody, []byte("multimodal_text")) ||
+		!bytes.Contains(conversationBody, []byte("file-service://file_uploaded_edit")) ||
+		!bytes.Contains(conversationBody, []byte(`"attachments"`)) {
+		t.Fatalf("expected uploaded image reference in official conversation payload: %s", string(conversationBody))
+	}
+	for _, path := range paths {
+		if path == "/v1/images/edits" {
+			t.Fatalf("chatgpt web image edit must not use OpenAI-compatible edit endpoint; paths=%v", paths)
+		}
+	}
+}
+
+func TestChatGPTWebImageVariationUsesOfficialConversationFlow(t *testing.T) {
+	inputImage := buildTestPNG(t, 2, 2)
+	var conversationBody []byte
+	var paths []string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		switch {
+		case r.URL.Path == "/backend-api/files" && r.Method == http.MethodPost:
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"file_id":"file_variation_input","upload_url":"` + uploadBlobURL(r.Host, "/blob-variation") + `"}`))
+		case r.URL.Path == "/blob-variation" && r.Method == http.MethodPut:
+			w.WriteHeader(http.StatusCreated)
+		case r.URL.Path == "/backend-api/files/file_variation_input/uploaded" && r.Method == http.MethodPost:
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"ok":true}`))
+		case r.URL.Path == "/backend-api/f/conversation/prepare" && r.Method == http.MethodPost:
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"conduit_token":"conduit-var"}`))
+		case r.URL.Path == "/backend-api/f/conversation" && r.Method == http.MethodPost:
+			conversationBody, _ = readBody(r)
+			w.Header().Set("Content-Type", "text/event-stream")
+			_, _ = w.Write([]byte(
+				`data: {"conversation_id":"conv_var","message":{"author":{"role":"user"},"content":{"content_type":"multimodal_text","parts":[{"content_type":"image_asset_pointer","asset_pointer":"file-service://file_variation_input","width":2,"height":2,"size_bytes":77}]}}}` + "\n\n" +
+					`data: {"conversation_id":"conv_var","message":{"author":{"role":"tool"},"content":{"content_type":"multimodal_text","parts":[{"content_type":"image_asset_pointer","asset_pointer":"file-service://file_generated_var","width":2,"height":2,"size_bytes":77}]}}}` + "\n\ndata: [DONE]\n\n",
+			))
+		case r.URL.Path == "/backend-api/files/file_variation_input/download" && r.Method == http.MethodGet:
+			t.Fatalf("variation input reference must not be treated as generated output")
+		case r.URL.Path == "/backend-api/files/file_generated_var/download" && r.Method == http.MethodGet:
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"download_url":"https://cdn.example.test/variation.png"}`))
+		default:
+			t.Fatalf("unexpected upstream call %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer upstream.Close()
+
+	runtime, err := reverseproxyservice.New(nil)
+	if err != nil {
+		t.Fatalf("create runtime: %v", err)
+	}
+	svc, err := service.NewWithReverseProxy(nil, runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeImageVariation(context.Background(), contract.ImageVariationRequest{
+		RequestID:      "req_chatgpt_web_variation",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/images/variations",
+		Model:          "chatgpt-image-local",
+		Image: contract.ImageInput{
+			FileName:    "source.png",
+			ContentType: "image/png",
+			Bytes:       inputImage,
+		},
+		Count:          1,
+		ResponseFormat: "url",
+		Extra:          map[string]any{"prompt": "keep the composition but change the mood"},
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-chatgpt-web",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:           69,
+			RuntimeClass: accountcontract.RuntimeClassOauthRefresh,
+			Metadata: map[string]any{
+				"base_url":                   upstream.URL,
+				"chatgpt_requirements_token": "tok-var",
+			},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-image-web"},
+		Credential: map[string]any{"access_token": "tok-var"},
+	})
+	if err != nil {
+		t.Fatalf("invoke chatgpt web image variation: %v", err)
+	}
+	if len(resp.Data) != 1 || resp.Data[0].URL != "https://cdn.example.test/variation.png" || resp.Data[0].Base64JSON != "" {
+		t.Fatalf("unexpected variation response: %+v", resp.Data)
+	}
+	if !bytes.Contains(conversationBody, []byte("file-service://file_variation_input")) ||
+		!bytes.Contains(conversationBody, []byte("keep the composition but change the mood")) {
+		t.Fatalf("expected variation prompt and uploaded reference in payload: %s", string(conversationBody))
+	}
+	for _, path := range paths {
+		if path == "/v1/images/variations" {
+			t.Fatalf("chatgpt web image variation must not use OpenAI-compatible variation endpoint; paths=%v", paths)
+		}
+	}
+}
+
 // TestChatGPTWebWiringWSFallbackHeaderSurfacedWhenUpstreamOffersWS proves the
 // WS-fallback inspector sees an upstream wss_url and surfaces the header on
 // the gateway response.
@@ -675,6 +898,17 @@ func buildTestPNG(t *testing.T, w, h int) []byte {
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, img); err != nil {
 		t.Fatalf("encode png: %v", err)
+	}
+	return buf.Bytes()
+}
+
+func buildSolidAlphaPNG(t *testing.T, w, h int, alpha uint8) []byte {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	draw.Draw(img, img.Bounds(), &image.Uniform{C: color.RGBA{255, 255, 255, alpha}}, image.Point{}, draw.Src)
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatalf("encode mask png: %v", err)
 	}
 	return buf.Bytes()
 }

@@ -7,6 +7,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"image"
+	"image/color"
+	"image/draw"
+	"image/png"
 	"io"
 	"net/http"
 	"net/url"
@@ -31,6 +35,35 @@ type chatGPTWebImageReference struct {
 }
 
 func (s *Service) invokeReverseProxyChatGPTWebImageGeneration(ctx context.Context, req contract.ImageGenerationRequest, baseURL string) (contract.ImageGenerationResponse, error) {
+	return s.invokeReverseProxyChatGPTWebImages(ctx, req, baseURL, nil)
+}
+
+func (s *Service) invokeReverseProxyChatGPTWebImageEdit(ctx context.Context, req contract.ImageEditRequest, baseURL string) (contract.ImageGenerationResponse, error) {
+	images, err := chatGPTWebEditableImageInputs(req.Images, req.Mask)
+	if err != nil {
+		return contract.ImageGenerationResponse{}, err
+	}
+	imageReq := imageGenerationRequestFromEdit(req)
+	resp, err := s.invokeReverseProxyChatGPTWebImages(ctx, imageReq, baseURL, images)
+	if err != nil {
+		return contract.ImageGenerationResponse{}, err
+	}
+	resp.Usage = imageEditUsage(req)
+	return resp, nil
+}
+
+func (s *Service) invokeReverseProxyChatGPTWebImageVariation(ctx context.Context, req contract.ImageVariationRequest, baseURL string) (contract.ImageGenerationResponse, error) {
+	imageReq := imageGenerationRequestFromVariation(req)
+	imageReq.Prompt = chatGPTWebImageVariationPrompt(req)
+	resp, err := s.invokeReverseProxyChatGPTWebImages(ctx, imageReq, baseURL, []contract.ImageInput{req.Image})
+	if err != nil {
+		return contract.ImageGenerationResponse{}, err
+	}
+	resp.Usage = imageVariationUsage(req)
+	return resp, nil
+}
+
+func (s *Service) invokeReverseProxyChatGPTWebImages(ctx context.Context, req contract.ImageGenerationRequest, baseURL string, inputs []contract.ImageInput) (contract.ImageGenerationResponse, error) {
 	if s.reverseProxy == nil {
 		return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "reverse proxy runtime unavailable"}
 	}
@@ -47,6 +80,10 @@ func (s *Service) invokeReverseProxyChatGPTWebImageGeneration(ctx context.Contex
 	}
 
 	origin := chatGPTWebOrigin(baseURL)
+	assets, err := s.chatGPTWebUploadImageInputs(ctx, req, origin, inputs)
+	if err != nil {
+		return contract.ImageGenerationResponse{}, err
+	}
 	count := req.Count
 	if count <= 0 {
 		count = 1
@@ -61,7 +98,7 @@ func (s *Service) invokeReverseProxyChatGPTWebImageGeneration(ctx context.Contex
 		if err != nil {
 			return contract.ImageGenerationResponse{}, err
 		}
-		batch, conversationID, err := s.chatGPTWebRunImageConversation(ctx, req, origin, requirements, conduitToken)
+		batch, conversationID, err := s.chatGPTWebRunImageConversation(ctx, req, origin, requirements, conduitToken, assets)
 		if err != nil {
 			return contract.ImageGenerationResponse{}, err
 		}
@@ -89,6 +126,33 @@ func (s *Service) invokeReverseProxyChatGPTWebImageGeneration(ctx context.Contex
 		StatusCode: http.StatusOK,
 		Usage:      estimatedImageUsage(req),
 	}, nil
+}
+
+func (s *Service) chatGPTWebUploadImageInputs(ctx context.Context, req contract.ImageGenerationRequest, origin string, inputs []contract.ImageInput) ([]*ChatGPTWebFileAsset, error) {
+	if len(inputs) == 0 {
+		return nil, nil
+	}
+	headers := chatGPTWebImageJSONHeaders(req, origin, "/backend-api/files", chatGPTWebSentinelRequirements{}, "")
+	uploader := newChatGPTWebFileUploader(s.reverseProxy)
+	session := ChatGPTWebUploadSession{
+		Account:   chatGPTWebImageReverseProxyAccount(req),
+		BaseURL:   origin,
+		Origin:    origin,
+		UserAgent: chatGPTWebUserAgent(chatGPTWebConversationRequestFromImage(req, nil)),
+		Headers:   headers,
+	}
+	assets := make([]*ChatGPTWebFileAsset, 0, len(inputs))
+	for idx, input := range inputs {
+		if len(input.Bytes) == 0 {
+			return nil, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "chatgpt web image input is empty"}
+		}
+		asset, err := uploader.uploadImage(ctx, session, input.Bytes, input.ContentType, chatGPTWebImageInputFileName(input, idx))
+		if err != nil {
+			return nil, providerErrorFromReverseProxy(err)
+		}
+		assets = append(assets, asset)
+	}
+	return assets, nil
 }
 
 func (s *Service) chatGPTWebPrepareImageConversation(ctx context.Context, req contract.ImageGenerationRequest, origin string, requirements chatGPTWebSentinelRequirements) (string, error) {
@@ -138,8 +202,8 @@ func (s *Service) chatGPTWebPrepareImageConversation(ctx context.Context, req co
 	return token, nil
 }
 
-func (s *Service) chatGPTWebRunImageConversation(ctx context.Context, req contract.ImageGenerationRequest, origin string, requirements chatGPTWebSentinelRequirements, conduitToken string) ([]contract.Image, string, error) {
-	body, err := json.Marshal(chatGPTWebImageConversationPayload(req))
+func (s *Service) chatGPTWebRunImageConversation(ctx context.Context, req contract.ImageGenerationRequest, origin string, requirements chatGPTWebSentinelRequirements, conduitToken string, assets []*ChatGPTWebFileAsset) ([]contract.Image, string, error) {
+	body, err := json.Marshal(chatGPTWebImageConversationPayload(req, assets))
 	if err != nil {
 		return nil, "", err
 	}
@@ -168,11 +232,11 @@ func (s *Service) chatGPTWebRunImageConversation(ctx context.Context, req contra
 	return images, conversationID, nil
 }
 
-func chatGPTWebImageConversationPayload(req contract.ImageGenerationRequest) map[string]any {
+func chatGPTWebImageConversationPayload(req contract.ImageGenerationRequest, assets []*ChatGPTWebFileAsset) map[string]any {
 	conversationReq := chatGPTWebConversationRequestFromImage(req, nil)
 	return map[string]any{
 		"action":                               "next",
-		"messages":                             []any{chatGPTWebImageUserMessage(req)},
+		"messages":                             []any{chatGPTWebImageUserMessage(req, assets)},
 		"parent_message_id":                    chatGPTWebStableID(conversationReq, "image-parent"),
 		"model":                                req.Mapping.UpstreamModelName,
 		"client_prepare_state":                 "sent",
@@ -189,20 +253,41 @@ func chatGPTWebImageConversationPayload(req contract.ImageGenerationRequest) map
 	}
 }
 
-func chatGPTWebImageUserMessage(req contract.ImageGenerationRequest) map[string]any {
+func chatGPTWebImageUserMessage(req contract.ImageGenerationRequest, assets []*ChatGPTWebFileAsset) map[string]any {
+	metadata := map[string]any{
+		"developer_mode_connector_ids": []any{},
+		"selected_github_repos":        []any{},
+		"selected_all_github_repos":    false,
+		"system_hints":                 []string{"picture_v2"},
+		"serialization_metadata":       map[string]any{"custom_symbol_offsets": []any{}},
+	}
+	if len(assets) > 0 {
+		attachments := make([]any, 0, len(assets))
+		for _, asset := range assets {
+			attachments = append(attachments, chatGPTWebAttachmentEntry(asset))
+		}
+		metadata["attachments"] = attachments
+	}
 	return map[string]any{
 		"id":          chatGPTWebStableID(chatGPTWebConversationRequestFromImage(req, nil), "image-user"),
 		"author":      map[string]string{"role": "user"},
 		"create_time": time.Now().Unix(),
-		"content":     map[string]any{"content_type": "text", "parts": []string{chatGPTWebImagePrompt(req)}},
-		"metadata": map[string]any{
-			"developer_mode_connector_ids": []any{},
-			"selected_github_repos":        []any{},
-			"selected_all_github_repos":    false,
-			"system_hints":                 []string{"picture_v2"},
-			"serialization_metadata":       map[string]any{"custom_symbol_offsets": []any{}},
-		},
+		"content":     chatGPTWebImageMessageContent(req, assets),
+		"metadata":    metadata,
 	}
+}
+
+func chatGPTWebImageMessageContent(req contract.ImageGenerationRequest, assets []*ChatGPTWebFileAsset) map[string]any {
+	prompt := chatGPTWebImagePrompt(req)
+	if len(assets) == 0 {
+		return map[string]any{"content_type": "text", "parts": []string{prompt}}
+	}
+	parts := make([]any, 0, len(assets)+1)
+	for _, asset := range assets {
+		parts = append(parts, chatGPTWebAssetPointerPart(asset))
+	}
+	parts = append(parts, prompt)
+	return map[string]any{"content_type": "multimodal_text", "parts": parts}
 }
 
 func chatGPTWebImageRefsFromSSE(body []byte) (string, []chatGPTWebImageReference, error) {
@@ -364,6 +449,9 @@ func (s *Service) chatGPTWebDownloadImageBytes(ctx context.Context, req contract
 func chatGPTWebCollectImageRefs(value any, conversationID *string, refs *[]chatGPTWebImageReference) {
 	switch typed := value.(type) {
 	case map[string]any:
+		if chatGPTWebMapAuthorRole(typed) == "user" {
+			return
+		}
 		if conversationID != nil && *conversationID == "" {
 			for _, key := range []string{"conversation_id", "conversationId"} {
 				if id := mapStringAny(typed, key); id != "" {
@@ -383,6 +471,14 @@ func chatGPTWebCollectImageRefs(value any, conversationID *string, refs *[]chatG
 			chatGPTWebCollectImageRefs(child, conversationID, refs)
 		}
 	}
+}
+
+func chatGPTWebMapAuthorRole(value map[string]any) string {
+	author, ok := value["author"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	return strings.ToLower(strings.TrimSpace(mapStringAny(author, "role")))
 }
 
 func chatGPTWebImageRefFromMap(value map[string]any) (chatGPTWebImageReference, bool) {
@@ -481,6 +577,86 @@ func chatGPTWebImagePrompt(req contract.ImageGenerationRequest) string {
 		return prompt
 	}
 	return strings.TrimSpace(prompt + "\n\n" + strings.Join(hints, " "))
+}
+
+func chatGPTWebImageVariationPrompt(req contract.ImageVariationRequest) string {
+	prompt := strings.TrimSpace(mapString(req.Extra, "prompt"))
+	if prompt == "" {
+		prompt = strings.TrimSpace(mapString(req.RequestSettings, "prompt"))
+	}
+	if prompt == "" {
+		prompt = "Create a new variation of the reference image."
+	}
+	return prompt
+}
+
+func chatGPTWebEditableImageInputs(images []contract.ImageInput, mask *contract.ImageInput) ([]contract.ImageInput, error) {
+	if mask == nil {
+		out := make([]contract.ImageInput, len(images))
+		copy(out, images)
+		return out, nil
+	}
+	out := make([]contract.ImageInput, 0, len(images))
+	for _, input := range images {
+		composited, err := chatGPTWebCompositeEditMask(input, *mask)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, composited)
+	}
+	return out, nil
+}
+
+func chatGPTWebCompositeEditMask(input contract.ImageInput, mask contract.ImageInput) (contract.ImageInput, error) {
+	baseImage, _, err := image.Decode(bytes.NewReader(input.Bytes))
+	if err != nil {
+		return contract.ImageInput{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "chatgpt web image edit input must be a decodable image when mask is supplied"}
+	}
+	maskImage, _, err := image.Decode(bytes.NewReader(mask.Bytes))
+	if err != nil {
+		return contract.ImageInput{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "chatgpt web image edit mask must be a decodable image"}
+	}
+	bounds := baseImage.Bounds()
+	outImage := image.NewRGBA(image.Rect(0, 0, bounds.Dx(), bounds.Dy()))
+	draw.Draw(outImage, outImage.Bounds(), baseImage, bounds.Min, draw.Src)
+	for y := 0; y < outImage.Bounds().Dy(); y++ {
+		for x := 0; x < outImage.Bounds().Dx(); x++ {
+			maskX := maskImage.Bounds().Min.X + x*maskImage.Bounds().Dx()/max(1, outImage.Bounds().Dx())
+			maskY := maskImage.Bounds().Min.Y + y*maskImage.Bounds().Dy()/max(1, outImage.Bounds().Dy())
+			alpha := chatGPTWebMaskAlpha(maskImage.At(maskX, maskY))
+			offset := outImage.PixOffset(x, y)
+			outImage.Pix[offset+3] = alpha
+		}
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, outImage); err != nil {
+		return contract.ImageInput{}, err
+	}
+	fileName := strings.TrimSpace(input.FileName)
+	if fileName == "" {
+		fileName = "image.png"
+	}
+	return contract.ImageInput{
+		FileName:    fileName,
+		ContentType: "image/png",
+		Bytes:       buf.Bytes(),
+	}, nil
+}
+
+func chatGPTWebMaskAlpha(c color.Color) uint8 {
+	r, g, b, a := c.RGBA()
+	if a != 0xffff {
+		return uint8(a >> 8)
+	}
+	gray := (r*299 + g*587 + b*114 + 500) / 1000
+	return uint8(gray >> 8)
+}
+
+func chatGPTWebImageInputFileName(input contract.ImageInput, idx int) string {
+	if name := strings.TrimSpace(input.FileName); name != "" {
+		return name
+	}
+	return fmt.Sprintf("image_%d.png", idx+1)
 }
 
 func chatGPTWebImageRuntimeIsAPIKey(req contract.ImageGenerationRequest) bool {

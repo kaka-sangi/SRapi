@@ -33,6 +33,9 @@ func (s *Service) InvokeImageEdit(ctx context.Context, req contract.ImageEditReq
 			if isCodexImageEditReverseProxy(req) {
 				return s.invokeReverseProxyCodexImageEdit(ctx, req, baseURL)
 			}
+			if isChatGPTWebImageEditReverseProxy(req) {
+				return s.invokeReverseProxyChatGPTWebImageEdit(ctx, req, baseURL)
+			}
 			return s.invokeReverseProxyOpenAICompatibleImageEdit(ctx, req, baseURL)
 		}
 		return s.invokeOpenAICompatibleImageEdit(ctx, req, baseURL)
@@ -68,6 +71,9 @@ func (s *Service) StreamImageEdit(ctx context.Context, req contract.ImageEditReq
 	if isReverseProxyImageEditRuntime(req) {
 		if isCodexImageEditReverseProxy(req) {
 			return s.streamReverseProxyCodexImageEdit(ctx, req, baseURL)
+		}
+		if isChatGPTWebImageEditReverseProxy(req) {
+			return contract.ImageGenerationResponse{}, contract.ErrStreamingUnsupported
 		}
 		return s.streamReverseProxyOpenAICompatibleImageEdit(ctx, req, baseURL)
 	}
@@ -283,6 +289,10 @@ func isReverseProxyImageEditRuntime(req contract.ImageEditRequest) bool {
 
 func isCodexImageEditReverseProxy(req contract.ImageEditRequest) bool {
 	return isCodexImageGenerationReverseProxy(imageGenerationRequestFromEdit(req))
+}
+
+func isChatGPTWebImageEditReverseProxy(req contract.ImageEditRequest) bool {
+	return isChatGPTWebImageGenerationReverseProxy(imageGenerationRequestFromEdit(req))
 }
 
 func synthesizeLocalImageEdit(req contract.ImageEditRequest) contract.ImageGenerationResponse {
