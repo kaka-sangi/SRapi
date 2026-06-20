@@ -203,6 +203,9 @@ func (s *Service) InvokeImageGeneration(ctx context.Context, req contract.ImageG
 			if isCodexImageGenerationReverseProxy(req) {
 				return s.invokeReverseProxyCodexImageGeneration(ctx, req, baseURL)
 			}
+			if isChatGPTWebImageGenerationReverseProxy(req) {
+				return s.invokeReverseProxyChatGPTWebImageGeneration(ctx, req, baseURL)
+			}
 			return s.invokeReverseProxyOpenAICompatibleImages(ctx, req, baseURL)
 		}
 		return s.invokeOpenAICompatibleImages(ctx, req, baseURL)

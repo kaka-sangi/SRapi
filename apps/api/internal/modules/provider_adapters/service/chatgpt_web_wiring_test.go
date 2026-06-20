@@ -11,6 +11,7 @@ import (
 	"image/png"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -432,6 +433,185 @@ func TestChatGPTWebWiringImageSlotLimiterReleasedOnReturn(t *testing.T) {
 		if _, err := svc.InvokeConversation(context.Background(), build()); err != nil {
 			t.Fatalf("call %d: %v", i, err)
 		}
+	}
+}
+
+func TestChatGPTWebImageGenerationUsesOfficialConversationFlow(t *testing.T) {
+	imageBytes := buildTestPNG(t, 2, 2)
+	var paths []string
+	var imageDownloadURL string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		switch r.URL.Path {
+		case "/backend-api/f/conversation/prepare":
+			if got := r.Header.Get("OpenAI-Sentinel-Chat-Requirements-Token"); got != "tok-image" {
+				t.Fatalf("expected prepare sentinel token, got %q", got)
+			}
+			var payload map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				t.Fatalf("decode prepare payload: %v", err)
+			}
+			if payload["model"] != "gpt-image-web" {
+				t.Fatalf("expected prepare model to be mapped, got %+v", payload)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"conduit_token":"conduit-test"}`))
+		case "/backend-api/f/conversation":
+			if got := r.Header.Get("X-Conduit-Token"); got != "conduit-test" {
+				t.Fatalf("expected conduit token, got %q", got)
+			}
+			if got := r.Header.Get("OpenAI-Sentinel-Chat-Requirements-Token"); got != "tok-image" {
+				t.Fatalf("expected conversation sentinel token, got %q", got)
+			}
+			if got := r.Header.Get("X-Oai-Turn-Trace-Id"); got == "" {
+				t.Fatalf("expected turn trace header")
+			}
+			var payload map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				t.Fatalf("decode image conversation payload: %v", err)
+			}
+			if payload["model"] != "gpt-image-web" {
+				t.Fatalf("expected mapped image model, got %+v", payload)
+			}
+			w.Header().Set("Content-Type", "text/event-stream")
+			_, _ = w.Write([]byte(`data: {"conversation_id":"conv_img","message":{"author":{"role":"tool"},"metadata":{"async_task_type":"image_gen"},"content":{"content_type":"multimodal_text","parts":[{"content_type":"image_asset_pointer","asset_pointer":"file-service://file_00000000abcdefabcdefabcdef","width":2,"height":2,"size_bytes":77}]}}}` + "\n\ndata: [DONE]\n\n"))
+		case "/backend-api/files/file_00000000abcdefabcdefabcdef/download":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"download_url":` + strconv.Quote(imageDownloadURL) + `}`))
+		default:
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+	}))
+	downloadServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write(imageBytes)
+	}))
+	defer upstream.Close()
+	defer downloadServer.Close()
+	imageDownloadURL = downloadServer.URL + "/image.png"
+
+	runtime, err := reverseproxyservice.New(nil)
+	if err != nil {
+		t.Fatalf("create runtime: %v", err)
+	}
+	svc, err := service.NewWithReverseProxy(downloadServer.Client(), runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeImageGeneration(context.Background(), contract.ImageGenerationRequest{
+		RequestID:      "req_chatgpt_web_image",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/images/generations",
+		Model:          "chatgpt-image-local",
+		Prompt:         "draw a small red square",
+		Count:          1,
+		Size:           "1024x1024",
+		ResponseFormat: "b64_json",
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-chatgpt-web",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:           66,
+			RuntimeClass: accountcontract.RuntimeClassOauthRefresh,
+			Metadata: map[string]any{
+				"base_url":                   upstream.URL,
+				"chatgpt_requirements_token": "tok-image",
+			},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-image-web"},
+		Credential: map[string]any{"access_token": "tok-image"},
+	})
+	if err != nil {
+		t.Fatalf("invoke chatgpt web image generation: %v", err)
+	}
+	if resp.Model != "gpt-image-web" || len(resp.Data) != 1 {
+		t.Fatalf("unexpected image response: %+v", resp)
+	}
+	if got := resp.Data[0].Base64JSON; got != base64.StdEncoding.EncodeToString(imageBytes) {
+		t.Fatalf("unexpected image base64 %q", got)
+	}
+	if resp.Data[0].Metadata["conversation_id"] != "conv_img" || resp.Data[0].Metadata["source"] != "file-service" {
+		t.Fatalf("expected image metadata, got %+v", resp.Data[0].Metadata)
+	}
+	for _, path := range paths {
+		if path == "/v1/images/generations" {
+			t.Fatalf("chatgpt web image generation must not use OpenAI-compatible image endpoint; paths=%v", paths)
+		}
+	}
+}
+
+func TestChatGPTWebImageGenerationURLFormatDoesNotDownloadImageBytes(t *testing.T) {
+	var conversationRuns int
+	var downloadMetadataHits int
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/backend-api/f/conversation/prepare":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"conduit_token":"conduit-test"}`))
+		case "/backend-api/f/conversation":
+			conversationRuns++
+			w.Header().Set("Content-Type", "text/event-stream")
+			fileID := "file_00000000abcdefabcdefabcde" + strconv.Itoa(conversationRuns)
+			_, _ = w.Write([]byte(`data: {"conversation_id":"conv_img_` + strconv.Itoa(conversationRuns) + `","message":{"author":{"role":"tool"},"metadata":{"async_task_type":"image_gen"},"content":{"content_type":"multimodal_text","parts":[{"content_type":"image_asset_pointer","asset_pointer":"file-service://` + fileID + `","width":2,"height":2,"size_bytes":77}]}}}` + "\n\ndata: [DONE]\n\n"))
+		case "/backend-api/files/file_00000000abcdefabcdefabcde1/download":
+			downloadMetadataHits++
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"download_url":"https://cdn.example.test/image-1.png"}`))
+		case "/backend-api/files/file_00000000abcdefabcdefabcde2/download":
+			downloadMetadataHits++
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"download_url":"https://cdn.example.test/image-2.png"}`))
+		default:
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+	}))
+	defer upstream.Close()
+
+	runtime, err := reverseproxyservice.New(nil)
+	if err != nil {
+		t.Fatalf("create runtime: %v", err)
+	}
+	svc, err := service.NewWithReverseProxy(nil, runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeImageGeneration(context.Background(), contract.ImageGenerationRequest{
+		RequestID:      "req_chatgpt_web_image_url",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/images/generations",
+		Model:          "chatgpt-image-local",
+		Prompt:         "draw two small squares",
+		Count:          2,
+		ResponseFormat: "url",
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-chatgpt-web",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:           67,
+			RuntimeClass: accountcontract.RuntimeClassOauthRefresh,
+			Metadata: map[string]any{
+				"base_url":                   upstream.URL,
+				"chatgpt_requirements_token": "tok-image",
+			},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-image-web"},
+		Credential: map[string]any{"access_token": "tok-image"},
+	})
+	if err != nil {
+		t.Fatalf("invoke chatgpt web image generation: %v", err)
+	}
+	if conversationRuns != 2 || downloadMetadataHits != 2 {
+		t.Fatalf("expected two official image runs and metadata hits, runs=%d metadata=%d", conversationRuns, downloadMetadataHits)
+	}
+	if len(resp.Data) != 2 || resp.Data[0].URL == "" || resp.Data[1].URL == "" {
+		t.Fatalf("expected two image URLs, got %+v", resp.Data)
+	}
+	if resp.Data[0].Base64JSON != "" || resp.Data[1].Base64JSON != "" {
+		t.Fatalf("url response_format must not download/encode image bytes, got %+v", resp.Data)
 	}
 }
 

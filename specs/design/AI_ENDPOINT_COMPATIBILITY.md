@@ -572,7 +572,7 @@ Images generations endpoint
 - 请求仍进入 API Key auth、模型可见性、entitlement、Scheduler、Provider Adapter、usage、billing 和 feedback 证据链。
 - Scheduler 使用 `image_generations` endpoint capability；Provider 或 account/mapping 必须显式声明 image generation 能力，text-only provider 不会被误选。
 - OpenAI-compatible provider alias（例如 `/api/provider/openai-compatible/v1/images/generations`）强制 provider context。
-- OpenAI-compatible API-key 和 reverse-proxy accounts 上游调用 `/images/generations` 并解析 `url`、`b64_json` 和 `revised_prompt`。`stream=true` 会向上游发送 OpenAI-compatible image stream 请求；当上游返回 `response.image_generation_call.partial_image` / `response.completed` 或原生 `image_generation.partial_image` / `image_generation.completed` SSE 时，Provider Adapter 会实时转换为下游 `image_generation.partial_image` / `image_generation.completed`，并从最终事件解析 usage。
+- OpenAI-compatible API-key 和普通 reverse-proxy accounts 上游调用 `/images/generations` 并解析 `url`、`b64_json` 和 `revised_prompt`；`reverse-proxy-chatgpt-web` 账号使用 ChatGPT Web `/backend-api/f/conversation/prepare` + `/backend-api/f/conversation` official-client 图片流，解析 generated `file-service://` / `sediment://` references 并通过 ChatGPT Web download metadata 取图。`stream=true` 会向上游发送 OpenAI-compatible image stream 请求；当上游返回 `response.image_generation_call.partial_image` / `response.completed` 或原生 `image_generation.partial_image` / `image_generation.completed` SSE 时，Provider Adapter 会实时转换为下游 `image_generation.partial_image` / `image_generation.completed`，并从最终事件解析 usage。
 - Image edits 和 variations 不在 WP-290 范围内。
 
 WP-480 已实现：
