@@ -604,6 +604,20 @@ func (s *Service) CreateProxy(ctx context.Context, req contract.CreateProxyReque
 		}
 		status = *req.Status
 	}
+	fallbackMode := contract.ProxyFallbackModeNone
+	if req.FallbackMode != nil {
+		if !validProxyFallbackMode(*req.FallbackMode) {
+			return contract.ProxyDefinition{}, ErrInvalidInput
+		}
+		fallbackMode = *req.FallbackMode
+	}
+	backupProxyID := cloneInt(req.BackupProxyID)
+	if err := s.validateProxyFallback(ctx, 0, fallbackMode, backupProxyID); err != nil {
+		return contract.ProxyDefinition{}, err
+	}
+	if fallbackMode != contract.ProxyFallbackModeProxy {
+		backupProxyID = nil
+	}
 	countryCode := normalizeCountryCode(req.CountryCode)
 	countryName := normalizeCountryName(req.CountryName)
 	return s.store.CreateProxy(ctx, contract.CreateStoredProxy{
@@ -615,6 +629,9 @@ func (s *Service) CreateProxy(ctx context.Context, req contract.CreateProxyReque
 		Metadata:      cloneMap(req.Metadata),
 		CountryCode:   countryCode,
 		CountryName:   countryName,
+		ExpiresAt:     cloneTime(req.ExpiresAt),
+		FallbackMode:  fallbackMode,
+		BackupProxyID: backupProxyID,
 	})
 }
 
@@ -625,6 +642,9 @@ func (s *Service) UpdateProxy(ctx context.Context, id int, req contract.UpdatePr
 	proxy, err := s.store.FindProxyByID(ctx, id)
 	if err != nil {
 		return contract.ProxyDefinition{}, err
+	}
+	if proxy.FallbackMode == "" {
+		proxy.FallbackMode = contract.ProxyFallbackModeNone
 	}
 	if req.Name != nil {
 		name := strings.TrimSpace(*req.Name)
@@ -676,6 +696,30 @@ func (s *Service) UpdateProxy(ctx context.Context, id int, req contract.UpdatePr
 	}
 	if req.CountryName != nil {
 		proxy.CountryName = normalizeCountryName(req.CountryName)
+	}
+	if req.ClearExpiresAt {
+		proxy.ExpiresAt = nil
+	}
+	if req.ExpiresAt != nil {
+		proxy.ExpiresAt = cloneTime(req.ExpiresAt)
+	}
+	if req.FallbackMode != nil {
+		if !validProxyFallbackMode(*req.FallbackMode) {
+			return contract.ProxyDefinition{}, ErrInvalidInput
+		}
+		proxy.FallbackMode = *req.FallbackMode
+	}
+	if req.ClearBackupProxyID {
+		proxy.BackupProxyID = nil
+	}
+	if req.BackupProxyID != nil {
+		proxy.BackupProxyID = cloneInt(req.BackupProxyID)
+	}
+	if err := s.validateProxyFallback(ctx, proxy.ID, proxy.FallbackMode, proxy.BackupProxyID); err != nil {
+		return contract.ProxyDefinition{}, err
+	}
+	if proxy.FallbackMode != contract.ProxyFallbackModeProxy {
+		proxy.BackupProxyID = nil
 	}
 	proxy.UpdatedAt = s.clock.Now()
 	return s.store.UpdateProxy(ctx, proxy)
@@ -1724,12 +1768,33 @@ func (s *Service) ResolveProxyURL(ctx context.Context, proxyID *string) (*string
 	if err != nil || id <= 0 {
 		return nil, ErrInvalidInput
 	}
+	return s.resolveProxyURLByID(ctx, id, map[int]struct{}{})
+}
+
+func (s *Service) resolveProxyURLByID(ctx context.Context, id int, seen map[int]struct{}) (*string, error) {
+	if _, exists := seen[id]; exists {
+		return nil, ErrProxyUnavailable
+	}
+	seen[id] = struct{}{}
 	proxy, err := s.store.FindProxyByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	if proxy.Status != contract.ProxyStatusActive || proxy.URLCiphertext == "" {
 		return nil, ErrProxyUnavailable
+	}
+	if proxyExpired(proxy, s.clock.Now()) {
+		switch proxy.FallbackMode {
+		case contract.ProxyFallbackModeDirect:
+			return nil, nil
+		case contract.ProxyFallbackModeProxy:
+			if proxy.BackupProxyID == nil || *proxy.BackupProxyID <= 0 {
+				return nil, ErrProxyUnavailable
+			}
+			return s.resolveProxyURLByID(ctx, *proxy.BackupProxyID, seen)
+		default:
+			return nil, ErrProxyUnavailable
+		}
 	}
 	rawURL, err := s.decryptProxyURL(proxy)
 	if err != nil {
@@ -2022,6 +2087,48 @@ func validProxyStatus(status contract.ProxyStatus) bool {
 	default:
 		return false
 	}
+}
+
+func validProxyFallbackMode(mode contract.ProxyFallbackMode) bool {
+	switch mode {
+	case contract.ProxyFallbackModeNone, contract.ProxyFallbackModeDirect, contract.ProxyFallbackModeProxy:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *Service) validateProxyFallback(ctx context.Context, proxyID int, mode contract.ProxyFallbackMode, backupProxyID *int) error {
+	if !validProxyFallbackMode(mode) {
+		return ErrInvalidInput
+	}
+	if mode != contract.ProxyFallbackModeProxy {
+		return nil
+	}
+	if backupProxyID == nil || *backupProxyID <= 0 {
+		return ErrInvalidInput
+	}
+	if proxyID > 0 && *backupProxyID == proxyID {
+		return ErrInvalidInput
+	}
+	backup, err := s.store.FindProxyByID(ctx, *backupProxyID)
+	if err != nil {
+		return err
+	}
+	if backup.Status != contract.ProxyStatusActive || backup.URLCiphertext == "" {
+		return ErrInvalidInput
+	}
+	return nil
+}
+
+func proxyExpired(proxy contract.ProxyDefinition, now time.Time) bool {
+	if proxy.ExpiresAt == nil {
+		return false
+	}
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	return !now.UTC().Before(proxy.ExpiresAt.UTC())
 }
 
 func validateProxyURL(proxyType contract.ProxyType, rawURL string) error {

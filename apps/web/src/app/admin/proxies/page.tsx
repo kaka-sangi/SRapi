@@ -33,6 +33,8 @@ import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import {
   PROXY_TYPES,
   PROXY_STATUSES,
+  PROXY_FALLBACK_MODES,
+  PROXY_BACKUP_NONE,
   emptyProxyForm,
   proxyFormFromProxy,
   buildCreateProxyBody,
@@ -135,6 +137,13 @@ function ProxiesContent() {
   const [toDelete, setToDelete] = useState<ProxyDefinition | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const isNew = formTarget === "new";
+  const visibleProxyRows = proxies.data?.data ?? [];
+  const backupProxyOptions = [
+    { value: PROXY_BACKUP_NONE, label: t("adminProxies.backupProxyNone") },
+    ...visibleProxyRows
+      .filter((proxy) => formTarget === "new" || !formTarget || proxy.id !== formTarget.id)
+      .map((proxy) => ({ value: proxy.id, label: proxy.name })),
+  ];
 
   // Bulk-test the selection. The server runs the probes in parallel with its
   // own concurrency cap (see Service.BatchTestProxies) so the frontend gets
@@ -231,6 +240,33 @@ function ProxiesContent() {
       options: enumOptions(PROXY_STATUSES),
       advanced: true,
     },
+    {
+      name: "expiresAtLocal",
+      label: t("adminProxies.expiresAt"),
+      type: "datetime",
+      hint: t("adminProxies.expiresAtHint"),
+      advanced: true,
+    },
+    {
+      name: "fallbackMode",
+      label: t("adminProxies.fallbackMode"),
+      type: "select",
+      options: fallbackModeOptions(t),
+      advanced: true,
+    },
+    {
+      name: "backupProxyId",
+      label: t("adminProxies.backupProxy"),
+      type: "select",
+      options: backupProxyOptions,
+      advanced: true,
+      validate: (value, draft) => {
+        const selected = String(value ?? "");
+        return draft.fallbackMode === "proxy" && (!selected || selected === PROXY_BACKUP_NONE)
+          ? t("adminProxies.backupProxyRequired")
+          : undefined;
+      },
+    },
     { name: "metadata", label: t("adminCommon.metadata"), help: t("adminCommon.metadataHelp"), type: "keyvalue", advanced: true },
   ];
 
@@ -305,6 +341,19 @@ function ProxiesContent() {
         }
         return <AvailabilityBadge pct={p.probe_success_pct_7d} />;
       },
+    },
+    {
+      key: "lifecycle",
+      header: t("adminProxies.lifecycleColumn"),
+      hideOnMobile: true,
+      sortValue: (p) => p.expires_at ?? "",
+      render: (p) => (
+        <ProxyLifecycleCell
+          proxy={p}
+          proxies={visibleProxyRows}
+          t={t}
+        />
+      ),
     },
     {
       key: "url",
@@ -521,6 +570,44 @@ export function AvailabilityBadge({ pct }: { pct: number }) {
   // — the same tone scheme the rest of the admin uses for at-a-glance status.
   const tone: "active" | "limited" | "error" = pct >= 95 ? "active" : pct >= 70 ? "limited" : "error";
   return <QuietBadge status={tone} label={`${pct}%`} />;
+}
+
+function ProxyLifecycleCell({
+  proxy,
+  proxies,
+  t,
+}: {
+  proxy: ProxyDefinition;
+  proxies: readonly ProxyDefinition[];
+  t: (key: string, vars?: Record<string, string | number>) => string;
+}) {
+  const expiresAt = proxy.expires_at ? new Date(proxy.expires_at) : null;
+  const expired = expiresAt ? expiresAt.getTime() <= Date.now() : false;
+  const fallbackMode = proxy.fallback_mode ?? "none";
+  const backupName = proxy.backup_proxy_id
+    ? proxies.find((item) => item.id === proxy.backup_proxy_id)?.name ?? `#${proxy.backup_proxy_id}`
+    : "";
+  const fallbackLabel = fallbackModeLabel(t, fallbackMode);
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className={expired ? "text-2xs text-srapi-error" : "font-mono text-2xs text-srapi-text-tertiary"}>
+        {expiresAt ? (expired ? t("adminProxies.expired") : formatDateTime(proxy.expires_at)) : t("adminProxies.noExpiry")}
+      </span>
+      <span className="text-2xs text-srapi-text-tertiary">
+        {fallbackMode === "proxy" && backupName ? `${fallbackLabel}: ${backupName}` : fallbackLabel}
+      </span>
+    </div>
+  );
+}
+
+function fallbackModeOptions(t: (key: string) => string): { value: string; label: string }[] {
+  return PROXY_FALLBACK_MODES.map((mode) => ({ value: mode, label: fallbackModeLabel(t, mode) }));
+}
+
+function fallbackModeLabel(t: (key: string) => string, mode: string): string {
+  if (mode === "direct") return t("adminProxies.fallbackDirect");
+  if (mode === "proxy") return t("adminProxies.fallbackProxy");
+  return t("adminProxies.fallbackNone");
 }
 
 // countryFilterOptions returns one entry per unique country_code present in

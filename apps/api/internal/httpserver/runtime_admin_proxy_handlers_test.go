@@ -103,6 +103,46 @@ func TestAdminProxyRegistrySupportsSOCKS5H(t *testing.T) {
 	}
 }
 
+func TestAdminProxyRegistryExposesLifecycleFields(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+
+	backupReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/proxies", strings.NewReader(`{"name":"backup-egress","type":"https","url":"https://backup-user:backup-pass@example.invalid:8443","status":"active"}`))
+	backupReq.Header.Set("Content-Type", "application/json")
+	backupReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	backupReq.AddCookie(sessionCookie)
+	backupRec := httptest.NewRecorder()
+	handler.ServeHTTP(backupRec, backupReq)
+	if backupRec.Code != http.StatusCreated {
+		t.Fatalf("expected backup proxy create 201, got %d body=%s", backupRec.Code, backupRec.Body.String())
+	}
+	var backup apiopenapi.ProxyDefinitionResponse
+	if err := json.NewDecoder(backupRec.Body).Decode(&backup); err != nil {
+		t.Fatalf("decode backup proxy response: %v", err)
+	}
+
+	createBody := `{"name":"expiring-egress","type":"https","url":"https://primary-user:primary-pass@example.invalid:8443","status":"active","expires_at":"2026-06-17T12:00:00Z","fallback_mode":"proxy","backup_proxy_id":"` + string(backup.Data.Id) + `"}`
+	createReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/proxies", strings.NewReader(createBody))
+	createReq.Header.Set("Content-Type", "application/json")
+	createReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	createReq.AddCookie(sessionCookie)
+	createRec := httptest.NewRecorder()
+	handler.ServeHTTP(createRec, createReq)
+	if createRec.Code != http.StatusCreated {
+		t.Fatalf("expected proxy create 201, got %d body=%s", createRec.Code, createRec.Body.String())
+	}
+	if strings.Contains(createRec.Body.String(), "primary-pass") || strings.Contains(createRec.Body.String(), "backup-pass") {
+		t.Fatalf("proxy response leaked raw url: %s", createRec.Body.String())
+	}
+	var created apiopenapi.ProxyDefinitionResponse
+	if err := json.NewDecoder(createRec.Body).Decode(&created); err != nil {
+		t.Fatalf("decode create proxy response: %v", err)
+	}
+	if created.Data.ExpiresAt == nil || created.Data.FallbackMode == nil || *created.Data.FallbackMode != apiopenapi.ProxyFallbackMode("proxy") || created.Data.BackupProxyId == nil || *created.Data.BackupProxyId != backup.Data.Id {
+		t.Fatalf("unexpected lifecycle fields: %+v", created.Data)
+	}
+}
+
 func TestAdminProxyRegistryPaginatesListAndUsesDeleteResponse(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)

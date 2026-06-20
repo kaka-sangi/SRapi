@@ -219,6 +219,9 @@ func (s *Store) CreateProxy(_ context.Context, input contract.CreateStoredProxy)
 		Metadata:      cloneMap(input.Metadata),
 		CountryCode:   input.CountryCode,
 		CountryName:   input.CountryName,
+		ExpiresAt:     cloneTime(input.ExpiresAt),
+		FallbackMode:  input.FallbackMode,
+		BackupProxyID: cloneInt(input.BackupProxyID),
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
@@ -626,6 +629,8 @@ func cloneAccount(value contract.ProviderAccount) contract.ProviderAccount {
 
 func cloneProxy(value contract.ProxyDefinition) contract.ProxyDefinition {
 	value.Metadata = cloneMap(value.Metadata)
+	value.ExpiresAt = cloneTime(value.ExpiresAt)
+	value.BackupProxyID = cloneInt(value.BackupProxyID)
 	if value.DeletedAt != nil {
 		cloned := *value.DeletedAt
 		value.DeletedAt = &cloned
@@ -675,6 +680,22 @@ func cloneMap(value map[string]any) map[string]any {
 }
 
 func cloneString(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
+func cloneInt(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
+func cloneTime(value *time.Time) *time.Time {
 	if value == nil {
 		return nil
 	}

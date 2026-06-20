@@ -26,6 +26,12 @@ func (Proxy) Fields() []ent.Field {
 			Comment("ISO-3166-1 alpha-2 country code (operator-supplied)."),
 		field.String("country_name").MaxLen(128).Default("").Optional().
 			Comment("Display name for the country, snapshotted at write time."),
+		field.Time("expires_at").Optional().Nillable().
+			Comment("Optional operator-defined expiry; expired proxies follow fallback_mode."),
+		field.String("fallback_mode").Default("none").
+			Comment("Expiry fallback mode: none, direct, or proxy."),
+		field.Int("backup_proxy_id").Optional().Nillable().
+			Comment("Proxy definition id used when fallback_mode is proxy."),
 		field.Time("last_probed_at").Optional().Nillable().
 			Comment("Last time the probe worker tested this proxy."),
 		field.Int("probe_success_count").Default(0).
@@ -42,5 +48,7 @@ func (Proxy) Indexes() []ent.Index {
 		index.Fields("name").Unique(),
 		index.Fields("status"),
 		index.Fields("type", "status"),
+		index.Fields("expires_at"),
+		index.Fields("backup_proxy_id"),
 	}
 }

@@ -71,7 +71,7 @@ func (s *Server) handleAdminConfigSnapshot(w http.ResponseWriter, r *http.Reques
 		s.writeConfigSnapshotError(w, requestID)
 		return
 	}
-	proxies, err := snapshotSection(ctx, s.runtime.accounts.ListProxies, toSnapshotProxyDefinition)
+	proxies, err := s.snapshotProxies(ctx)
 	if err != nil {
 		s.writeConfigSnapshotError(w, requestID)
 		return
@@ -150,6 +150,22 @@ func (s *Server) handleAdminConfigSnapshot(w http.ResponseWriter, r *http.Reques
 		},
 		RequestId: requestID,
 	})
+}
+
+func (s *Server) snapshotProxies(ctx context.Context) ([]apiopenapi.SnapshotProxyDefinition, error) {
+	items, err := s.runtime.accounts.ListProxies(ctx)
+	if err != nil {
+		return nil, err
+	}
+	namesByID := make(map[int]string, len(items))
+	for _, proxy := range items {
+		namesByID[proxy.ID] = proxy.Name
+	}
+	out := make([]apiopenapi.SnapshotProxyDefinition, 0, len(items))
+	for _, proxy := range items {
+		out = append(out, toSnapshotProxyDefinition(proxy, namesByID))
+	}
+	return out, nil
 }
 
 func (s *Server) writeConfigSnapshotError(w http.ResponseWriter, requestID string) {

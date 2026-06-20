@@ -35,6 +35,12 @@ const (
 	FieldCountryCode = "country_code"
 	// FieldCountryName holds the string denoting the country_name field in the database.
 	FieldCountryName = "country_name"
+	// FieldExpiresAt holds the string denoting the expires_at field in the database.
+	FieldExpiresAt = "expires_at"
+	// FieldFallbackMode holds the string denoting the fallback_mode field in the database.
+	FieldFallbackMode = "fallback_mode"
+	// FieldBackupProxyID holds the string denoting the backup_proxy_id field in the database.
+	FieldBackupProxyID = "backup_proxy_id"
 	// FieldLastProbedAt holds the string denoting the last_probed_at field in the database.
 	FieldLastProbedAt = "last_probed_at"
 	// FieldProbeSuccessCount holds the string denoting the probe_success_count field in the database.
@@ -61,6 +67,9 @@ var Columns = []string{
 	FieldMetadataJSON,
 	FieldCountryCode,
 	FieldCountryName,
+	FieldExpiresAt,
+	FieldFallbackMode,
+	FieldBackupProxyID,
 	FieldLastProbedAt,
 	FieldProbeSuccessCount,
 	FieldProbeFailureCount,
@@ -100,6 +109,8 @@ var (
 	DefaultCountryName string
 	// CountryNameValidator is a validator for the "country_name" field. It is called by the builders before save.
 	CountryNameValidator func(string) error
+	// DefaultFallbackMode holds the default value on creation for the "fallback_mode" field.
+	DefaultFallbackMode string
 	// DefaultProbeSuccessCount holds the default value on creation for the "probe_success_count" field.
 	DefaultProbeSuccessCount int
 	// DefaultProbeFailureCount holds the default value on creation for the "probe_failure_count" field.
@@ -159,6 +170,21 @@ func ByCountryCode(opts ...sql.OrderTermOption) OrderOption {
 // ByCountryName orders the results by the country_name field.
 func ByCountryName(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCountryName, opts...).ToFunc()
+}
+
+// ByExpiresAt orders the results by the expires_at field.
+func ByExpiresAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldExpiresAt, opts...).ToFunc()
+}
+
+// ByFallbackMode orders the results by the fallback_mode field.
+func ByFallbackMode(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFallbackMode, opts...).ToFunc()
+}
+
+// ByBackupProxyID orders the results by the backup_proxy_id field.
+func ByBackupProxyID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBackupProxyID, opts...).ToFunc()
 }
 
 // ByLastProbedAt orders the results by the last_probed_at field.

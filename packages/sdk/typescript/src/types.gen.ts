@@ -2188,6 +2188,11 @@ export type ProxyDefinitionType = 'http' | 'https' | 'socks5' | 'socks5h';
 
 export type ProxyDefinitionStatus = 'active' | 'disabled';
 
+/**
+ * Runtime behavior when an active proxy is past expires_at.
+ */
+export type ProxyFallbackMode = 'none' | 'direct' | 'proxy';
+
 export type ProxyDefinition = {
     id: Id;
     name: string;
@@ -2206,6 +2211,15 @@ export type ProxyDefinition = {
      * Display name for the country, snapshotted at write time.
      */
     country_name?: string | null;
+    /**
+     * Optional operator-defined expiry. Expired active proxies follow fallback_mode.
+     */
+    expires_at?: string | null;
+    fallback_mode?: ProxyFallbackMode;
+    /**
+     * Proxy definition id used when fallback_mode is proxy.
+     */
+    backup_proxy_id?: string | null;
     /**
      * Last time the proxy probe worker tested this proxy.
      */
@@ -2243,6 +2257,12 @@ export type CreateProxyDefinitionRequest = {
      * Localized display name for the country, snapshotted at write time.
      */
     country_name?: string | null;
+    /**
+     * Optional operator-defined expiry. Past values force fallback immediately.
+     */
+    expires_at?: string;
+    fallback_mode?: ProxyFallbackMode;
+    backup_proxy_id?: Id;
 };
 
 export type UpdateProxyDefinitionRequest = {
@@ -2258,6 +2278,20 @@ export type UpdateProxyDefinitionRequest = {
      * Localized display name for the country, snapshotted at write time.
      */
     country_name?: string | null;
+    /**
+     * Replacement expiry. Omit to keep the existing value.
+     */
+    expires_at?: string;
+    /**
+     * Clears expires_at when true.
+     */
+    clear_expires_at?: boolean;
+    fallback_mode?: ProxyFallbackMode;
+    backup_proxy_id?: Id;
+    /**
+     * Clears backup_proxy_id when true. Non-proxy fallback modes also clear it.
+     */
+    clear_backup_proxy_id?: boolean;
 };
 
 export type SnapshotProxyDefinition = {
@@ -2277,6 +2311,15 @@ export type SnapshotProxyDefinition = {
      * Localized display name for the country, snapshotted at write time.
      */
     country_name?: string | null;
+    /**
+     * Optional operator-defined expiry.
+     */
+    expires_at?: string | null;
+    fallback_mode?: ProxyFallbackMode;
+    /**
+     * Proxy definition name used when fallback_mode is proxy. Prefer this in config imports because proxy ids are environment-local.
+     */
+    backup_proxy_name?: string | null;
 };
 
 export type ImportProxyDefinition = {
@@ -2292,6 +2335,15 @@ export type ImportProxyDefinition = {
      * Localized display name for the country, snapshotted at write time.
      */
     country_name?: string | null;
+    /**
+     * Optional operator-defined expiry.
+     */
+    expires_at?: string | null;
+    fallback_mode?: ProxyFallbackMode;
+    /**
+     * Proxy definition name used when fallback_mode is proxy. Prefer this in config imports because proxy ids are environment-local.
+     */
+    backup_proxy_name?: string | null;
 };
 
 export type BatchCreateProxiesRequest = {
@@ -7805,6 +7857,12 @@ export type CreateProxyDefinitionRequestWritable = {
      * Localized display name for the country, snapshotted at write time.
      */
     country_name?: string | null;
+    /**
+     * Optional operator-defined expiry. Past values force fallback immediately.
+     */
+    expires_at?: string;
+    fallback_mode?: ProxyFallbackMode;
+    backup_proxy_id?: Id;
 };
 
 export type UpdateProxyDefinitionRequestWritable = {
@@ -7824,6 +7882,20 @@ export type UpdateProxyDefinitionRequestWritable = {
      * Localized display name for the country, snapshotted at write time.
      */
     country_name?: string | null;
+    /**
+     * Replacement expiry. Omit to keep the existing value.
+     */
+    expires_at?: string;
+    /**
+     * Clears expires_at when true.
+     */
+    clear_expires_at?: boolean;
+    fallback_mode?: ProxyFallbackMode;
+    backup_proxy_id?: Id;
+    /**
+     * Clears backup_proxy_id when true. Non-proxy fallback modes also clear it.
+     */
+    clear_backup_proxy_id?: boolean;
 };
 
 export type ImportProxyDefinitionWritable = {
@@ -7843,6 +7915,15 @@ export type ImportProxyDefinitionWritable = {
      * Localized display name for the country, snapshotted at write time.
      */
     country_name?: string | null;
+    /**
+     * Optional operator-defined expiry.
+     */
+    expires_at?: string | null;
+    fallback_mode?: ProxyFallbackMode;
+    /**
+     * Proxy definition name used when fallback_mode is proxy. Prefer this in config imports because proxy ids are environment-local.
+     */
+    backup_proxy_name?: string | null;
 };
 
 export type BatchCreateProxiesRequestWritable = {

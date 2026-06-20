@@ -51,14 +51,22 @@ func (s *Server) handleCreateAdminProxy(w http.ResponseWriter, r *http.Request) 
 		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid proxy request", requestID)
 		return
 	}
+	backupProxyID, err := optionalAPIIDToInt(body.BackupProxyId)
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid backup proxy id", requestID)
+		return
+	}
 	proxy, err := s.runtime.accounts.CreateProxy(r.Context(), accountcontract.CreateProxyRequest{
-		Name:        body.Name,
-		Type:        accountcontract.ProxyType(body.Type),
-		URL:         optionalStringValue(body.Url),
-		Status:      toProxyStatusPtr(body.Status),
-		Metadata:    jsonObjectToMap(body.Metadata),
-		CountryCode: body.CountryCode,
-		CountryName: body.CountryName,
+		Name:          body.Name,
+		Type:          accountcontract.ProxyType(body.Type),
+		URL:           optionalStringValue(body.Url),
+		Status:        toProxyStatusPtr(body.Status),
+		Metadata:      jsonObjectToMap(body.Metadata),
+		CountryCode:   body.CountryCode,
+		CountryName:   body.CountryName,
+		ExpiresAt:     body.ExpiresAt,
+		FallbackMode:  toProxyFallbackModePtr(body.FallbackMode),
+		BackupProxyID: backupProxyID,
 	})
 	if err != nil {
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid proxy request", requestID)
@@ -97,14 +105,24 @@ func (s *Server) handleUpdateAdminProxy(w http.ResponseWriter, r *http.Request) 
 		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid proxy request", requestID)
 		return
 	}
+	backupProxyID, err := optionalAPIIDToInt(body.BackupProxyId)
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid backup proxy id", requestID)
+		return
+	}
 	updated, err := s.runtime.accounts.UpdateProxy(r.Context(), id, accountcontract.UpdateProxyRequest{
-		Name:        body.Name,
-		Type:        toProxyTypePtr(body.Type),
-		URL:         body.Url,
-		Status:      toProxyStatusPtr(body.Status),
-		Metadata:    jsonObjectToMapPtr(body.Metadata),
-		CountryCode: body.CountryCode,
-		CountryName: body.CountryName,
+		Name:               body.Name,
+		Type:               toProxyTypePtr(body.Type),
+		URL:                body.Url,
+		Status:             toProxyStatusPtr(body.Status),
+		Metadata:           jsonObjectToMapPtr(body.Metadata),
+		CountryCode:        body.CountryCode,
+		CountryName:        body.CountryName,
+		ExpiresAt:          body.ExpiresAt,
+		ClearExpiresAt:     boolPtrValue(body.ClearExpiresAt),
+		FallbackMode:       toProxyFallbackModePtr(body.FallbackMode),
+		BackupProxyID:      backupProxyID,
+		ClearBackupProxyID: boolPtrValue(body.ClearBackupProxyId),
 	})
 	if err != nil {
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid proxy request", requestID)
@@ -143,14 +161,22 @@ func (s *Server) handleBatchCreateAdminProxies(w http.ResponseWriter, r *http.Re
 	}
 	reqs := make([]accountcontract.CreateProxyRequest, 0, len(body.Proxies))
 	for _, p := range body.Proxies {
+		backupProxyID, err := optionalAPIIDToInt(p.BackupProxyId)
+		if err != nil {
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid backup proxy id", requestID)
+			return
+		}
 		reqs = append(reqs, accountcontract.CreateProxyRequest{
-			Name:        p.Name,
-			Type:        accountcontract.ProxyType(p.Type),
-			URL:         optionalStringValue(p.Url),
-			Status:      toProxyStatusPtr(p.Status),
-			Metadata:    jsonObjectToMap(p.Metadata),
-			CountryCode: p.CountryCode,
-			CountryName: p.CountryName,
+			Name:          p.Name,
+			Type:          accountcontract.ProxyType(p.Type),
+			URL:           optionalStringValue(p.Url),
+			Status:        toProxyStatusPtr(p.Status),
+			Metadata:      jsonObjectToMap(p.Metadata),
+			CountryCode:   p.CountryCode,
+			CountryName:   p.CountryName,
+			ExpiresAt:     p.ExpiresAt,
+			FallbackMode:  toProxyFallbackModePtr(p.FallbackMode),
+			BackupProxyID: backupProxyID,
 		})
 	}
 	results, err := s.runtime.accounts.BatchCreateProxies(r.Context(), reqs)

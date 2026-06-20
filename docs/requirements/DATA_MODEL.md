@@ -123,6 +123,15 @@ owner_user_id nullable
 type
 status
 metadata_json
+country_code
+country_name
+expires_at
+fallback_mode
+backup_proxy_id
+last_probed_at
+probe_success_count
+probe_failure_count
+last_probe_latency_ms
 created_at
 updated_at
 deleted_at
@@ -866,6 +875,7 @@ deleted_at
 http
 https
 socks5
+socks5h
 ```
 
 索引：
@@ -874,12 +884,18 @@ socks5
 unique(name)
 index(status)
 index(type, status)
+index(expires_at)
+index(backup_proxy_id)
 ```
 
 规则：
 
 - `url_ciphertext` 存储加密后的代理 URL，API 响应只暴露 `url_configured`。
 - `url_version` 记录代理 URL 密文字段的 key/aad 版本，便于后续密钥轮换。
+- `expires_at` 是可选的运维生命周期字段；未设置时代理不会因为时间过期。
+- `fallback_mode` 取值 `none`、`direct`、`proxy`。过期代理在运行时解析阶段处理：`direct` 返回直连，`proxy` 递归解析 `backup_proxy_id`，`none` 视为不可用。
+- `backup_proxy_id` 仅在 `fallback_mode=proxy` 时有效；服务层写入时校验引用存在且不是自身，运行时解析检测循环引用。
+- probe 计数字段由 `proxy_probe` worker 维护，用于后台列表展示近似 7 天可用率和最近成功探测延迟。
 
 ## 9A. 速率限制与平台配额
 

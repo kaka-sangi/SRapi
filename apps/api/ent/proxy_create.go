@@ -142,6 +142,48 @@ func (_c *ProxyCreate) SetNillableCountryName(v *string) *ProxyCreate {
 	return _c
 }
 
+// SetExpiresAt sets the "expires_at" field.
+func (_c *ProxyCreate) SetExpiresAt(v time.Time) *ProxyCreate {
+	_c.mutation.SetExpiresAt(v)
+	return _c
+}
+
+// SetNillableExpiresAt sets the "expires_at" field if the given value is not nil.
+func (_c *ProxyCreate) SetNillableExpiresAt(v *time.Time) *ProxyCreate {
+	if v != nil {
+		_c.SetExpiresAt(*v)
+	}
+	return _c
+}
+
+// SetFallbackMode sets the "fallback_mode" field.
+func (_c *ProxyCreate) SetFallbackMode(v string) *ProxyCreate {
+	_c.mutation.SetFallbackMode(v)
+	return _c
+}
+
+// SetNillableFallbackMode sets the "fallback_mode" field if the given value is not nil.
+func (_c *ProxyCreate) SetNillableFallbackMode(v *string) *ProxyCreate {
+	if v != nil {
+		_c.SetFallbackMode(*v)
+	}
+	return _c
+}
+
+// SetBackupProxyID sets the "backup_proxy_id" field.
+func (_c *ProxyCreate) SetBackupProxyID(v int) *ProxyCreate {
+	_c.mutation.SetBackupProxyID(v)
+	return _c
+}
+
+// SetNillableBackupProxyID sets the "backup_proxy_id" field if the given value is not nil.
+func (_c *ProxyCreate) SetNillableBackupProxyID(v *int) *ProxyCreate {
+	if v != nil {
+		_c.SetBackupProxyID(*v)
+	}
+	return _c
+}
+
 // SetLastProbedAt sets the "last_probed_at" field.
 func (_c *ProxyCreate) SetLastProbedAt(v time.Time) *ProxyCreate {
 	_c.mutation.SetLastProbedAt(v)
@@ -257,6 +299,10 @@ func (_c *ProxyCreate) defaults() {
 		v := proxy.DefaultCountryName
 		_c.mutation.SetCountryName(v)
 	}
+	if _, ok := _c.mutation.FallbackMode(); !ok {
+		v := proxy.DefaultFallbackMode
+		_c.mutation.SetFallbackMode(v)
+	}
 	if _, ok := _c.mutation.ProbeSuccessCount(); !ok {
 		v := proxy.DefaultProbeSuccessCount
 		_c.mutation.SetProbeSuccessCount(v)
@@ -310,6 +356,9 @@ func (_c *ProxyCreate) check() error {
 		if err := proxy.CountryNameValidator(v); err != nil {
 			return &ValidationError{Name: "country_name", err: fmt.Errorf(`ent: validator failed for field "Proxy.country_name": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.FallbackMode(); !ok {
+		return &ValidationError{Name: "fallback_mode", err: errors.New(`ent: missing required field "Proxy.fallback_mode"`)}
 	}
 	if _, ok := _c.mutation.ProbeSuccessCount(); !ok {
 		return &ValidationError{Name: "probe_success_count", err: errors.New(`ent: missing required field "Proxy.probe_success_count"`)}
@@ -389,6 +438,18 @@ func (_c *ProxyCreate) createSpec() (*Proxy, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.CountryName(); ok {
 		_spec.SetField(proxy.FieldCountryName, field.TypeString, value)
 		_node.CountryName = value
+	}
+	if value, ok := _c.mutation.ExpiresAt(); ok {
+		_spec.SetField(proxy.FieldExpiresAt, field.TypeTime, value)
+		_node.ExpiresAt = &value
+	}
+	if value, ok := _c.mutation.FallbackMode(); ok {
+		_spec.SetField(proxy.FieldFallbackMode, field.TypeString, value)
+		_node.FallbackMode = value
+	}
+	if value, ok := _c.mutation.BackupProxyID(); ok {
+		_spec.SetField(proxy.FieldBackupProxyID, field.TypeInt, value)
+		_node.BackupProxyID = &value
 	}
 	if value, ok := _c.mutation.LastProbedAt(); ok {
 		_spec.SetField(proxy.FieldLastProbedAt, field.TypeTime, value)

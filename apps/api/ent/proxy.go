@@ -40,6 +40,12 @@ type Proxy struct {
 	CountryCode string `json:"country_code,omitempty"`
 	// Display name for the country, snapshotted at write time.
 	CountryName string `json:"country_name,omitempty"`
+	// Optional operator-defined expiry; expired proxies follow fallback_mode.
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	// Expiry fallback mode: none, direct, or proxy.
+	FallbackMode string `json:"fallback_mode,omitempty"`
+	// Proxy definition id used when fallback_mode is proxy.
+	BackupProxyID *int `json:"backup_proxy_id,omitempty"`
 	// Last time the probe worker tested this proxy.
 	LastProbedAt *time.Time `json:"last_probed_at,omitempty"`
 	// Successful probes since last counter reset (~7 days). Used for availability %.
@@ -58,11 +64,11 @@ func (*Proxy) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case proxy.FieldURLCiphertext, proxy.FieldMetadataJSON:
 			values[i] = new([]byte)
-		case proxy.FieldID, proxy.FieldURLVersion, proxy.FieldProbeSuccessCount, proxy.FieldProbeFailureCount, proxy.FieldLastProbeLatencyMs:
+		case proxy.FieldID, proxy.FieldURLVersion, proxy.FieldBackupProxyID, proxy.FieldProbeSuccessCount, proxy.FieldProbeFailureCount, proxy.FieldLastProbeLatencyMs:
 			values[i] = new(sql.NullInt64)
-		case proxy.FieldName, proxy.FieldType, proxy.FieldStatus, proxy.FieldCountryCode, proxy.FieldCountryName:
+		case proxy.FieldName, proxy.FieldType, proxy.FieldStatus, proxy.FieldCountryCode, proxy.FieldCountryName, proxy.FieldFallbackMode:
 			values[i] = new(sql.NullString)
-		case proxy.FieldCreatedAt, proxy.FieldUpdatedAt, proxy.FieldDeletedAt, proxy.FieldLastProbedAt:
+		case proxy.FieldCreatedAt, proxy.FieldUpdatedAt, proxy.FieldDeletedAt, proxy.FieldExpiresAt, proxy.FieldLastProbedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -153,6 +159,26 @@ func (_m *Proxy) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field country_name", values[i])
 			} else if value.Valid {
 				_m.CountryName = value.String
+			}
+		case proxy.FieldExpiresAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field expires_at", values[i])
+			} else if value.Valid {
+				_m.ExpiresAt = new(time.Time)
+				*_m.ExpiresAt = value.Time
+			}
+		case proxy.FieldFallbackMode:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field fallback_mode", values[i])
+			} else if value.Valid {
+				_m.FallbackMode = value.String
+			}
+		case proxy.FieldBackupProxyID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field backup_proxy_id", values[i])
+			} else if value.Valid {
+				_m.BackupProxyID = new(int)
+				*_m.BackupProxyID = int(value.Int64)
 			}
 		case proxy.FieldLastProbedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -248,6 +274,19 @@ func (_m *Proxy) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("country_name=")
 	builder.WriteString(_m.CountryName)
+	builder.WriteString(", ")
+	if v := _m.ExpiresAt; v != nil {
+		builder.WriteString("expires_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("fallback_mode=")
+	builder.WriteString(_m.FallbackMode)
+	builder.WriteString(", ")
+	if v := _m.BackupProxyID; v != nil {
+		builder.WriteString("backup_proxy_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	if v := _m.LastProbedAt; v != nil {
 		builder.WriteString("last_probed_at=")

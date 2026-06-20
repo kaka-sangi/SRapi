@@ -1959,6 +1959,9 @@ var (
 		{Name: "metadata_json", Type: field.TypeJSON, Nullable: true},
 		{Name: "country_code", Type: field.TypeString, Nullable: true, Size: 2, Default: ""},
 		{Name: "country_name", Type: field.TypeString, Nullable: true, Size: 128, Default: ""},
+		{Name: "expires_at", Type: field.TypeTime, Nullable: true},
+		{Name: "fallback_mode", Type: field.TypeString, Default: "none"},
+		{Name: "backup_proxy_id", Type: field.TypeInt, Nullable: true},
 		{Name: "last_probed_at", Type: field.TypeTime, Nullable: true},
 		{Name: "probe_success_count", Type: field.TypeInt, Default: 0},
 		{Name: "probe_failure_count", Type: field.TypeInt, Default: 0},
@@ -1984,6 +1987,16 @@ var (
 				Name:    "proxy_type_status",
 				Unique:  false,
 				Columns: []*schema.Column{ProxiesColumns[5], ProxiesColumns[8]},
+			},
+			{
+				Name:    "proxy_expires_at",
+				Unique:  false,
+				Columns: []*schema.Column{ProxiesColumns[12]},
+			},
+			{
+				Name:    "proxy_backup_proxy_id",
+				Unique:  false,
+				Columns: []*schema.Column{ProxiesColumns[14]},
 			},
 		},
 	}

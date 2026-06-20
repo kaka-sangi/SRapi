@@ -741,12 +741,15 @@ submitted back to the import endpoint without runtime-only `id` or timestamp
 fields.
 
 Proxy definitions are exported as `SnapshotProxyDefinition`: name, type, status,
-metadata, region fields, and `url_configured` only. Raw proxy URLs remain
+metadata, region fields, lifecycle fields (`expires_at`, `fallback_mode`,
+`backup_proxy_name`), and `url_configured` only. Raw proxy URLs remain
 write-only; import accepts `ImportProxyDefinition.url` for operators who want to
 seed or replace encrypted proxy URLs in the target environment. A new proxy row
 without `url` is skipped rather than creating an unusable proxy. Existing proxy
 rows may omit `url` to retain the encrypted target URL and its current type
-while updating metadata, region, or status.
+while updating metadata, region, status, and lifecycle settings. Snapshot import
+uses `backup_proxy_name` rather than source-environment ids so backup fallback
+references can be remapped by natural key.
 
 Scheduled test plans are exported as `ImportScheduledTestPlan` so the
 `scheduled_test_plans` array can be imported by name. Account-scoped plans use

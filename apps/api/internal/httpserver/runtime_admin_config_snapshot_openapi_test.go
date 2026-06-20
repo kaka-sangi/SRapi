@@ -40,7 +40,11 @@ func TestAdminRateLimitConfigSnapshotUsesOpenAPIWireTypes(t *testing.T) {
 		t.Fatalf("unexpected payload rule response: %+v", payloadRuleResp.Data)
 	}
 
-	proxyResp := createAdminProxy(t, handler, sessionCookie, csrfToken, `{"name":"openapi-snapshot-proxy","type":"https","url":"https://proxy-user:proxy-pass@example.invalid:8443","status":"active","metadata":{"region":"us-east"},"country_code":"US","country_name":"United States"}`)
+	backupProxyResp := createAdminProxy(t, handler, sessionCookie, csrfToken, `{"name":"openapi-snapshot-proxy-backup","type":"https","url":"https://backup-user:backup-pass@example.invalid:8443","status":"active"}`)
+	if backupProxyResp.Data.Name != "openapi-snapshot-proxy-backup" || !backupProxyResp.Data.UrlConfigured {
+		t.Fatalf("unexpected backup proxy response: %+v", backupProxyResp.Data)
+	}
+	proxyResp := createAdminProxy(t, handler, sessionCookie, csrfToken, `{"name":"openapi-snapshot-proxy","type":"https","url":"https://proxy-user:proxy-pass@example.invalid:8443","status":"active","metadata":{"region":"us-east"},"country_code":"US","country_name":"United States","expires_at":"2026-07-01T00:00:00Z","fallback_mode":"proxy","backup_proxy_id":"`+string(backupProxyResp.Data.Id)+`"}`)
 	if proxyResp.Data.Name != "openapi-snapshot-proxy" || proxyResp.Data.Type != apiopenapi.Https || !proxyResp.Data.UrlConfigured {
 		t.Fatalf("unexpected proxy response: %+v", proxyResp.Data)
 	}
@@ -87,7 +91,7 @@ func TestAdminRateLimitConfigSnapshotUsesOpenAPIWireTypes(t *testing.T) {
 	if snapshotRec.Code != http.StatusOK {
 		t.Fatalf("expected config snapshot 200, got %d body=%s", snapshotRec.Code, snapshotRec.Body.String())
 	}
-	if strings.Contains(snapshotRec.Body.String(), "proxy-pass") {
+	if strings.Contains(snapshotRec.Body.String(), "proxy-pass") || strings.Contains(snapshotRec.Body.String(), "backup-pass") {
 		t.Fatalf("config snapshot leaked proxy credential: %s", snapshotRec.Body.String())
 	}
 	var snapshotResp apiopenapi.ConfigSnapshotResponse
@@ -102,7 +106,16 @@ func TestAdminRateLimitConfigSnapshotUsesOpenAPIWireTypes(t *testing.T) {
 		t.Fatalf("unexpected snapshot payload rules: %+v", *snapshotResp.Data.PayloadRules)
 	}
 	snapshotProxy := findSnapshotProxyByName(*snapshotResp.Data.Proxies, "openapi-snapshot-proxy")
-	if snapshotProxy == nil || snapshotProxy.Type != apiopenapi.Https || !snapshotProxy.UrlConfigured || snapshotProxy.CountryCode == nil || *snapshotProxy.CountryCode != "US" {
+	if snapshotProxy == nil ||
+		snapshotProxy.Type != apiopenapi.Https ||
+		!snapshotProxy.UrlConfigured ||
+		snapshotProxy.CountryCode == nil ||
+		*snapshotProxy.CountryCode != "US" ||
+		snapshotProxy.ExpiresAt == nil ||
+		snapshotProxy.FallbackMode == nil ||
+		*snapshotProxy.FallbackMode != apiopenapi.ProxyFallbackMode("proxy") ||
+		snapshotProxy.BackupProxyName == nil ||
+		*snapshotProxy.BackupProxyName != "openapi-snapshot-proxy-backup" {
 		t.Fatalf("unexpected snapshot proxies: %+v", *snapshotResp.Data.Proxies)
 	}
 	snapshotScheduledPlan := findImportScheduledTestPlanByName(*snapshotResp.Data.ScheduledTestPlans, "openapi-snapshot-scheduled-account")
@@ -129,7 +142,7 @@ func TestAdminRateLimitConfigSnapshotUsesOpenAPIWireTypes(t *testing.T) {
 		t.Fatalf("unexpected snapshot group rate limits: %+v", *snapshotResp.Data.GroupRateLimits)
 	}
 
-	importReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/config-snapshot/import?dry_run=true", strings.NewReader(`{"payload_rules":[{"name":"openapi-snapshot-payload-rule","enabled":false,"priority":9,"action":"filter","match_model":"gpt-*","match_protocol":"openai-compatible","params":{"metadata.trace":true}},{"name":"openapi-snapshot-payload-rule-new","enabled":true,"priority":3,"action":"default","params":{"temperature":0.4}}],"proxies":[{"name":"openapi-snapshot-proxy","type":"http","status":"disabled","metadata":{"region":"eu-west"},"country_code":"DE","country_name":"Germany"},{"name":"openapi-snapshot-proxy-new","type":"http","url":"http://proxy-new.example.invalid:8080","status":"active","metadata":{"region":"ap-south"}},{"name":"openapi-snapshot-proxy-missing-url","type":"socks5","status":"active"}],"scheduled_test_plans":[{"name":"openapi-snapshot-scheduled-account","enabled":false,"scope_type":"account","scope_account_provider_name":"openapi-scheduled-provider","scope_account_name":"openapi-scheduled-account","interval_seconds":7200,"cron_expression":"*/30 * * * *","probe_model":"gpt-updated","max_results":3,"auto_recover":false},{"name":"openapi-snapshot-scheduled-group-new","enabled":true,"scope_type":"group","scope_group_name":"openapi-rate-limit-group","interval_seconds":600,"probe_model":"gpt-group","max_results":2,"auto_recover":true},{"name":"openapi-snapshot-scheduled-missing-account","scope_type":"account","scope_account_provider_name":"missing-openapi-scheduled-provider","scope_account_name":"openapi-scheduled-account"},{"name":"openapi-snapshot-scheduled-missing-group","scope_type":"group","scope_group_name":"missing-openapi-rate-limit-group"}],"model_rate_limits":[{"model_name":"openapi-rate-limit-model","rpm_limit":121,"tpm_limit":4001,"max_concurrency":4,"enabled":true},{"model_name":"missing-openapi-rate-limit-model","rpm_limit":1}],"group_rate_limits":[{"account_group_name":"openapi-rate-limit-group","rpm_limit":91,"tpm_limit":3001,"max_concurrency":3,"enabled":true},{"account_group_name":"missing-openapi-rate-limit-group","rpm_limit":1}]}`))
+	importReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/config-snapshot/import?dry_run=true", strings.NewReader(`{"payload_rules":[{"name":"openapi-snapshot-payload-rule","enabled":false,"priority":9,"action":"filter","match_model":"gpt-*","match_protocol":"openai-compatible","params":{"metadata.trace":true}},{"name":"openapi-snapshot-payload-rule-new","enabled":true,"priority":3,"action":"default","params":{"temperature":0.4}}],"proxies":[{"name":"openapi-snapshot-proxy-backup","type":"https","status":"active"},{"name":"openapi-snapshot-proxy","type":"http","status":"disabled","metadata":{"region":"eu-west"},"country_code":"DE","country_name":"Germany","expires_at":"2026-08-01T00:00:00Z","fallback_mode":"proxy","backup_proxy_name":"openapi-snapshot-proxy-backup"},{"name":"openapi-snapshot-proxy-new","type":"http","url":"http://proxy-new.example.invalid:8080","status":"active","metadata":{"region":"ap-south"}},{"name":"openapi-snapshot-proxy-missing-url","type":"socks5","status":"active"}],"scheduled_test_plans":[{"name":"openapi-snapshot-scheduled-account","enabled":false,"scope_type":"account","scope_account_provider_name":"openapi-scheduled-provider","scope_account_name":"openapi-scheduled-account","interval_seconds":7200,"cron_expression":"*/30 * * * *","probe_model":"gpt-updated","max_results":3,"auto_recover":false},{"name":"openapi-snapshot-scheduled-group-new","enabled":true,"scope_type":"group","scope_group_name":"openapi-rate-limit-group","interval_seconds":600,"probe_model":"gpt-group","max_results":2,"auto_recover":true},{"name":"openapi-snapshot-scheduled-missing-account","scope_type":"account","scope_account_provider_name":"missing-openapi-scheduled-provider","scope_account_name":"openapi-scheduled-account"},{"name":"openapi-snapshot-scheduled-missing-group","scope_type":"group","scope_group_name":"missing-openapi-rate-limit-group"}],"model_rate_limits":[{"model_name":"openapi-rate-limit-model","rpm_limit":121,"tpm_limit":4001,"max_concurrency":4,"enabled":true},{"model_name":"missing-openapi-rate-limit-model","rpm_limit":1}],"group_rate_limits":[{"account_group_name":"openapi-rate-limit-group","rpm_limit":91,"tpm_limit":3001,"max_concurrency":3,"enabled":true},{"account_group_name":"missing-openapi-rate-limit-group","rpm_limit":1}]}`))
 	importReq.Header.Set("Content-Type", "application/json")
 	importReq.Header.Set("X-CSRF-Token", csrfToken)
 	importReq.AddCookie(sessionCookie)
@@ -149,7 +162,7 @@ func TestAdminRateLimitConfigSnapshotUsesOpenAPIWireTypes(t *testing.T) {
 		importResp.Data.GroupRateLimits.Skipped != 1 ||
 		importResp.Data.PayloadRules.Updated != 1 ||
 		importResp.Data.PayloadRules.Created != 1 ||
-		importResp.Data.Proxies.Updated != 1 ||
+		importResp.Data.Proxies.Updated != 2 ||
 		importResp.Data.Proxies.Created != 1 ||
 		importResp.Data.Proxies.Skipped != 1 ||
 		importResp.Data.ScheduledTestPlans.Updated != 1 ||
@@ -158,7 +171,7 @@ func TestAdminRateLimitConfigSnapshotUsesOpenAPIWireTypes(t *testing.T) {
 		t.Fatalf("unexpected config import dry run response: %+v", importResp.Data)
 	}
 
-	importPayloadRulesReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/config-snapshot/import", strings.NewReader(`{"payload_rules":[{"name":"openapi-snapshot-payload-rule","enabled":false,"priority":9,"action":"filter","match_model":"gpt-*","match_protocol":"openai-compatible","params":{"metadata.trace":true}},{"name":"openapi-snapshot-payload-rule-new","enabled":true,"priority":3,"action":"default","params":{"temperature":0.4}}],"proxies":[{"name":"openapi-snapshot-proxy","type":"http","status":"disabled","metadata":{"region":"eu-west"},"country_code":"DE","country_name":"Germany"},{"name":"openapi-snapshot-proxy-new","type":"http","url":"http://proxy-new.example.invalid:8080","status":"active","metadata":{"region":"ap-south"}},{"name":"openapi-snapshot-proxy-missing-url","type":"socks5","status":"active"}],"scheduled_test_plans":[{"name":"openapi-snapshot-scheduled-account","enabled":false,"scope_type":"account","scope_account_provider_name":"openapi-scheduled-provider","scope_account_name":"openapi-scheduled-account","interval_seconds":7200,"cron_expression":"*/30 * * * *","probe_model":"gpt-updated","max_results":3,"auto_recover":false},{"name":"openapi-snapshot-scheduled-group-new","enabled":true,"scope_type":"group","scope_group_name":"openapi-rate-limit-group","interval_seconds":600,"probe_model":"gpt-group","max_results":2,"auto_recover":true},{"name":"openapi-snapshot-scheduled-missing-account","scope_type":"account","scope_account_provider_name":"missing-openapi-scheduled-provider","scope_account_name":"openapi-scheduled-account"},{"name":"openapi-snapshot-scheduled-missing-group","scope_type":"group","scope_group_name":"missing-openapi-rate-limit-group"}]}`))
+	importPayloadRulesReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/config-snapshot/import", strings.NewReader(`{"payload_rules":[{"name":"openapi-snapshot-payload-rule","enabled":false,"priority":9,"action":"filter","match_model":"gpt-*","match_protocol":"openai-compatible","params":{"metadata.trace":true}},{"name":"openapi-snapshot-payload-rule-new","enabled":true,"priority":3,"action":"default","params":{"temperature":0.4}}],"proxies":[{"name":"openapi-snapshot-proxy-backup","type":"https","status":"active"},{"name":"openapi-snapshot-proxy","type":"http","status":"disabled","metadata":{"region":"eu-west"},"country_code":"DE","country_name":"Germany","expires_at":"2026-08-01T00:00:00Z","fallback_mode":"proxy","backup_proxy_name":"openapi-snapshot-proxy-backup"},{"name":"openapi-snapshot-proxy-new","type":"http","url":"http://proxy-new.example.invalid:8080","status":"active","metadata":{"region":"ap-south"}},{"name":"openapi-snapshot-proxy-missing-url","type":"socks5","status":"active"}],"scheduled_test_plans":[{"name":"openapi-snapshot-scheduled-account","enabled":false,"scope_type":"account","scope_account_provider_name":"openapi-scheduled-provider","scope_account_name":"openapi-scheduled-account","interval_seconds":7200,"cron_expression":"*/30 * * * *","probe_model":"gpt-updated","max_results":3,"auto_recover":false},{"name":"openapi-snapshot-scheduled-group-new","enabled":true,"scope_type":"group","scope_group_name":"openapi-rate-limit-group","interval_seconds":600,"probe_model":"gpt-group","max_results":2,"auto_recover":true},{"name":"openapi-snapshot-scheduled-missing-account","scope_type":"account","scope_account_provider_name":"missing-openapi-scheduled-provider","scope_account_name":"openapi-scheduled-account"},{"name":"openapi-snapshot-scheduled-missing-group","scope_type":"group","scope_group_name":"missing-openapi-rate-limit-group"}]}`))
 	importPayloadRulesReq.Header.Set("Content-Type", "application/json")
 	importPayloadRulesReq.Header.Set("X-CSRF-Token", csrfToken)
 	importPayloadRulesReq.AddCookie(sessionCookie)
@@ -174,7 +187,7 @@ func TestAdminRateLimitConfigSnapshotUsesOpenAPIWireTypes(t *testing.T) {
 	if importPayloadRulesResp.Data.PayloadRules.Updated != 1 || importPayloadRulesResp.Data.PayloadRules.Created != 1 {
 		t.Fatalf("unexpected payload rules config import response: %+v", importPayloadRulesResp.Data)
 	}
-	if importPayloadRulesResp.Data.Proxies.Updated != 1 || importPayloadRulesResp.Data.Proxies.Created != 1 || importPayloadRulesResp.Data.Proxies.Skipped != 1 {
+	if importPayloadRulesResp.Data.Proxies.Updated != 2 || importPayloadRulesResp.Data.Proxies.Created != 1 || importPayloadRulesResp.Data.Proxies.Skipped != 1 {
 		t.Fatalf("unexpected proxies config import response: %+v", importPayloadRulesResp.Data)
 	}
 	if importPayloadRulesResp.Data.ScheduledTestPlans.Updated != 1 || importPayloadRulesResp.Data.ScheduledTestPlans.Created != 1 || importPayloadRulesResp.Data.ScheduledTestPlans.Skipped != 2 {
@@ -216,9 +229,21 @@ func TestAdminRateLimitConfigSnapshotUsesOpenAPIWireTypes(t *testing.T) {
 		t.Fatalf("decode proxy list response: %v", err)
 	}
 	updatedProxy := findProxyByName(proxyListResp.Data, "openapi-snapshot-proxy")
+	backupProxy := findProxyByName(proxyListResp.Data, "openapi-snapshot-proxy-backup")
 	newProxy := findProxyByName(proxyListResp.Data, "openapi-snapshot-proxy-new")
 	missingURLProxy := findProxyByName(proxyListResp.Data, "openapi-snapshot-proxy-missing-url")
-	if updatedProxy == nil || updatedProxy.Type != apiopenapi.Https || updatedProxy.Status != apiopenapi.ProxyDefinitionStatusDisabled || !updatedProxy.UrlConfigured || updatedProxy.CountryCode == nil || *updatedProxy.CountryCode != "DE" {
+	if updatedProxy == nil ||
+		backupProxy == nil ||
+		updatedProxy.Type != apiopenapi.Https ||
+		updatedProxy.Status != apiopenapi.ProxyDefinitionStatusDisabled ||
+		!updatedProxy.UrlConfigured ||
+		updatedProxy.CountryCode == nil ||
+		*updatedProxy.CountryCode != "DE" ||
+		updatedProxy.ExpiresAt == nil ||
+		updatedProxy.FallbackMode == nil ||
+		*updatedProxy.FallbackMode != apiopenapi.ProxyFallbackMode("proxy") ||
+		updatedProxy.BackupProxyId == nil ||
+		*updatedProxy.BackupProxyId != backupProxy.Id {
 		t.Fatalf("unexpected imported updated proxy: %+v", updatedProxy)
 	}
 	if newProxy == nil || newProxy.Type != apiopenapi.Http || newProxy.Status != apiopenapi.ProxyDefinitionStatusActive || !newProxy.UrlConfigured {

@@ -79,6 +79,18 @@ const (
 	ProxyStatusDisabled ProxyStatus = "disabled"
 )
 
+type ProxyFallbackMode string
+
+const (
+	// ProxyFallbackModeNone keeps an expired proxy unavailable.
+	ProxyFallbackModeNone ProxyFallbackMode = "none"
+	// ProxyFallbackModeDirect treats an expired proxy as an intentional direct
+	// connection.
+	ProxyFallbackModeDirect ProxyFallbackMode = "direct"
+	// ProxyFallbackModeProxy resolves an expired proxy through BackupProxyID.
+	ProxyFallbackModeProxy ProxyFallbackMode = "proxy"
+)
+
 type ProviderAccount struct {
 	ID                   int
 	ProviderID           int
@@ -129,6 +141,11 @@ type ProxyDefinition struct {
 	// CountryName is the localized display name snapshotted at write time so
 	// list views render a stable label even when the frontend locale changes.
 	CountryName string
+	// ExpiresAt is an optional operator-defined lifetime. Expired active
+	// proxies resolve according to FallbackMode instead of being selected as-is.
+	ExpiresAt     *time.Time
+	FallbackMode  ProxyFallbackMode
+	BackupProxyID *int
 	// LastProbedAt is set by the proxy_probe worker after each pass; nil
 	// before the proxy has ever been probed.
 	LastProbedAt *time.Time
@@ -638,23 +655,31 @@ type UpdateGroupRequest struct {
 }
 
 type CreateProxyRequest struct {
-	Name        string
-	Type        ProxyType
-	URL         string
-	Status      *ProxyStatus
-	Metadata    map[string]any
-	CountryCode *string
-	CountryName *string
+	Name          string
+	Type          ProxyType
+	URL           string
+	Status        *ProxyStatus
+	Metadata      map[string]any
+	CountryCode   *string
+	CountryName   *string
+	ExpiresAt     *time.Time
+	FallbackMode  *ProxyFallbackMode
+	BackupProxyID *int
 }
 
 type UpdateProxyRequest struct {
-	Name        *string
-	Type        *ProxyType
-	URL         *string
-	Status      *ProxyStatus
-	Metadata    *map[string]any
-	CountryCode *string
-	CountryName *string
+	Name               *string
+	Type               *ProxyType
+	URL                *string
+	Status             *ProxyStatus
+	Metadata           *map[string]any
+	CountryCode        *string
+	CountryName        *string
+	ExpiresAt          *time.Time
+	ClearExpiresAt     bool
+	FallbackMode       *ProxyFallbackMode
+	BackupProxyID      *int
+	ClearBackupProxyID bool
 }
 
 type CreateStoredAccount struct {
@@ -681,6 +706,9 @@ type CreateStoredProxy struct {
 	Metadata      map[string]any
 	CountryCode   string
 	CountryName   string
+	ExpiresAt     *time.Time
+	FallbackMode  ProxyFallbackMode
+	BackupProxyID *int
 }
 
 type CreateStoredAccountGroup struct {

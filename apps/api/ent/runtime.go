@@ -2016,16 +2016,20 @@ func init() {
 	proxy.DefaultCountryName = proxyDescCountryName.Default.(string)
 	// proxy.CountryNameValidator is a validator for the "country_name" field. It is called by the builders before save.
 	proxy.CountryNameValidator = proxyDescCountryName.Validators[0].(func(string) error)
+	// proxyDescFallbackMode is the schema descriptor for fallback_mode field.
+	proxyDescFallbackMode := proxyFields[9].Descriptor()
+	// proxy.DefaultFallbackMode holds the default value on creation for the fallback_mode field.
+	proxy.DefaultFallbackMode = proxyDescFallbackMode.Default.(string)
 	// proxyDescProbeSuccessCount is the schema descriptor for probe_success_count field.
-	proxyDescProbeSuccessCount := proxyFields[9].Descriptor()
+	proxyDescProbeSuccessCount := proxyFields[12].Descriptor()
 	// proxy.DefaultProbeSuccessCount holds the default value on creation for the probe_success_count field.
 	proxy.DefaultProbeSuccessCount = proxyDescProbeSuccessCount.Default.(int)
 	// proxyDescProbeFailureCount is the schema descriptor for probe_failure_count field.
-	proxyDescProbeFailureCount := proxyFields[10].Descriptor()
+	proxyDescProbeFailureCount := proxyFields[13].Descriptor()
 	// proxy.DefaultProbeFailureCount holds the default value on creation for the probe_failure_count field.
 	proxy.DefaultProbeFailureCount = proxyDescProbeFailureCount.Default.(int)
 	// proxyDescLastProbeLatencyMs is the schema descriptor for last_probe_latency_ms field.
-	proxyDescLastProbeLatencyMs := proxyFields[11].Descriptor()
+	proxyDescLastProbeLatencyMs := proxyFields[14].Descriptor()
 	// proxy.DefaultLastProbeLatencyMs holds the default value on creation for the last_probe_latency_ms field.
 	proxy.DefaultLastProbeLatencyMs = proxyDescLastProbeLatencyMs.Default.(int)
 	qualityevalsampleMixin := schema.QualityEvalSample{}.Mixin()

@@ -22647,6 +22647,14 @@ components:
         - active
         - disabled
 
+    ProxyFallbackMode:
+      type: string
+      description: Runtime behavior when an active proxy is past expires_at.
+      enum:
+        - none
+        - direct
+        - proxy
+
     ProxyDefinition:
       type: object
       required:
@@ -22683,6 +22691,17 @@ components:
           type: string
           nullable: true
           description: Display name for the country, snapshotted at write time.
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Optional operator-defined expiry. Expired active proxies follow fallback_mode.
+        fallback_mode:
+          $ref: "#/components/schemas/ProxyFallbackMode"
+        backup_proxy_id:
+          type: string
+          nullable: true
+          description: Proxy definition id used when fallback_mode is proxy.
         last_probed_at:
           type: string
           format: date-time
@@ -22741,6 +22760,14 @@ components:
           type: string
           nullable: true
           description: Localized display name for the country, snapshotted at write time.
+        expires_at:
+          type: string
+          format: date-time
+          description: Optional operator-defined expiry. Past values force fallback immediately.
+        fallback_mode:
+          $ref: "#/components/schemas/ProxyFallbackMode"
+        backup_proxy_id:
+          $ref: "#/components/schemas/Id"
 
     UpdateProxyDefinitionRequest:
       type: object
@@ -22769,6 +22796,20 @@ components:
           type: string
           nullable: true
           description: Localized display name for the country, snapshotted at write time.
+        expires_at:
+          type: string
+          format: date-time
+          description: Replacement expiry. Omit to keep the existing value.
+        clear_expires_at:
+          type: boolean
+          description: Clears expires_at when true.
+        fallback_mode:
+          $ref: "#/components/schemas/ProxyFallbackMode"
+        backup_proxy_id:
+          $ref: "#/components/schemas/Id"
+        clear_backup_proxy_id:
+          type: boolean
+          description: Clears backup_proxy_id when true. Non-proxy fallback modes also clear it.
 
     SnapshotProxyDefinition:
       type: object
@@ -22799,6 +22840,17 @@ components:
           type: string
           nullable: true
           description: Localized display name for the country, snapshotted at write time.
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Optional operator-defined expiry.
+        fallback_mode:
+          $ref: "#/components/schemas/ProxyFallbackMode"
+        backup_proxy_name:
+          type: string
+          nullable: true
+          description: Proxy definition name used when fallback_mode is proxy. Prefer this in config imports because proxy ids are environment-local.
 
     ImportProxyDefinition:
       type: object
@@ -22829,6 +22881,17 @@ components:
           type: string
           nullable: true
           description: Localized display name for the country, snapshotted at write time.
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Optional operator-defined expiry.
+        fallback_mode:
+          $ref: "#/components/schemas/ProxyFallbackMode"
+        backup_proxy_name:
+          type: string
+          nullable: true
+          description: Proxy definition name used when fallback_mode is proxy. Prefer this in config imports because proxy ids are environment-local.
 
     BatchCreateProxiesRequest:
       type: object

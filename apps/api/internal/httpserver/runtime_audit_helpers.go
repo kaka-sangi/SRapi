@@ -170,11 +170,14 @@ func accountAuditSnapshot(account accountcontract.ProviderAccount) map[string]an
 
 func proxyAuditSnapshot(proxy accountcontract.ProxyDefinition) map[string]any {
 	return map[string]any{
-		"name":           proxy.Name,
-		"type":           proxy.Type,
-		"status":         proxy.Status,
-		"url_configured": proxy.URLCiphertext != "",
-		"url_version":    proxy.URLVersion,
+		"name":            proxy.Name,
+		"type":            proxy.Type,
+		"status":          proxy.Status,
+		"url_configured":  proxy.URLCiphertext != "",
+		"url_version":     proxy.URLVersion,
+		"expires_at":      proxy.ExpiresAt,
+		"fallback_mode":   proxy.FallbackMode,
+		"backup_proxy_id": proxy.BackupProxyID,
 		// Same redaction policy as account metadata — proxies seldom carry
 		// secrets but the audit log is forever, so don't gamble.
 		"metadata": sanitizedExportMetadata(cloneAnyMap(proxy.Metadata)),

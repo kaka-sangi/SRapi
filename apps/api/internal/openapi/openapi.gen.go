@@ -2726,6 +2726,27 @@ func (e ProxyDefinitionType) Valid() bool {
 	}
 }
 
+// Defines values for ProxyFallbackMode.
+const (
+	ProxyFallbackModeDirect ProxyFallbackMode = "direct"
+	ProxyFallbackModeNone   ProxyFallbackMode = "none"
+	ProxyFallbackModeProxy  ProxyFallbackMode = "proxy"
+)
+
+// Valid indicates whether the value is a known member of the ProxyFallbackMode enum.
+func (e ProxyFallbackMode) Valid() bool {
+	switch e {
+	case ProxyFallbackModeDirect:
+		return true
+	case ProxyFallbackModeNone:
+		return true
+	case ProxyFallbackModeProxy:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RealtimeActiveSlotSourceEndpoint.
 const (
 	V1realtime    RealtimeActiveSlotSourceEndpoint = "/v1/realtime"
@@ -3985,16 +4006,16 @@ func (e ConnectRealtimeWebSocketParamsStickyStrength) Valid() bool {
 
 // Defines values for ConnectResponsesWebSocketParamsStickyStrength.
 const (
-	ConnectResponsesWebSocketParamsStickyStrengthHard ConnectResponsesWebSocketParamsStickyStrength = "hard"
-	ConnectResponsesWebSocketParamsStickyStrengthSoft ConnectResponsesWebSocketParamsStickyStrength = "soft"
+	Hard ConnectResponsesWebSocketParamsStickyStrength = "hard"
+	Soft ConnectResponsesWebSocketParamsStickyStrength = "soft"
 )
 
 // Valid indicates whether the value is a known member of the ConnectResponsesWebSocketParamsStickyStrength enum.
 func (e ConnectResponsesWebSocketParamsStickyStrength) Valid() bool {
 	switch e {
-	case ConnectResponsesWebSocketParamsStickyStrengthHard:
+	case Hard:
 		return true
-	case ConnectResponsesWebSocketParamsStickyStrengthSoft:
+	case Soft:
 		return true
 	default:
 		return false
@@ -7300,14 +7321,22 @@ type CreateProviderRequest struct {
 
 // CreateProxyDefinitionRequest defines model for CreateProxyDefinitionRequest.
 type CreateProxyDefinitionRequest struct {
+	BackupProxyId *Id `json:"backup_proxy_id,omitempty"`
+
 	// CountryCode ISO-3166-1 alpha-2 country code, operator-supplied.
 	CountryCode *string `json:"country_code,omitempty"`
 
 	// CountryName Localized display name for the country, snapshotted at write time.
-	CountryName *string                `json:"country_name,omitempty"`
-	Metadata    *JsonObject            `json:"metadata,omitempty"`
-	Name        string                 `json:"name"`
-	Status      *ProxyDefinitionStatus `json:"status,omitempty"`
+	CountryName *string `json:"country_name,omitempty"`
+
+	// ExpiresAt Optional operator-defined expiry. Past values force fallback immediately.
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+
+	// FallbackMode Runtime behavior when an active proxy is past expires_at.
+	FallbackMode *ProxyFallbackMode     `json:"fallback_mode,omitempty"`
+	Metadata     *JsonObject            `json:"metadata,omitempty"`
+	Name         string                 `json:"name"`
+	Status       *ProxyDefinitionStatus `json:"status,omitempty"`
 
 	// Type Proxy transport type. Use socks5h when DNS resolution must happen through the proxy.
 	Type ProxyDefinitionType `json:"type"`
@@ -8253,14 +8282,23 @@ type ImportModelRateLimit struct {
 
 // ImportProxyDefinition defines model for ImportProxyDefinition.
 type ImportProxyDefinition struct {
+	// BackupProxyName Proxy definition name used when fallback_mode is proxy. Prefer this in config imports because proxy ids are environment-local.
+	BackupProxyName *string `json:"backup_proxy_name,omitempty"`
+
 	// CountryCode ISO-3166-1 alpha-2 country code, operator-supplied.
 	CountryCode *string `json:"country_code,omitempty"`
 
 	// CountryName Localized display name for the country, snapshotted at write time.
-	CountryName *string                `json:"country_name,omitempty"`
-	Metadata    *JsonObject            `json:"metadata,omitempty"`
-	Name        string                 `json:"name"`
-	Status      *ProxyDefinitionStatus `json:"status,omitempty"`
+	CountryName *string `json:"country_name,omitempty"`
+
+	// ExpiresAt Optional operator-defined expiry.
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+
+	// FallbackMode Runtime behavior when an active proxy is past expires_at.
+	FallbackMode *ProxyFallbackMode     `json:"fallback_mode,omitempty"`
+	Metadata     *JsonObject            `json:"metadata,omitempty"`
+	Name         string                 `json:"name"`
+	Status       *ProxyDefinitionStatus `json:"status,omitempty"`
 
 	// Type Proxy transport type. Use socks5h when DNS resolution must happen through the proxy.
 	Type ProxyDefinitionType `json:"type"`
@@ -10086,13 +10124,22 @@ type ProxyBatchTestRow struct {
 
 // ProxyDefinition defines model for ProxyDefinition.
 type ProxyDefinition struct {
+	// BackupProxyId Proxy definition id used when fallback_mode is proxy.
+	BackupProxyId *string `json:"backup_proxy_id,omitempty"`
+
 	// CountryCode ISO-3166-1 alpha-2 country code, operator-supplied.
 	CountryCode *string `json:"country_code,omitempty"`
 
 	// CountryName Display name for the country, snapshotted at write time.
 	CountryName *string   `json:"country_name,omitempty"`
 	CreatedAt   Timestamp `json:"created_at"`
-	Id          Id        `json:"id"`
+
+	// ExpiresAt Optional operator-defined expiry. Expired active proxies follow fallback_mode.
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+
+	// FallbackMode Runtime behavior when an active proxy is past expires_at.
+	FallbackMode *ProxyFallbackMode `json:"fallback_mode,omitempty"`
+	Id           Id                 `json:"id"`
 
 	// LastProbeLatencyMs Latency of the most recent successful probe in milliseconds. 0 if no successful probe yet.
 	LastProbeLatencyMs int `json:"last_probe_latency_ms"`
@@ -10138,6 +10185,9 @@ type ProxyDefinitionStatus string
 
 // ProxyDefinitionType Proxy transport type. Use socks5h when DNS resolution must happen through the proxy.
 type ProxyDefinitionType string
+
+// ProxyFallbackMode Runtime behavior when an active proxy is past expires_at.
+type ProxyFallbackMode string
 
 // ProxyTestResult defines model for ProxyTestResult.
 type ProxyTestResult struct {
@@ -11273,14 +11323,23 @@ type SnapshotModelRateLimit struct {
 
 // SnapshotProxyDefinition defines model for SnapshotProxyDefinition.
 type SnapshotProxyDefinition struct {
+	// BackupProxyName Proxy definition name used when fallback_mode is proxy. Prefer this in config imports because proxy ids are environment-local.
+	BackupProxyName *string `json:"backup_proxy_name,omitempty"`
+
 	// CountryCode ISO-3166-1 alpha-2 country code, operator-supplied.
 	CountryCode *string `json:"country_code,omitempty"`
 
 	// CountryName Localized display name for the country, snapshotted at write time.
-	CountryName *string               `json:"country_name,omitempty"`
-	Metadata    *JsonObject           `json:"metadata,omitempty"`
-	Name        string                `json:"name"`
-	Status      ProxyDefinitionStatus `json:"status"`
+	CountryName *string `json:"country_name,omitempty"`
+
+	// ExpiresAt Optional operator-defined expiry.
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+
+	// FallbackMode Runtime behavior when an active proxy is past expires_at.
+	FallbackMode *ProxyFallbackMode    `json:"fallback_mode,omitempty"`
+	Metadata     *JsonObject           `json:"metadata,omitempty"`
+	Name         string                `json:"name"`
+	Status       ProxyDefinitionStatus `json:"status"`
 
 	// Type Proxy transport type. Use socks5h when DNS resolution must happen through the proxy.
 	Type ProxyDefinitionType `json:"type"`
@@ -11711,14 +11770,28 @@ type UpdateProviderRequest struct {
 
 // UpdateProxyDefinitionRequest defines model for UpdateProxyDefinitionRequest.
 type UpdateProxyDefinitionRequest struct {
+	BackupProxyId *Id `json:"backup_proxy_id,omitempty"`
+
+	// ClearBackupProxyId Clears backup_proxy_id when true. Non-proxy fallback modes also clear it.
+	ClearBackupProxyId *bool `json:"clear_backup_proxy_id,omitempty"`
+
+	// ClearExpiresAt Clears expires_at when true.
+	ClearExpiresAt *bool `json:"clear_expires_at,omitempty"`
+
 	// CountryCode ISO-3166-1 alpha-2 country code, operator-supplied.
 	CountryCode *string `json:"country_code,omitempty"`
 
 	// CountryName Localized display name for the country, snapshotted at write time.
-	CountryName *string                `json:"country_name,omitempty"`
-	Metadata    *JsonObject            `json:"metadata,omitempty"`
-	Name        *string                `json:"name,omitempty"`
-	Status      *ProxyDefinitionStatus `json:"status,omitempty"`
+	CountryName *string `json:"country_name,omitempty"`
+
+	// ExpiresAt Replacement expiry. Omit to keep the existing value.
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+
+	// FallbackMode Runtime behavior when an active proxy is past expires_at.
+	FallbackMode *ProxyFallbackMode     `json:"fallback_mode,omitempty"`
+	Metadata     *JsonObject            `json:"metadata,omitempty"`
+	Name         *string                `json:"name,omitempty"`
+	Status       *ProxyDefinitionStatus `json:"status,omitempty"`
 
 	// Type Proxy transport type. Use socks5h when DNS resolution must happen through the proxy.
 	Type *ProxyDefinitionType `json:"type,omitempty"`

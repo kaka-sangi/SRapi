@@ -51522,6 +51522,10 @@ type ProxyMutation struct {
 	metadata_json            *map[string]interface{}
 	country_code             *string
 	country_name             *string
+	expires_at               *time.Time
+	fallback_mode            *string
+	backup_proxy_id          *int
+	addbackup_proxy_id       *int
 	last_probed_at           *time.Time
 	probe_success_count      *int
 	addprobe_success_count   *int
@@ -52114,6 +52118,161 @@ func (m *ProxyMutation) ResetCountryName() {
 	delete(m.clearedFields, proxy.FieldCountryName)
 }
 
+// SetExpiresAt sets the "expires_at" field.
+func (m *ProxyMutation) SetExpiresAt(t time.Time) {
+	m.expires_at = &t
+}
+
+// ExpiresAt returns the value of the "expires_at" field in the mutation.
+func (m *ProxyMutation) ExpiresAt() (r time.Time, exists bool) {
+	v := m.expires_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpiresAt returns the old "expires_at" field's value of the Proxy entity.
+// If the Proxy object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProxyMutation) OldExpiresAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpiresAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpiresAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpiresAt: %w", err)
+	}
+	return oldValue.ExpiresAt, nil
+}
+
+// ClearExpiresAt clears the value of the "expires_at" field.
+func (m *ProxyMutation) ClearExpiresAt() {
+	m.expires_at = nil
+	m.clearedFields[proxy.FieldExpiresAt] = struct{}{}
+}
+
+// ExpiresAtCleared returns if the "expires_at" field was cleared in this mutation.
+func (m *ProxyMutation) ExpiresAtCleared() bool {
+	_, ok := m.clearedFields[proxy.FieldExpiresAt]
+	return ok
+}
+
+// ResetExpiresAt resets all changes to the "expires_at" field.
+func (m *ProxyMutation) ResetExpiresAt() {
+	m.expires_at = nil
+	delete(m.clearedFields, proxy.FieldExpiresAt)
+}
+
+// SetFallbackMode sets the "fallback_mode" field.
+func (m *ProxyMutation) SetFallbackMode(s string) {
+	m.fallback_mode = &s
+}
+
+// FallbackMode returns the value of the "fallback_mode" field in the mutation.
+func (m *ProxyMutation) FallbackMode() (r string, exists bool) {
+	v := m.fallback_mode
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFallbackMode returns the old "fallback_mode" field's value of the Proxy entity.
+// If the Proxy object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProxyMutation) OldFallbackMode(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFallbackMode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFallbackMode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFallbackMode: %w", err)
+	}
+	return oldValue.FallbackMode, nil
+}
+
+// ResetFallbackMode resets all changes to the "fallback_mode" field.
+func (m *ProxyMutation) ResetFallbackMode() {
+	m.fallback_mode = nil
+}
+
+// SetBackupProxyID sets the "backup_proxy_id" field.
+func (m *ProxyMutation) SetBackupProxyID(i int) {
+	m.backup_proxy_id = &i
+	m.addbackup_proxy_id = nil
+}
+
+// BackupProxyID returns the value of the "backup_proxy_id" field in the mutation.
+func (m *ProxyMutation) BackupProxyID() (r int, exists bool) {
+	v := m.backup_proxy_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBackupProxyID returns the old "backup_proxy_id" field's value of the Proxy entity.
+// If the Proxy object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProxyMutation) OldBackupProxyID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBackupProxyID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBackupProxyID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBackupProxyID: %w", err)
+	}
+	return oldValue.BackupProxyID, nil
+}
+
+// AddBackupProxyID adds i to the "backup_proxy_id" field.
+func (m *ProxyMutation) AddBackupProxyID(i int) {
+	if m.addbackup_proxy_id != nil {
+		*m.addbackup_proxy_id += i
+	} else {
+		m.addbackup_proxy_id = &i
+	}
+}
+
+// AddedBackupProxyID returns the value that was added to the "backup_proxy_id" field in this mutation.
+func (m *ProxyMutation) AddedBackupProxyID() (r int, exists bool) {
+	v := m.addbackup_proxy_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearBackupProxyID clears the value of the "backup_proxy_id" field.
+func (m *ProxyMutation) ClearBackupProxyID() {
+	m.backup_proxy_id = nil
+	m.addbackup_proxy_id = nil
+	m.clearedFields[proxy.FieldBackupProxyID] = struct{}{}
+}
+
+// BackupProxyIDCleared returns if the "backup_proxy_id" field was cleared in this mutation.
+func (m *ProxyMutation) BackupProxyIDCleared() bool {
+	_, ok := m.clearedFields[proxy.FieldBackupProxyID]
+	return ok
+}
+
+// ResetBackupProxyID resets all changes to the "backup_proxy_id" field.
+func (m *ProxyMutation) ResetBackupProxyID() {
+	m.backup_proxy_id = nil
+	m.addbackup_proxy_id = nil
+	delete(m.clearedFields, proxy.FieldBackupProxyID)
+}
+
 // SetLastProbedAt sets the "last_probed_at" field.
 func (m *ProxyMutation) SetLastProbedAt(t time.Time) {
 	m.last_probed_at = &t
@@ -52365,7 +52524,7 @@ func (m *ProxyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ProxyMutation) Fields() []string {
-	fields := make([]string, 0, 15)
+	fields := make([]string, 0, 18)
 	if m.created_at != nil {
 		fields = append(fields, proxy.FieldCreatedAt)
 	}
@@ -52398,6 +52557,15 @@ func (m *ProxyMutation) Fields() []string {
 	}
 	if m.country_name != nil {
 		fields = append(fields, proxy.FieldCountryName)
+	}
+	if m.expires_at != nil {
+		fields = append(fields, proxy.FieldExpiresAt)
+	}
+	if m.fallback_mode != nil {
+		fields = append(fields, proxy.FieldFallbackMode)
+	}
+	if m.backup_proxy_id != nil {
+		fields = append(fields, proxy.FieldBackupProxyID)
 	}
 	if m.last_probed_at != nil {
 		fields = append(fields, proxy.FieldLastProbedAt)
@@ -52441,6 +52609,12 @@ func (m *ProxyMutation) Field(name string) (ent.Value, bool) {
 		return m.CountryCode()
 	case proxy.FieldCountryName:
 		return m.CountryName()
+	case proxy.FieldExpiresAt:
+		return m.ExpiresAt()
+	case proxy.FieldFallbackMode:
+		return m.FallbackMode()
+	case proxy.FieldBackupProxyID:
+		return m.BackupProxyID()
 	case proxy.FieldLastProbedAt:
 		return m.LastProbedAt()
 	case proxy.FieldProbeSuccessCount:
@@ -52480,6 +52654,12 @@ func (m *ProxyMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldCountryCode(ctx)
 	case proxy.FieldCountryName:
 		return m.OldCountryName(ctx)
+	case proxy.FieldExpiresAt:
+		return m.OldExpiresAt(ctx)
+	case proxy.FieldFallbackMode:
+		return m.OldFallbackMode(ctx)
+	case proxy.FieldBackupProxyID:
+		return m.OldBackupProxyID(ctx)
 	case proxy.FieldLastProbedAt:
 		return m.OldLastProbedAt(ctx)
 	case proxy.FieldProbeSuccessCount:
@@ -52574,6 +52754,27 @@ func (m *ProxyMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetCountryName(v)
 		return nil
+	case proxy.FieldExpiresAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpiresAt(v)
+		return nil
+	case proxy.FieldFallbackMode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFallbackMode(v)
+		return nil
+	case proxy.FieldBackupProxyID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBackupProxyID(v)
+		return nil
 	case proxy.FieldLastProbedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -52613,6 +52814,9 @@ func (m *ProxyMutation) AddedFields() []string {
 	if m.addurl_version != nil {
 		fields = append(fields, proxy.FieldURLVersion)
 	}
+	if m.addbackup_proxy_id != nil {
+		fields = append(fields, proxy.FieldBackupProxyID)
+	}
 	if m.addprobe_success_count != nil {
 		fields = append(fields, proxy.FieldProbeSuccessCount)
 	}
@@ -52632,6 +52836,8 @@ func (m *ProxyMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case proxy.FieldURLVersion:
 		return m.AddedURLVersion()
+	case proxy.FieldBackupProxyID:
+		return m.AddedBackupProxyID()
 	case proxy.FieldProbeSuccessCount:
 		return m.AddedProbeSuccessCount()
 	case proxy.FieldProbeFailureCount:
@@ -52653,6 +52859,13 @@ func (m *ProxyMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddURLVersion(v)
+		return nil
+	case proxy.FieldBackupProxyID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddBackupProxyID(v)
 		return nil
 	case proxy.FieldProbeSuccessCount:
 		v, ok := value.(int)
@@ -52698,6 +52911,12 @@ func (m *ProxyMutation) ClearedFields() []string {
 	if m.FieldCleared(proxy.FieldCountryName) {
 		fields = append(fields, proxy.FieldCountryName)
 	}
+	if m.FieldCleared(proxy.FieldExpiresAt) {
+		fields = append(fields, proxy.FieldExpiresAt)
+	}
+	if m.FieldCleared(proxy.FieldBackupProxyID) {
+		fields = append(fields, proxy.FieldBackupProxyID)
+	}
 	if m.FieldCleared(proxy.FieldLastProbedAt) {
 		fields = append(fields, proxy.FieldLastProbedAt)
 	}
@@ -52729,6 +52948,12 @@ func (m *ProxyMutation) ClearField(name string) error {
 		return nil
 	case proxy.FieldCountryName:
 		m.ClearCountryName()
+		return nil
+	case proxy.FieldExpiresAt:
+		m.ClearExpiresAt()
+		return nil
+	case proxy.FieldBackupProxyID:
+		m.ClearBackupProxyID()
 		return nil
 	case proxy.FieldLastProbedAt:
 		m.ClearLastProbedAt()
@@ -52773,6 +52998,15 @@ func (m *ProxyMutation) ResetField(name string) error {
 		return nil
 	case proxy.FieldCountryName:
 		m.ResetCountryName()
+		return nil
+	case proxy.FieldExpiresAt:
+		m.ResetExpiresAt()
+		return nil
+	case proxy.FieldFallbackMode:
+		m.ResetFallbackMode()
+		return nil
+	case proxy.FieldBackupProxyID:
+		m.ResetBackupProxyID()
 		return nil
 	case proxy.FieldLastProbedAt:
 		m.ResetLastProbedAt()

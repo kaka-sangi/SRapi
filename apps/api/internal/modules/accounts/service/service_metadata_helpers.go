@@ -337,6 +337,22 @@ func cloneString(value *string) *string {
 	return &cloned
 }
 
+func cloneInt(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
+func cloneTime(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
 func normalizeProxyID(value *string) (*string, error) {
 	if value == nil {
 		return nil, nil

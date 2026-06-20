@@ -3,6 +3,7 @@ package httpserver
 import (
 	"context"
 	"net/http"
+	"sort"
 	"strings"
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
@@ -337,10 +338,15 @@ func (s *Server) importProxies(ctx context.Context, items []apiopenapi.ImportPro
 	for _, proxy := range existing {
 		byName[proxy.Name] = proxy
 	}
-	for _, item := range items {
+	ordered := append([]apiopenapi.ImportProxyDefinition(nil), items...)
+	sort.SliceStable(ordered, func(i, j int) bool {
+		return ordered[i].BackupProxyName == nil && ordered[j].BackupProxyName != nil
+	})
+	for _, item := range ordered {
 		proxyType := accountcontract.ProxyType(item.Type)
 		status := toProxyStatusPtr(item.Status)
 		metadata := jsonObjectToMapPtr(item.Metadata)
+		backupProxyID := proxyIDByName(byName, item.BackupProxyName)
 		proxyURL := item.Url
 		if proxyURL != nil && strings.TrimSpace(*proxyURL) == "" {
 			proxyURL = nil
@@ -355,16 +361,21 @@ func (s *Server) importProxies(ctx context.Context, items []apiopenapi.ImportPro
 			if proxyURL != nil {
 				updateType = &proxyType
 			}
-			if _, err := s.runtime.accounts.UpdateProxy(ctx, current.ID, accountcontract.UpdateProxyRequest{
-				Type:        updateType,
-				URL:         proxyURL,
-				Status:      status,
-				Metadata:    metadata,
-				CountryCode: item.CountryCode,
-				CountryName: item.CountryName,
-			}); err != nil {
+			updated, err := s.runtime.accounts.UpdateProxy(ctx, current.ID, accountcontract.UpdateProxyRequest{
+				Type:          updateType,
+				URL:           proxyURL,
+				Status:        status,
+				Metadata:      metadata,
+				CountryCode:   item.CountryCode,
+				CountryName:   item.CountryName,
+				ExpiresAt:     item.ExpiresAt,
+				FallbackMode:  toProxyFallbackModePtr(item.FallbackMode),
+				BackupProxyID: backupProxyID,
+			})
+			if err != nil {
 				return result, err
 			}
+			byName[updated.Name] = updated
 			continue
 		}
 		if proxyURL == nil {
@@ -375,19 +386,36 @@ func (s *Server) importProxies(ctx context.Context, items []apiopenapi.ImportPro
 		if dryRun {
 			continue
 		}
-		if _, err := s.runtime.accounts.CreateProxy(ctx, accountcontract.CreateProxyRequest{
-			Name:        item.Name,
-			Type:        proxyType,
-			URL:         *proxyURL,
-			Status:      status,
-			Metadata:    jsonObjectToMap(item.Metadata),
-			CountryCode: item.CountryCode,
-			CountryName: item.CountryName,
-		}); err != nil {
+		created, err := s.runtime.accounts.CreateProxy(ctx, accountcontract.CreateProxyRequest{
+			Name:          item.Name,
+			Type:          proxyType,
+			URL:           *proxyURL,
+			Status:        status,
+			Metadata:      jsonObjectToMap(item.Metadata),
+			CountryCode:   item.CountryCode,
+			CountryName:   item.CountryName,
+			ExpiresAt:     item.ExpiresAt,
+			FallbackMode:  toProxyFallbackModePtr(item.FallbackMode),
+			BackupProxyID: backupProxyID,
+		})
+		if err != nil {
 			return result, err
 		}
+		byName[created.Name] = created
 	}
 	return result, nil
+}
+
+func proxyIDByName(items map[string]accountcontract.ProxyDefinition, name *string) *int {
+	if name == nil {
+		return nil
+	}
+	proxy, ok := items[strings.TrimSpace(*name)]
+	if !ok {
+		return nil
+	}
+	id := proxy.ID
+	return &id
 }
 
 func (s *Server) importScheduledTestPlans(ctx context.Context, items []apiopenapi.ImportScheduledTestPlan, dryRun bool) (apiopenapi.ImportRemapResult, error) {

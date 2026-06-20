@@ -186,6 +186,10 @@ func (s *Store) ListGroupIDsByAccounts(ctx context.Context, accountIDs []int) (m
 }
 
 func (s *Store) CreateProxy(ctx context.Context, input contract.CreateStoredProxy) (contract.ProxyDefinition, error) {
+	fallbackMode := input.FallbackMode
+	if fallbackMode == "" {
+		fallbackMode = contract.ProxyFallbackModeNone
+	}
 	created, err := s.client.Proxy.Create().
 		SetName(input.Name).
 		SetType(string(input.Type)).
@@ -195,6 +199,9 @@ func (s *Store) CreateProxy(ctx context.Context, input contract.CreateStoredProx
 		SetMetadataJSON(cloneMap(input.Metadata)).
 		SetCountryCode(input.CountryCode).
 		SetCountryName(input.CountryName).
+		SetNillableExpiresAt(input.ExpiresAt).
+		SetFallbackMode(string(fallbackMode)).
+		SetNillableBackupProxyID(input.BackupProxyID).
 		Save(ctx)
 	if err != nil {
 		return contract.ProxyDefinition{}, err
@@ -203,6 +210,9 @@ func (s *Store) CreateProxy(ctx context.Context, input contract.CreateStoredProx
 }
 
 func (s *Store) UpdateProxy(ctx context.Context, proxy contract.ProxyDefinition) (contract.ProxyDefinition, error) {
+	if proxy.FallbackMode == "" {
+		proxy.FallbackMode = contract.ProxyFallbackModeNone
+	}
 	update := s.client.Proxy.UpdateOneID(proxy.ID).
 		Where(entproxy.DeletedAtIsNil()).
 		SetName(proxy.Name).
@@ -213,9 +223,20 @@ func (s *Store) UpdateProxy(ctx context.Context, proxy contract.ProxyDefinition)
 		SetMetadataJSON(cloneMap(proxy.Metadata)).
 		SetCountryCode(proxy.CountryCode).
 		SetCountryName(proxy.CountryName).
+		SetFallbackMode(string(proxy.FallbackMode)).
 		SetProbeSuccessCount(proxy.ProbeSuccessCount).
 		SetProbeFailureCount(proxy.ProbeFailureCount).
 		SetLastProbeLatencyMs(proxy.LastProbeLatencyMs)
+	if proxy.ExpiresAt != nil {
+		update.SetExpiresAt(*proxy.ExpiresAt)
+	} else {
+		update.ClearExpiresAt()
+	}
+	if proxy.BackupProxyID != nil {
+		update.SetBackupProxyID(*proxy.BackupProxyID)
+	} else {
+		update.ClearBackupProxyID()
+	}
 	if proxy.LastProbedAt != nil {
 		update.SetLastProbedAt(*proxy.LastProbedAt)
 	} else {
@@ -577,6 +598,9 @@ func toProxy(row *ent.Proxy) contract.ProxyDefinition {
 		Metadata:           cloneMap(row.MetadataJSON),
 		CountryCode:        row.CountryCode,
 		CountryName:        row.CountryName,
+		ExpiresAt:          cloneTime(row.ExpiresAt),
+		FallbackMode:       contract.ProxyFallbackMode(row.FallbackMode),
+		BackupProxyID:      cloneInt(row.BackupProxyID),
 		LastProbedAt:       cloneTime(row.LastProbedAt),
 		ProbeSuccessCount:  row.ProbeSuccessCount,
 		ProbeFailureCount:  row.ProbeFailureCount,
@@ -692,6 +716,14 @@ func cloneMap(value map[string]any) map[string]any {
 }
 
 func cloneString(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
+func cloneInt(value *int) *int {
 	if value == nil {
 		return nil
 	}

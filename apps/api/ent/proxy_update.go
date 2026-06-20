@@ -181,6 +181,67 @@ func (_u *ProxyUpdate) ClearCountryName() *ProxyUpdate {
 	return _u
 }
 
+// SetExpiresAt sets the "expires_at" field.
+func (_u *ProxyUpdate) SetExpiresAt(v time.Time) *ProxyUpdate {
+	_u.mutation.SetExpiresAt(v)
+	return _u
+}
+
+// SetNillableExpiresAt sets the "expires_at" field if the given value is not nil.
+func (_u *ProxyUpdate) SetNillableExpiresAt(v *time.Time) *ProxyUpdate {
+	if v != nil {
+		_u.SetExpiresAt(*v)
+	}
+	return _u
+}
+
+// ClearExpiresAt clears the value of the "expires_at" field.
+func (_u *ProxyUpdate) ClearExpiresAt() *ProxyUpdate {
+	_u.mutation.ClearExpiresAt()
+	return _u
+}
+
+// SetFallbackMode sets the "fallback_mode" field.
+func (_u *ProxyUpdate) SetFallbackMode(v string) *ProxyUpdate {
+	_u.mutation.SetFallbackMode(v)
+	return _u
+}
+
+// SetNillableFallbackMode sets the "fallback_mode" field if the given value is not nil.
+func (_u *ProxyUpdate) SetNillableFallbackMode(v *string) *ProxyUpdate {
+	if v != nil {
+		_u.SetFallbackMode(*v)
+	}
+	return _u
+}
+
+// SetBackupProxyID sets the "backup_proxy_id" field.
+func (_u *ProxyUpdate) SetBackupProxyID(v int) *ProxyUpdate {
+	_u.mutation.ResetBackupProxyID()
+	_u.mutation.SetBackupProxyID(v)
+	return _u
+}
+
+// SetNillableBackupProxyID sets the "backup_proxy_id" field if the given value is not nil.
+func (_u *ProxyUpdate) SetNillableBackupProxyID(v *int) *ProxyUpdate {
+	if v != nil {
+		_u.SetBackupProxyID(*v)
+	}
+	return _u
+}
+
+// AddBackupProxyID adds value to the "backup_proxy_id" field.
+func (_u *ProxyUpdate) AddBackupProxyID(v int) *ProxyUpdate {
+	_u.mutation.AddBackupProxyID(v)
+	return _u
+}
+
+// ClearBackupProxyID clears the value of the "backup_proxy_id" field.
+func (_u *ProxyUpdate) ClearBackupProxyID() *ProxyUpdate {
+	_u.mutation.ClearBackupProxyID()
+	return _u
+}
+
 // SetLastProbedAt sets the "last_probed_at" field.
 func (_u *ProxyUpdate) SetLastProbedAt(v time.Time) *ProxyUpdate {
 	_u.mutation.SetLastProbedAt(v)
@@ -390,6 +451,24 @@ func (_u *ProxyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if _u.mutation.CountryNameCleared() {
 		_spec.ClearField(proxy.FieldCountryName, field.TypeString)
 	}
+	if value, ok := _u.mutation.ExpiresAt(); ok {
+		_spec.SetField(proxy.FieldExpiresAt, field.TypeTime, value)
+	}
+	if _u.mutation.ExpiresAtCleared() {
+		_spec.ClearField(proxy.FieldExpiresAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.FallbackMode(); ok {
+		_spec.SetField(proxy.FieldFallbackMode, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.BackupProxyID(); ok {
+		_spec.SetField(proxy.FieldBackupProxyID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedBackupProxyID(); ok {
+		_spec.AddField(proxy.FieldBackupProxyID, field.TypeInt, value)
+	}
+	if _u.mutation.BackupProxyIDCleared() {
+		_spec.ClearField(proxy.FieldBackupProxyID, field.TypeInt)
+	}
 	if value, ok := _u.mutation.LastProbedAt(); ok {
 		_spec.SetField(proxy.FieldLastProbedAt, field.TypeTime, value)
 	}
@@ -584,6 +663,67 @@ func (_u *ProxyUpdateOne) SetNillableCountryName(v *string) *ProxyUpdateOne {
 // ClearCountryName clears the value of the "country_name" field.
 func (_u *ProxyUpdateOne) ClearCountryName() *ProxyUpdateOne {
 	_u.mutation.ClearCountryName()
+	return _u
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (_u *ProxyUpdateOne) SetExpiresAt(v time.Time) *ProxyUpdateOne {
+	_u.mutation.SetExpiresAt(v)
+	return _u
+}
+
+// SetNillableExpiresAt sets the "expires_at" field if the given value is not nil.
+func (_u *ProxyUpdateOne) SetNillableExpiresAt(v *time.Time) *ProxyUpdateOne {
+	if v != nil {
+		_u.SetExpiresAt(*v)
+	}
+	return _u
+}
+
+// ClearExpiresAt clears the value of the "expires_at" field.
+func (_u *ProxyUpdateOne) ClearExpiresAt() *ProxyUpdateOne {
+	_u.mutation.ClearExpiresAt()
+	return _u
+}
+
+// SetFallbackMode sets the "fallback_mode" field.
+func (_u *ProxyUpdateOne) SetFallbackMode(v string) *ProxyUpdateOne {
+	_u.mutation.SetFallbackMode(v)
+	return _u
+}
+
+// SetNillableFallbackMode sets the "fallback_mode" field if the given value is not nil.
+func (_u *ProxyUpdateOne) SetNillableFallbackMode(v *string) *ProxyUpdateOne {
+	if v != nil {
+		_u.SetFallbackMode(*v)
+	}
+	return _u
+}
+
+// SetBackupProxyID sets the "backup_proxy_id" field.
+func (_u *ProxyUpdateOne) SetBackupProxyID(v int) *ProxyUpdateOne {
+	_u.mutation.ResetBackupProxyID()
+	_u.mutation.SetBackupProxyID(v)
+	return _u
+}
+
+// SetNillableBackupProxyID sets the "backup_proxy_id" field if the given value is not nil.
+func (_u *ProxyUpdateOne) SetNillableBackupProxyID(v *int) *ProxyUpdateOne {
+	if v != nil {
+		_u.SetBackupProxyID(*v)
+	}
+	return _u
+}
+
+// AddBackupProxyID adds value to the "backup_proxy_id" field.
+func (_u *ProxyUpdateOne) AddBackupProxyID(v int) *ProxyUpdateOne {
+	_u.mutation.AddBackupProxyID(v)
+	return _u
+}
+
+// ClearBackupProxyID clears the value of the "backup_proxy_id" field.
+func (_u *ProxyUpdateOne) ClearBackupProxyID() *ProxyUpdateOne {
+	_u.mutation.ClearBackupProxyID()
 	return _u
 }
 
@@ -825,6 +965,24 @@ func (_u *ProxyUpdateOne) sqlSave(ctx context.Context) (_node *Proxy, err error)
 	}
 	if _u.mutation.CountryNameCleared() {
 		_spec.ClearField(proxy.FieldCountryName, field.TypeString)
+	}
+	if value, ok := _u.mutation.ExpiresAt(); ok {
+		_spec.SetField(proxy.FieldExpiresAt, field.TypeTime, value)
+	}
+	if _u.mutation.ExpiresAtCleared() {
+		_spec.ClearField(proxy.FieldExpiresAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.FallbackMode(); ok {
+		_spec.SetField(proxy.FieldFallbackMode, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.BackupProxyID(); ok {
+		_spec.SetField(proxy.FieldBackupProxyID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedBackupProxyID(); ok {
+		_spec.AddField(proxy.FieldBackupProxyID, field.TypeInt, value)
+	}
+	if _u.mutation.BackupProxyIDCleared() {
+		_spec.ClearField(proxy.FieldBackupProxyID, field.TypeInt)
 	}
 	if value, ok := _u.mutation.LastProbedAt(); ok {
 		_spec.SetField(proxy.FieldLastProbedAt, field.TypeTime, value)

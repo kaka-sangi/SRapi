@@ -181,6 +181,136 @@ func TestProxyRegistrySupportsSOCKS5H(t *testing.T) {
 	}
 }
 
+func TestExpiredProxyDirectFallbackResolvesToNilProxyURL(t *testing.T) {
+	now := time.Date(2026, 6, 17, 12, 0, 0, 0, time.UTC)
+	svc, err := New(accountmemory.New(), "0123456789abcdef0123456789abcdef", fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := context.Background()
+	expiresAt := now.Add(-time.Minute)
+	mode := contract.ProxyFallbackModeDirect
+
+	proxy, err := svc.CreateProxy(ctx, contract.CreateProxyRequest{
+		Name:         "expired-direct",
+		Type:         contract.ProxyTypeHTTPS,
+		URL:          "https://proxy-user:proxy-pass@example.invalid:8443",
+		ExpiresAt:    &expiresAt,
+		FallbackMode: &mode,
+	})
+	if err != nil {
+		t.Fatalf("create proxy: %v", err)
+	}
+	proxyID := strconv.Itoa(proxy.ID)
+	runtimeURL, err := svc.ResolveProxyURL(ctx, &proxyID)
+	if err != nil {
+		t.Fatalf("resolve proxy url: %v", err)
+	}
+	if runtimeURL != nil {
+		t.Fatalf("expected direct fallback nil proxy url, got %q", *runtimeURL)
+	}
+}
+
+func TestExpiredProxyBackupFallbackResolvesBackupURL(t *testing.T) {
+	now := time.Date(2026, 6, 17, 12, 0, 0, 0, time.UTC)
+	svc, err := New(accountmemory.New(), "0123456789abcdef0123456789abcdef", fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := context.Background()
+	backup, err := svc.CreateProxy(ctx, contract.CreateProxyRequest{
+		Name: "backup-egress",
+		Type: contract.ProxyTypeHTTPS,
+		URL:  "https://backup-user:backup-pass@example.invalid:8443",
+	})
+	if err != nil {
+		t.Fatalf("create backup proxy: %v", err)
+	}
+	expiresAt := now.Add(-time.Minute)
+	mode := contract.ProxyFallbackModeProxy
+	backupID := backup.ID
+
+	proxy, err := svc.CreateProxy(ctx, contract.CreateProxyRequest{
+		Name:          "expired-with-backup",
+		Type:          contract.ProxyTypeHTTPS,
+		URL:           "https://primary-user:primary-pass@example.invalid:8443",
+		ExpiresAt:     &expiresAt,
+		FallbackMode:  &mode,
+		BackupProxyID: &backupID,
+	})
+	if err != nil {
+		t.Fatalf("create primary proxy: %v", err)
+	}
+	proxyID := strconv.Itoa(proxy.ID)
+	runtimeURL, err := svc.ResolveProxyURL(ctx, &proxyID)
+	if err != nil {
+		t.Fatalf("resolve backup fallback: %v", err)
+	}
+	if runtimeURL == nil || *runtimeURL != "https://backup-user:backup-pass@example.invalid:8443" {
+		t.Fatalf("unexpected backup fallback url: %v", runtimeURL)
+	}
+}
+
+func TestProxyFallbackRejectsInvalidBackupConfiguration(t *testing.T) {
+	svc, err := New(accountmemory.New(), "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	mode := contract.ProxyFallbackModeProxy
+
+	_, err = svc.CreateProxy(context.Background(), contract.CreateProxyRequest{
+		Name:         "missing-backup",
+		Type:         contract.ProxyTypeHTTPS,
+		URL:          "https://primary-user:primary-pass@example.invalid:8443",
+		FallbackMode: &mode,
+	})
+	if !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid fallback config, got %v", err)
+	}
+}
+
+func TestExpiredProxyBackupFallbackDetectsCycles(t *testing.T) {
+	now := time.Date(2026, 6, 17, 12, 0, 0, 0, time.UTC)
+	svc, err := New(accountmemory.New(), "0123456789abcdef0123456789abcdef", fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := context.Background()
+	expiresAt := now.Add(-time.Minute)
+	proxyA, err := svc.CreateProxy(ctx, contract.CreateProxyRequest{
+		Name:      "cycle-a",
+		Type:      contract.ProxyTypeHTTPS,
+		URL:       "https://a-user:a-pass@example.invalid:8443",
+		ExpiresAt: &expiresAt,
+	})
+	if err != nil {
+		t.Fatalf("create proxy a: %v", err)
+	}
+	proxyB, err := svc.CreateProxy(ctx, contract.CreateProxyRequest{
+		Name:      "cycle-b",
+		Type:      contract.ProxyTypeHTTPS,
+		URL:       "https://b-user:b-pass@example.invalid:8443",
+		ExpiresAt: &expiresAt,
+	})
+	if err != nil {
+		t.Fatalf("create proxy b: %v", err)
+	}
+	mode := contract.ProxyFallbackModeProxy
+	backupB := proxyB.ID
+	if _, err := svc.UpdateProxy(ctx, proxyA.ID, contract.UpdateProxyRequest{FallbackMode: &mode, BackupProxyID: &backupB}); err != nil {
+		t.Fatalf("link proxy a to b: %v", err)
+	}
+	backupA := proxyA.ID
+	if _, err := svc.UpdateProxy(ctx, proxyB.ID, contract.UpdateProxyRequest{FallbackMode: &mode, BackupProxyID: &backupA}); err != nil {
+		t.Fatalf("link proxy b to a: %v", err)
+	}
+
+	proxyID := strconv.Itoa(proxyA.ID)
+	if _, err := svc.ResolveProxyURL(ctx, &proxyID); !errors.Is(err, ErrProxyUnavailable) {
+		t.Fatalf("expected cycle to be unavailable, got %v", err)
+	}
+}
+
 func TestDeleteProxySoftDeletesAndUnbindsAccounts(t *testing.T) {
 	store := accountmemory.New()
 	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)

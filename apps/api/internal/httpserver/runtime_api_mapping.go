@@ -1495,6 +1495,14 @@ func toProxyTypePtr(value *apiopenapi.ProxyDefinitionType) *accountcontract.Prox
 	return &proxyType
 }
 
+func toProxyFallbackModePtr(value *apiopenapi.ProxyFallbackMode) *accountcontract.ProxyFallbackMode {
+	if value == nil {
+		return nil
+	}
+	mode := accountcontract.ProxyFallbackMode(*value)
+	return &mode
+}
+
 func toUserStatusPtr(value *apiopenapi.UserStatus) *userscontract.Status {
 	if value == nil {
 		return nil

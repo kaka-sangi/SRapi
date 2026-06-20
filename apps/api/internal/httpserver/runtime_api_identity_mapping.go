@@ -304,6 +304,12 @@ func toAPIProxyDefinition(proxy accountcontract.ProxyDefinition) apiopenapi.Prox
 		name := proxy.CountryName
 		out.CountryName = &name
 	}
+	out.ExpiresAt = cloneTimePtr(proxy.ExpiresAt)
+	if proxy.FallbackMode != "" {
+		mode := apiopenapi.ProxyFallbackMode(proxy.FallbackMode)
+		out.FallbackMode = &mode
+	}
+	out.BackupProxyId = optionalAPIIDString(proxy.BackupProxyID)
 	if proxy.LastProbedAt != nil {
 		ts := *proxy.LastProbedAt
 		out.LastProbedAt = &ts
@@ -311,7 +317,7 @@ func toAPIProxyDefinition(proxy accountcontract.ProxyDefinition) apiopenapi.Prox
 	return out
 }
 
-func toSnapshotProxyDefinition(proxy accountcontract.ProxyDefinition) apiopenapi.SnapshotProxyDefinition {
+func toSnapshotProxyDefinition(proxy accountcontract.ProxyDefinition, namesByID map[int]string) apiopenapi.SnapshotProxyDefinition {
 	out := apiopenapi.SnapshotProxyDefinition{
 		Metadata:      mapToJsonObjectPtr(proxy.Metadata),
 		Name:          proxy.Name,
@@ -326,6 +332,16 @@ func toSnapshotProxyDefinition(proxy accountcontract.ProxyDefinition) apiopenapi
 	if proxy.CountryName != "" {
 		name := proxy.CountryName
 		out.CountryName = &name
+	}
+	out.ExpiresAt = cloneTimePtr(proxy.ExpiresAt)
+	if proxy.FallbackMode != "" {
+		mode := apiopenapi.ProxyFallbackMode(proxy.FallbackMode)
+		out.FallbackMode = &mode
+	}
+	if proxy.BackupProxyID != nil {
+		if name, ok := namesByID[*proxy.BackupProxyID]; ok {
+			out.BackupProxyName = &name
+		}
 	}
 	return out
 }
