@@ -171,6 +171,7 @@ type Store interface {
 	UpdateAlias(ctx context.Context, id int, input UpdateStoredAlias) (ModelAlias, error)
 	FindMapping(ctx context.Context, modelID int, providerID int, upstreamModelName string) (ModelProviderMapping, error)
 	CreateMapping(ctx context.Context, input CreateStoredMapping) (ModelProviderMapping, error)
+	ListMappings(ctx context.Context) ([]ModelProviderMapping, error)
 	ListMappingsByModel(ctx context.Context, modelID int) ([]ModelProviderMapping, error)
 	FindMappingByID(ctx context.Context, id int) (ModelProviderMapping, error)
 	DeleteMapping(ctx context.Context, id int) error

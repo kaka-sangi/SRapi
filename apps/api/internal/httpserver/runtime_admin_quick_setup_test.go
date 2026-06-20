@@ -53,6 +53,43 @@ func TestAdminQuickSetupUsesCurrentPresetDefaultModelMappingForExistingProvider(
 	assertQuickMappedUpstreamModel(t, handler, sessionCookie, "gemini-3-pro-preview", "gemini-3-pro-high")
 }
 
+func TestAdminModelMappingsAllListsMappingsWithPaginationAndStatus(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	provider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"mapping-list-provider","display_name":"Mapping List Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelA := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"mapping-list-a","display_name":"Mapping List A","status":"active"}`)
+	modelB := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"mapping-list-b","display_name":"Mapping List B","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelA.Data.Id), `{"provider_id":"`+string(provider.Data.Id)+`","upstream_model_name":"mapping-list-upstream-a","status":"active"}`)
+	disabledMapping := mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelB.Data.Id), `{"provider_id":"`+string(provider.Data.Id)+`","upstream_model_name":"mapping-list-upstream-b","status":"disabled"}`)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/model-mappings?status=disabled&page=1&page_size=500", nil)
+	req.AddCookie(sessionCookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected model mappings all 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var resp apiopenapi.ModelProviderMappingPagedListResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode model mappings all: %v", err)
+	}
+	foundDisabled := false
+	for _, mapping := range resp.Data {
+		if mapping.Status != apiopenapi.ResourceStatus("disabled") {
+			t.Fatalf("expected only disabled mappings, got %+v", resp.Data)
+		}
+		if mapping.Id == disabledMapping.Data.Id {
+			foundDisabled = true
+		}
+	}
+	if !foundDisabled {
+		t.Fatalf("expected disabled mapping %s, got %+v", disabledMapping.Data.Id, resp.Data)
+	}
+	if resp.Pagination.PageSize != 500 || resp.Pagination.Total < 1 {
+		t.Fatalf("expected disabled mapping pagination, got %+v", resp.Pagination)
+	}
+}
+
 func assertQuickMappedUpstreamModel(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, canonicalName string, upstreamModelName string) {
 	t.Helper()
 	model := mustFindAdminModelByCanonicalName(t, handler, sessionCookie, canonicalName)

@@ -250,6 +250,20 @@ func (s *Store) ListMappingsByModel(ctx context.Context, modelID int) ([]contrac
 	return out, nil
 }
 
+func (s *Store) ListMappings(ctx context.Context) ([]contract.ModelProviderMapping, error) {
+	rows, err := s.client.ModelProviderMapping.Query().
+		Order(entmodelmapping.ByID()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.ModelProviderMapping, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toMapping(row))
+	}
+	return out, nil
+}
+
 func (s *Store) FindMappingByID(ctx context.Context, id int) (contract.ModelProviderMapping, error) {
 	found, err := s.client.ModelProviderMapping.Get(ctx, id)
 	if err != nil {

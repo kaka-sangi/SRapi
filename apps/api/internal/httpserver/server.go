@@ -565,6 +565,7 @@ func newWithServer(cfg config.Config, logger *slog.Logger, options ...Option) (h
 	mux.HandleFunc("POST /api/v1/admin/providers/{id}/test", server.handleTestAdminProvider)
 	mux.HandleFunc("GET /api/v1/admin/models", server.handleListAdminModels)
 	mux.HandleFunc("POST /api/v1/admin/models", server.handleCreateAdminModel)
+	mux.HandleFunc("GET /api/v1/admin/model-mappings", server.handleListAdminModelMappingsAll)
 	mux.HandleFunc("PATCH /api/v1/admin/models/{id}", server.handleUpdateAdminModel)
 	mux.HandleFunc("DELETE /api/v1/admin/models/{id}", server.handleDeleteAdminModel)
 	mux.HandleFunc("GET /api/v1/admin/models/{id}/aliases", server.handleListAdminModelAliases)

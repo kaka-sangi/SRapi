@@ -1206,6 +1206,7 @@ export const en = {
     scopedApiKeys: "Scoped API keys",
     providerMatrix: "Provider readiness",
     accounts: "Accounts",
+    modelMappings: "Model mappings",
     proxies: "Proxies",
     apiKeys: "API keys",
     blockers: "Blockers",
@@ -1215,6 +1216,7 @@ export const en = {
     reason: {
       provider_disabled: "provider disabled",
       no_active_models: "no active models",
+      no_model_mappings: "no active model mappings",
       no_active_accounts: "no active accounts",
       no_routable_accounts: "no routable accounts",
       proxy_attention: "proxy binding needs attention",

@@ -68,6 +68,7 @@ export const queryKeys = {
     users: (params?: unknown) => ["admin", "users", params ?? {}] as const,
     providers: (params?: unknown) => ["admin", "providers", params ?? {}] as const,
     models: (params?: unknown) => ["admin", "models", params ?? {}] as const,
+    modelMappings: (params?: unknown) => ["admin", "model-mappings", params ?? {}] as const,
     accounts: (params?: unknown) => ["admin", "accounts", params ?? {}] as const,
     account: (id: string) => ["admin", "accounts", id] as const,
     accountsHealthSummary: () => ["admin", "accounts", "health-summary"] as const,

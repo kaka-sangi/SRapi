@@ -1173,6 +1173,7 @@ export const zh: Messages = {
     scopedApiKeys: "有限定密钥",
     providerMatrix: "供应商可服务性",
     accounts: "账号",
+    modelMappings: "模型映射",
     proxies: "代理",
     apiKeys: "API Keys",
     blockers: "阻塞项",
@@ -1182,6 +1183,7 @@ export const zh: Messages = {
     reason: {
       provider_disabled: "供应商已停用",
       no_active_models: "无启用模型",
+      no_model_mappings: "无启用模型映射",
       no_active_accounts: "无启用账号",
       no_routable_accounts: "无可路由账号",
       proxy_attention: "代理绑定需处理",

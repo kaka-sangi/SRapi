@@ -12,6 +12,13 @@ export function useAdminModels(params?: P<typeof adminApi.listModels>) {
   });
 }
 
+export function useAdminModelMappings(params?: P<typeof adminApi.listModelMappingsAll>) {
+  return useQuery({
+    queryKey: queryKeys.admin.modelMappings(params),
+    queryFn: () => adminApi.listModelMappingsAll(params),
+  });
+}
+
 // ---- Rate limits (per-model & per-account-group TPM/RPM/concurrency) ----
 // The API has no per-id GET, so these list-all and the UI joins by id.
 export function useModelRateLimits() {

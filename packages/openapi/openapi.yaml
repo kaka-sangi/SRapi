@@ -4009,6 +4009,39 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/model-mappings:
+    get:
+      tags:
+        - AdminModels
+      operationId: listAdminModelMappingsAll
+      summary: List provider mappings across all models.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Status"
+      responses:
+        "200":
+          description: Model provider mapping list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelProviderMappingPagedListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/models/{id}:
     patch:
       tags:
@@ -21498,6 +21531,22 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ModelProviderMapping"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    ModelProviderMappingPagedListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModelProviderMapping"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
         request_id:
           $ref: "#/components/schemas/RequestId"
 

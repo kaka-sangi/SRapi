@@ -8,6 +8,7 @@ import type {
   AccountHealthSnapshot,
   ApiKey,
   Model,
+  ModelProviderMapping,
   Provider,
   ProviderAccount,
   ProxyDefinition,
@@ -33,6 +34,7 @@ vi.mock("@/hooks/admin-queries", () => ({
   useAdminAccounts: () => query([account({ id: "a1", provider_id: "p1", group_ids: ["g1"], proxy_id: "1" })]),
   useAdminApiKeys: () => query([apiKey({ id: "k1", group_ids: ["g1"] })]),
   useAdminModels: () => query([model({ id: "m1" })]),
+  useAdminModelMappings: () => query([mapping({ id: "map1", model_id: "m1", provider_id: "p1" })]),
   useAdminProxies: () => query([proxy({ id: "1" })]),
   useAccountsHealthSummary: () => ({
     data: [health({ account_id: "a1", provider_id: "p1" })],
@@ -52,6 +54,7 @@ describe("AdminGatewayResourcesPage", () => {
 
     expect(screen.getByRole("heading", { name: "网关资源" })).toBeInTheDocument();
     expect(screen.getByText("可用代理")).toBeInTheDocument();
+    expect(screen.getByText("模型映射")).toBeInTheDocument();
     expect(screen.getAllByText("1/1").length).toBeGreaterThan(0);
     expect(screen.getByText("OpenAI")).toBeInTheDocument();
     expect(screen.getByText("就绪")).toBeInTheDocument();
@@ -151,6 +154,19 @@ function model(overrides: Partial<Model> = {}): Model {
     display_name: "GPT Test",
     status: "active",
     capabilities: [],
+    created_at: "2026-06-20T00:00:00Z",
+    ...overrides,
+  };
+}
+
+function mapping(overrides: Partial<ModelProviderMapping> = {}): ModelProviderMapping {
+  return {
+    id: "map1",
+    model_id: "m1",
+    provider_id: "p1",
+    upstream_model_name: "gpt-test",
+    status: "active",
+    capability_override: [],
     created_at: "2026-06-20T00:00:00Z",
     ...overrides,
   };

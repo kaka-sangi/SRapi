@@ -2,6 +2,7 @@ import type {
   AccountHealthSnapshot,
   ApiKey,
   Model,
+  ModelProviderMapping,
   Provider,
   ProviderAccount,
   ProxyDefinition,
@@ -14,6 +15,7 @@ export interface GatewayProviderResourceRow {
   attentionAccounts: number;
   proxiedAccounts: number;
   proxyAttentionAccounts: number;
+  activeModelMappings: number;
   apiKeyCount: number;
   scopedKeyCount: number;
   status: "ready" | "limited" | "blocked";
@@ -26,6 +28,7 @@ export interface GatewayResourceSummary {
   providers: number;
   activeProviders: number;
   activeModels: number;
+  activeModelMappings: number;
   activeApiKeys: number;
   activeAccounts: number;
   routableAccounts: number;
@@ -44,6 +47,7 @@ export function buildGatewayResourceSummary({
   health,
   apiKeys,
   models,
+  modelMappings = [],
   proxies = [],
   nowMs = Date.now(),
 }: {
@@ -52,6 +56,7 @@ export function buildGatewayResourceSummary({
   health: AccountHealthSnapshot[];
   apiKeys: ApiKey[];
   models: Model[];
+  modelMappings?: ModelProviderMapping[];
   proxies?: ProxyDefinition[];
   nowMs?: number;
 }): GatewayResourceSummary {
@@ -59,6 +64,10 @@ export function buildGatewayResourceSummary({
   const proxyStates = buildProxyRuntimeStates(proxies, nowMs);
   const activeKeys = apiKeys.filter((key) => key.status === "active");
   const activeModels = models.filter((model) => model.status === "active");
+  const activeModelIDs = new Set(activeModels.map((model) => String(model.id)));
+  const activeModelMappings = modelMappings.filter(
+    (mapping) => mapping.status === "active" && activeModelIDs.has(String(mapping.model_id)),
+  );
   const scopedKeyCount = activeKeys.filter(
     (key) => key.allowed_models.length > 0 || key.group_ids.length > 0,
   ).length;
@@ -82,6 +91,7 @@ export function buildGatewayResourceSummary({
     const proxyAttentionAccounts = activeAccounts.filter((account) =>
       accountNeedsProxyAttention(account, proxyStates),
     ).length;
+    const providerModelMappings = activeModelMappings.filter((mapping) => mapping.provider_id === provider.id);
     const providerGroupIds = new Set(providerAccounts.flatMap((account) => account.group_ids.map(String)));
     const providerKeys = activeKeys.filter(
       (key) =>
@@ -94,6 +104,7 @@ export function buildGatewayResourceSummary({
     const reasons: string[] = [];
     if (provider.status !== "active") reasons.push("provider_disabled");
     if (activeModels.length === 0) reasons.push("no_active_models");
+    else if (providerModelMappings.length === 0) reasons.push("no_model_mappings");
     if (activeAccounts.length === 0) reasons.push("no_active_accounts");
     else if (routableAccounts.length === 0) reasons.push("no_routable_accounts");
     if (proxyAttentionAccounts > 0) reasons.push("proxy_attention");
@@ -109,6 +120,7 @@ export function buildGatewayResourceSummary({
       attentionAccounts,
       proxiedAccounts,
       proxyAttentionAccounts,
+      activeModelMappings: providerModelMappings.length,
       apiKeyCount: providerKeys.length,
       scopedKeyCount: scopedProviderKeys.length,
       status,
@@ -129,6 +141,7 @@ export function buildGatewayResourceSummary({
     proxiedAccounts: rows.reduce((sum, row) => sum + row.proxiedAccounts, 0),
     proxyAttentionAccounts: rows.reduce((sum, row) => sum + row.proxyAttentionAccounts, 0),
     scopedApiKeys: scopedKeyCount,
+    activeModelMappings: activeModelMappings.length,
     rows,
   };
 }

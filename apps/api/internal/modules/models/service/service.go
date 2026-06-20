@@ -326,6 +326,18 @@ func (s *Service) FindMappingByID(ctx context.Context, mappingID int) (contract.
 	return mapping, nil
 }
 
+func (s *Service) ListMappings(ctx context.Context) ([]contract.ModelProviderMapping, error) {
+	mappings, err := s.store.ListMappings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.ModelProviderMapping, 0, len(mappings))
+	for _, mapping := range mappings {
+		out = append(out, mapping)
+	}
+	return out, nil
+}
+
 func (s *Service) ListMappingsByModel(ctx context.Context, modelID int) ([]contract.ModelProviderMapping, error) {
 	if modelID <= 0 {
 		return nil, ErrInvalidInput

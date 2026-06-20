@@ -4,6 +4,7 @@ import type {
   AccountHealthSnapshot,
   ApiKey,
   Model,
+  ModelProviderMapping,
   Provider,
   ProviderAccount,
   ProxyDefinition,
@@ -28,6 +29,7 @@ describe("buildGatewayResourceSummary", () => {
         apiKey({ id: "k1", group_ids: ["g1"] }),
       ],
       models: [model({ id: "m1" })],
+      modelMappings: [mapping({ id: "map1", model_id: "m1", provider_id: "p1" })],
     });
 
     expect(summary.activeProviders).toBe(2);
@@ -36,6 +38,7 @@ describe("buildGatewayResourceSummary", () => {
       expect.objectContaining({
         provider: expect.objectContaining({ id: "p1" }),
         status: "ready",
+        activeModelMappings: 1,
         routableAccounts: 1,
         reasons: [],
       }),
@@ -43,7 +46,8 @@ describe("buildGatewayResourceSummary", () => {
         provider: expect.objectContaining({ id: "p2" }),
         status: "blocked",
         routableAccounts: 0,
-        reasons: ["no_routable_accounts", "no_api_keys"],
+        activeModelMappings: 0,
+        reasons: ["no_model_mappings", "no_routable_accounts", "no_api_keys"],
       }),
     ]);
   });
@@ -55,6 +59,7 @@ describe("buildGatewayResourceSummary", () => {
       health: [],
       apiKeys: [apiKey({ id: "k1", group_ids: [], allowed_models: [] })],
       models: [model({ id: "m1" })],
+      modelMappings: [mapping({ id: "map1", model_id: "m1", provider_id: "p1" })],
     });
 
     expect(summary.rows[0]).toEqual(
@@ -77,6 +82,7 @@ describe("buildGatewayResourceSummary", () => {
       health: [],
       apiKeys: [apiKey({ id: "k1" })],
       models: [model({ id: "m1" })],
+      modelMappings: [mapping({ id: "map1", model_id: "m1", provider_id: "p1" })],
       proxies: [
         proxy({ id: "1", name: "primary" }),
         proxy({
@@ -107,6 +113,42 @@ describe("buildGatewayResourceSummary", () => {
         reasons: ["proxy_attention"],
       }),
     );
+  });
+
+  it("does not mark a provider ready without active mappings to active models", () => {
+    const summary = buildGatewayResourceSummary({
+      providers: [provider({ id: "p1" }), provider({ id: "p2" })],
+      accounts: [
+        account({ id: "a1", provider_id: "p1" }),
+        account({ id: "a2", provider_id: "p2" }),
+      ],
+      health: [],
+      apiKeys: [apiKey({ id: "k1" })],
+      models: [
+        model({ id: "m1", status: "active" }),
+        model({ id: "m2", status: "disabled" }),
+      ],
+      modelMappings: [
+        mapping({ id: "map1", model_id: "m1", provider_id: "p1", status: "active" }),
+        mapping({ id: "map2", model_id: "m2", provider_id: "p2", status: "active" }),
+      ],
+    });
+
+    expect(summary.activeModelMappings).toBe(1);
+    expect(summary.rows).toEqual([
+      expect.objectContaining({
+        provider: expect.objectContaining({ id: "p1" }),
+        status: "ready",
+        activeModelMappings: 1,
+        reasons: [],
+      }),
+      expect.objectContaining({
+        provider: expect.objectContaining({ id: "p2" }),
+        status: "limited",
+        activeModelMappings: 0,
+        reasons: ["no_model_mappings"],
+      }),
+    ]);
   });
 });
 
@@ -182,6 +224,19 @@ function model(overrides: Partial<Model> = {}): Model {
     display_name: "GPT Test",
     status: "active",
     capabilities: [],
+    created_at: "2026-06-20T00:00:00Z",
+    ...overrides,
+  };
+}
+
+function mapping(overrides: Partial<ModelProviderMapping> = {}): ModelProviderMapping {
+  return {
+    id: "map1",
+    model_id: "m1",
+    provider_id: "p1",
+    upstream_model_name: "gpt-test",
+    status: "active",
+    capability_override: [],
     created_at: "2026-06-20T00:00:00Z",
     ...overrides,
   };

@@ -275,6 +275,16 @@ func (s *memoryStore) ListMappingsByModel(_ context.Context, modelID int) ([]con
 	return out, nil
 }
 
+func (s *memoryStore) ListMappings(_ context.Context) ([]contract.ModelProviderMapping, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]contract.ModelProviderMapping, 0, len(s.mappingsByID))
+	for _, mapping := range s.mappingsByID {
+		out = append(out, mapping)
+	}
+	return out, nil
+}
+
 func (s *memoryStore) FindMappingByID(_ context.Context, id int) (contract.ModelProviderMapping, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -25,6 +25,7 @@ import {
   useAccountsHealthSummary,
   useAdminAccounts,
   useAdminApiKeys,
+  useAdminModelMappings,
   useAdminModels,
   useAdminProviders,
   useAdminProxies,
@@ -50,6 +51,7 @@ function GatewayResourcesContent() {
   const accounts = useAdminAccounts({ page: 1, page_size: OVERVIEW_LIMIT });
   const apiKeys = useAdminApiKeys({ page: 1, page_size: OVERVIEW_LIMIT });
   const models = useAdminModels({ page: 1, page_size: OVERVIEW_LIMIT });
+  const modelMappings = useAdminModelMappings({ page: 1, page_size: OVERVIEW_LIMIT, status: "active" });
   const proxies = useAdminProxies({ page: 1, page_size: OVERVIEW_LIMIT });
   const health = useAccountsHealthSummary();
   const [nowMs] = useState(() => Date.now());
@@ -59,6 +61,7 @@ function GatewayResourcesContent() {
     accounts.isLoading ||
     apiKeys.isLoading ||
     models.isLoading ||
+    modelMappings.isLoading ||
     proxies.isLoading ||
     health.isLoading;
   const error =
@@ -66,6 +69,7 @@ function GatewayResourcesContent() {
     accounts.isError ||
     apiKeys.isError ||
     models.isError ||
+    modelMappings.isError ||
     proxies.isError ||
     health.isError;
   const summary = buildGatewayResourceSummary({
@@ -73,6 +77,7 @@ function GatewayResourcesContent() {
     accounts: accounts.data?.data ?? [],
     apiKeys: apiKeys.data?.data ?? [],
     models: models.data?.data ?? [],
+    modelMappings: modelMappings.data?.data ?? [],
     proxies: proxies.data?.data ?? [],
     health: health.data ?? [],
     nowMs,
@@ -150,6 +155,7 @@ function GatewayResourcesContent() {
                     <tr>
                       <TableHead>{t("adminProviders.name")}</TableHead>
                       <TableHead>{t("adminProviders.adapterType")}</TableHead>
+                      <TableHead className="text-right">{t("adminGatewayResources.modelMappings")}</TableHead>
                       <TableHead className="text-right">{t("adminGatewayResources.accounts")}</TableHead>
                       <TableHead className="text-right">{t("adminGatewayResources.proxies")}</TableHead>
                       <TableHead className="text-right">{t("adminGatewayResources.apiKeys")}</TableHead>
@@ -218,6 +224,11 @@ function ProviderResourceRow({ row }: { row: GatewayProviderResourceRow }) {
       </TableCell>
       <TableCell className="font-mono text-2xs text-srapi-text-secondary">
         {row.provider.adapter_type}
+      </TableCell>
+      <TableCell className="text-right font-mono text-2xs tabular">
+        <span className={row.activeModelMappings > 0 ? "text-srapi-text-primary" : "text-srapi-error"}>
+          {row.activeModelMappings}
+        </span>
       </TableCell>
       <TableCell className="text-right font-mono text-2xs tabular">
         <span className="text-srapi-success">{row.routableAccounts}</span>

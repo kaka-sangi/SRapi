@@ -8497,6 +8497,13 @@ type ModelProviderMappingListResponse struct {
 	RequestId RequestId              `json:"request_id"`
 }
 
+// ModelProviderMappingPagedListResponse defines model for ModelProviderMappingPagedListResponse.
+type ModelProviderMappingPagedListResponse struct {
+	Data       []ModelProviderMapping `json:"data"`
+	Pagination Pagination             `json:"pagination"`
+	RequestId  RequestId              `json:"request_id"`
+}
+
 // ModelProviderMappingResponse defines model for ModelProviderMappingResponse.
 type ModelProviderMappingResponse struct {
 	Data      ModelProviderMapping `json:"data"`
@@ -12922,6 +12929,13 @@ type GetAdminErrorStreamParams struct {
 
 	// Since Unix-millisecond cursor used to replay buffered events.
 	Since *int64 `form:"since,omitempty" json:"since,omitempty"`
+}
+
+// ListAdminModelMappingsAllParams defines parameters for ListAdminModelMappingsAll.
+type ListAdminModelMappingsAllParams struct {
+	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+	Status   *Status   `form:"status,omitempty" json:"status,omitempty"`
 }
 
 // ListAdminModelsParams defines parameters for ListAdminModels.
@@ -22643,6 +22657,9 @@ type ServerInterface interface {
 	// Delete a per-account-group rate limit.
 	// (DELETE /api/v1/admin/group-rate-limits/{groupId})
 	DeleteAdminGroupRateLimit(w http.ResponseWriter, r *http.Request, groupId Id)
+	// List provider mappings across all models.
+	// (GET /api/v1/admin/model-mappings)
+	ListAdminModelMappingsAll(w http.ResponseWriter, r *http.Request, params ListAdminModelMappingsAllParams)
 	// List per-model rate limits.
 	// (GET /api/v1/admin/model-rate-limits)
 	ListAdminModelRateLimits(w http.ResponseWriter, r *http.Request)
@@ -28696,6 +28713,71 @@ func (siw *ServerInterfaceWrapper) DeleteAdminGroupRateLimit(w http.ResponseWrit
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.DeleteAdminGroupRateLimit(w, r, groupId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminModelMappingsAll operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminModelMappingsAll(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminModelMappingsAllParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminModelMappingsAll(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -39941,6 +40023,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/group-rate-limits", wrapper.ListAdminGroupRateLimits)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/group-rate-limits", wrapper.UpsertAdminGroupRateLimit)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/group-rate-limits/{groupId}", wrapper.DeleteAdminGroupRateLimit)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/model-mappings", wrapper.ListAdminModelMappingsAll)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/model-rate-limits", wrapper.ListAdminModelRateLimits)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/model-rate-limits", wrapper.UpsertAdminModelRateLimit)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/model-rate-limits/{modelId}", wrapper.DeleteAdminModelRateLimit)

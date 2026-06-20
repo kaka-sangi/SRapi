@@ -1651,6 +1651,12 @@ export type ModelProviderMappingListResponse = {
     request_id: RequestId;
 };
 
+export type ModelProviderMappingPagedListResponse = {
+    data: Array<ModelProviderMapping>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
 export type AdminQuickMapModelsRequest = {
     provider_id: Id;
     models: Array<string>;
@@ -12505,6 +12511,43 @@ export type QuickMapAdminModelsResponses = {
 };
 
 export type QuickMapAdminModelsResponse = QuickMapAdminModelsResponses[keyof QuickMapAdminModelsResponses];
+
+export type ListAdminModelMappingsAllData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+        status?: string;
+    };
+    url: '/api/v1/admin/model-mappings';
+};
+
+export type ListAdminModelMappingsAllErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminModelMappingsAllError = ListAdminModelMappingsAllErrors[keyof ListAdminModelMappingsAllErrors];
+
+export type ListAdminModelMappingsAllResponses = {
+    /**
+     * Model provider mapping list.
+     */
+    200: ModelProviderMappingPagedListResponse;
+};
+
+export type ListAdminModelMappingsAllResponse = ListAdminModelMappingsAllResponses[keyof ListAdminModelMappingsAllResponses];
 
 export type DeleteAdminModelData = {
     body?: never;

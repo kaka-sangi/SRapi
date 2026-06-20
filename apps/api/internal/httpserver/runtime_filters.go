@@ -56,6 +56,18 @@ func filterModels(models []modelcontract.Model, status, q string) []modelcontrac
 	return out
 }
 
+func filterModelMappings(mappings []modelcontract.ModelProviderMapping, status string) []modelcontract.ModelProviderMapping {
+	status = strings.TrimSpace(status)
+	out := make([]modelcontract.ModelProviderMapping, 0, len(mappings))
+	for _, mapping := range mappings {
+		if status != "" && string(mapping.Status) != status {
+			continue
+		}
+		out = append(out, mapping)
+	}
+	return out
+}
+
 func filterAccounts(accounts []accountcontract.ProviderAccount, status, providerID string) []accountcontract.ProviderAccount {
 	status = strings.TrimSpace(status)
 	providerID = strings.TrimSpace(providerID)

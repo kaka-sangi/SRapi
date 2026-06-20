@@ -336,6 +336,30 @@ func (s *Server) handleListAdminModels(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) handleListAdminModelMappingsAll(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	mappings, err := s.runtime.models.ListMappings(r.Context())
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list model mappings", requestID)
+		return
+	}
+	mappings = filterModelMappings(mappings, r.URL.Query().Get("status"))
+	data := make([]apiopenapi.ModelProviderMapping, 0, len(mappings))
+	for _, mapping := range mappings {
+		data = append(data, toAPIModelProviderMapping(mapping))
+	}
+	data, pg := paginate(r, data)
+	writeJSONAny(w, http.StatusOK, apiopenapi.ModelProviderMappingPagedListResponse{
+		Data:       data,
+		Pagination: pg,
+		RequestId:  requestID,
+	})
+}
+
 func (s *Server) handleCreateAdminModel(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	session, err := s.requireAdminSession(r)

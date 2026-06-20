@@ -281,6 +281,17 @@ func (s *Store) ListMappingsByModel(_ context.Context, modelID int) ([]contract.
 	return out, nil
 }
 
+func (s *Store) ListMappings(_ context.Context) ([]contract.ModelProviderMapping, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]contract.ModelProviderMapping, 0, len(s.mappingsByID))
+	for _, mapping := range s.mappingsByID {
+		out = append(out, cloneMapping(mapping))
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+
 func (s *Store) FindMappingByID(_ context.Context, id int) (contract.ModelProviderMapping, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

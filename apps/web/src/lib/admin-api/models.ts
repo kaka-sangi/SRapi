@@ -6,6 +6,7 @@ import {
   createAdminModelAlias,
   updateAdminModelAlias,
   quickMapAdminModels,
+  listAdminModelMappingsAll,
   listAdminModelAliases,
   deleteAdminModelAlias,
   createAdminModelMapping,
@@ -19,6 +20,7 @@ import type {
   AdminQuickMapModelsResult,
   Id,
   ListAdminModelsData,
+  ListAdminModelMappingsAllData,
   Model,
   ModelAlias,
   ModelProviderMapping,
@@ -30,6 +32,12 @@ import type { AdminListResult } from "./types";
 export const modelsApi = {
   listModels(query?: ListAdminModelsData["query"]): Promise<AdminListResult<Model>> {
     return unwrapList(() => listAdminModels({ query, throwOnError: true }));
+  },
+
+  listModelMappingsAll(
+    query?: ListAdminModelMappingsAllData["query"],
+  ): Promise<AdminListResult<ModelProviderMapping>> {
+    return unwrapList(() => listAdminModelMappingsAll({ query, throwOnError: true }));
   },
 
   quickMapModels(body: QuickMapAdminModelsData["body"]): Promise<AdminQuickMapModelsResult> {
