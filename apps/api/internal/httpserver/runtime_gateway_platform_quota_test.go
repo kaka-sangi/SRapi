@@ -174,6 +174,61 @@ func TestAdminUserPlatformQuotaRejectsInvalidMoneyLimits(t *testing.T) {
 	}
 }
 
+func TestAdminUserPlatformQuotasListsRequestedUser(t *testing.T) {
+	quotaStore := userplatformquotasmemory.New()
+	handler := New(config.Load(), nil, WithUserPlatformQuotasStore(quotaStore))
+
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	adminUserID, err := strconv.Atoi(loginResp.Data.User.Id)
+	if err != nil {
+		t.Fatalf("parse admin user id %q: %v", loginResp.Data.User.Id, err)
+	}
+
+	weekly := "7.00000000"
+	if _, err := quotaStore.UpsertQuota(context.Background(), userplatformquotascontract.UpsertQuota{
+		UserID:      adminUserID,
+		Platform:    "openai-compatible",
+		WeeklyLimit: &weekly,
+		Currency:    "USD",
+		Enabled:     true,
+	}); err != nil {
+		t.Fatalf("seed admin user platform quota: %v", err)
+	}
+	if _, err := quotaStore.UpsertQuota(context.Background(), userplatformquotascontract.UpsertQuota{
+		UserID:   adminUserID + 1,
+		Platform: "anthropic-compatible",
+		Currency: "USD",
+		Enabled:  true,
+	}); err != nil {
+		t.Fatalf("seed other user platform quota: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/users/"+strconv.Itoa(adminUserID)+"/platform-quotas", nil)
+	req.AddCookie(sessionCookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected admin platform quotas 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var resp apiopenapi.UserPlatformQuotaListResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode admin platform quotas: %v", err)
+	}
+	if len(resp.Data) != 1 {
+		t.Fatalf("expected one requested-user quota, got %+v", resp.Data)
+	}
+	quota := resp.Data[0]
+	if quota.UserId != int64(adminUserID) || quota.Platform != "openai-compatible" {
+		t.Fatalf("unexpected admin platform quota: %+v", quota)
+	}
+	if quota.WeeklyLimit == nil || *quota.WeeklyLimit != weekly {
+		t.Fatalf("expected weekly limit %q, got %+v", weekly, quota.WeeklyLimit)
+	}
+	if resp.Pagination.Total != 1 {
+		t.Fatalf("expected pagination total 1, got %+v", resp.Pagination)
+	}
+}
+
 func TestCurrentUserPlatformQuotasListsOwnQuotas(t *testing.T) {
 	quotaStore := userplatformquotasmemory.New()
 	handler := New(config.Load(), nil, WithUserPlatformQuotasStore(quotaStore))

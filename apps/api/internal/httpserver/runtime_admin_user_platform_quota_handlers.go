@@ -5,37 +5,15 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	userplatformquotascontract "github.com/srapi/srapi/apps/api/internal/modules/user_platform_quotas/contract"
 	userplatformquotasservice "github.com/srapi/srapi/apps/api/internal/modules/user_platform_quotas/service"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
-type userPlatformQuotaPayload struct {
-	UserID       int       `json:"user_id"`
-	Platform     string    `json:"platform"`
-	DailyLimit   *string   `json:"daily_limit"`
-	WeeklyLimit  *string   `json:"weekly_limit"`
-	MonthlyLimit *string   `json:"monthly_limit"`
-	Currency     string    `json:"currency"`
-	Enabled      bool      `json:"enabled"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-}
-
-type upsertUserPlatformQuotaRequest struct {
-	Platform     string  `json:"platform"`
-	DailyLimit   *string `json:"daily_limit"`
-	WeeklyLimit  *string `json:"weekly_limit"`
-	MonthlyLimit *string `json:"monthly_limit"`
-	Currency     string  `json:"currency"`
-	Enabled      *bool   `json:"enabled"`
-}
-
-func toUserPlatformQuotaPayload(quota userplatformquotascontract.Quota) userPlatformQuotaPayload {
-	return userPlatformQuotaPayload{
-		UserID:       quota.UserID,
+func toAPIUserPlatformQuota(quota userplatformquotascontract.Quota) apiopenapi.UserPlatformQuota {
+	return apiopenapi.UserPlatformQuota{
+		UserId:       int64(quota.UserID),
 		Platform:     quota.Platform,
 		DailyLimit:   quota.DailyLimit,
 		WeeklyLimit:  quota.WeeklyLimit,
@@ -63,16 +41,12 @@ func (s *Server) handleListAdminUserPlatformQuotas(w http.ResponseWriter, r *htt
 		s.writeUserPlatformQuotaError(w, err, requestID)
 		return
 	}
-	data := make([]userPlatformQuotaPayload, 0, len(quotas))
+	data := make([]apiopenapi.UserPlatformQuota, 0, len(quotas))
 	for _, quota := range quotas {
-		data = append(data, toUserPlatformQuotaPayload(quota))
+		data = append(data, toAPIUserPlatformQuota(quota))
 	}
 	data, pg := paginate(r, data)
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       data,
-		"pagination": pg,
-		"request_id": requestID,
-	})
+	writeJSONAny(w, http.StatusOK, apiopenapi.UserPlatformQuotaListResponse{Data: data, Pagination: pg, RequestId: requestID})
 }
 
 func (s *Server) handleListCurrentUserPlatformQuotas(w http.ResponseWriter, r *http.Request) {
@@ -87,16 +61,12 @@ func (s *Server) handleListCurrentUserPlatformQuotas(w http.ResponseWriter, r *h
 		s.writeUserPlatformQuotaError(w, err, requestID)
 		return
 	}
-	data := make([]userPlatformQuotaPayload, 0, len(quotas))
+	data := make([]apiopenapi.UserPlatformQuota, 0, len(quotas))
 	for _, quota := range quotas {
-		data = append(data, toUserPlatformQuotaPayload(quota))
+		data = append(data, toAPIUserPlatformQuota(quota))
 	}
 	data, pg := paginate(r, data)
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       data,
-		"pagination": pg,
-		"request_id": requestID,
-	})
+	writeJSONAny(w, http.StatusOK, apiopenapi.UserPlatformQuotaListResponse{Data: data, Pagination: pg, RequestId: requestID})
 }
 
 func (s *Server) handleUpsertAdminUserPlatformQuota(w http.ResponseWriter, r *http.Request) {
@@ -119,7 +89,7 @@ func (s *Server) handleUpsertAdminUserPlatformQuota(w http.ResponseWriter, r *ht
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "user not found", requestID)
 		return
 	}
-	var body upsertUserPlatformQuotaRequest
+	var body apiopenapi.UpsertUserPlatformQuotaRequest
 	if err := s.decodeJSONBody(w, r, &body); err != nil {
 		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid user platform quota request", requestID)
 		return
@@ -132,7 +102,10 @@ func (s *Server) handleUpsertAdminUserPlatformQuota(w http.ResponseWriter, r *ht
 	if body.Enabled != nil {
 		enabled = *body.Enabled
 	}
-	currency := strings.TrimSpace(body.Currency)
+	currency := ""
+	if body.Currency != nil {
+		currency = strings.TrimSpace(*body.Currency)
+	}
 	if currency == "" {
 		currency = "USD"
 	}
@@ -157,10 +130,7 @@ func (s *Server) handleUpsertAdminUserPlatformQuota(w http.ResponseWriter, r *ht
 		"monthly_limit": quota.MonthlyLimit,
 		"enabled":       quota.Enabled,
 	}))
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       toUserPlatformQuotaPayload(quota),
-		"request_id": requestID,
-	})
+	writeJSONAny(w, http.StatusOK, apiopenapi.UserPlatformQuotaResponse{Data: toAPIUserPlatformQuota(quota), RequestId: requestID})
 }
 
 func (s *Server) handleDeleteAdminUserPlatformQuota(w http.ResponseWriter, r *http.Request) {
