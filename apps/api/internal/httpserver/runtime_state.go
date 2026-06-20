@@ -368,22 +368,7 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		return nil, err
 	}
 
-	reverseProxySvc, err := reverseproxyservice.New(nil, reverseproxyservice.WithBlockedPrivateEgress(cfg.Server.Mode != "local"))
-	if err != nil {
-		return nil, err
-	}
-
-	adaptersSvc, err := provideradapterservice.NewWithReverseProxy(
-		&http.Client{Timeout: cfg.Gateway.RequestTimeout},
-		reverseProxySvc,
-		// Synthesize fake upstream responses only in local/dev. In any other mode a
-		// missing base_url must hard-error so customers are never billed for fakes.
-		provideradapterservice.WithLocalStub(cfg.Server.Mode == "local"),
-		// Plumb the deployment config so the codex.go request-build path can
-		// consult the global OAuth model-alias map and DisableImageGeneration
-		// enum (ported from CLIProxyAPI). nil-safe at the helper level.
-		provideradapterservice.WithConfig(&cfg),
-	)
+	adapterRuntime, err := newGatewayAdapterRuntime(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -466,6 +451,7 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 	if err != nil {
 		return nil, err
 	}
+	sessionAffinityStore := sessionAffinityStoreForRuntime(opts, allowMemoryStores)
 
 	rt := assembleRuntimeState(cfg, logger, opts, runtimeAssembly{
 		usersSvc:                access.usersSvc,
@@ -481,9 +467,9 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		gatewaySvc:              gatewaySvc,
 		providersSvc:            providersSvc,
 		modelsSvc:               modelsSvc,
-		adaptersSvc:             adaptersSvc,
+		adaptersSvc:             adapterRuntime.adaptersSvc,
 		realtimeSvc:             realtimeSvc,
-		reverseProxySvc:         reverseProxySvc,
+		reverseProxySvc:         adapterRuntime.reverseProxySvc,
 		accountsSvc:             accountsSvc,
 		adminControlSvc:         adminControlSvc,
 		qualityEvalSvc:          qualityEvalSvc,
@@ -512,6 +498,7 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		totpStore:               access.totpStore,
 		usageStore:              usageStore,
 	})
+	rt.sessionAffinity = sessionAffinityStore
 	idempotencyStore := opts.idempotency
 	if idempotencyStore == nil {
 		if !allowMemoryStores {
@@ -535,6 +522,28 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 	}
 	rt.startUsageWriters(cfg.Gateway.UsageMaxConcurrency)
 	return rt, nil
+}
+
+func newGatewayAdapterRuntime(cfg config.Config) (gatewayAdapterRuntime, error) {
+	reverseProxySvc, err := reverseproxyservice.New(nil, reverseproxyservice.WithBlockedPrivateEgress(cfg.Server.Mode != "local"))
+	if err != nil {
+		return gatewayAdapterRuntime{}, err
+	}
+	adaptersSvc, err := provideradapterservice.NewWithReverseProxy(
+		&http.Client{Timeout: cfg.Gateway.RequestTimeout},
+		reverseProxySvc,
+		// Synthesize fake upstream responses only in local/dev. In any other mode a
+		// missing base_url must hard-error so customers are never billed for fakes.
+		provideradapterservice.WithLocalStub(cfg.Server.Mode == "local"),
+		// Plumb the deployment config so the codex.go request-build path can
+		// consult the global OAuth model-alias map and DisableImageGeneration
+		// enum (ported from CLIProxyAPI). nil-safe at the helper level.
+		provideradapterservice.WithConfig(&cfg),
+	)
+	if err != nil {
+		return gatewayAdapterRuntime{}, err
+	}
+	return gatewayAdapterRuntime{adaptersSvc: adaptersSvc, reverseProxySvc: reverseProxySvc}, nil
 }
 
 // buildCapabilityServices wires the sub2api gap-closure services (user
@@ -1024,6 +1033,11 @@ type runtimeAssembly struct {
 	usageStore              usagecontract.Store
 }
 
+type gatewayAdapterRuntime struct {
+	adaptersSvc     *provideradapterservice.Service
+	reverseProxySvc *reverseproxyservice.Service
+}
+
 func assembleRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions, assembly runtimeAssembly) *runtimeState {
 	return &runtimeState{
 		cfg:                  cfg,
@@ -1190,9 +1204,19 @@ func newOperationsRuntime(store operationscontract.Store, usageStore usagecontra
 // NewMemorySessionAffinityStore builds a per-instance in-memory session affinity
 // store. The app bootstrap uses it as a best-effort fallback when Redis is not
 // configured (it cannot import the module package directly under the architecture
-// rules). Tests that build the handler without injecting a store leave session
-// affinity disabled, so this never changes default test behavior.
+// rules). Memory-storage runtimes also fall back to this store so gateway
+// resources that need follow-up account affinity can work in local/test mode.
 func NewMemorySessionAffinityStore() sessionaffinitycontract.Store {
+	return sessionaffinitymemory.New()
+}
+
+func sessionAffinityStoreForRuntime(opts runtimeOptions, allowMemoryStores bool) sessionaffinitycontract.Store {
+	if opts.sessionAffinity != nil {
+		return opts.sessionAffinity
+	}
+	if !allowMemoryStores {
+		return nil
+	}
 	return sessionaffinitymemory.New()
 }
 

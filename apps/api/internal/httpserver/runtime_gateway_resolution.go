@@ -253,6 +253,7 @@ func providerScopedCapabilityKeys() []string {
 		capabilitiescontract.KeyMessages,
 		capabilitiescontract.KeyEmbeddings,
 		capabilitiescontract.KeyImages,
+		capabilitiescontract.KeyVideos,
 		capabilitiescontract.KeyAudioTranscriptions,
 		capabilitiescontract.KeyAudioSpeech,
 		capabilitiescontract.KeyModerations,

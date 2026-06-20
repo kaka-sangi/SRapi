@@ -7343,6 +7343,106 @@ func TestGatewayImageGenerationRouteTargetsOpenAICompatibleUpstream(t *testing.T
 	}
 }
 
+func TestGatewayVideoRouteBindsFollowUpReadsToCreatedAccount(t *testing.T) {
+	type upstreamCall struct {
+		Account string
+		Path    string
+		Method  string
+	}
+	var (
+		mu    sync.Mutex
+		calls []upstreamCall
+	)
+	content := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "video/mp4")
+		w.Header().Set("Content-Disposition", `attachment; filename="vid-123.mp4"`)
+		_, _ = w.Write([]byte("video-bytes"))
+	}))
+	defer content.Close()
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		account := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		mu.Lock()
+		calls = append(calls, upstreamCall{Account: account, Path: r.URL.Path, Method: r.Method})
+		mu.Unlock()
+		if account != "primary-video-secret" {
+			t.Fatalf("video follow-up escaped bound account: account=%s path=%s", account, r.URL.Path)
+		}
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/videos/generations":
+			var payload struct {
+				Model    string `json:"model"`
+				Prompt   string `json:"prompt"`
+				Duration int    `json:"duration"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				t.Fatalf("decode video create payload: %v", err)
+			}
+			if payload.Model != "grok-imagine-video" || payload.Prompt != "make a clean test video" || payload.Duration != 4 {
+				t.Fatalf("unexpected video create payload: %+v", payload)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"request_id":"vid_123","status":"queued","progress":0,"created_at":1710000200}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/videos/vid_123":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"request_id":"vid_123","status":"completed","progress":100,"created_at":1710000200,"video":{"url":"` + content.URL + `/vid_123.mp4"}}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"wp-video-provider","display_name":"WP Video Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"videos":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"sora-2","display_name":"Sora 2","status":"active","capabilities":[{"key":"videos","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"grok-imagine-video","status":"active"}`)
+	primaryAccount := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp-video-primary","runtime_class":"api_key","credential":{"api_key":"primary-video-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active","priority":0}`)
+	_ = primaryAccount
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp-video-secondary","runtime_class":"api_key","credential":{"api_key":"secondary-video-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active","priority":100}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	createRec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/videos", `{"model":"sora-2","prompt":"make a clean test video","seconds":4,"size":"720x1280"}`)
+	var created apiopenapi.VideoObject
+	if err := json.NewDecoder(createRec.Body).Decode(&created); err != nil {
+		t.Fatalf("decode video create response: %v", err)
+	}
+	if created.Id != "vid_123" || created.Status != apiopenapi.Queued || created.Model != "sora-2" {
+		t.Fatalf("unexpected create video response: %+v", created)
+	}
+
+	retrieveRec := mustGatewayRequest(t, handler, apiKey, http.MethodGet, "/v1/videos/vid_123", "")
+	var retrieved apiopenapi.VideoObject
+	if err := json.NewDecoder(retrieveRec.Body).Decode(&retrieved); err != nil {
+		t.Fatalf("decode video retrieve response: %v", err)
+	}
+	if retrieved.Id != "vid_123" || retrieved.Status != apiopenapi.Completed || retrieved.Progress == nil || *retrieved.Progress != 100 {
+		t.Fatalf("unexpected retrieve video response: %+v", retrieved)
+	}
+
+	contentReq := httptest.NewRequest(http.MethodGet, "/v1/videos/vid_123/content", nil)
+	contentReq.Header.Set("Authorization", "Bearer "+apiKey)
+	contentRec := httptest.NewRecorder()
+	handler.ServeHTTP(contentRec, contentReq)
+	if contentRec.Code != http.StatusOK {
+		t.Fatalf("expected content 200, got %d body=%s", contentRec.Code, contentRec.Body.String())
+	}
+	if contentRec.Header().Get("Content-Type") != "video/mp4" || contentRec.Body.String() != "video-bytes" {
+		t.Fatalf("unexpected content response: type=%q body=%q", contentRec.Header().Get("Content-Type"), contentRec.Body.String())
+	}
+
+	mu.Lock()
+	gotCalls := append([]upstreamCall(nil), calls...)
+	mu.Unlock()
+	if len(gotCalls) != 3 {
+		t.Fatalf("expected create, retrieve, content metadata calls, got %+v", gotCalls)
+	}
+	for _, call := range gotCalls {
+		if call.Account != "primary-video-secret" {
+			t.Fatalf("expected all video calls on primary account, got %+v", gotCalls)
+		}
+	}
+}
+
 func TestGatewayImageGenerationStreamReturnsSSE(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload map[string]any

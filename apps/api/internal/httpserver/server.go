@@ -848,6 +848,9 @@ func (s *Server) registerGatewayEndpointRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v1/images/generations", s.handleCreateImageGeneration)
 	mux.HandleFunc("POST /v1/images/edits", s.handleCreateImageEdit)
 	mux.HandleFunc("POST /v1/images/variations", s.handleCreateImageVariation)
+	mux.HandleFunc("POST /v1/videos", s.withGatewayIdempotency(s.handleCreateVideo))
+	mux.HandleFunc("GET /v1/videos/{video_id}", s.handleRetrieveVideo)
+	mux.HandleFunc("GET /v1/videos/{video_id}/content", s.handleDownloadVideoContent)
 	mux.HandleFunc("POST /v1/audio/transcriptions", s.handleCreateAudioTranscription)
 	mux.HandleFunc("POST /v1/audio/speech", s.handleCreateAudioSpeech)
 	mux.HandleFunc("POST /v1/moderations", s.handleCreateModeration)
@@ -1259,6 +1262,9 @@ func (s *Server) registerGatewayProviderAliases(mux *http.ServeMux) {
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "images/generations", s.handleCreateImageGeneration, presetSupports(preset, capabilitiescontract.KeyImages))
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "images/edits", s.handleCreateImageEdit, presetSupports(preset, capabilitiescontract.KeyImages))
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "images/variations", s.handleCreateImageVariation, presetSupports(preset, capabilitiescontract.KeyImages))
+			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "videos", s.handleCreateVideo, presetSupports(preset, capabilitiescontract.KeyVideos))
+			s.registerGatewayAliasRouteForMethod(mux, seen, http.MethodGet, preset.ProviderKey, prefix, "videos/{video_id}", s.handleRetrieveVideo, presetSupports(preset, capabilitiescontract.KeyVideos))
+			s.registerGatewayAliasRouteForMethod(mux, seen, http.MethodGet, preset.ProviderKey, prefix, "videos/{video_id}/content", s.handleDownloadVideoContent, presetSupports(preset, capabilitiescontract.KeyVideos))
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "audio/transcriptions", s.handleCreateAudioTranscription, presetSupports(preset, capabilitiescontract.KeyAudioTranscriptions))
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "audio/speech", s.handleCreateAudioSpeech, presetSupports(preset, capabilitiescontract.KeyAudioSpeech))
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "moderations", s.handleCreateModeration, presetSupports(preset, capabilitiescontract.KeyModerations))
@@ -1307,7 +1313,7 @@ func gatewayAliasRouteUsesIdempotency(method, endpoint string) bool {
 		return false
 	}
 	switch strings.Trim(strings.ToLower(strings.TrimSpace(endpoint)), "/") {
-	case "chat/completions", "responses", "responses/compact", "messages", "embeddings":
+	case "chat/completions", "responses", "responses/compact", "messages", "embeddings", "videos":
 		return true
 	default:
 		return false

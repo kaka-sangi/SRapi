@@ -16,6 +16,7 @@ export const MODEL_CAPABILITY_OPTIONS: { value: string; label: string }[] = [
   { value: "gemini_count_tokens", label: "Gemini · count tokens" },
   { value: "embeddings", label: "Embeddings" },
   { value: "images", label: "Images" },
+  { value: "videos", label: "Videos" },
   { value: "audio_transcriptions", label: "Audio · transcriptions" },
   { value: "audio_speech", label: "Audio · speech" },
   { value: "moderations", label: "Moderations" },

@@ -76,6 +76,7 @@ describe("MODEL_CAPABILITY_OPTIONS", () => {
       "gemini_count_tokens",
       "embeddings",
       "images",
+      "videos",
       "audio_transcriptions",
       "audio_speech",
       "moderations",

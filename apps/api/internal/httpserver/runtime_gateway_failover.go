@@ -432,6 +432,41 @@ func (s *Server) invokeProviderImageGenerationWithFailover(
 		})
 }
 
+func (s *Server) invokeProviderVideoWithFailover(
+	ctx context.Context,
+	r *http.Request,
+	authed apikeycontract.AuthResult,
+	canonical gatewaycontract.CanonicalRequest,
+	scheduleReq schedulercontract.ScheduleRequest,
+	modelID int,
+	forcedProviderKey string,
+	admission gatewayAdmission,
+	startedAt time.Time,
+	operation provideradaptercontract.VideoOperation,
+) gatewayFailoverResult[provideradaptercontract.VideoResponse] {
+	return invokeGatewayCandidateWithFailover(s, ctx, r, authed, canonical, scheduleReq, modelID, forcedProviderKey, admission, startedAt,
+		func(ctx context.Context, candidate schedulercontract.Candidate) (provideradaptercontract.VideoResponse, error) {
+			return s.runtime.invokeProviderVideo(ctx, providerVideoRequest(canonical, candidate, operation, r))
+		})
+}
+
+func (s *Server) invokeProviderVideoContentWithFailover(
+	ctx context.Context,
+	r *http.Request,
+	authed apikeycontract.AuthResult,
+	canonical gatewaycontract.CanonicalRequest,
+	scheduleReq schedulercontract.ScheduleRequest,
+	modelID int,
+	forcedProviderKey string,
+	admission gatewayAdmission,
+	startedAt time.Time,
+) gatewayFailoverResult[provideradaptercontract.VideoContentResponse] {
+	return invokeGatewayCandidateWithFailover(s, ctx, r, authed, canonical, scheduleReq, modelID, forcedProviderKey, admission, startedAt,
+		func(ctx context.Context, candidate schedulercontract.Candidate) (provideradaptercontract.VideoContentResponse, error) {
+			return s.runtime.invokeProviderVideoContent(ctx, providerVideoRequest(canonical, candidate, provideradaptercontract.VideoOperationContent, r))
+		})
+}
+
 func (s *Server) invokeProviderImageEditWithFailover(
 	ctx context.Context,
 	r *http.Request,

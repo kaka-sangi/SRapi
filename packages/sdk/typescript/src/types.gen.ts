@@ -6386,6 +6386,76 @@ export type ImageGenerationResponse = {
     data: Array<ImageGenerationObject>;
 };
 
+export type VideoCreateRequest = {
+    model: string;
+    prompt: string;
+    seconds?: number;
+    /**
+     * Provider-compatible alias for `seconds`.
+     */
+    duration?: number;
+    /**
+     * OpenAI-style output size such as `720x1280`, `1280x720`, `1024x1024`, or `auto`.
+     */
+    size?: string;
+    /**
+     * Provider-specific aspect ratio override, for example `16:9`, `9:16`, or `1:1`.
+     */
+    aspect_ratio?: string;
+    /**
+     * Provider-specific resolution override, for example `720p` or `1080p`.
+     */
+    resolution?: string;
+    input_reference?: VideoReference;
+    image?: VideoReference;
+    /**
+     * Alias for an image URL input reference.
+     */
+    image_url?: string;
+    /**
+     * Optional reference images. SRapi rejects requests that combine `input_reference`/`image` with reference images.
+     */
+    reference_images?: Array<VideoReference>;
+    /**
+     * Optional reference image URLs.
+     */
+    reference_image_urls?: Array<string>;
+    user?: string;
+    [key: string]: unknown;
+};
+
+export type VideoReference = string | {
+    image_url?: string | {
+        url?: string;
+        [key: string]: unknown;
+    };
+    url?: string;
+    file_id?: string;
+    [key: string]: unknown;
+};
+
+export type VideoError = {
+    code?: string;
+    message?: string;
+    [key: string]: unknown;
+};
+
+export type VideoObject = {
+    id: string;
+    object: 'video';
+    model: string;
+    status: 'queued' | 'in_progress' | 'completed' | 'failed';
+    progress?: number;
+    prompt?: string;
+    seconds?: number;
+    size?: string;
+    created_at?: number;
+    completed_at?: number;
+    expires_at?: number;
+    error?: VideoError;
+    [key: string]: unknown;
+};
+
 export type ImageGenerationStreamEvent = {
     object: 'image.generation.result';
     created: number;
@@ -21800,6 +21870,155 @@ export type CreateImageVariationResponses = {
 };
 
 export type CreateImageVariationResponse = CreateImageVariationResponses[keyof CreateImageVariationResponses];
+
+export type CreateVideoData = {
+    body: VideoCreateRequest;
+    path?: never;
+    query?: never;
+    url: '/v1/videos';
+};
+
+export type CreateVideoErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateVideoError = CreateVideoErrors[keyof CreateVideoErrors];
+
+export type CreateVideoResponses = {
+    /**
+     * OpenAI-compatible video job response.
+     */
+    200: VideoObject;
+};
+
+export type CreateVideoResponse = CreateVideoResponses[keyof CreateVideoResponses];
+
+export type RetrieveVideoData = {
+    body?: never;
+    path: {
+        video_id: string;
+    };
+    query?: {
+        /**
+         * Optional model reference for scheduler capability resolution. When omitted, SRapi uses `sora-2`.
+         */
+        model?: string;
+    };
+    url: '/v1/videos/{video_id}';
+};
+
+export type RetrieveVideoErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    404: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type RetrieveVideoError = RetrieveVideoErrors[keyof RetrieveVideoErrors];
+
+export type RetrieveVideoResponses = {
+    /**
+     * OpenAI-compatible video job response.
+     */
+    200: VideoObject;
+};
+
+export type RetrieveVideoResponse = RetrieveVideoResponses[keyof RetrieveVideoResponses];
+
+export type DownloadVideoContentData = {
+    body?: never;
+    path: {
+        video_id: string;
+    };
+    query?: {
+        /**
+         * Optional model reference for scheduler capability resolution. When omitted, SRapi uses `sora-2`.
+         */
+        model?: string;
+    };
+    url: '/v1/videos/{video_id}/content';
+};
+
+export type DownloadVideoContentErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    404: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type DownloadVideoContentError = DownloadVideoContentErrors[keyof DownloadVideoContentErrors];
+
+export type DownloadVideoContentResponses = {
+    /**
+     * Binary video content.
+     */
+    200: Blob | File;
+};
+
+export type DownloadVideoContentResponse = DownloadVideoContentResponses[keyof DownloadVideoContentResponses];
 
 export type CreateAudioTranscriptionData = {
     body: AudioTranscriptionRequest;

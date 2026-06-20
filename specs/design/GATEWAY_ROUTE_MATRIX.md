@@ -58,6 +58,9 @@ OpenAI-compatible preset:
   POST {alias}/v1/images/generations
   POST {alias}/v1/images/edits
   POST {alias}/v1/images/variations
+  POST {alias}/v1/videos
+  GET  {alias}/v1/videos/{video_id}
+  GET  {alias}/v1/videos/{video_id}/content
   POST {alias}/v1/audio/transcriptions
   POST {alias}/v1/audio/speech
   POST {alias}/v1/moderations
@@ -198,6 +201,9 @@ Antigravity adapter 会把生成请求转为 `v1internal:generateContent` /
 | `/v1/images/generations` | Media runtime | 最小解析 OpenAI image generation body，调度后调用 OpenAI-compatible `/images/generations`，记录 media/usage 和调度证据。 | Shipped (WP-290) |
 | `/v1/images/edits` | Media runtime | 最小解析 OpenAI-compatible multipart image edit body 和 JSON 本地图像引用，支持 `image` / `image[]` / `images`、可选 `mask`、`prompt/model` 与输出选项，调度后调用 OpenAI-compatible multipart `/images/edits`，记录 media/usage 和调度证据。`stream=true` 返回 SSE 的最终 `image.generation.result` chunk；Remote URL 和 `file_id` references 仍需后续安全边界。 | Shipped (WP-480, WP-510, WP-520) |
 | `/v1/images/variations` | Media runtime | 最小解析 OpenAI-compatible multipart image variation body，支持单个 `image`、`model`、`n`、`size`、`response_format` 和 `user`，调度后调用 OpenAI-compatible `/images/variations`，记录 media/usage 和调度证据。OpenAI 官方上游当前仅支持 `dall-e-2`。 | Shipped (WP-490) |
+| `/v1/videos` | Video runtime | 最小解析 OpenAI-style video generation body，调度前要求 `videos` capability，调度后调用 xAI/OpenAI-compatible `/videos/generations`，记录 usage、quota signals 和调度证据；成功创建的视频 ID 绑定到选中 Provider Account，后续读取必须命中该绑定。 | Shipped |
+| `/v1/videos/{video_id}` | Video runtime | 读取 OpenAI-style video metadata；Gateway 先按 API Key + video ID 查找创建时账号绑定，再使用 hard sticky 调度到同一账号并调用上游 `/videos/{video_id}`。缺少或过期绑定返回 `video_binding_not_found`，避免跨账号读取。 | Shipped |
+| `/v1/videos/{video_id}/content` | Video runtime | 读取 video content binary stream；复用 video ID 账号绑定和 hard sticky 调度，Provider Adapter 先读取上游 video metadata 中的 content URL，再用选中账号凭证下载并流式返回。 | Shipped |
 | `/v1/audio/transcriptions` | Audio runtime | 最小解析 multipart audio transcription body，调度后调用 OpenAI-compatible `/audio/transcriptions`，记录 audio/usage 和调度证据。 | Shipped (WP-330) |
 | `/v1/audio/speech` | Audio runtime | 最小解析 OpenAI speech JSON body，调度后调用 OpenAI-compatible `/audio/speech`，返回 binary audio 并记录 usage 和调度证据。 | Shipped (WP-340) |
 | `/v1/moderations` | Moderation runtime | 最小解析 OpenAI moderation body，调度后调用 OpenAI-compatible `/moderations`，记录用量和调度证据。 | Shipped (WP-310) |

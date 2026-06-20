@@ -1651,6 +1651,120 @@ func TestOpenAICompatibleAdapterInvokesImageGenerationsUpstream(t *testing.T) {
 	assertQuotaSignal(t, resp.QuotaSignals, "codex_5h_percent", "34", "66", "100", 0.66)
 }
 
+func TestOpenAICompatibleAdapterInvokesXAIVideoCreate(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/videos/generations" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer video-secret" {
+			t.Fatalf("unexpected auth header %q", got)
+		}
+		if got := r.Header.Get("x-idempotency-key"); got != "video-key-1" {
+			t.Fatalf("unexpected idempotency header %q", got)
+		}
+		var payload struct {
+			Model           string           `json:"model"`
+			Prompt          string           `json:"prompt"`
+			Duration        int              `json:"duration"`
+			AspectRatio     string           `json:"aspect_ratio"`
+			Resolution      string           `json:"resolution"`
+			ReferenceImages []map[string]any `json:"reference_images"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if payload.Model != "grok-imagine-video" || payload.Prompt != "make a video" || payload.Duration != 10 {
+			t.Fatalf("unexpected video payload: %+v", payload)
+		}
+		if payload.AspectRatio != "16:9" || payload.Resolution != "720p" || len(payload.ReferenceImages) != 1 || payload.ReferenceImages[0]["url"] != "https://example.test/ref.png" {
+			t.Fatalf("unexpected video controls: %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Codex-Primary-Used-Percent", "17")
+		w.Header().Set("X-Codex-Primary-Reset-After-Seconds", "3600")
+		w.Header().Set("X-Codex-Primary-Window-Minutes", "10080")
+		_, _ = w.Write([]byte(`{"request_id":"vid_123","status":"queued","progress":0,"created_at":1710000002}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeVideo(context.Background(), contract.VideoRequest{
+		RequestID:       "req_video",
+		Model:           "sora-2",
+		Operation:       contract.VideoOperationCreate,
+		Prompt:          "make a video",
+		Seconds:         15,
+		Size:            "1280x720",
+		ReferenceImages: []string{"https://example.test/ref.png"},
+		Provider:        providercontract.Provider{ID: 1, AdapterType: "openai-compatible", Protocol: "openai-compatible"},
+		Account:         accountcontract.ProviderAccount{ID: 1, Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:         modelcontract.ModelProviderMapping{UpstreamModelName: "sora-2"},
+		Credential:      map[string]any{"api_key": "video-secret"},
+		RequestSettings: map[string]any{"idempotency_key": "video-key-1"},
+	})
+	if err != nil {
+		t.Fatalf("invoke video create: %v", err)
+	}
+	if resp.ID != "vid_123" || resp.Model != "sora-2" || resp.Status != "queued" || resp.Progress == nil || *resp.Progress != 0 {
+		t.Fatalf("unexpected video response: %+v", resp)
+	}
+	if len(resp.QuotaSignals) != 1 {
+		t.Fatalf("expected passive quota signal, got %+v", resp.QuotaSignals)
+	}
+	assertQuotaSignal(t, resp.QuotaSignals, "codex_7d_percent", "17", "83", "100", 0.83)
+}
+
+func TestOpenAICompatibleAdapterStreamsXAIVideoContent(t *testing.T) {
+	content := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "video/mp4")
+		w.Header().Set("Content-Disposition", `attachment; filename="video.mp4"`)
+		w.Header().Set("ETag", `"video-etag"`)
+		_, _ = w.Write([]byte("mp4-bytes"))
+	}))
+	defer content.Close()
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/videos/vid_456" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer video-secret" {
+			t.Fatalf("unexpected auth header %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"request_id":"vid_456","status":"completed","progress":100,"video":{"url":"` + content.URL + `/video.mp4"}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeVideoContent(context.Background(), contract.VideoRequest{
+		RequestID:  "req_video_content",
+		Model:      "sora-2",
+		Operation:  contract.VideoOperationContent,
+		VideoID:    "vid_456",
+		Provider:   providercontract.Provider{ID: 1, AdapterType: "openai-compatible", Protocol: "openai-compatible"},
+		Account:    accountcontract.ProviderAccount{ID: 1, Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "grok-imagine-video"},
+		Credential: map[string]any{"api_key": "video-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke video content: %v", err)
+	}
+	defer resp.Content.Close()
+	raw, err := io.ReadAll(resp.Content)
+	if err != nil {
+		t.Fatalf("read video content: %v", err)
+	}
+	if string(raw) != "mp4-bytes" || resp.ContentType != "video/mp4" || resp.Headers.Get("Content-Disposition") == "" || resp.Headers.Get("ETag") != `"video-etag"` {
+		t.Fatalf("unexpected content response: content=%q type=%q headers=%+v", raw, resp.ContentType, resp.Headers)
+	}
+}
+
 func TestOpenAICompatibleAdapterInvokesImageEditsUpstream(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/images/edits" {

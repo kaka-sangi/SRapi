@@ -36,6 +36,7 @@ const (
 	// hash in a digest chain.
 	gatewaySessionDigestHashLen          = 16
 	gatewayPreviousResponseSessionPrefix = "sid:prev:"
+	gatewayVideoResultSessionPrefix      = "sid:video:"
 )
 
 // legacyAnthropicUserIDRegex matches Claude Code's legacy metadata.user_id
@@ -222,6 +223,14 @@ func gatewayPreviousResponseSessionKey(responseID string) string {
 	return gatewayPreviousResponseSessionPrefix + shortDigest(responseID)
 }
 
+func gatewayVideoResultSessionKey(videoID string) string {
+	videoID = strings.TrimSpace(videoID)
+	if videoID == "" {
+		return ""
+	}
+	return gatewayVideoResultSessionPrefix + shortDigest(videoID)
+}
+
 func gatewayHeaderValue(headers http.Header, key string) string {
 	if headers == nil {
 		return ""
@@ -378,6 +387,14 @@ func (rt *runtimeState) bindGatewayPreviousResponseAffinity(ctx context.Context,
 	rt.bindGatewaySessionAffinity(ctx, apiKeyID, gatewayPreviousResponseSessionKey(responseID), accountID)
 }
 
+func (rt *runtimeState) lookupGatewayVideoResultAffinity(ctx context.Context, apiKeyID int, videoID string) (int, bool) {
+	return rt.lookupGatewaySessionAffinity(ctx, apiKeyID, gatewayVideoResultSessionKey(videoID))
+}
+
+func (rt *runtimeState) bindGatewayVideoResultAffinity(ctx context.Context, apiKeyID int, videoID string, accountID int) {
+	rt.bindGatewaySessionAffinity(ctx, apiKeyID, gatewayVideoResultSessionKey(videoID), accountID)
+}
+
 // gatewayConversationSessionID maps a session key to a stable per-conversation
 // id used for session-count limits. For a digest chain (which grows each turn)
 // it keys off the stable conversation root (system + first turn) so every turn
@@ -413,7 +430,8 @@ func gatewayConversationSessionID(sessionKey string) string {
 }
 
 func gatewayAccountSessionID(sessionKey string) string {
-	if strings.HasPrefix(strings.TrimSpace(sessionKey), gatewayPreviousResponseSessionPrefix) {
+	trimmed := strings.TrimSpace(sessionKey)
+	if strings.HasPrefix(trimmed, gatewayPreviousResponseSessionPrefix) || strings.HasPrefix(trimmed, gatewayVideoResultSessionPrefix) {
 		return ""
 	}
 	return gatewayConversationSessionID(sessionKey)

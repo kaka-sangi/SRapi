@@ -42,6 +42,9 @@ POST /v1/embeddings
 POST /v1/images/generations
 POST /v1/images/edits
 POST /v1/images/variations
+POST /v1/videos
+GET  /v1/videos/{video_id}
+GET  /v1/videos/{video_id}/content
 POST /v1/audio/transcriptions
 POST /v1/audio/speech
 POST /v1/moderations
@@ -54,6 +57,13 @@ Roadmap（尚未实现）：
 ```txt
 POST /v1/batches
 ```
+
+`/v1/videos` 是 OpenAI-style video generation Gateway route。Gateway 最小解析
+JSON body，调度前要求 `videos.v1` capability，Provider Adapter 当前调用
+xAI/OpenAI-compatible `/videos/generations` 上游。成功 create 会把返回的 video ID
+按 API Key 绑定到选中的 Provider Account；`GET /v1/videos/{video_id}` 和
+`GET /v1/videos/{video_id}/content` 必须先找到该绑定，再 hard sticky 调度回同一账号。
+缺少或过期绑定返回 `video_binding_not_found`，避免不同上游账号之间读取视频状态或内容。
 
 ### 2.2 Anthropic-compatible
 

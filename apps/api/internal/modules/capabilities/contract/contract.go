@@ -57,6 +57,7 @@ const (
 	KeyGeminiCountTokens     = "gemini_count_tokens"
 	KeyEmbeddings            = "embeddings"
 	KeyImages                = "images"
+	KeyVideos                = "videos"
 	KeyAudioTranscriptions   = "audio_transcriptions"
 	KeyAudioSpeech           = "audio_speech"
 	KeyModerations           = "moderations"
@@ -108,6 +109,7 @@ var defaultDefinitions = []Definition{
 	{Key: KeyGeminiCountTokens, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports Gemini-compatible countTokens requests."},
 	{Key: KeyEmbeddings, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports embeddings."},
 	{Key: KeyImages, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports image generation."},
+	{Key: KeyVideos, Version: "v1", Category: "endpoint", Status: DefinitionStatusExperimental, Description: "Provider supports video generation and retrieval."},
 	{Key: KeyAudioTranscriptions, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports audio transcription."},
 	{Key: KeyAudioSpeech, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports audio speech synthesis."},
 	{Key: KeyModerations, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports moderation classification."},
@@ -170,6 +172,9 @@ var convenienceKeys = map[string]string{
 	"gemini_count_tokens":              KeyGeminiCountTokens,
 	"supports_embeddings":              KeyEmbeddings,
 	"supports_images":                  KeyImages,
+	"supports_videos":                  KeyVideos,
+	"video":                            KeyVideos,
+	"videos":                           KeyVideos,
 	"supports_audio":                   KeyAudioTranscriptions,
 	"supports_audio_transcriptions":    KeyAudioTranscriptions,
 	"audio":                            KeyAudioTranscriptions,

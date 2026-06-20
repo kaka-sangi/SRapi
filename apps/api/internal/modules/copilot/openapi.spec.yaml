@@ -13753,6 +13753,162 @@ paths:
         default:
           $ref: "#/components/responses/GatewayError"
 
+  /v1/videos:
+    post:
+      tags:
+        - Gateway
+      operationId: createVideo
+      summary: Create an OpenAI-compatible video job.
+      description: OpenAI-compatible video route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account with videos effective capability, invokes the selected xAI-compatible video adapter, binds the returned video id to the serving account for follow-up reads, and records media usage and Scheduler evidence.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VideoCreateRequest"
+            examples:
+              basic:
+                value:
+                  model: sora-2
+                  prompt: A cinematic product reveal of a stainless steel water bottle on a white desk
+                  seconds: 4
+                  size: 720x1280
+      responses:
+        "200":
+          description: OpenAI-compatible video job response.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VideoObject"
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /v1/videos/{video_id}:
+    get:
+      tags:
+        - Gateway
+      operationId: retrieveVideo
+      summary: Retrieve an OpenAI-compatible video job.
+      description: Retrieves a video job using the account binding created by `/v1/videos`. SRapi intentionally fails when the binding is missing or expired so follow-up reads do not leak to a different upstream account.
+      security:
+        - gatewayBearerAuth: []
+      parameters:
+        - name: video_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: model
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional model reference for scheduler capability resolution. When omitted, SRapi uses `sora-2`.
+      responses:
+        "200":
+          description: OpenAI-compatible video job response.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VideoObject"
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "404":
+          $ref: "#/components/responses/GatewayError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /v1/videos/{video_id}/content:
+    get:
+      tags:
+        - Gateway
+      operationId: downloadVideoContent
+      summary: Download generated video content.
+      description: Downloads the binary content URL reported by the upstream video job. SRapi uses the account binding created by `/v1/videos` before fetching the content URL.
+      security:
+        - gatewayBearerAuth: []
+      parameters:
+        - name: video_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: model
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional model reference for scheduler capability resolution. When omitted, SRapi uses `sora-2`.
+      responses:
+        "200":
+          description: Binary video content.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+            Content-Type:
+              schema:
+                type: string
+            Content-Length:
+              schema:
+                type: string
+            Content-Disposition:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+            ETag:
+              schema:
+                type: string
+            Last-Modified:
+              schema:
+                type: string
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+            video/mp4:
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "404":
+          $ref: "#/components/responses/GatewayError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
   /v1/audio/transcriptions:
     post:
       tags:
@@ -32247,6 +32403,135 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ImageGenerationObject"
+
+    VideoCreateRequest:
+      type: object
+      required:
+        - model
+        - prompt
+      properties:
+        model:
+          type: string
+        prompt:
+          type: string
+          minLength: 1
+        seconds:
+          type: integer
+          minimum: 1
+          maximum: 15
+          default: 4
+        duration:
+          type: integer
+          minimum: 1
+          maximum: 15
+          description: Provider-compatible alias for `seconds`.
+        size:
+          type: string
+          description: OpenAI-style output size such as `720x1280`, `1280x720`, `1024x1024`, or `auto`.
+        aspect_ratio:
+          type: string
+          description: Provider-specific aspect ratio override, for example `16:9`, `9:16`, or `1:1`.
+        resolution:
+          type: string
+          description: Provider-specific resolution override, for example `720p` or `1080p`.
+        input_reference:
+          $ref: "#/components/schemas/VideoReference"
+          description: Optional source image reference used as the first frame or visual guide.
+        image:
+          $ref: "#/components/schemas/VideoReference"
+          description: Alias for `input_reference`.
+        image_url:
+          type: string
+          description: Alias for an image URL input reference.
+        reference_images:
+          type: array
+          maxItems: 7
+          items:
+            $ref: "#/components/schemas/VideoReference"
+          description: Optional reference images. SRapi rejects requests that combine `input_reference`/`image` with reference images.
+        reference_image_urls:
+          type: array
+          maxItems: 7
+          items:
+            type: string
+          description: Optional reference image URLs.
+        user:
+          type: string
+      additionalProperties: true
+
+    VideoReference:
+      oneOf:
+        - type: string
+        - type: object
+          additionalProperties: true
+          properties:
+            image_url:
+              oneOf:
+                - type: string
+                - type: object
+                  additionalProperties: true
+                  properties:
+                    url:
+                      type: string
+            url:
+              type: string
+            file_id:
+              type: string
+
+    VideoError:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+      additionalProperties: true
+
+    VideoObject:
+      type: object
+      required:
+        - id
+        - object
+        - model
+        - status
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          enum:
+            - video
+        model:
+          type: string
+        status:
+          type: string
+          enum:
+            - queued
+            - in_progress
+            - completed
+            - failed
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        prompt:
+          type: string
+        seconds:
+          type: integer
+        size:
+          type: string
+        created_at:
+          type: integer
+          format: int64
+        completed_at:
+          type: integer
+          format: int64
+        expires_at:
+          type: integer
+          format: int64
+        error:
+          $ref: "#/components/schemas/VideoError"
+      additionalProperties: true
 
     ImageGenerationStreamEvent:
       type: object

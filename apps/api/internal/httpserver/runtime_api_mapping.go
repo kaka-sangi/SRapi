@@ -1689,6 +1689,14 @@ func cloneIntPtr(value *int) *int {
 	return &cloned
 }
 
+func cloneInt64Ptr(value *int64) *int64 {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
 func ptrFloat32(value float32) *float32 { return &value }
 
 func cloneFloat32Ptr(value *float32) *float32 {

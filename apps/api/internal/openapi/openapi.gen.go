@@ -3527,6 +3527,45 @@ func (e UserSubscriptionStatus) Valid() bool {
 	}
 }
 
+// Defines values for VideoObjectObject.
+const (
+	Video VideoObjectObject = "video"
+)
+
+// Valid indicates whether the value is a known member of the VideoObjectObject enum.
+func (e VideoObjectObject) Valid() bool {
+	switch e {
+	case Video:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for VideoObjectStatus.
+const (
+	Completed  VideoObjectStatus = "completed"
+	Failed     VideoObjectStatus = "failed"
+	InProgress VideoObjectStatus = "in_progress"
+	Queued     VideoObjectStatus = "queued"
+)
+
+// Valid indicates whether the value is a known member of the VideoObjectStatus enum.
+func (e VideoObjectStatus) Valid() bool {
+	switch e {
+	case Completed:
+		return true
+	case Failed:
+		return true
+	case InProgress:
+		return true
+	case Queued:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Bucket.
 const (
 	BucketDay  Bucket = "day"
@@ -12226,6 +12265,97 @@ type UserSubscriptionResponse struct {
 // UserSubscriptionStatus defines model for UserSubscriptionStatus.
 type UserSubscriptionStatus string
 
+// VideoCreateRequest defines model for VideoCreateRequest.
+type VideoCreateRequest struct {
+	// AspectRatio Provider-specific aspect ratio override, for example `16:9`, `9:16`, or `1:1`.
+	AspectRatio *string `json:"aspect_ratio,omitempty"`
+
+	// Duration Provider-compatible alias for `seconds`.
+	Duration *int            `json:"duration,omitempty"`
+	Image    *VideoReference `json:"image,omitempty"`
+
+	// ImageUrl Alias for an image URL input reference.
+	ImageUrl       *string         `json:"image_url,omitempty"`
+	InputReference *VideoReference `json:"input_reference,omitempty"`
+	Model          string          `json:"model"`
+	Prompt         string          `json:"prompt"`
+
+	// ReferenceImageUrls Optional reference image URLs.
+	ReferenceImageUrls *[]string `json:"reference_image_urls,omitempty"`
+
+	// ReferenceImages Optional reference images. SRapi rejects requests that combine `input_reference`/`image` with reference images.
+	ReferenceImages *[]VideoReference `json:"reference_images,omitempty"`
+
+	// Resolution Provider-specific resolution override, for example `720p` or `1080p`.
+	Resolution *string `json:"resolution,omitempty"`
+	Seconds    *int    `json:"seconds,omitempty"`
+
+	// Size OpenAI-style output size such as `720x1280`, `1280x720`, `1024x1024`, or `auto`.
+	Size                 *string                `json:"size,omitempty"`
+	User                 *string                `json:"user,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// VideoError defines model for VideoError.
+type VideoError struct {
+	Code                 *string                `json:"code,omitempty"`
+	Message              *string                `json:"message,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// VideoObject defines model for VideoObject.
+type VideoObject struct {
+	CompletedAt          *int64                 `json:"completed_at,omitempty"`
+	CreatedAt            *int64                 `json:"created_at,omitempty"`
+	Error                *VideoError            `json:"error,omitempty"`
+	ExpiresAt            *int64                 `json:"expires_at,omitempty"`
+	Id                   string                 `json:"id"`
+	Model                string                 `json:"model"`
+	Object               VideoObjectObject      `json:"object"`
+	Progress             *int                   `json:"progress,omitempty"`
+	Prompt               *string                `json:"prompt,omitempty"`
+	Seconds              *int                   `json:"seconds,omitempty"`
+	Size                 *string                `json:"size,omitempty"`
+	Status               VideoObjectStatus      `json:"status"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// VideoObjectObject defines model for VideoObject.Object.
+type VideoObjectObject string
+
+// VideoObjectStatus defines model for VideoObject.Status.
+type VideoObjectStatus string
+
+// VideoReference defines model for VideoReference.
+type VideoReference struct {
+	union json.RawMessage
+}
+
+// VideoReference0 defines model for .
+type VideoReference0 = string
+
+// VideoReference1 defines model for .
+type VideoReference1 struct {
+	FileId               *string                    `json:"file_id,omitempty"`
+	ImageUrl             *VideoReference_1_ImageUrl `json:"image_url,omitempty"`
+	Url                  *string                    `json:"url,omitempty"`
+	AdditionalProperties map[string]interface{}     `json:"-"`
+}
+
+// VideoReference1ImageUrl0 defines model for .
+type VideoReference1ImageUrl0 = string
+
+// VideoReference1ImageUrl1 defines model for .
+type VideoReference1ImageUrl1 struct {
+	Url                  *string                `json:"url,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// VideoReference_1_ImageUrl defines model for VideoReference.1.ImageUrl.
+type VideoReference_1_ImageUrl struct {
+	union json.RawMessage
+}
+
 // Bucket defines model for Bucket.
 type Bucket string
 
@@ -13300,6 +13430,18 @@ type GetGatewayUsageParams struct {
 	Days *int `form:"days,omitempty" json:"days,omitempty"`
 }
 
+// RetrieveVideoParams defines parameters for RetrieveVideo.
+type RetrieveVideoParams struct {
+	// Model Optional model reference for scheduler capability resolution. When omitted, SRapi uses `sora-2`.
+	Model *string `form:"model,omitempty" json:"model,omitempty"`
+}
+
+// DownloadVideoContentParams defines parameters for DownloadVideoContent.
+type DownloadVideoContentParams struct {
+	// Model Optional model reference for scheduler capability resolution. When omitted, SRapi uses `sora-2`.
+	Model *string `form:"model,omitempty" json:"model,omitempty"`
+}
+
 // ListGeminiModelsParams defines parameters for ListGeminiModels.
 type ListGeminiModelsParams struct {
 	// PageSize Maximum number of models to return. Defaults to all visible models when omitted.
@@ -13899,6 +14041,9 @@ type CreateResponseJSONRequestBody = ResponsesRequest
 
 // CreateResponseCompactJSONRequestBody defines body for CreateResponseCompact for application/json ContentType.
 type CreateResponseCompactJSONRequestBody = ResponsesRequest
+
+// CreateVideoJSONRequestBody defines body for CreateVideo for application/json ContentType.
+type CreateVideoJSONRequestBody = VideoCreateRequest
 
 // CountGeminiTokensJSONRequestBody defines body for CountGeminiTokens for application/json ContentType.
 type CountGeminiTokensJSONRequestBody = GeminiCountTokensRequest
@@ -19825,6 +19970,724 @@ func (a ToolDefinition) MarshalJSON() ([]byte, error) {
 	return json.Marshal(object)
 }
 
+// Getter for additional properties for VideoCreateRequest. Returns the specified
+// element and whether it was found
+func (a VideoCreateRequest) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for VideoCreateRequest
+func (a *VideoCreateRequest) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for VideoCreateRequest to handle AdditionalProperties
+func (a *VideoCreateRequest) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["aspect_ratio"]; found {
+		err = json.Unmarshal(raw, &a.AspectRatio)
+		if err != nil {
+			return fmt.Errorf("error reading 'aspect_ratio': %w", err)
+		}
+		delete(object, "aspect_ratio")
+	}
+
+	if raw, found := object["duration"]; found {
+		err = json.Unmarshal(raw, &a.Duration)
+		if err != nil {
+			return fmt.Errorf("error reading 'duration': %w", err)
+		}
+		delete(object, "duration")
+	}
+
+	if raw, found := object["image"]; found {
+		err = json.Unmarshal(raw, &a.Image)
+		if err != nil {
+			return fmt.Errorf("error reading 'image': %w", err)
+		}
+		delete(object, "image")
+	}
+
+	if raw, found := object["image_url"]; found {
+		err = json.Unmarshal(raw, &a.ImageUrl)
+		if err != nil {
+			return fmt.Errorf("error reading 'image_url': %w", err)
+		}
+		delete(object, "image_url")
+	}
+
+	if raw, found := object["input_reference"]; found {
+		err = json.Unmarshal(raw, &a.InputReference)
+		if err != nil {
+			return fmt.Errorf("error reading 'input_reference': %w", err)
+		}
+		delete(object, "input_reference")
+	}
+
+	if raw, found := object["model"]; found {
+		err = json.Unmarshal(raw, &a.Model)
+		if err != nil {
+			return fmt.Errorf("error reading 'model': %w", err)
+		}
+		delete(object, "model")
+	}
+
+	if raw, found := object["prompt"]; found {
+		err = json.Unmarshal(raw, &a.Prompt)
+		if err != nil {
+			return fmt.Errorf("error reading 'prompt': %w", err)
+		}
+		delete(object, "prompt")
+	}
+
+	if raw, found := object["reference_image_urls"]; found {
+		err = json.Unmarshal(raw, &a.ReferenceImageUrls)
+		if err != nil {
+			return fmt.Errorf("error reading 'reference_image_urls': %w", err)
+		}
+		delete(object, "reference_image_urls")
+	}
+
+	if raw, found := object["reference_images"]; found {
+		err = json.Unmarshal(raw, &a.ReferenceImages)
+		if err != nil {
+			return fmt.Errorf("error reading 'reference_images': %w", err)
+		}
+		delete(object, "reference_images")
+	}
+
+	if raw, found := object["resolution"]; found {
+		err = json.Unmarshal(raw, &a.Resolution)
+		if err != nil {
+			return fmt.Errorf("error reading 'resolution': %w", err)
+		}
+		delete(object, "resolution")
+	}
+
+	if raw, found := object["seconds"]; found {
+		err = json.Unmarshal(raw, &a.Seconds)
+		if err != nil {
+			return fmt.Errorf("error reading 'seconds': %w", err)
+		}
+		delete(object, "seconds")
+	}
+
+	if raw, found := object["size"]; found {
+		err = json.Unmarshal(raw, &a.Size)
+		if err != nil {
+			return fmt.Errorf("error reading 'size': %w", err)
+		}
+		delete(object, "size")
+	}
+
+	if raw, found := object["user"]; found {
+		err = json.Unmarshal(raw, &a.User)
+		if err != nil {
+			return fmt.Errorf("error reading 'user': %w", err)
+		}
+		delete(object, "user")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for VideoCreateRequest to handle AdditionalProperties
+func (a VideoCreateRequest) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.AspectRatio != nil {
+		object["aspect_ratio"], err = json.Marshal(a.AspectRatio)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'aspect_ratio': %w", err)
+		}
+	}
+
+	if a.Duration != nil {
+		object["duration"], err = json.Marshal(a.Duration)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'duration': %w", err)
+		}
+	}
+
+	if a.Image != nil {
+		object["image"], err = json.Marshal(a.Image)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'image': %w", err)
+		}
+	}
+
+	if a.ImageUrl != nil {
+		object["image_url"], err = json.Marshal(a.ImageUrl)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'image_url': %w", err)
+		}
+	}
+
+	if a.InputReference != nil {
+		object["input_reference"], err = json.Marshal(a.InputReference)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'input_reference': %w", err)
+		}
+	}
+
+	object["model"], err = json.Marshal(a.Model)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'model': %w", err)
+	}
+
+	object["prompt"], err = json.Marshal(a.Prompt)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'prompt': %w", err)
+	}
+
+	if a.ReferenceImageUrls != nil {
+		object["reference_image_urls"], err = json.Marshal(a.ReferenceImageUrls)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'reference_image_urls': %w", err)
+		}
+	}
+
+	if a.ReferenceImages != nil {
+		object["reference_images"], err = json.Marshal(a.ReferenceImages)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'reference_images': %w", err)
+		}
+	}
+
+	if a.Resolution != nil {
+		object["resolution"], err = json.Marshal(a.Resolution)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'resolution': %w", err)
+		}
+	}
+
+	if a.Seconds != nil {
+		object["seconds"], err = json.Marshal(a.Seconds)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'seconds': %w", err)
+		}
+	}
+
+	if a.Size != nil {
+		object["size"], err = json.Marshal(a.Size)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'size': %w", err)
+		}
+	}
+
+	if a.User != nil {
+		object["user"], err = json.Marshal(a.User)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'user': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for VideoError. Returns the specified
+// element and whether it was found
+func (a VideoError) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for VideoError
+func (a *VideoError) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for VideoError to handle AdditionalProperties
+func (a *VideoError) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["code"]; found {
+		err = json.Unmarshal(raw, &a.Code)
+		if err != nil {
+			return fmt.Errorf("error reading 'code': %w", err)
+		}
+		delete(object, "code")
+	}
+
+	if raw, found := object["message"]; found {
+		err = json.Unmarshal(raw, &a.Message)
+		if err != nil {
+			return fmt.Errorf("error reading 'message': %w", err)
+		}
+		delete(object, "message")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for VideoError to handle AdditionalProperties
+func (a VideoError) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Code != nil {
+		object["code"], err = json.Marshal(a.Code)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'code': %w", err)
+		}
+	}
+
+	if a.Message != nil {
+		object["message"], err = json.Marshal(a.Message)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'message': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for VideoObject. Returns the specified
+// element and whether it was found
+func (a VideoObject) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for VideoObject
+func (a *VideoObject) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for VideoObject to handle AdditionalProperties
+func (a *VideoObject) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["completed_at"]; found {
+		err = json.Unmarshal(raw, &a.CompletedAt)
+		if err != nil {
+			return fmt.Errorf("error reading 'completed_at': %w", err)
+		}
+		delete(object, "completed_at")
+	}
+
+	if raw, found := object["created_at"]; found {
+		err = json.Unmarshal(raw, &a.CreatedAt)
+		if err != nil {
+			return fmt.Errorf("error reading 'created_at': %w", err)
+		}
+		delete(object, "created_at")
+	}
+
+	if raw, found := object["error"]; found {
+		err = json.Unmarshal(raw, &a.Error)
+		if err != nil {
+			return fmt.Errorf("error reading 'error': %w", err)
+		}
+		delete(object, "error")
+	}
+
+	if raw, found := object["expires_at"]; found {
+		err = json.Unmarshal(raw, &a.ExpiresAt)
+		if err != nil {
+			return fmt.Errorf("error reading 'expires_at': %w", err)
+		}
+		delete(object, "expires_at")
+	}
+
+	if raw, found := object["id"]; found {
+		err = json.Unmarshal(raw, &a.Id)
+		if err != nil {
+			return fmt.Errorf("error reading 'id': %w", err)
+		}
+		delete(object, "id")
+	}
+
+	if raw, found := object["model"]; found {
+		err = json.Unmarshal(raw, &a.Model)
+		if err != nil {
+			return fmt.Errorf("error reading 'model': %w", err)
+		}
+		delete(object, "model")
+	}
+
+	if raw, found := object["object"]; found {
+		err = json.Unmarshal(raw, &a.Object)
+		if err != nil {
+			return fmt.Errorf("error reading 'object': %w", err)
+		}
+		delete(object, "object")
+	}
+
+	if raw, found := object["progress"]; found {
+		err = json.Unmarshal(raw, &a.Progress)
+		if err != nil {
+			return fmt.Errorf("error reading 'progress': %w", err)
+		}
+		delete(object, "progress")
+	}
+
+	if raw, found := object["prompt"]; found {
+		err = json.Unmarshal(raw, &a.Prompt)
+		if err != nil {
+			return fmt.Errorf("error reading 'prompt': %w", err)
+		}
+		delete(object, "prompt")
+	}
+
+	if raw, found := object["seconds"]; found {
+		err = json.Unmarshal(raw, &a.Seconds)
+		if err != nil {
+			return fmt.Errorf("error reading 'seconds': %w", err)
+		}
+		delete(object, "seconds")
+	}
+
+	if raw, found := object["size"]; found {
+		err = json.Unmarshal(raw, &a.Size)
+		if err != nil {
+			return fmt.Errorf("error reading 'size': %w", err)
+		}
+		delete(object, "size")
+	}
+
+	if raw, found := object["status"]; found {
+		err = json.Unmarshal(raw, &a.Status)
+		if err != nil {
+			return fmt.Errorf("error reading 'status': %w", err)
+		}
+		delete(object, "status")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for VideoObject to handle AdditionalProperties
+func (a VideoObject) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.CompletedAt != nil {
+		object["completed_at"], err = json.Marshal(a.CompletedAt)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'completed_at': %w", err)
+		}
+	}
+
+	if a.CreatedAt != nil {
+		object["created_at"], err = json.Marshal(a.CreatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'created_at': %w", err)
+		}
+	}
+
+	if a.Error != nil {
+		object["error"], err = json.Marshal(a.Error)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'error': %w", err)
+		}
+	}
+
+	if a.ExpiresAt != nil {
+		object["expires_at"], err = json.Marshal(a.ExpiresAt)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'expires_at': %w", err)
+		}
+	}
+
+	object["id"], err = json.Marshal(a.Id)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'id': %w", err)
+	}
+
+	object["model"], err = json.Marshal(a.Model)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'model': %w", err)
+	}
+
+	object["object"], err = json.Marshal(a.Object)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'object': %w", err)
+	}
+
+	if a.Progress != nil {
+		object["progress"], err = json.Marshal(a.Progress)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'progress': %w", err)
+		}
+	}
+
+	if a.Prompt != nil {
+		object["prompt"], err = json.Marshal(a.Prompt)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'prompt': %w", err)
+		}
+	}
+
+	if a.Seconds != nil {
+		object["seconds"], err = json.Marshal(a.Seconds)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'seconds': %w", err)
+		}
+	}
+
+	if a.Size != nil {
+		object["size"], err = json.Marshal(a.Size)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'size': %w", err)
+		}
+	}
+
+	object["status"], err = json.Marshal(a.Status)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'status': %w", err)
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for VideoReference1. Returns the specified
+// element and whether it was found
+func (a VideoReference1) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for VideoReference1
+func (a *VideoReference1) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for VideoReference1 to handle AdditionalProperties
+func (a *VideoReference1) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["file_id"]; found {
+		err = json.Unmarshal(raw, &a.FileId)
+		if err != nil {
+			return fmt.Errorf("error reading 'file_id': %w", err)
+		}
+		delete(object, "file_id")
+	}
+
+	if raw, found := object["image_url"]; found {
+		err = json.Unmarshal(raw, &a.ImageUrl)
+		if err != nil {
+			return fmt.Errorf("error reading 'image_url': %w", err)
+		}
+		delete(object, "image_url")
+	}
+
+	if raw, found := object["url"]; found {
+		err = json.Unmarshal(raw, &a.Url)
+		if err != nil {
+			return fmt.Errorf("error reading 'url': %w", err)
+		}
+		delete(object, "url")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for VideoReference1 to handle AdditionalProperties
+func (a VideoReference1) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.FileId != nil {
+		object["file_id"], err = json.Marshal(a.FileId)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'file_id': %w", err)
+		}
+	}
+
+	if a.ImageUrl != nil {
+		object["image_url"], err = json.Marshal(a.ImageUrl)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'image_url': %w", err)
+		}
+	}
+
+	if a.Url != nil {
+		object["url"], err = json.Marshal(a.Url)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'url': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for VideoReference1ImageUrl1. Returns the specified
+// element and whether it was found
+func (a VideoReference1ImageUrl1) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for VideoReference1ImageUrl1
+func (a *VideoReference1ImageUrl1) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for VideoReference1ImageUrl1 to handle AdditionalProperties
+func (a *VideoReference1ImageUrl1) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["url"]; found {
+		err = json.Unmarshal(raw, &a.Url)
+		if err != nil {
+			return fmt.Errorf("error reading 'url': %w", err)
+		}
+		delete(object, "url")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for VideoReference1ImageUrl1 to handle AdditionalProperties
+func (a VideoReference1ImageUrl1) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Url != nil {
+		object["url"], err = json.Marshal(a.Url)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'url': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
 // AsAnthropicCountTokensRequestSystem0 returns the union data inside the AnthropicCountTokensRequest_System as a AnthropicCountTokensRequestSystem0
 func (t AnthropicCountTokensRequest_System) AsAnthropicCountTokensRequestSystem0() (AnthropicCountTokensRequestSystem0, error) {
 	var body AnthropicCountTokensRequestSystem0
@@ -20689,6 +21552,130 @@ func (t ResponsesRequest_ToolChoice) MarshalJSON() ([]byte, error) {
 }
 
 func (t *ResponsesRequest_ToolChoice) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsVideoReference0 returns the union data inside the VideoReference as a VideoReference0
+func (t VideoReference) AsVideoReference0() (VideoReference0, error) {
+	var body VideoReference0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromVideoReference0 overwrites any union data inside the VideoReference as the provided VideoReference0
+func (t *VideoReference) FromVideoReference0(v VideoReference0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeVideoReference0 performs a merge with any union data inside the VideoReference, using the provided VideoReference0
+func (t *VideoReference) MergeVideoReference0(v VideoReference0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsVideoReference1 returns the union data inside the VideoReference as a VideoReference1
+func (t VideoReference) AsVideoReference1() (VideoReference1, error) {
+	var body VideoReference1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromVideoReference1 overwrites any union data inside the VideoReference as the provided VideoReference1
+func (t *VideoReference) FromVideoReference1(v VideoReference1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeVideoReference1 performs a merge with any union data inside the VideoReference, using the provided VideoReference1
+func (t *VideoReference) MergeVideoReference1(v VideoReference1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t VideoReference) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *VideoReference) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsVideoReference1ImageUrl0 returns the union data inside the VideoReference_1_ImageUrl as a VideoReference1ImageUrl0
+func (t VideoReference_1_ImageUrl) AsVideoReference1ImageUrl0() (VideoReference1ImageUrl0, error) {
+	var body VideoReference1ImageUrl0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromVideoReference1ImageUrl0 overwrites any union data inside the VideoReference_1_ImageUrl as the provided VideoReference1ImageUrl0
+func (t *VideoReference_1_ImageUrl) FromVideoReference1ImageUrl0(v VideoReference1ImageUrl0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeVideoReference1ImageUrl0 performs a merge with any union data inside the VideoReference_1_ImageUrl, using the provided VideoReference1ImageUrl0
+func (t *VideoReference_1_ImageUrl) MergeVideoReference1ImageUrl0(v VideoReference1ImageUrl0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsVideoReference1ImageUrl1 returns the union data inside the VideoReference_1_ImageUrl as a VideoReference1ImageUrl1
+func (t VideoReference_1_ImageUrl) AsVideoReference1ImageUrl1() (VideoReference1ImageUrl1, error) {
+	var body VideoReference1ImageUrl1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromVideoReference1ImageUrl1 overwrites any union data inside the VideoReference_1_ImageUrl as the provided VideoReference1ImageUrl1
+func (t *VideoReference_1_ImageUrl) FromVideoReference1ImageUrl1(v VideoReference1ImageUrl1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeVideoReference1ImageUrl1 performs a merge with any union data inside the VideoReference_1_ImageUrl, using the provided VideoReference1ImageUrl1
+func (t *VideoReference_1_ImageUrl) MergeVideoReference1ImageUrl1(v VideoReference1ImageUrl1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t VideoReference_1_ImageUrl) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *VideoReference_1_ImageUrl) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -22056,6 +23043,15 @@ type ServerInterface interface {
 	// Get usage and quota summary for the current gateway API key.
 	// (GET /v1/usage)
 	GetGatewayUsage(w http.ResponseWriter, r *http.Request, params GetGatewayUsageParams)
+	// Create an OpenAI-compatible video job.
+	// (POST /v1/videos)
+	CreateVideo(w http.ResponseWriter, r *http.Request)
+	// Retrieve an OpenAI-compatible video job.
+	// (GET /v1/videos/{video_id})
+	RetrieveVideo(w http.ResponseWriter, r *http.Request, videoId string, params RetrieveVideoParams)
+	// Download generated video content.
+	// (GET /v1/videos/{video_id}/content)
+	DownloadVideoContent(w http.ResponseWriter, r *http.Request, videoId string, params DownloadVideoContentParams)
 	// List Gemini-compatible models available to the gateway API key.
 	// (GET /v1beta/models)
 	ListGeminiModels(w http.ResponseWriter, r *http.Request, params ListGeminiModelsParams)
@@ -37905,6 +38901,122 @@ func (siw *ServerInterfaceWrapper) GetGatewayUsage(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
+// CreateVideo operation middleware
+func (siw *ServerInterfaceWrapper) CreateVideo(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateVideo(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RetrieveVideo operation middleware
+func (siw *ServerInterfaceWrapper) RetrieveVideo(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "video_id" -------------
+	var videoId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "video_id", r.PathValue("video_id"), &videoId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "video_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RetrieveVideoParams
+
+	// ------------- Optional query parameter "model" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "model", r.URL.Query(), &params.Model, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "model"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "model", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RetrieveVideo(w, r, videoId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DownloadVideoContent operation middleware
+func (siw *ServerInterfaceWrapper) DownloadVideoContent(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "video_id" -------------
+	var videoId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "video_id", r.PathValue("video_id"), &videoId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "video_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DownloadVideoContentParams
+
+	// ------------- Optional query parameter "model" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "model", r.URL.Query(), &params.Model, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "model"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "model", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DownloadVideoContent(w, r, videoId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListGeminiModels operation middleware
 func (siw *ServerInterfaceWrapper) ListGeminiModels(w http.ResponseWriter, r *http.Request) {
 
@@ -38638,6 +39750,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/responses/ws", wrapper.ConnectResponsesWebSocket)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/responses/{response_id}/input_items", wrapper.ListResponseInputItems)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/usage", wrapper.GetGatewayUsage)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/videos", wrapper.CreateVideo)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/videos/{video_id}", wrapper.RetrieveVideo)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/videos/{video_id}/content", wrapper.DownloadVideoContent)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1beta/models", wrapper.ListGeminiModels)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1beta/models/{model}", wrapper.GetGeminiModel)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1beta/models/{model}:countTokens", wrapper.CountGeminiTokens)

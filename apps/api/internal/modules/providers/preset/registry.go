@@ -133,6 +133,9 @@ func openAIPreset(providerKey string, displayName string, defaultBaseURL string,
 	if openAIPresetSupportsResponsesInputItems(providerKey) {
 		capabilities[capabilitiescontract.KeyResponsesInputItems] = true
 	}
+	if openAIPresetSupportsVideos(providerKey) {
+		capabilities[capabilitiescontract.KeyVideos] = true
+	}
 	preset := compatiblePreset(providerKey, PlatformFamilyOpenAICompatible, displayName, defaultBaseURL, routeAliases, capabilities)
 	if providerKey == "openai" {
 		preset.RuntimeClassAllowlist = []accountscontract.RuntimeClass{
@@ -552,6 +555,15 @@ func openAIPresetSupportsResponsesCompact(providerKey string) bool {
 func openAIPresetSupportsResponsesInputItems(providerKey string) bool {
 	switch strings.TrimSpace(providerKey) {
 	case "openai", "openai-compatible":
+		return true
+	default:
+		return false
+	}
+}
+
+func openAIPresetSupportsVideos(providerKey string) bool {
+	switch strings.TrimSpace(providerKey) {
+	case "grok":
 		return true
 	default:
 		return false

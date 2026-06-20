@@ -22,6 +22,9 @@ const (
 	EndpointImagesGenerations     SourceEndpoint = "/v1/images/generations"
 	EndpointImagesEdits           SourceEndpoint = "/v1/images/edits"
 	EndpointImagesVariations      SourceEndpoint = "/v1/images/variations"
+	EndpointVideos                SourceEndpoint = "/v1/videos"
+	EndpointVideoRetrieve         SourceEndpoint = "/v1/videos/{video_id}"
+	EndpointVideoContent          SourceEndpoint = "/v1/videos/{video_id}/content"
 	EndpointAudioTranscriptions   SourceEndpoint = "/v1/audio/transcriptions"
 	EndpointAudioSpeech           SourceEndpoint = "/v1/audio/speech"
 	EndpointModerations           SourceEndpoint = "/v1/moderations"
@@ -112,6 +115,16 @@ type CanonicalRequest struct {
 	ImageStream           bool
 	ImageUser             string
 	ImageExtra            map[string]any
+	VideoID               string
+	VideoPrompt           string
+	VideoSeconds          int
+	VideoSize             string
+	VideoAspectRatio      string
+	VideoResolution       string
+	VideoInputReference   string
+	VideoReferenceImages  []string
+	VideoUser             string
+	VideoExtra            map[string]any
 	AudioFileName         string
 	AudioContentType      string
 	AudioBytes            []byte
@@ -234,6 +247,40 @@ type ImageGenerationResponse struct {
 	Created               int64
 	Data                  []Image
 	Usage                 Usage
+	CompatibilityWarnings []string
+}
+
+type VideoStatus string
+
+const (
+	VideoStatusQueued     VideoStatus = "queued"
+	VideoStatusInProgress VideoStatus = "in_progress"
+	VideoStatusCompleted  VideoStatus = "completed"
+	VideoStatusFailed     VideoStatus = "failed"
+)
+
+type VideoError struct {
+	Code     string
+	Message  string
+	Metadata map[string]any
+}
+
+type VideoResponse struct {
+	ID                    string
+	RequestID             string
+	Model                 string
+	CanonicalModel        string
+	Status                VideoStatus
+	Progress              *int
+	Prompt                string
+	Seconds               *int
+	Size                  string
+	CreatedAt             *int64
+	CompletedAt           *int64
+	ExpiresAt             *int64
+	Error                 *VideoError
+	Usage                 Usage
+	Metadata              map[string]any
 	CompatibilityWarnings []string
 }
 

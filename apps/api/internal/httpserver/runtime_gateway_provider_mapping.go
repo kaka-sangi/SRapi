@@ -194,6 +194,30 @@ func providerImageGenerationRequest(req gatewaycontract.CanonicalRequest, candid
 	}
 }
 
+func providerVideoRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate, operation provideradaptercontract.VideoOperation, source ...*http.Request) provideradaptercontract.VideoRequest {
+	return provideradaptercontract.VideoRequest{
+		RequestID:       req.RequestID,
+		SourceProtocol:  string(req.SourceProtocol),
+		SourceEndpoint:  req.SourceEndpoint,
+		Model:           req.CanonicalModel,
+		Operation:       operation,
+		VideoID:         req.VideoID,
+		Prompt:          req.VideoPrompt,
+		Seconds:         req.VideoSeconds,
+		Size:            req.VideoSize,
+		AspectRatio:     req.VideoAspectRatio,
+		Resolution:      req.VideoResolution,
+		InputReference:  req.VideoInputReference,
+		ReferenceImages: append([]string(nil), req.VideoReferenceImages...),
+		User:            req.VideoUser,
+		Extra:           cloneAnyMap(req.VideoExtra),
+		Provider:        candidate.Provider,
+		Account:         candidate.Account,
+		Mapping:         candidate.Mapping,
+		RequestSettings: gatewayProviderRequestSettings(sourceHTTPRequest(source), req),
+	}
+}
+
 func providerImageEditRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate) provideradaptercontract.ImageEditRequest {
 	return provideradaptercontract.ImageEditRequest{
 		RequestID:      req.RequestID,

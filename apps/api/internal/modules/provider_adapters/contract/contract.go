@@ -198,6 +198,71 @@ type ImageGenerationRequest struct {
 	RequestSettings map[string]any
 }
 
+type VideoOperation string
+
+const (
+	VideoOperationCreate   VideoOperation = "create"
+	VideoOperationRetrieve VideoOperation = "retrieve"
+	VideoOperationContent  VideoOperation = "content"
+)
+
+type VideoRequest struct {
+	RequestID       string
+	SourceProtocol  string
+	SourceEndpoint  string
+	Model           string
+	Operation       VideoOperation
+	VideoID         string
+	Prompt          string
+	Seconds         int
+	Size            string
+	AspectRatio     string
+	Resolution      string
+	InputReference  string
+	ReferenceImages []string
+	User            string
+	Extra           map[string]any
+	Provider        providercontract.Provider
+	Account         accountcontract.ProviderAccount
+	Mapping         modelcontract.ModelProviderMapping
+	Credential      map[string]any
+	RequestSettings map[string]any
+}
+
+type VideoError struct {
+	Code     string
+	Message  string
+	Metadata map[string]any
+}
+
+type VideoResponse struct {
+	ID           string
+	Model        string
+	Status       string
+	Progress     *int
+	Prompt       string
+	Seconds      *int
+	Size         string
+	CreatedAt    *int64
+	CompletedAt  *int64
+	ExpiresAt    *int64
+	Error        *VideoError
+	ContentURL   string
+	Metadata     map[string]any
+	StatusCode   int
+	Usage        Usage
+	QuotaSignals []QuotaSignal
+	Headers      http.Header
+}
+
+type VideoContentResponse struct {
+	StatusCode   int
+	ContentType  string
+	Content      io.ReadCloser
+	Headers      http.Header
+	QuotaSignals []QuotaSignal
+}
+
 type ImageInput struct {
 	FileName    string
 	ContentType string
@@ -732,6 +797,12 @@ type EmbeddingAdapter interface {
 type ImageGenerationAdapter interface {
 	InvokeImageGeneration(ctx context.Context, req ImageGenerationRequest) (ImageGenerationResponse, error)
 	StreamImageGeneration(ctx context.Context, req ImageGenerationRequest) (ImageGenerationResponse, error)
+}
+
+// VideoAdapter invokes provider video generation, retrieval, and content download.
+type VideoAdapter interface {
+	InvokeVideo(ctx context.Context, req VideoRequest) (VideoResponse, error)
+	InvokeVideoContent(ctx context.Context, req VideoRequest) (VideoContentResponse, error)
 }
 
 // ImageEditAdapter invokes provider image editing.
