@@ -2083,6 +2083,10 @@ export const en = {
     extraHeadersHelp:
       "Additional HTTP headers injected into every upstream request using this profile.",
     enabled: "Enabled",
+    clickToDisable: "Disable profile",
+    clickToEnable: "Enable profile",
+    toggleDisabled: "TLS profile disabled",
+    toggleEnabled: "TLS profile enabled",
     userAgentHint: "Overrides the egress User-Agent header (optional).",
     searchPlaceholder: "Search name, template, UA…",
     emptyTitle: "No TLS profiles",

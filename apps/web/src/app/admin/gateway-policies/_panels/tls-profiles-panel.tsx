@@ -21,6 +21,8 @@ import {
   useDeleteTlsProfile,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
+import { useToast } from "@/context/ToastContext";
+import { adminErrorMessage } from "@/lib/admin-api";
 import {
   TLS_TEMPLATES,
   HTTP_VERSION_POLICIES,
@@ -44,10 +46,14 @@ const profileCompare = (a: TlsProfile, b: TlsProfile) => a.name.localeCompare(b.
 
 export function TlsProfilesPanel() {
   const { t } = useLanguage();
+  const { toast } = useToast();
   const list = useAdminList();
   const colVis = useColumnVisibility("admin-tls-profiles", []);
   const all = useTlsProfiles();
-  const { query, total } = useClientPagedList(all, list, { match: profileMatch, compare: profileCompare });
+  const { query, total } = useClientPagedList(all, list, {
+    match: profileMatch,
+    compare: profileCompare,
+  });
 
   const createMut = useCreateTlsProfile();
   const updateMut = useUpdateTlsProfile();
@@ -55,8 +61,30 @@ export function TlsProfilesPanel() {
 
   const [formTarget, setFormTarget] = useState<TlsProfile | "new" | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TlsProfile | null>(null);
+  const [togglingId, setTogglingId] = useState<number | null>(null);
   const isNew = formTarget === "new";
   const isFiltered = Boolean(list.search);
+
+  async function toggleEnabled(profile: TlsProfile) {
+    if (togglingId === profile.id) return;
+    setTogglingId(profile.id);
+    try {
+      await updateMut.mutateAsync({
+        id: String(profile.id),
+        body: { enabled: !profile.enabled },
+      });
+      toast({
+        title: profile.enabled
+          ? t("adminTlsProfiles.toggleDisabled")
+          : t("adminTlsProfiles.toggleEnabled"),
+        tone: "success",
+      });
+    } catch (err) {
+      toast({ title: adminErrorMessage(err), tone: "error" });
+    } finally {
+      setTogglingId(null);
+    }
+  }
 
   const fields: FieldConfig<TlsProfileFormState>[] = [
     { name: "name", label: t("adminTlsProfiles.name") },
@@ -80,7 +108,13 @@ export function TlsProfilesPanel() {
       hint: t("adminTlsProfiles.userAgentHint"),
     },
     { name: "enabled", label: t("adminTlsProfiles.enabled"), type: "switch" },
-    { name: "extra_headers", label: t("adminTlsProfiles.extraHeaders"), help: t("adminTlsProfiles.extraHeadersHelp"), type: "keyvalue", advanced: true },
+    {
+      name: "extra_headers",
+      label: t("adminTlsProfiles.extraHeaders"),
+      help: t("adminTlsProfiles.extraHeadersHelp"),
+      type: "keyvalue",
+      advanced: true,
+    },
   ];
 
   const columns: Column<TlsProfile>[] = [
@@ -94,7 +128,7 @@ export function TlsProfilesPanel() {
       key: "template",
       header: t("adminTlsProfiles.template"),
       render: (p) => (
-        <span className="font-mono text-xs text-srapi-text-secondary">
+        <span className="text-srapi-text-secondary font-mono text-xs">
           {p.tls_template || "default"}
         </span>
       ),
@@ -104,7 +138,7 @@ export function TlsProfilesPanel() {
       header: t("adminTlsProfiles.httpPolicy"),
       hideOnMobile: true,
       render: (p) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary">{p.http_version_policy}</span>
+        <span className="text-2xs text-srapi-text-tertiary font-mono">{p.http_version_policy}</span>
       ),
     },
     {
@@ -113,7 +147,7 @@ export function TlsProfilesPanel() {
       hideOnMobile: true,
       render: (p) =>
         p.user_agent ? (
-          <span className="block max-w-[20rem] truncate font-mono text-2xs text-srapi-text-tertiary">
+          <span className="text-2xs text-srapi-text-tertiary block max-w-[20rem] truncate font-mono">
             {p.user_agent}
           </span>
         ) : (
@@ -124,10 +158,23 @@ export function TlsProfilesPanel() {
       key: "enabled",
       header: t("adminTlsProfiles.enabled"),
       render: (p) => (
-        <QuietBadge
-          status={p.enabled ? "active" : "disabled"}
-          label={p.enabled ? t("common.active") : t("common.disabled")}
-        />
+        <button
+          type="button"
+          onClick={() => void toggleEnabled(p)}
+          disabled={togglingId === p.id}
+          className="cursor-pointer disabled:cursor-wait disabled:opacity-60"
+          aria-label={
+            p.enabled ? t("adminTlsProfiles.clickToDisable") : t("adminTlsProfiles.clickToEnable")
+          }
+          title={
+            p.enabled ? t("adminTlsProfiles.clickToDisable") : t("adminTlsProfiles.clickToEnable")
+          }
+        >
+          <QuietBadge
+            status={p.enabled ? "active" : "disabled"}
+            label={p.enabled ? t("common.active") : t("common.disabled")}
+          />
+        </button>
       ),
     },
   ];
@@ -142,7 +189,9 @@ export function TlsProfilesPanel() {
           <div className="flex items-center gap-3">
             {all.data ? <ListCount total={total} /> : null}
             <ColumnToggle
-              columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
+              columns={columns
+                .filter((c) => !c.pinned)
+                .map((c) => ({ key: c.key, label: c.header }))}
               visibility={colVis}
             />
             <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
