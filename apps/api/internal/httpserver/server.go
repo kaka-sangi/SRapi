@@ -1225,13 +1225,15 @@ type gatewayRouteContextKey struct{}
 type gatewayRouteContext struct {
 	ForcedProviderKey string
 	SourceEndpoint    string
+	EvidenceEndpoint  string
 }
 
-func (s *Server) withGatewayProviderAlias(providerKey string, next http.HandlerFunc) http.HandlerFunc {
+func (s *Server) withGatewayProviderAlias(providerKey string, sourceEndpoint string, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		route := gatewayRouteContext{
 			ForcedProviderKey: strings.TrimSpace(providerKey),
-			SourceEndpoint:    r.URL.Path,
+			SourceEndpoint:    strings.TrimSpace(sourceEndpoint),
+			EvidenceEndpoint:  r.URL.Path,
 		}
 		next(w, r.WithContext(context.WithValue(r.Context(), gatewayRouteContextKey{}, route)))
 	}
@@ -1256,6 +1258,8 @@ func (s *Server) registerGatewayProviderAliases(mux *http.ServeMux) {
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "responses", s.handleCreateResponse, presetSupports(preset, capabilitiescontract.KeyResponses))
 			s.registerGatewayAliasRouteForMethod(mux, seen, http.MethodGet, preset.ProviderKey, prefix, "responses/{response_id}/input_items", s.handleListResponseInputItems, presetSupports(preset, capabilitiescontract.KeyResponsesInputItems))
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "responses/compact", s.handleCreateResponse, presetSupports(preset, capabilitiescontract.KeyResponsesCompact))
+			s.registerGatewayAliasRouteForMethod(mux, seen, http.MethodGet, preset.ProviderKey, prefix, "responses/ws", s.handleResponsesWebSocket, presetSupports(preset, capabilitiescontract.KeyResponsesWebSocket))
+			s.registerGatewayAliasRouteForMethod(mux, seen, http.MethodGet, preset.ProviderKey, prefix, "realtime", s.handleRealtimeWebSocket, presetSupports(preset, capabilitiescontract.KeyRealtimeWebSocket))
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "messages", s.handleCreateMessage, presetSupports(preset, capabilitiescontract.KeyMessages))
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "messages/count_tokens", s.handleAnthropicCountTokens, presetSupports(preset, capabilitiescontract.KeyAnthropicCountTokens))
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "embeddings", s.handleCreateEmbedding, presetSupports(preset, capabilitiescontract.KeyEmbeddings))
@@ -1305,7 +1309,7 @@ func (s *Server) registerGatewayAliasRouteForMethod(mux *http.ServeMux, seen map
 	if gatewayAliasRouteUsesIdempotency(method, endpoint) {
 		wrapped = s.withGatewayIdempotency(wrapped)
 	}
-	mux.HandleFunc(pattern, s.withGatewayProviderAlias(providerKey, wrapped))
+	mux.HandleFunc(pattern, s.withGatewayProviderAlias(providerKey, "/v1/"+endpoint, wrapped))
 }
 
 func gatewayAliasRouteUsesIdempotency(method, endpoint string) bool {

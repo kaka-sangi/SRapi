@@ -139,6 +139,115 @@ func TestGatewayResponsesWebSocketTargetsResponsesRuntime(t *testing.T) {
 	}
 }
 
+func TestGatewayResponsesWebSocketAliasTargetsResponsesRuntime(t *testing.T) {
+	type upstreamCall struct {
+		Path          string
+		Authorization string
+		Model         string
+		Input         any
+	}
+	var (
+		mu    sync.Mutex
+		calls []upstreamCall
+	)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Model string `json:"model"`
+			Input any    `json:"input"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		mu.Lock()
+		calls = append(calls, upstreamCall{
+			Path:          r.URL.Path,
+			Authorization: r.Header.Get("Authorization"),
+			Model:         payload.Model,
+			Input:         payload.Input,
+		})
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"resp_alias_ws","object":"response","model":"grok-alias-upstream","output":[{"type":"message","content":[{"type":"output_text","text":"alias runtime ok"}]}],"usage":{"input_tokens":4,"output_tokens":5,"total_tokens":9}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	otherProviderResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"wrong-xai-runtime-provider","display_name":"Wrong XAI Runtime Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"grok","display_name":"Grok","adapter_type":"native-grok","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"grok-alias-runtime-model","display_name":"Grok Alias Runtime Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(otherProviderResp.Data.Id)+`","upstream_model_name":"wrong-runtime-upstream","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"grok-alias-upstream","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(otherProviderResp.Data.Id)+`","name":"wrong-runtime-account","runtime_class":"api_key","credential":{"api_key":"wrong-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"grok-alias-runtime-account","runtime_class":"api_key","credential":{"api_key":"xai-runtime-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	aliasEndpoint := "/api/provider/xai/v1/responses/ws"
+	conn := mustDialResponsesWebSocket(t, server.URL+aliasEndpoint+"?model=grok-alias-runtime-model", apiKey)
+	defer conn.Close(websocket.StatusNormalClosure, "")
+
+	writeWebSocketJSON(t, conn, map[string]any{
+		"type":  "response.create",
+		"input": "hello alias runtime",
+	})
+	event := readWebSocketEvent(t, conn)
+	if event["type"] != "response.completed" {
+		t.Fatalf("expected response.completed event, got %+v", event)
+	}
+	if !strings.Contains(mustMarshalString(t, event), "alias runtime ok") {
+		t.Fatalf("expected upstream response in websocket event, got %+v", event)
+	}
+
+	mu.Lock()
+	gotCalls := append([]upstreamCall(nil), calls...)
+	mu.Unlock()
+	if len(gotCalls) != 1 {
+		t.Fatalf("expected one upstream call, got %+v", gotCalls)
+	}
+	call := gotCalls[0]
+	if call.Path != "/v1/responses" || call.Authorization != "Bearer xai-runtime-secret" || call.Model != "grok-alias-upstream" {
+		t.Fatalf("unexpected alias runtime upstream call: %+v", call)
+	}
+	if !strings.Contains(mustMarshalString(t, call.Input), "hello alias runtime") {
+		t.Fatalf("expected alias runtime prompt forwarded upstream, got %+v", call.Input)
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=grok-alias-runtime-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected scheduler decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 {
+		t.Fatalf("expected one scheduler decision, got %+v", decisionsResp.Data)
+	}
+	decision := decisionsResp.Data[0]
+	if decision.SourceEndpoint != aliasEndpoint ||
+		decision.SelectedProviderId == nil ||
+		*decision.SelectedProviderId != string(providerResp.Data.Id) ||
+		decision.SelectedAccountId == nil ||
+		*decision.SelectedAccountId != string(accountResp.Data.Id) ||
+		decision.CandidateCount != 1 {
+		t.Fatalf("expected alias runtime scheduler evidence, got %+v", decision)
+	}
+
+	usageResp := waitForRealtimeUsageLog(t, handler, sessionCookie, "grok-alias-runtime-model")
+	if len(usageResp.Data) != 1 ||
+		!usageResp.Data[0].Success ||
+		usageResp.Data[0].SourceEndpoint != aliasEndpoint ||
+		usageResp.Data[0].TotalTokens != 9 ||
+		usageResp.Data[0].UsageEstimated {
+		t.Fatalf("unexpected alias runtime usage record: %+v", usageResp.Data)
+	}
+}
+
 func TestGatewayResponsesWebSocketForwardsStreamingEvents(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload struct {
@@ -758,15 +867,19 @@ func TestGatewayResponsesWebSocketRelaysGrokAPIKeyUpstreamWebSocket(t *testing.T
 
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	otherProviderResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"wrong-xai-ws-provider","display_name":"Wrong XAI WS Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
 	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"grok","display_name":"Grok","adapter_type":"native-grok","protocol":"openai-compatible","status":"active"}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"grok-ws-model","display_name":"Grok WS Model","status":"active","capabilities":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(otherProviderResp.Data.Id)+`","upstream_model_name":"wrong-upstream","status":"active","capability_override":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"grok-upstream","status":"active","capability_override":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(otherProviderResp.Data.Id)+`","name":"wrong-ws-account","runtime_class":"api_key","credential":{"api_key":"wrong-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
 	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"grok-ws-account","runtime_class":"api_key","credential":{"api_key":"xai-ws-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 
 	server := httptest.NewServer(handler)
 	defer server.Close()
-	conn := mustDialResponsesWebSocket(t, server.URL+"/v1/responses/ws?model=grok-ws-model&upstream_ws=true", apiKey)
+	aliasEndpoint := "/api/provider/xai/v1/responses/ws"
+	conn := mustDialResponsesWebSocket(t, server.URL+aliasEndpoint+"?model=grok-ws-model&upstream_ws=true", apiKey)
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
 	writeWebSocketJSON(t, conn, map[string]any{
@@ -830,14 +943,19 @@ func TestGatewayResponsesWebSocketRelaysGrokAPIKeyUpstreamWebSocket(t *testing.T
 		t.Fatalf("expected one scheduler decision, got %+v", decisionsResp.Data)
 	}
 	decision := decisionsResp.Data[0]
-	if decision.SourceEndpoint != responsesWebSocketSourceEndpoint || decision.SelectedAccountId == nil || *decision.SelectedAccountId != string(accountResp.Data.Id) {
-		t.Fatalf("expected xai websocket scheduler evidence, got %+v", decision)
+	if decision.SourceEndpoint != aliasEndpoint ||
+		decision.SelectedProviderId == nil ||
+		*decision.SelectedProviderId != string(providerResp.Data.Id) ||
+		decision.SelectedAccountId == nil ||
+		*decision.SelectedAccountId != string(accountResp.Data.Id) ||
+		decision.CandidateCount != 1 {
+		t.Fatalf("expected xai websocket alias scheduler evidence, got %+v", decision)
 	}
 
 	usageResp := waitForRealtimeUsageLog(t, handler, sessionCookie, "grok-ws-model")
 	if len(usageResp.Data) != 1 ||
 		!usageResp.Data[0].Success ||
-		usageResp.Data[0].SourceEndpoint != responsesWebSocketSourceEndpoint ||
+		usageResp.Data[0].SourceEndpoint != aliasEndpoint ||
 		usageResp.Data[0].TotalTokens != 11 ||
 		usageResp.Data[0].UsageEstimated {
 		t.Fatalf("unexpected xai websocket usage record: %+v", usageResp.Data)

@@ -465,7 +465,7 @@ func gatewayScheduleRequest(r *http.Request, canonical gatewaycontract.Canonical
 		UserID:              canonical.UserID,
 		APIKeyID:            canonical.APIKeyID,
 		SourceProtocol:      string(canonical.SourceProtocol),
-		SourceEndpoint:      canonical.SourceEndpoint,
+		SourceEndpoint:      gatewayEvidenceEndpoint(r.Context(), canonical.SourceEndpoint),
 		Model:               canonical.CanonicalModel,
 		Strategy:            schedulercontract.StrategyBalanced,
 		Warnings:            canonical.CompatibilityWarnings,
@@ -1039,6 +1039,18 @@ func intersectsInt(left []int, right []int) bool {
 
 func gatewaySourceEndpoint(ctx context.Context, fallback string) string {
 	if route, ok := ctx.Value(gatewayRouteContextKey{}).(gatewayRouteContext); ok {
+		if sourceEndpoint := strings.TrimSpace(route.SourceEndpoint); sourceEndpoint != "" {
+			return sourceEndpoint
+		}
+	}
+	return fallback
+}
+
+func gatewayEvidenceEndpoint(ctx context.Context, fallback string) string {
+	if route, ok := ctx.Value(gatewayRouteContextKey{}).(gatewayRouteContext); ok {
+		if evidenceEndpoint := strings.TrimSpace(route.EvidenceEndpoint); evidenceEndpoint != "" {
+			return evidenceEndpoint
+		}
 		if sourceEndpoint := strings.TrimSpace(route.SourceEndpoint); sourceEndpoint != "" {
 			return sourceEndpoint
 		}

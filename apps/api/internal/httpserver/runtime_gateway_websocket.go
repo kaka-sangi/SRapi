@@ -198,7 +198,7 @@ func (s *Server) acquireResponsesWebSocketSlot(ctx context.Context, r *http.Requ
 		RequestID:             requestIDFromContext(ctx),
 		UserID:                authed.UserID,
 		APIKeyID:              authed.Key.ID,
-		SourceEndpoint:        responsesWebSocketSourceEndpoint,
+		SourceEndpoint:        gatewayEvidenceEndpoint(r.Context(), responsesWebSocketSourceEndpoint),
 		SessionAffinityKey:    affinityKey,
 		SessionAffinitySource: affinitySource,
 		StickyAccountID:       stickyAccountID,
@@ -215,6 +215,7 @@ func (s *Server) releaseResponsesWebSocketSlot(ctx context.Context, slotID strin
 func (s *Server) handleRealtimeWebSocket(w http.ResponseWriter, r *http.Request) {
 	startedAt := time.Now()
 	requestID := requestIDFromContext(r.Context())
+	sourceEndpoint := gatewaySourceEndpoint(r.Context(), realtimeWebSocketSourceEndpoint)
 	authed, err := s.requireGatewayKey(r)
 	if err != nil {
 		writeGatewayAuthError(w, err, requestID)
@@ -253,7 +254,7 @@ func (s *Server) handleRealtimeWebSocket(w http.ResponseWriter, r *http.Request)
 
 	canonical := s.runtime.gateway.NormalizeRealtimeWebSocket(modelName, gatewayservice.RequestMeta{
 		RequestID:      requestID,
-		SourceEndpoint: realtimeWebSocketSourceEndpoint,
+		SourceEndpoint: sourceEndpoint,
 		UserID:         authed.UserID,
 		APIKeyID:       authed.Key.ID,
 		CanonicalModel: modelResolution.Model.CanonicalName,
@@ -325,7 +326,7 @@ func (s *Server) acquireRealtimeWebSocketSlot(ctx context.Context, r *http.Reque
 		RequestID:             requestIDFromContext(ctx),
 		UserID:                authed.UserID,
 		APIKeyID:              authed.Key.ID,
-		SourceEndpoint:        realtimeWebSocketSourceEndpoint,
+		SourceEndpoint:        gatewayEvidenceEndpoint(r.Context(), realtimeWebSocketSourceEndpoint),
 		SessionAffinityKey:    affinityKey,
 		SessionAffinitySource: affinitySource,
 		StickyAccountID:       stickyAccountID,
@@ -686,7 +687,7 @@ func responsesWebSocketRelayRequested(r *http.Request) bool {
 func (s *Server) relayProviderResponsesWebSocket(r *http.Request, conn *websocket.Conn, payload []byte, authed apikeycontract.AuthResult, idleSession *wsIdleSession) (bool, responsesWebSocketTurnState, error) {
 	startedAt := time.Now()
 	requestID := requestIDFromContext(r.Context())
-	sourceEndpoint := responsesWebSocketSourceEndpoint
+	sourceEndpoint := gatewaySourceEndpoint(r.Context(), responsesWebSocketSourceEndpoint)
 	modelName := responsesWebSocketPayloadModel(payload, r.URL.Query().Get("model"))
 	modelResolution, err := s.runtime.resolveModelCached(r.Context(), modelName)
 	if err != nil {
@@ -718,6 +719,7 @@ func (s *Server) relayProviderResponsesWebSocket(r *http.Request, conn *websocke
 		return false, responsesWebSocketTurnState{}, errors.New(gatewayEntitlementMessage(gatewayEntitlementErrorClass(admission.Entitlement)))
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
+	scheduleReq.SourceEndpoint = gatewayEvidenceEndpoint(r.Context(), sourceEndpoint)
 	scheduleReq.RequestCapabilities = append(scheduleReq.RequestCapabilities, capabilityRequirement(capabilitiescontract.KeyResponsesWebSocket))
 	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
 	result, err := s.runtime.scheduleGatewayRequest(withGatewayInboundClient(r.Context(), r), scheduleReq, model.ID, gatewayForcedProviderKey(r.Context()), authed.Key)
@@ -959,7 +961,7 @@ func responsesWebSocketUsageRecord(authed apikeycontract.AuthResult, canonical g
 		DecisionID:            result.Decision.ID,
 		AttemptNo:             result.Decision.AttemptNo,
 		SourceProtocol:        string(canonical.SourceProtocol),
-		SourceEndpoint:        canonical.SourceEndpoint,
+		SourceEndpoint:        firstNonEmpty(result.Decision.SourceEndpoint, canonical.SourceEndpoint),
 		Model:                 canonical.CanonicalModel,
 		RequestedModel:        gatewayRequestedModel(canonical),
 		Success:               success,
@@ -1310,7 +1312,11 @@ func (s *Server) captureResponsesRequest(original *http.Request, payload []byte)
 	internal.URL.RawQuery = original.URL.RawQuery
 	clearWebSocketUpgradeHeaders(internal.Header)
 
-	route := gatewayRouteContext{SourceEndpoint: responsesWebSocketSourceEndpoint}
+	route := gatewayRouteContext{
+		ForcedProviderKey: gatewayForcedProviderKey(original.Context()),
+		SourceEndpoint:    string(gatewaycontract.EndpointResponses),
+		EvidenceEndpoint:  gatewayEvidenceEndpoint(original.Context(), responsesWebSocketSourceEndpoint),
+	}
 	internal = internal.WithContext(context.WithValue(internal.Context(), gatewayRouteContextKey{}, route))
 	captured := newGatewayCaptureResponse()
 	s.handleCreateResponse(captured, internal)

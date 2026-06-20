@@ -30,6 +30,7 @@ func (s *Server) recordOpsErrorLog(ctx context.Context, rec gatewayUsageRecord) 
 	if s == nil || s.runtime == nil || s.runtime.opsErrorLogs == nil {
 		return
 	}
+	rec.SourceEndpoint = gatewayEvidenceEndpoint(ctx, rec.SourceEndpoint)
 	errorClass := stringValue(rec.ErrorClass)
 	upstreamStatus := opsErrorLogIntValue(rec.StatusCode)
 	if !opsErrorLogShouldRecord(errorClass, upstreamStatus) {
@@ -100,6 +101,7 @@ func (s *Server) recordGatewaySystemLog(ctx context.Context, rec gatewayUsageRec
 	if s == nil || s.runtime == nil {
 		return
 	}
+	rec.SourceEndpoint = gatewayEvidenceEndpoint(ctx, rec.SourceEndpoint)
 	s.runtime.recordGatewaySystemLog(ctx, rec)
 }
 

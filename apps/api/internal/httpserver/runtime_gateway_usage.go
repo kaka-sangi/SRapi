@@ -38,6 +38,7 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 	if rec.AttemptNo == 0 {
 		rec.AttemptNo = 1
 	}
+	rec.SourceEndpoint = gatewayEvidenceEndpoint(ctx, rec.SourceEndpoint)
 	model := fallbackModelName(rec.Model)
 	pricing := rec.Pricing.withDefaults()
 	rt.warnDefaultZeroGatewayPricing(rec, model, pricing)
