@@ -22,6 +22,7 @@ import { ADMIN_ROUTES } from "@/lib/routes";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAdminGatewayResources } from "@/hooks/admin-queries";
 import type {
+  GatewayEndpointResourceRow,
   GatewayModelResourceRow,
   GatewayPricingCoverage,
   GatewayProviderResourceRow,
@@ -467,10 +468,11 @@ function EndpointMatrix({
     <div className="grid min-w-[260px] grid-cols-2 gap-1 lg:grid-cols-4">
       {row.endpoints.map((endpoint) => {
         const available = endpoint.routable_accounts > 0 && endpoint.status !== "blocked";
+        const title = endpointTitle(endpoint, t);
         return (
           <span
             key={endpoint.key}
-            title={`${t(`adminGatewayResources.endpoint.${endpoint.key}`)}: ${endpoint.routable_accounts}`}
+            title={title}
             className={
               available
                 ? "border-srapi-success/30 bg-srapi-success/10 text-srapi-success inline-flex items-center justify-between gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[10px]"
@@ -478,12 +480,27 @@ function EndpointMatrix({
             }
           >
             <span>{t(`adminGatewayResources.endpointShort.${endpoint.key}`)}</span>
-            <span className="tabular">{endpoint.routable_accounts}</span>
+            <span className="tabular">
+              {endpoint.routable_accounts}/{endpoint.candidate_accounts}
+            </span>
           </span>
         );
       })}
     </div>
   );
+}
+
+function endpointTitle(
+  endpoint: GatewayEndpointResourceRow,
+  t: (key: string, params?: Record<string, string | number>) => string,
+) {
+  return [
+    `${t(`adminGatewayResources.endpoint.${endpoint.key}`)} · ${endpoint.source_endpoint}`,
+    `${t("adminGatewayResources.endpointDiagnostics.routable")}: ${endpoint.routable_accounts}`,
+    `${t("adminGatewayResources.endpointDiagnostics.candidate")}: ${endpoint.candidate_accounts}`,
+    `${t("adminGatewayResources.endpointDiagnostics.unsupported")}: ${endpoint.unsupported_accounts}`,
+    `${t("adminGatewayResources.endpointDiagnostics.unavailableModel")}: ${endpoint.unavailable_model_accounts}`,
+  ].join("\n");
 }
 
 function ProviderResourceRow({ row }: { row: GatewayProviderResourceRow }) {

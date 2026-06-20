@@ -21811,7 +21811,11 @@ components:
       type: object
       required:
         - key
+        - source_endpoint
         - routable_accounts
+        - candidate_accounts
+        - unsupported_accounts
+        - unavailable_model_accounts
         - status
       properties:
         key:
@@ -21819,15 +21823,41 @@ components:
           enum:
             - chat_completions
             - responses
+            - responses_websocket
             - responses_compact
             - responses_input_items
             - messages
             - anthropic_count_tokens
             - gemini_generate_content
             - gemini_count_tokens
+            - embeddings
+            - image_generations
+            - image_edits
+            - image_variations
+            - videos
+            - audio_transcriptions
+            - audio_speech
+            - moderations
+            - rerank
+            - realtime_websocket
+        source_endpoint:
+          type: string
+          description: Gateway route or route template represented by this endpoint readiness row.
         routable_accounts:
           type: integer
           minimum: 0
+        candidate_accounts:
+          type: integer
+          minimum: 0
+          description: Active, provider-routable accounts considered for this model route before endpoint capability and model availability filters.
+        unsupported_accounts:
+          type: integer
+          minimum: 0
+          description: Candidate accounts whose effective capabilities do not include this endpoint.
+        unavailable_model_accounts:
+          type: integer
+          minimum: 0
+          description: Candidate accounts whose effective model mapping is blocked by excluded_models or supported_models metadata.
         status:
           $ref: "#/components/schemas/GatewayProviderResourceStatus"
 

@@ -1717,8 +1717,24 @@ export type GatewayProviderResourceRow = {
 };
 
 export type GatewayEndpointResourceRow = {
-    key: 'chat_completions' | 'responses' | 'responses_compact' | 'responses_input_items' | 'messages' | 'anthropic_count_tokens' | 'gemini_generate_content' | 'gemini_count_tokens';
+    key: 'chat_completions' | 'responses' | 'responses_websocket' | 'responses_compact' | 'responses_input_items' | 'messages' | 'anthropic_count_tokens' | 'gemini_generate_content' | 'gemini_count_tokens' | 'embeddings' | 'image_generations' | 'image_edits' | 'image_variations' | 'videos' | 'audio_transcriptions' | 'audio_speech' | 'moderations' | 'rerank' | 'realtime_websocket';
+    /**
+     * Gateway route or route template represented by this endpoint readiness row.
+     */
+    source_endpoint: string;
     routable_accounts: number;
+    /**
+     * Active, provider-routable accounts considered for this model route before endpoint capability and model availability filters.
+     */
+    candidate_accounts: number;
+    /**
+     * Candidate accounts whose effective capabilities do not include this endpoint.
+     */
+    unsupported_accounts: number;
+    /**
+     * Candidate accounts whose effective model mapping is blocked by excluded_models or supported_models metadata.
+     */
+    unavailable_model_accounts: number;
     status: GatewayProviderResourceStatus;
 };
 

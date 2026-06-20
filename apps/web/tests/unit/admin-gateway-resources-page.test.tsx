@@ -48,6 +48,8 @@ describe("AdminGatewayResourcesPage", () => {
     expect(screen.getAllByText("端点").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Chat").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Compact").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Image").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("RT WS").length).toBeGreaterThan(0);
     expect(screen.getAllByText("计费").length).toBeGreaterThan(0);
     expect(screen.getAllByText("规则定价").length).toBeGreaterThan(0);
     expect(screen.getAllByText("3/3").length).toBeGreaterThan(0);
@@ -107,14 +109,25 @@ function summary(): GatewayResourceSummary {
         active_model_mappings: 1,
         routable_accounts: 1,
         endpoints: [
-          { key: "chat_completions", routable_accounts: 1, status: "ready" },
-          { key: "responses", routable_accounts: 1, status: "ready" },
-          { key: "responses_compact", routable_accounts: 0, status: "blocked" },
-          { key: "responses_input_items", routable_accounts: 0, status: "blocked" },
-          { key: "messages", routable_accounts: 1, status: "ready" },
-          { key: "anthropic_count_tokens", routable_accounts: 0, status: "blocked" },
-          { key: "gemini_generate_content", routable_accounts: 0, status: "blocked" },
-          { key: "gemini_count_tokens", routable_accounts: 0, status: "blocked" },
+          endpoint("chat_completions", "/v1/chat/completions", 1, 1, "ready"),
+          endpoint("responses", "/v1/responses", 1, 1, "ready"),
+          endpoint("responses_websocket", "/v1/responses/ws", 0, 1, "blocked", 1),
+          endpoint("responses_compact", "/v1/responses/compact", 0, 1, "blocked", 1),
+          endpoint("responses_input_items", "/v1/responses/{response_id}/input_items", 0, 1, "blocked", 1),
+          endpoint("messages", "/v1/messages", 1, 1, "ready"),
+          endpoint("anthropic_count_tokens", "/v1/messages/count_tokens", 0, 1, "blocked", 1),
+          endpoint("gemini_generate_content", "/v1beta/models/{model}:generateContent", 0, 1, "blocked", 1),
+          endpoint("gemini_count_tokens", "/v1beta/models/{model}:countTokens", 0, 1, "blocked", 1),
+          endpoint("embeddings", "/v1/embeddings", 1, 1, "ready"),
+          endpoint("image_generations", "/v1/images/generations", 1, 1, "ready"),
+          endpoint("image_edits", "/v1/images/edits", 0, 1, "blocked", 1),
+          endpoint("image_variations", "/v1/images/variations", 0, 1, "blocked", 1),
+          endpoint("videos", "/v1/videos", 0, 1, "blocked", 1),
+          endpoint("audio_transcriptions", "/v1/audio/transcriptions", 0, 1, "blocked", 1),
+          endpoint("audio_speech", "/v1/audio/speech", 0, 1, "blocked", 1),
+          endpoint("moderations", "/v1/moderations", 0, 1, "blocked", 1),
+          endpoint("rerank", "/v1/rerank", 0, 1, "blocked", 1),
+          endpoint("realtime_websocket", "/v1/realtime", 0, 1, "blocked", 1),
         ],
         pricing: {
           status: "priced",
@@ -139,14 +152,25 @@ function summary(): GatewayResourceSummary {
         upstream_model: "gpt-4.1-upstream",
         routable_accounts: 1,
         endpoints: [
-          { key: "chat_completions", routable_accounts: 1, status: "ready" },
-          { key: "responses", routable_accounts: 1, status: "ready" },
-          { key: "responses_compact", routable_accounts: 0, status: "blocked" },
-          { key: "responses_input_items", routable_accounts: 0, status: "blocked" },
-          { key: "messages", routable_accounts: 1, status: "ready" },
-          { key: "anthropic_count_tokens", routable_accounts: 0, status: "blocked" },
-          { key: "gemini_generate_content", routable_accounts: 0, status: "blocked" },
-          { key: "gemini_count_tokens", routable_accounts: 0, status: "blocked" },
+          endpoint("chat_completions", "/v1/chat/completions", 1, 1, "ready"),
+          endpoint("responses", "/v1/responses", 1, 1, "ready"),
+          endpoint("responses_websocket", "/v1/responses/ws", 0, 1, "blocked", 1),
+          endpoint("responses_compact", "/v1/responses/compact", 0, 1, "blocked", 1),
+          endpoint("responses_input_items", "/v1/responses/{response_id}/input_items", 0, 1, "blocked", 1),
+          endpoint("messages", "/v1/messages", 1, 1, "ready"),
+          endpoint("anthropic_count_tokens", "/v1/messages/count_tokens", 0, 1, "blocked", 1),
+          endpoint("gemini_generate_content", "/v1beta/models/{model}:generateContent", 0, 1, "blocked", 1),
+          endpoint("gemini_count_tokens", "/v1beta/models/{model}:countTokens", 0, 1, "blocked", 1),
+          endpoint("embeddings", "/v1/embeddings", 1, 1, "ready"),
+          endpoint("image_generations", "/v1/images/generations", 1, 1, "ready"),
+          endpoint("image_edits", "/v1/images/edits", 0, 1, "blocked", 1),
+          endpoint("image_variations", "/v1/images/variations", 0, 1, "blocked", 1),
+          endpoint("videos", "/v1/videos", 0, 1, "blocked", 1),
+          endpoint("audio_transcriptions", "/v1/audio/transcriptions", 0, 1, "blocked", 1),
+          endpoint("audio_speech", "/v1/audio/speech", 0, 1, "blocked", 1),
+          endpoint("moderations", "/v1/moderations", 0, 1, "blocked", 1),
+          endpoint("rerank", "/v1/rerank", 0, 1, "blocked", 1),
+          endpoint("realtime_websocket", "/v1/realtime", 0, 1, "blocked", 1),
         ],
         pricing: {
           status: "priced",
@@ -163,6 +187,25 @@ function summary(): GatewayResourceSummary {
         reasons: [],
       },
     ],
+  };
+}
+
+function endpoint(
+  key: NonNullable<GatewayResourceSummary["model_rows"][number]["endpoints"][number]["key"]>,
+  sourceEndpoint: string,
+  routableAccounts: number,
+  candidateAccounts: number,
+  status: "ready" | "limited" | "blocked",
+  unsupportedAccounts = 0,
+) {
+  return {
+    key,
+    source_endpoint: sourceEndpoint,
+    routable_accounts: routableAccounts,
+    candidate_accounts: candidateAccounts,
+    unsupported_accounts: unsupportedAccounts,
+    unavailable_model_accounts: 0,
+    status,
   };
 }
 

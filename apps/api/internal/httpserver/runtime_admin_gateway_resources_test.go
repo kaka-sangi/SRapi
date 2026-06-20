@@ -126,8 +126,15 @@ func TestBuildGatewayResourceSummaryAggregatesReadiness(t *testing.T) {
 		len(modelRow.Reasons) != 0 {
 		t.Fatalf("unexpected model resource row: %+v", modelRow)
 	}
-	assertGatewayEndpointRow(t, modelRow, apiopenapi.ChatCompletions, 1, apiopenapi.GatewayProviderResourceStatusReady)
-	assertGatewayEndpointRow(t, modelRow, apiopenapi.Responses, 1, apiopenapi.GatewayProviderResourceStatusReady)
+	assertGatewayEndpointRow(t, modelRow, apiopenapi.GatewayEndpointResourceRowKeyChatCompletions, 1, apiopenapi.GatewayProviderResourceStatusReady)
+	assertGatewayEndpointRow(t, modelRow, apiopenapi.GatewayEndpointResourceRowKeyResponses, 1, apiopenapi.GatewayProviderResourceStatusReady)
+	assertGatewayEndpointDiagnostics(t, modelRow, apiopenapi.GatewayEndpointResourceRowKeyEmbeddings, endpointDiagnostics{
+		sourceEndpoint:      "/v1/embeddings",
+		candidateAccounts:   1,
+		unsupportedAccounts: 0,
+		routableAccounts:    1,
+		status:              apiopenapi.GatewayProviderResourceStatusReady,
+	})
 
 	routeRow := findGatewayRouteResourceRow(t, summary, "model-1000", "ready-provider")
 	if routeRow.Status != apiopenapi.GatewayProviderResourceStatusReady ||
@@ -138,8 +145,8 @@ func TestBuildGatewayResourceSummaryAggregatesReadiness(t *testing.T) {
 		len(routeRow.Reasons) != 0 {
 		t.Fatalf("unexpected route resource row: %+v", routeRow)
 	}
-	assertGatewayRouteEndpointRow(t, routeRow, apiopenapi.ChatCompletions, 1, apiopenapi.GatewayProviderResourceStatusReady)
-	assertGatewayRouteEndpointRow(t, routeRow, apiopenapi.Responses, 1, apiopenapi.GatewayProviderResourceStatusReady)
+	assertGatewayRouteEndpointRow(t, routeRow, apiopenapi.GatewayEndpointResourceRowKeyChatCompletions, 1, apiopenapi.GatewayProviderResourceStatusReady)
+	assertGatewayRouteEndpointRow(t, routeRow, apiopenapi.GatewayEndpointResourceRowKeyResponses, 1, apiopenapi.GatewayProviderResourceStatusReady)
 }
 
 func TestBuildGatewayResourceSummaryReportsBlockedModels(t *testing.T) {
@@ -227,9 +234,54 @@ func TestBuildGatewayResourceSummaryReportsEndpointCapabilities(t *testing.T) {
 	if row.Status != apiopenapi.GatewayProviderResourceStatusReady || row.RoutableAccounts != 1 {
 		t.Fatalf("unexpected model endpoint row status: %+v", row)
 	}
-	assertGatewayEndpointRow(t, row, apiopenapi.ChatCompletions, 1, apiopenapi.GatewayProviderResourceStatusReady)
-	assertGatewayEndpointRow(t, row, apiopenapi.Responses, 1, apiopenapi.GatewayProviderResourceStatusReady)
-	assertGatewayEndpointRow(t, row, apiopenapi.ResponsesCompact, 0, apiopenapi.GatewayProviderResourceStatusBlocked)
+	assertGatewayEndpointRow(t, row, apiopenapi.GatewayEndpointResourceRowKeyChatCompletions, 1, apiopenapi.GatewayProviderResourceStatusReady)
+	assertGatewayEndpointRow(t, row, apiopenapi.GatewayEndpointResourceRowKeyResponses, 1, apiopenapi.GatewayProviderResourceStatusReady)
+	assertGatewayEndpointRow(t, row, apiopenapi.GatewayEndpointResourceRowKeyResponsesCompact, 0, apiopenapi.GatewayProviderResourceStatusBlocked)
+	assertGatewayEndpointDiagnostics(t, row, apiopenapi.GatewayEndpointResourceRowKeyResponsesCompact, endpointDiagnostics{
+		sourceEndpoint:      "/v1/responses/compact",
+		candidateAccounts:   1,
+		unsupportedAccounts: 1,
+		routableAccounts:    0,
+		status:              apiopenapi.GatewayProviderResourceStatusBlocked,
+	})
+}
+
+func TestBuildGatewayResourceSummaryReportsEndpointModelAvailability(t *testing.T) {
+	now := time.Date(2026, 6, 20, 12, 0, 0, 0, time.UTC)
+	account := testGatewayResourceAccount(10, 1, accountcontract.StatusActive, nil)
+	account.Metadata = map[string]any{accountExcludedModelsMetadataKey: []any{"model-1000"}}
+
+	summary := buildGatewayResourceSummary(gatewayResourceSummaryInput{
+		Providers: []providercontract.Provider{
+			testGatewayResourceProvider(1, "blocked-model-provider", providercontract.StatusActive),
+		},
+		Accounts: []accountcontract.ProviderAccount{account},
+		Models: []modelcontract.Model{
+			testGatewayResourceModel(1000, modelcontract.StatusActive),
+		},
+		ModelMappings: []modelcontract.ModelProviderMapping{
+			{ID: 500, ModelID: 1000, ProviderID: 1, UpstreamModelName: "upstream-model", Status: modelcontract.StatusActive},
+		},
+		APIKeys: []apikeycontract.APIKey{
+			{ID: 1, Status: apikeycontract.StatusActive},
+		},
+		Now: now,
+	})
+
+	row := findGatewayRouteResourceRow(t, summary, "model-1000", "blocked-model-provider")
+	if row.Status != apiopenapi.GatewayProviderResourceStatusLimited ||
+		row.RoutableAccounts != 0 ||
+		row.ApiKeyCount != 1 ||
+		!slices.Equal(row.Reasons, []apiopenapi.GatewayProviderResourceReason{apiopenapi.NoRoutableAccounts}) {
+		t.Fatalf("unexpected blocked model route row: %+v", row)
+	}
+	assertGatewayRouteEndpointDiagnostics(t, row, apiopenapi.GatewayEndpointResourceRowKeyChatCompletions, endpointDiagnostics{
+		sourceEndpoint:           "/v1/chat/completions",
+		candidateAccounts:        1,
+		unavailableModelAccounts: 1,
+		routableAccounts:         0,
+		status:                   apiopenapi.GatewayProviderResourceStatusBlocked,
+	})
 }
 
 func TestBuildGatewayResourceSummaryReportsPricingCoverage(t *testing.T) {
@@ -497,30 +549,63 @@ func findGatewayResourceRow(t *testing.T, summary apiopenapi.GatewayResourceSumm
 
 func assertGatewayEndpointRow(t *testing.T, row apiopenapi.GatewayModelResourceRow, key apiopenapi.GatewayEndpointResourceRowKey, accounts int, status apiopenapi.GatewayProviderResourceStatus) {
 	t.Helper()
-	for _, endpoint := range row.Endpoints {
-		if endpoint.Key != key {
-			continue
-		}
-		if endpoint.RoutableAccounts != accounts || endpoint.Status != status {
-			t.Fatalf("endpoint %s = %+v, want accounts=%d status=%s", key, endpoint, accounts, status)
-		}
-		return
+	endpoint := findGatewayEndpointRow(t, row.Endpoints, key)
+	if endpoint.RoutableAccounts != accounts || endpoint.Status != status {
+		t.Fatalf("endpoint %s = %+v, want accounts=%d status=%s", key, endpoint, accounts, status)
 	}
-	t.Fatalf("endpoint %s not found in %+v", key, row.Endpoints)
 }
 
 func assertGatewayRouteEndpointRow(t *testing.T, row apiopenapi.GatewayRouteResourceRow, key apiopenapi.GatewayEndpointResourceRowKey, accounts int, status apiopenapi.GatewayProviderResourceStatus) {
 	t.Helper()
-	for _, endpoint := range row.Endpoints {
+	endpoint := findGatewayEndpointRow(t, row.Endpoints, key)
+	if endpoint.RoutableAccounts != accounts || endpoint.Status != status {
+		t.Fatalf("route endpoint %s = %+v, want accounts=%d status=%s", key, endpoint, accounts, status)
+	}
+}
+
+type endpointDiagnostics struct {
+	sourceEndpoint           string
+	candidateAccounts        int
+	unsupportedAccounts      int
+	unavailableModelAccounts int
+	routableAccounts         int
+	status                   apiopenapi.GatewayProviderResourceStatus
+}
+
+func assertGatewayEndpointDiagnostics(t *testing.T, row apiopenapi.GatewayModelResourceRow, key apiopenapi.GatewayEndpointResourceRowKey, want endpointDiagnostics) {
+	t.Helper()
+	endpoint := findGatewayEndpointRow(t, row.Endpoints, key)
+	assertEndpointDiagnostics(t, endpoint, want)
+}
+
+func assertGatewayRouteEndpointDiagnostics(t *testing.T, row apiopenapi.GatewayRouteResourceRow, key apiopenapi.GatewayEndpointResourceRowKey, want endpointDiagnostics) {
+	t.Helper()
+	endpoint := findGatewayEndpointRow(t, row.Endpoints, key)
+	assertEndpointDiagnostics(t, endpoint, want)
+}
+
+func assertEndpointDiagnostics(t *testing.T, endpoint apiopenapi.GatewayEndpointResourceRow, want endpointDiagnostics) {
+	t.Helper()
+	if endpoint.SourceEndpoint != want.sourceEndpoint ||
+		endpoint.CandidateAccounts != want.candidateAccounts ||
+		endpoint.UnsupportedAccounts != want.unsupportedAccounts ||
+		endpoint.UnavailableModelAccounts != want.unavailableModelAccounts ||
+		endpoint.RoutableAccounts != want.routableAccounts ||
+		endpoint.Status != want.status {
+		t.Fatalf("endpoint diagnostics = %+v, want %+v", endpoint, want)
+	}
+}
+
+func findGatewayEndpointRow(t *testing.T, endpoints []apiopenapi.GatewayEndpointResourceRow, key apiopenapi.GatewayEndpointResourceRowKey) apiopenapi.GatewayEndpointResourceRow {
+	t.Helper()
+	for _, endpoint := range endpoints {
 		if endpoint.Key != key {
 			continue
 		}
-		if endpoint.RoutableAccounts != accounts || endpoint.Status != status {
-			t.Fatalf("route endpoint %s = %+v, want accounts=%d status=%s", key, endpoint, accounts, status)
-		}
-		return
+		return endpoint
 	}
-	t.Fatalf("route endpoint %s not found in %+v", key, row.Endpoints)
+	t.Fatalf("endpoint %s not found in %+v", key, endpoints)
+	return apiopenapi.GatewayEndpointResourceRow{}
 }
 
 func testGatewayResourceProvider(id int, name string, status providercontract.Status) providercontract.Provider {

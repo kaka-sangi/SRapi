@@ -430,7 +430,14 @@ func gatewayRouteDisplayUpstreamModel(model modelcontract.Model, mapping modelco
 }
 
 type gatewayEndpointResourceCounts struct {
-	accountIDs map[string]map[int]struct{}
+	stats map[string]*gatewayEndpointResourceStats
+}
+
+type gatewayEndpointResourceStats struct {
+	candidateAccountIDs        map[int]struct{}
+	routableAccountIDs         map[int]struct{}
+	unavailableModelAccountIDs map[int]struct{}
+	unsupportedAccountIDs      map[int]struct{}
 }
 
 type gatewayPricingCoverageCounts struct {
@@ -447,7 +454,20 @@ type gatewayPricingCoverageCounts struct {
 }
 
 func newGatewayEndpointResourceCounts() gatewayEndpointResourceCounts {
-	return gatewayEndpointResourceCounts{accountIDs: make(map[string]map[int]struct{}, len(gatewayEndpointResourceKeys))}
+	counts := gatewayEndpointResourceCounts{stats: make(map[string]*gatewayEndpointResourceStats, len(gatewayEndpointResourceKeys))}
+	for _, key := range gatewayEndpointResourceKeys {
+		counts.stats[key] = newGatewayEndpointResourceStats()
+	}
+	return counts
+}
+
+func newGatewayEndpointResourceStats() *gatewayEndpointResourceStats {
+	return &gatewayEndpointResourceStats{
+		candidateAccountIDs:        map[int]struct{}{},
+		routableAccountIDs:         map[int]struct{}{},
+		unavailableModelAccountIDs: map[int]struct{}{},
+		unsupportedAccountIDs:      map[int]struct{}{},
+	}
 }
 
 func newGatewayPricingCoverageCounts() gatewayPricingCoverageCounts {
@@ -461,34 +481,54 @@ func newGatewayPricingCoverageCounts() gatewayPricingCoverageCounts {
 var gatewayEndpointResourceKeys = []string{
 	capabilitiescontract.KeyChatCompletions,
 	capabilitiescontract.KeyResponses,
+	capabilitiescontract.KeyResponsesWebSocket,
 	capabilitiescontract.KeyResponsesCompact,
 	capabilitiescontract.KeyResponsesInputItems,
 	capabilitiescontract.KeyMessages,
 	capabilitiescontract.KeyAnthropicCountTokens,
 	capabilitiescontract.KeyGeminiGenerateContent,
 	capabilitiescontract.KeyGeminiCountTokens,
+	capabilitiescontract.KeyEmbeddings,
+	capabilitiescontract.KeyImageGenerations,
+	capabilitiescontract.KeyImageEdits,
+	capabilitiescontract.KeyImageVariations,
+	capabilitiescontract.KeyVideos,
+	capabilitiescontract.KeyAudioTranscriptions,
+	capabilitiescontract.KeyAudioSpeech,
+	capabilitiescontract.KeyModerations,
+	capabilitiescontract.KeyRerank,
+	capabilitiescontract.KeyRealtimeWebSocket,
 }
 
 func (counts gatewayEndpointResourceCounts) addAccount(ctx context.Context, model modelcontract.Model, mapping modelcontract.ModelProviderMapping, provider providercontract.Provider, account accountcontract.ProviderAccount, billing *billingservice.Service, now time.Time, pricing *gatewayPricingCoverageCounts) {
 	supported := gatewaySupportedCapabilityKeys(effectiveCapabilities(model, mapping, provider, account))
 	for _, key := range gatewayEndpointResourceKeys {
+		stats := counts.endpointStats(key)
+		stats.candidateAccountIDs[account.ID] = struct{}{}
 		if _, ok := supported[key]; !ok {
+			stats.unsupportedAccountIDs[account.ID] = struct{}{}
 			continue
 		}
 		effectiveMapping := gatewayResourceEffectiveModelMapping(model, mapping, provider, account, gatewayEndpointSourceEndpoint(key))
 		if !gatewayResourceAccountCanServeMapping(model, provider, account, effectiveMapping) {
+			stats.unavailableModelAccountIDs[account.ID] = struct{}{}
 			continue
 		}
-		values, ok := counts.accountIDs[key]
-		if !ok {
-			values = make(map[int]struct{})
-			counts.accountIDs[key] = values
-		}
-		values[account.ID] = struct{}{}
+		stats.routableAccountIDs[account.ID] = struct{}{}
 		if pricing != nil {
 			pricing.addRoute(ctx, model, effectiveMapping, provider, billing, now)
 		}
 	}
+}
+
+func (counts gatewayEndpointResourceCounts) endpointStats(key string) *gatewayEndpointResourceStats {
+	stats, ok := counts.stats[key]
+	if ok {
+		return stats
+	}
+	stats = newGatewayEndpointResourceStats()
+	counts.stats[key] = stats
+	return stats
 }
 
 func (counts *gatewayPricingCoverageCounts) addRoute(ctx context.Context, model modelcontract.Model, mapping modelcontract.ModelProviderMapping, provider providercontract.Provider, billing *billingservice.Service, now time.Time) {
@@ -601,6 +641,8 @@ func gatewayEndpointSourceEndpoint(key string) string {
 		return "/v1/chat/completions"
 	case capabilitiescontract.KeyResponses:
 		return "/v1/responses"
+	case capabilitiescontract.KeyResponsesWebSocket:
+		return "/v1/responses/ws"
 	case capabilitiescontract.KeyResponsesCompact:
 		return "/v1/responses/compact"
 	case capabilitiescontract.KeyResponsesInputItems:
@@ -613,6 +655,26 @@ func gatewayEndpointSourceEndpoint(key string) string {
 		return "/v1beta/models/{model}:generateContent"
 	case capabilitiescontract.KeyGeminiCountTokens:
 		return "/v1beta/models/{model}:countTokens"
+	case capabilitiescontract.KeyEmbeddings:
+		return "/v1/embeddings"
+	case capabilitiescontract.KeyImageGenerations:
+		return "/v1/images/generations"
+	case capabilitiescontract.KeyImageEdits:
+		return "/v1/images/edits"
+	case capabilitiescontract.KeyImageVariations:
+		return "/v1/images/variations"
+	case capabilitiescontract.KeyVideos:
+		return "/v1/videos"
+	case capabilitiescontract.KeyAudioTranscriptions:
+		return "/v1/audio/transcriptions"
+	case capabilitiescontract.KeyAudioSpeech:
+		return "/v1/audio/speech"
+	case capabilitiescontract.KeyModerations:
+		return "/v1/moderations"
+	case capabilitiescontract.KeyRerank:
+		return "/v1/rerank"
+	case capabilitiescontract.KeyRealtimeWebSocket:
+		return "/v1/realtime"
 	default:
 		return ""
 	}
@@ -620,8 +682,8 @@ func gatewayEndpointSourceEndpoint(key string) string {
 
 func (counts gatewayEndpointResourceCounts) uniqueAccountCount() int {
 	seen := make(map[int]struct{})
-	for _, values := range counts.accountIDs {
-		for accountID := range values {
+	for _, stats := range counts.stats {
+		for accountID := range stats.routableAccountIDs {
 			seen[accountID] = struct{}{}
 		}
 	}
@@ -631,15 +693,20 @@ func (counts gatewayEndpointResourceCounts) uniqueAccountCount() int {
 func (counts gatewayEndpointResourceCounts) rows() []apiopenapi.GatewayEndpointResourceRow {
 	rows := make([]apiopenapi.GatewayEndpointResourceRow, 0, len(gatewayEndpointResourceKeys))
 	for _, key := range gatewayEndpointResourceKeys {
+		stats := counts.endpointStats(key)
 		status := apiopenapi.GatewayProviderResourceStatusBlocked
-		routableAccounts := len(counts.accountIDs[key])
+		routableAccounts := len(stats.routableAccountIDs)
 		if routableAccounts > 0 {
 			status = apiopenapi.GatewayProviderResourceStatusReady
 		}
 		rows = append(rows, apiopenapi.GatewayEndpointResourceRow{
-			Key:              apiopenapi.GatewayEndpointResourceRowKey(key),
-			RoutableAccounts: routableAccounts,
-			Status:           status,
+			CandidateAccounts:        len(stats.candidateAccountIDs),
+			Key:                      apiopenapi.GatewayEndpointResourceRowKey(key),
+			RoutableAccounts:         routableAccounts,
+			SourceEndpoint:           gatewayEndpointSourceEndpoint(key),
+			Status:                   status,
+			UnavailableModelAccounts: len(stats.unavailableModelAccountIDs),
+			UnsupportedAccounts:      len(stats.unsupportedAccountIDs),
 		})
 	}
 	return rows

@@ -1321,34 +1321,67 @@ func (e ErrorPassthroughRuleAction) Valid() bool {
 
 // Defines values for GatewayEndpointResourceRowKey.
 const (
-	AnthropicCountTokens  GatewayEndpointResourceRowKey = "anthropic_count_tokens"
-	ChatCompletions       GatewayEndpointResourceRowKey = "chat_completions"
-	GeminiCountTokens     GatewayEndpointResourceRowKey = "gemini_count_tokens"
-	GeminiGenerateContent GatewayEndpointResourceRowKey = "gemini_generate_content"
-	Messages              GatewayEndpointResourceRowKey = "messages"
-	Responses             GatewayEndpointResourceRowKey = "responses"
-	ResponsesCompact      GatewayEndpointResourceRowKey = "responses_compact"
-	ResponsesInputItems   GatewayEndpointResourceRowKey = "responses_input_items"
+	GatewayEndpointResourceRowKeyAnthropicCountTokens  GatewayEndpointResourceRowKey = "anthropic_count_tokens"
+	GatewayEndpointResourceRowKeyAudioSpeech           GatewayEndpointResourceRowKey = "audio_speech"
+	GatewayEndpointResourceRowKeyAudioTranscriptions   GatewayEndpointResourceRowKey = "audio_transcriptions"
+	GatewayEndpointResourceRowKeyChatCompletions       GatewayEndpointResourceRowKey = "chat_completions"
+	GatewayEndpointResourceRowKeyEmbeddings            GatewayEndpointResourceRowKey = "embeddings"
+	GatewayEndpointResourceRowKeyGeminiCountTokens     GatewayEndpointResourceRowKey = "gemini_count_tokens"
+	GatewayEndpointResourceRowKeyGeminiGenerateContent GatewayEndpointResourceRowKey = "gemini_generate_content"
+	GatewayEndpointResourceRowKeyImageEdits            GatewayEndpointResourceRowKey = "image_edits"
+	GatewayEndpointResourceRowKeyImageGenerations      GatewayEndpointResourceRowKey = "image_generations"
+	GatewayEndpointResourceRowKeyImageVariations       GatewayEndpointResourceRowKey = "image_variations"
+	GatewayEndpointResourceRowKeyMessages              GatewayEndpointResourceRowKey = "messages"
+	GatewayEndpointResourceRowKeyModerations           GatewayEndpointResourceRowKey = "moderations"
+	GatewayEndpointResourceRowKeyRealtimeWebsocket     GatewayEndpointResourceRowKey = "realtime_websocket"
+	GatewayEndpointResourceRowKeyRerank                GatewayEndpointResourceRowKey = "rerank"
+	GatewayEndpointResourceRowKeyResponses             GatewayEndpointResourceRowKey = "responses"
+	GatewayEndpointResourceRowKeyResponsesCompact      GatewayEndpointResourceRowKey = "responses_compact"
+	GatewayEndpointResourceRowKeyResponsesInputItems   GatewayEndpointResourceRowKey = "responses_input_items"
+	GatewayEndpointResourceRowKeyResponsesWebsocket    GatewayEndpointResourceRowKey = "responses_websocket"
+	GatewayEndpointResourceRowKeyVideos                GatewayEndpointResourceRowKey = "videos"
 )
 
 // Valid indicates whether the value is a known member of the GatewayEndpointResourceRowKey enum.
 func (e GatewayEndpointResourceRowKey) Valid() bool {
 	switch e {
-	case AnthropicCountTokens:
+	case GatewayEndpointResourceRowKeyAnthropicCountTokens:
 		return true
-	case ChatCompletions:
+	case GatewayEndpointResourceRowKeyAudioSpeech:
 		return true
-	case GeminiCountTokens:
+	case GatewayEndpointResourceRowKeyAudioTranscriptions:
 		return true
-	case GeminiGenerateContent:
+	case GatewayEndpointResourceRowKeyChatCompletions:
 		return true
-	case Messages:
+	case GatewayEndpointResourceRowKeyEmbeddings:
 		return true
-	case Responses:
+	case GatewayEndpointResourceRowKeyGeminiCountTokens:
 		return true
-	case ResponsesCompact:
+	case GatewayEndpointResourceRowKeyGeminiGenerateContent:
 		return true
-	case ResponsesInputItems:
+	case GatewayEndpointResourceRowKeyImageEdits:
+		return true
+	case GatewayEndpointResourceRowKeyImageGenerations:
+		return true
+	case GatewayEndpointResourceRowKeyImageVariations:
+		return true
+	case GatewayEndpointResourceRowKeyMessages:
+		return true
+	case GatewayEndpointResourceRowKeyModerations:
+		return true
+	case GatewayEndpointResourceRowKeyRealtimeWebsocket:
+		return true
+	case GatewayEndpointResourceRowKeyRerank:
+		return true
+	case GatewayEndpointResourceRowKeyResponses:
+		return true
+	case GatewayEndpointResourceRowKeyResponsesCompact:
+		return true
+	case GatewayEndpointResourceRowKeyResponsesInputItems:
+		return true
+	case GatewayEndpointResourceRowKeyResponsesWebsocket:
+		return true
+	case GatewayEndpointResourceRowKeyVideos:
 		return true
 	default:
 		return false
@@ -2932,16 +2965,16 @@ func (e RealtimeActiveSlotSourceEndpoint) Valid() bool {
 
 // Defines values for RealtimeSlotKind.
 const (
-	RealtimeWebsocket  RealtimeSlotKind = "realtime_websocket"
-	ResponsesWebsocket RealtimeSlotKind = "responses_websocket"
+	RealtimeSlotKindRealtimeWebsocket  RealtimeSlotKind = "realtime_websocket"
+	RealtimeSlotKindResponsesWebsocket RealtimeSlotKind = "responses_websocket"
 )
 
 // Valid indicates whether the value is a known member of the RealtimeSlotKind enum.
 func (e RealtimeSlotKind) Valid() bool {
 	switch e {
-	case RealtimeWebsocket:
+	case RealtimeSlotKindRealtimeWebsocket:
 		return true
-	case ResponsesWebsocket:
+	case RealtimeSlotKindResponsesWebsocket:
 		return true
 	default:
 		return false
@@ -7986,9 +8019,20 @@ type ErrorResponse struct {
 
 // GatewayEndpointResourceRow defines model for GatewayEndpointResourceRow.
 type GatewayEndpointResourceRow struct {
-	Key              GatewayEndpointResourceRowKey `json:"key"`
-	RoutableAccounts int                           `json:"routable_accounts"`
-	Status           GatewayProviderResourceStatus `json:"status"`
+	// CandidateAccounts Active, provider-routable accounts considered for this model route before endpoint capability and model availability filters.
+	CandidateAccounts int                           `json:"candidate_accounts"`
+	Key               GatewayEndpointResourceRowKey `json:"key"`
+	RoutableAccounts  int                           `json:"routable_accounts"`
+
+	// SourceEndpoint Gateway route or route template represented by this endpoint readiness row.
+	SourceEndpoint string                        `json:"source_endpoint"`
+	Status         GatewayProviderResourceStatus `json:"status"`
+
+	// UnavailableModelAccounts Candidate accounts whose effective model mapping is blocked by excluded_models or supported_models metadata.
+	UnavailableModelAccounts int `json:"unavailable_model_accounts"`
+
+	// UnsupportedAccounts Candidate accounts whose effective capabilities do not include this endpoint.
+	UnsupportedAccounts int `json:"unsupported_accounts"`
 }
 
 // GatewayEndpointResourceRowKey defines model for GatewayEndpointResourceRow.Key.
