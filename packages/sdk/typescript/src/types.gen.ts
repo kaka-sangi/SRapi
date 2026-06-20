@@ -1756,6 +1756,10 @@ export type ProviderAccount = {
     name: string;
     runtime_class: RuntimeClass;
     upstream_client?: string | null;
+    /**
+     * Registered proxy definition id when this account is bound to one.
+     */
+    proxy_id?: string | null;
     status: ProviderAccountStatus;
     priority: number;
     weight: number;

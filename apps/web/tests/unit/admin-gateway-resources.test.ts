@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { buildGatewayResourceSummary } from "@/lib/admin-gateway-resources";
-import type { AccountHealthSnapshot, ApiKey, Model, Provider, ProviderAccount } from "@/lib/sdk-types";
+import type {
+  AccountHealthSnapshot,
+  ApiKey,
+  Model,
+  Provider,
+  ProviderAccount,
+  ProxyDefinition,
+} from "@/lib/sdk-types";
 
 describe("buildGatewayResourceSummary", () => {
   it("marks providers ready only when active accounts, models, and keys can route", () => {
@@ -58,6 +65,49 @@ describe("buildGatewayResourceSummary", () => {
       }),
     );
   });
+
+  it("counts proxy availability and flags accounts bound to unavailable proxies", () => {
+    const summary = buildGatewayResourceSummary({
+      providers: [provider({ id: "p1" })],
+      accounts: [
+        account({ id: "a1", provider_id: "p1", proxy_id: "1" }),
+        account({ id: "a2", provider_id: "p1", proxy_id: "2" }),
+        account({ id: "a3", provider_id: "p1", proxy_id: "4" }),
+      ],
+      health: [],
+      apiKeys: [apiKey({ id: "k1" })],
+      models: [model({ id: "m1" })],
+      proxies: [
+        proxy({ id: "1", name: "primary" }),
+        proxy({
+          id: "2",
+          name: "expired-with-backup",
+          expires_at: "2026-06-19T00:00:00Z",
+          fallback_mode: "proxy",
+          backup_proxy_id: "3",
+        }),
+        proxy({ id: "3", name: "backup" }),
+        proxy({ id: "4", name: "disabled", status: "disabled" }),
+      ],
+      nowMs: Date.parse("2026-06-20T00:00:00Z"),
+    });
+
+    expect(summary.activeProxies).toBe(3);
+    expect(summary.availableProxies).toBe(3);
+    expect(summary.expiredProxies).toBe(1);
+    expect(summary.proxiedAccounts).toBe(3);
+    expect(summary.proxyAttentionAccounts).toBe(2);
+    expect(summary.routableAccounts).toBe(2);
+    expect(summary.rows[0]).toEqual(
+      expect.objectContaining({
+        status: "limited",
+        proxiedAccounts: 3,
+        proxyAttentionAccounts: 2,
+        routableAccounts: 2,
+        reasons: ["proxy_attention"],
+      }),
+    );
+  });
 });
 
 function provider(overrides: Partial<Provider> = {}): Provider {
@@ -83,6 +133,7 @@ function account(overrides: Partial<ProviderAccount> = {}): ProviderAccount {
     priority: 0,
     weight: 1,
     group_ids: [],
+    proxy_id: null,
     created_at: "2026-06-20T00:00:00Z",
     ...overrides,
   };
@@ -132,6 +183,29 @@ function model(overrides: Partial<Model> = {}): Model {
     status: "active",
     capabilities: [],
     created_at: "2026-06-20T00:00:00Z",
+    ...overrides,
+  };
+}
+
+function proxy(overrides: Partial<ProxyDefinition> = {}): ProxyDefinition {
+  return {
+    id: "1",
+    name: "proxy",
+    type: "http",
+    status: "active",
+    url_configured: true,
+    country_code: null,
+    country_name: null,
+    expires_at: null,
+    fallback_mode: "none",
+    backup_proxy_id: null,
+    last_probed_at: null,
+    probe_success_count: 0,
+    probe_failure_count: 0,
+    last_probe_latency_ms: 0,
+    probe_success_pct_7d: null,
+    created_at: "2026-06-20T00:00:00Z",
+    updated_at: "2026-06-20T00:00:00Z",
     ...overrides,
   };
 }

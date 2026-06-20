@@ -21764,6 +21764,10 @@ components:
           type: string
           nullable: true
           example: claude_code_cli
+        proxy_id:
+          type: string
+          nullable: true
+          description: Registered proxy definition id when this account is bound to one.
         status:
           $ref: "#/components/schemas/ProviderAccountStatus"
         priority:

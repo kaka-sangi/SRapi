@@ -242,6 +242,7 @@ func toAPIAccount(account accountcontract.ProviderAccount) apiopenapi.ProviderAc
 		Name:             account.Name,
 		Priority:         account.Priority,
 		ProviderId:       apiopenapi.Id(strconv.Itoa(account.ProviderID)),
+		ProxyId:          account.ProxyID,
 		RiskLevel:        account.RiskLevel,
 		RuntimeClass:     apiopenapi.RuntimeClass(account.RuntimeClass),
 		Status:           apiopenapi.ProviderAccountStatus(account.Status),

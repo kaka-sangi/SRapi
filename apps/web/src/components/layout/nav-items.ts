@@ -97,6 +97,7 @@ const ADMIN_GATEWAY_SECTION: NavSection = {
     { href: ADMIN_ROUTES.gatewayPolicies, labelKey: "nav.adminGatewayPolicies", icon: ShieldCheck },
     { href: ADMIN_ROUTES.accounts, labelKey: "nav.adminAccounts", icon: CloudCog },
     { href: ADMIN_ROUTES.groups, labelKey: "nav.adminGroups", icon: Group },
+    { href: ADMIN_ROUTES.proxies, labelKey: "nav.adminProxies", icon: Globe },
     { href: ADMIN_ROUTES.apiKeys, labelKey: "nav.adminApiKeys", icon: KeyRound },
   ],
 };
@@ -128,7 +129,6 @@ const ADMIN_OPS_SECTION: NavSection = {
 const ADMIN_SYSTEM_SECTION: NavSection = {
   titleKey: "nav.sectionAdminSystem",
   items: [
-    { href: ADMIN_ROUTES.proxies, labelKey: "nav.adminProxies", icon: Globe },
     { href: ADMIN_ROUTES.identity, labelKey: "nav.adminIdentity", icon: Fingerprint },
     { href: ADMIN_ROUTES.logs, labelKey: "nav.adminLogs", icon: FileSearch },
     {

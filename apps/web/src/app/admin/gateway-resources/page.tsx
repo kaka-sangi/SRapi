@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, AlertTriangle, Cable, CheckCircle2, KeyRound, Route } from "lucide-react";
+import { useState } from "react";
+import { Activity, AlertTriangle, Cable, CheckCircle2, Globe, KeyRound, Route } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +27,7 @@ import {
   useAdminApiKeys,
   useAdminModels,
   useAdminProviders,
+  useAdminProxies,
 } from "@/hooks/admin-queries";
 import {
   buildGatewayResourceSummary,
@@ -48,22 +50,32 @@ function GatewayResourcesContent() {
   const accounts = useAdminAccounts({ page: 1, page_size: OVERVIEW_LIMIT });
   const apiKeys = useAdminApiKeys({ page: 1, page_size: OVERVIEW_LIMIT });
   const models = useAdminModels({ page: 1, page_size: OVERVIEW_LIMIT });
+  const proxies = useAdminProxies({ page: 1, page_size: OVERVIEW_LIMIT });
   const health = useAccountsHealthSummary();
+  const [nowMs] = useState(() => Date.now());
 
   const loading =
     providers.isLoading ||
     accounts.isLoading ||
     apiKeys.isLoading ||
     models.isLoading ||
+    proxies.isLoading ||
     health.isLoading;
   const error =
-    providers.isError || accounts.isError || apiKeys.isError || models.isError || health.isError;
+    providers.isError ||
+    accounts.isError ||
+    apiKeys.isError ||
+    models.isError ||
+    proxies.isError ||
+    health.isError;
   const summary = buildGatewayResourceSummary({
     providers: providers.data?.data ?? [],
     accounts: accounts.data?.data ?? [],
     apiKeys: apiKeys.data?.data ?? [],
     models: models.data?.data ?? [],
+    proxies: proxies.data?.data ?? [],
     health: health.data ?? [],
+    nowMs,
   });
 
   return (
@@ -99,7 +111,7 @@ function GatewayResourcesContent() {
       ) : null}
       {!loading && !error ? (
         <div className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <ResourceKpi
               icon={Cable}
               label={t("adminGatewayResources.activeProviders")}
@@ -114,6 +126,11 @@ function GatewayResourcesContent() {
               icon={Route}
               label={t("adminGatewayResources.activeModels")}
               value={String(summary.activeModels)}
+            />
+            <ResourceKpi
+              icon={Globe}
+              label={t("adminGatewayResources.availableProxies")}
+              value={`${summary.availableProxies}/${summary.activeProxies}`}
             />
             <ResourceKpi
               icon={KeyRound}
@@ -134,6 +151,7 @@ function GatewayResourcesContent() {
                       <TableHead>{t("adminProviders.name")}</TableHead>
                       <TableHead>{t("adminProviders.adapterType")}</TableHead>
                       <TableHead className="text-right">{t("adminGatewayResources.accounts")}</TableHead>
+                      <TableHead className="text-right">{t("adminGatewayResources.proxies")}</TableHead>
                       <TableHead className="text-right">{t("adminGatewayResources.apiKeys")}</TableHead>
                       <TableHead>{t("adminCommon.status")}</TableHead>
                       <TableHead>{t("adminGatewayResources.blockers")}</TableHead>
@@ -206,6 +224,14 @@ function ProviderResourceRow({ row }: { row: GatewayProviderResourceRow }) {
         <span className="text-srapi-text-tertiary"> / {row.totalAccounts}</span>
       </TableCell>
       <TableCell className="text-right font-mono text-2xs tabular">
+        <span className={row.proxyAttentionAccounts > 0 ? "text-srapi-error" : "text-srapi-text-primary"}>
+          {row.proxiedAccounts}
+        </span>
+        {row.proxyAttentionAccounts > 0 ? (
+          <span className="text-srapi-text-tertiary"> · {row.proxyAttentionAccounts}</span>
+        ) : null}
+      </TableCell>
+      <TableCell className="text-right font-mono text-2xs tabular">
         <span className="text-srapi-text-primary">{row.apiKeyCount}</span>
         {row.scopedKeyCount > 0 ? (
           <span className="text-srapi-text-tertiary"> · {row.scopedKeyCount}</span>
@@ -240,8 +266,8 @@ function ProviderResourceRow({ row }: { row: GatewayProviderResourceRow }) {
 function GatewayResourcesSkeleton() {
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, index) => (
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        {Array.from({ length: 5 }).map((_, index) => (
           <Card key={index} className="p-5">
             <Skeleton className="h-3 w-28" />
             <Skeleton className="mt-4 h-8 w-20" />

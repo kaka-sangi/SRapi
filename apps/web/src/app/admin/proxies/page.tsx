@@ -58,6 +58,7 @@ function ProxiesContent() {
   const { t, language } = useLanguage();
   const list = useAdminList();
   const colVis = useColumnVisibility("admin-proxies", []);
+  const [nowMs] = useState(() => Date.now());
   const statusFilter = (list.filters.status as ProxyDefinition["status"]) || undefined;
   const countryFilter = (list.filters.country as string | undefined) || undefined;
   // Memoise the localized {value,label} pairs once per render and resolve a
@@ -351,6 +352,7 @@ function ProxiesContent() {
         <ProxyLifecycleCell
           proxy={p}
           proxies={visibleProxyRows}
+          nowMs={nowMs}
           t={t}
         />
       ),
@@ -575,14 +577,16 @@ export function AvailabilityBadge({ pct }: { pct: number }) {
 function ProxyLifecycleCell({
   proxy,
   proxies,
+  nowMs,
   t,
 }: {
   proxy: ProxyDefinition;
   proxies: readonly ProxyDefinition[];
+  nowMs: number;
   t: (key: string, vars?: Record<string, string | number>) => string;
 }) {
   const expiresAt = proxy.expires_at ? new Date(proxy.expires_at) : null;
-  const expired = expiresAt ? expiresAt.getTime() <= Date.now() : false;
+  const expired = expiresAt ? expiresAt.getTime() <= nowMs : false;
   const fallbackMode = proxy.fallback_mode ?? "none";
   const backupName = proxy.backup_proxy_id
     ? proxies.find((item) => item.id === proxy.backup_proxy_id)?.name ?? `#${proxy.backup_proxy_id}`

@@ -223,6 +223,28 @@ func TestAdminProxyRegistryBindsAccountByProxyID(t *testing.T) {
 	if bindRec.Code != http.StatusOK {
 		t.Fatalf("expected proxy bind 200, got %d body=%s", bindRec.Code, bindRec.Body.String())
 	}
+	var bound apiopenapi.ProviderAccountResponse
+	if err := json.NewDecoder(bindRec.Body).Decode(&bound); err != nil {
+		t.Fatalf("decode bound account response: %v", err)
+	}
+	if bound.Data.ProxyId == nil || *bound.Data.ProxyId != string(proxyResp.Data.Id) {
+		t.Fatalf("expected bind response proxy_id %s, got %+v", proxyResp.Data.Id, bound.Data.ProxyId)
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/"+string(accountResp.Data.Id), nil)
+	getReq.AddCookie(sessionCookie)
+	getRec := httptest.NewRecorder()
+	handler.ServeHTTP(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("expected account get 200, got %d body=%s", getRec.Code, getRec.Body.String())
+	}
+	var got apiopenapi.ProviderAccountResponse
+	if err := json.NewDecoder(getRec.Body).Decode(&got); err != nil {
+		t.Fatalf("decode account get response: %v", err)
+	}
+	if got.Data.ProxyId == nil || *got.Data.ProxyId != string(proxyResp.Data.Id) {
+		t.Fatalf("expected get response proxy_id %s, got %+v", proxyResp.Data.Id, got.Data.ProxyId)
+	}
 
 	qualityReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/"+string(accountResp.Data.Id)+"/proxy-quality", nil)
 	qualityReq.AddCookie(sessionCookie)

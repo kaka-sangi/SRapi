@@ -10029,6 +10029,9 @@ type ProviderAccount struct {
 	Priority      int        `json:"priority"`
 	ProviderId    Id         `json:"provider_id"`
 
+	// ProxyId Registered proxy definition id when this account is bound to one.
+	ProxyId *string `json:"proxy_id,omitempty"`
+
 	// RefreshAttempts Consecutive refresh-failure count; reset to 0 on a success.
 	RefreshAttempts *int `json:"refresh_attempts,omitempty"`
 
