@@ -7138,6 +7138,52 @@ func TestGatewayClaudeCodeReverseProxyUsesOfficialClientMessagesShape(t *testing
 	}
 }
 
+func TestGatewayClaudeCodeReverseProxyStreamsControlEventsVerbatim(t *testing.T) {
+	sentinelEvents := []string{
+		`{"type":"tool_progress","tool_use_id":"toolu_123","tool_name":"Bash","parent_tool_use_id":null,"elapsed_time_seconds":2.5,"task_id":"task_123","uuid":"11111111-1111-4111-8111-111111111111","session_id":"sess_123"}`,
+		`{"type":"system","subtype":"session_state_changed","state":"requires_action","uuid":"22222222-2222-4222-8222-222222222222","session_id":"sess_123"}`,
+		`{"type":"tool_use_summary","summary":"Searched in auth/","preceding_tool_use_ids":["toolu_1","toolu_2"],"uuid":"33333333-3333-4333-8333-333333333333","session_id":"sess_123"}`,
+		`{"type":"control_request","request_id":"req_123","request":{"subtype":"can_use_tool","tool_name":"Bash","input":{"command":"npm test"},"tool_use_id":"toolu_123","description":"Running npm test"}}`,
+	}
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/messages" || r.URL.RawQuery != "beta=true" {
+			t.Fatalf("unexpected Claude Code stream route %s?%s", r.URL.Path, r.URL.RawQuery)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		flusher, _ := w.(http.Flusher)
+		for _, event := range sentinelEvents {
+			_, _ = io.WriteString(w, "data: "+event+"\n\n")
+			if flusher != nil {
+				flusher.Flush()
+			}
+		}
+		_, _ = io.WriteString(w, "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"claude-code-sentinel","display_name":"Claude Code Sentinel","adapter_type":"reverse-proxy-claude-code-cli","protocol":"anthropic-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"claude-code-sentinel-model","display_name":"Claude Code Sentinel Model","status":"active","capabilities":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"claude-upstream","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"claude-code-sentinel-account","runtime_class":"cli_client_token","upstream_client":"claude_code_cli","credential":{"cli_client_token":"claude-code-token"},"metadata":{"base_url":"`+upstream.URL+`/v1","user_agent":"claude-cli/2.1.63 (external, cli)","claude_code_version":"2.1.63","claude_code_build":"abc123"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/messages", `{"model":"claude-code-sentinel-model","stream":true,"max_tokens":64,"messages":[{"role":"user","content":"run tool workflow"}]}`)
+	if got := rec.Header().Get("Content-Type"); !strings.Contains(got, "text/event-stream") {
+		t.Fatalf("expected SSE response, got content-type %q body=%s", got, rec.Body.String())
+	}
+	body := rec.Body.String()
+	for _, event := range sentinelEvents {
+		if !strings.Contains(body, "data: "+event+"\n\n") {
+			t.Fatalf("expected Claude Code control event to be relayed verbatim:\nwant: %s\nbody:\n%s", event, body)
+		}
+	}
+	if strings.Contains(body, "[DONE]") {
+		t.Fatalf("Claude Code Anthropic stream must not gain an OpenAI [DONE] sentinel, got:\n%s", body)
+	}
+}
+
 func TestGatewayEmbeddingsRouteTargetsOpenAICompatibleUpstream(t *testing.T) {
 	type upstreamCall struct {
 		Path          string
