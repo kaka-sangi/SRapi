@@ -4510,6 +4510,61 @@ func TestGatewayGeminiGenerateContentRecordsExplicitZeroUsage(t *testing.T) {
 	}
 }
 
+func TestGatewayGeminiStreamGenerateContentRecordsExplicitZeroUsage(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1beta/models/gemini-native-upstream:streamGenerateContent" {
+			t.Fatalf("unexpected native gemini path %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"zero stream response\"}]},\"finishReason\":\"STOP\"}],\"usageMetadata\":{\"promptTokenCount\":0,\"candidatesTokenCount\":0,\"totalTokenCount\":0}}\n\n"))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp, modelResp, accountResp := mustCreateNativeGeminiGatewayTarget(t, handler, sessionCookie, loginResp.Data.CsrfToken, upstream.URL)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	body := `{"contents":[{"role":"user","parts":[{"text":"return explicit zero stream usage"}]}]}`
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1beta/models/native-gemini-route-model:streamGenerateContent", body)
+	if got := rec.Header().Get("Content-Type"); !strings.Contains(got, "text/event-stream") {
+		t.Fatalf("expected SSE response, got content-type %q body=%s", got, rec.Body.String())
+	}
+	if body := rec.Body.String(); !strings.Contains(body, "zero stream response") || !strings.Contains(body, `"totalTokenCount":0`) {
+		t.Fatalf("expected streamed Gemini zero usage response, got:\n%s", body)
+	}
+
+	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=native-gemini-route-model", nil)
+	usageReq.AddCookie(sessionCookie)
+	usageRec := httptest.NewRecorder()
+	handler.ServeHTTP(usageRec, usageReq)
+	if usageRec.Code != http.StatusOK {
+		t.Fatalf("expected usage logs 200, got %d body=%s", usageRec.Code, usageRec.Body.String())
+	}
+	var usageResp apiopenapi.UsageLogListResponse
+	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
+		t.Fatalf("decode usage logs: %v", err)
+	}
+	if len(usageResp.Data) != 1 {
+		t.Fatalf("expected one usage record, got %+v", usageResp.Data)
+	}
+	usage := usageResp.Data[0]
+	if !usage.Success ||
+		usage.TotalTokens != 0 ||
+		usage.InputTokens != 0 ||
+		usage.OutputTokens != 0 ||
+		usage.Cost != "0.00000000" ||
+		usage.UsageEstimated ||
+		usage.SourceEndpoint != "/v1beta/models/native-gemini-route-model:streamGenerateContent" ||
+		usage.TargetProtocol == nil ||
+		*usage.TargetProtocol != "gemini-compatible" {
+		t.Fatalf("unexpected explicit zero stream usage record: %+v", usage)
+	}
+	if usage.ProviderId == nil || *usage.ProviderId != providerResp.Data.Id || usage.AccountId == nil || *usage.AccountId != accountResp.Data.Id || usage.Model != modelResp.Data.CanonicalName {
+		t.Fatalf("expected provider/account/model evidence, got %+v", usage)
+	}
+}
+
 func TestGatewayGeminiCountTokensSchedulesGeminiCompatibleUpstream(t *testing.T) {
 	var (
 		mu    sync.Mutex
