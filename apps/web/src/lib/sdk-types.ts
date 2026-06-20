@@ -162,6 +162,7 @@ export type {
   GatewayUsageRequest,
   GatewayAccountBlockers,
   GatewayEndpointResourceRow,
+  GatewayResourceFix,
   GatewayModelResourceRow,
   GatewayPricingCoverage,
   GatewayProviderResourceReason,

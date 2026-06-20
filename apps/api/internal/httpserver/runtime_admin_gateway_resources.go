@@ -3,6 +3,7 @@ package httpserver
 import (
 	"context"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -219,6 +220,8 @@ func buildGatewayResourceSummary(input gatewayResourceSummaryInput) apiopenapi.G
 			activeAccounts++
 		}
 	}
+	modelRows := buildGatewayModelResourceRows(input.Context, activeModels, activeModelMappings, input.Providers, routableAccountsByProvider, activeKeys, input.Billing, now)
+	routeRows := buildGatewayRouteResourceRows(input.Context, activeModels, activeModelMappings, input.Providers, routableAccountsByProvider, providerGroupIDs, activeKeys, input.Billing, now)
 	return apiopenapi.GatewayResourceSummary{
 		ActiveAccounts:         activeAccounts,
 		ActiveApiKeys:          len(activeKeys),
@@ -228,12 +231,13 @@ func buildGatewayResourceSummary(input gatewayResourceSummaryInput) apiopenapi.G
 		ActiveProxies:          activeProxies,
 		AvailableProxies:       availableProxies,
 		ExpiredProxies:         expiredProxies,
-		ModelRows:              buildGatewayModelResourceRows(input.Context, activeModels, activeModelMappings, input.Providers, routableAccountsByProvider, activeKeys, input.Billing, now),
+		Fixes:                  gatewayResourceFixes(rows, modelRows, routeRows),
+		ModelRows:              modelRows,
 		Providers:              len(input.Providers),
 		ProxiedAccounts:        sumProviderResourceRows(rows, func(row apiopenapi.GatewayProviderResourceRow) int { return row.ProxiedAccounts }),
 		ProxyAttentionAccounts: sumProviderResourceRows(rows, func(row apiopenapi.GatewayProviderResourceRow) int { return row.ProxyAttentionAccounts }),
 		RoutableAccounts:       sumProviderResourceRows(rows, func(row apiopenapi.GatewayProviderResourceRow) int { return row.RoutableAccounts }),
-		RouteRows:              buildGatewayRouteResourceRows(input.Context, activeModels, activeModelMappings, input.Providers, routableAccountsByProvider, providerGroupIDs, activeKeys, input.Billing, now),
+		RouteRows:              routeRows,
 		Rows:                   rows,
 		ScopedApiKeys:          scopedKeyCount,
 	}
@@ -412,6 +416,176 @@ func buildGatewayRouteResourceRows(
 		})
 	}
 	return rows
+}
+
+func gatewayResourceFixes(
+	providerRows []apiopenapi.GatewayProviderResourceRow,
+	modelRows []apiopenapi.GatewayModelResourceRow,
+	routeRows []apiopenapi.GatewayRouteResourceRow,
+) []apiopenapi.GatewayResourceFix {
+	acc := newGatewayResourceFixAccumulator()
+	for _, row := range providerRows {
+		for _, reason := range row.Reasons {
+			if reason == apiopenapi.NoRoutableAccounts || reason == apiopenapi.ProxyAttention {
+				continue
+			}
+			acc.add(reason, gatewayFixAreaForReason(reason), gatewayFixSeverityForReason(reason), 1)
+		}
+		acc.add(apiopenapi.NoRoutableAccounts, apiopenapi.Accounts, apiopenapi.GatewayResourceFixSeverityCritical, row.AccountBlockers.Health)
+		acc.add(apiopenapi.NoRoutableAccounts, apiopenapi.Accounts, apiopenapi.GatewayResourceFixSeverityCritical, row.AccountBlockers.Quota)
+		acc.add(apiopenapi.ProxyAttention, apiopenapi.Proxies, apiopenapi.GatewayResourceFixSeverityWarning, max(row.AccountBlockers.Proxy, row.ProxyAttentionAccounts))
+	}
+	for _, row := range modelRows {
+		for _, reason := range row.Reasons {
+			acc.add(reason, gatewayFixAreaForReason(reason), gatewayFixSeverityForReason(reason), 1)
+		}
+		if row.Pricing.Status == apiopenapi.GatewayPricingCoverageStatusError {
+			acc.add(apiopenapi.PricingUncovered, apiopenapi.Pricing, apiopenapi.GatewayResourceFixSeverityWarning, 1)
+		}
+		acc.addEndpointFixes(row.Endpoints)
+	}
+	for _, row := range routeRows {
+		for _, reason := range row.Reasons {
+			acc.add(reason, gatewayFixAreaForReason(reason), gatewayFixSeverityForReason(reason), 1)
+		}
+		if row.Pricing.Status == apiopenapi.GatewayPricingCoverageStatusError {
+			acc.add(apiopenapi.PricingUncovered, apiopenapi.Pricing, apiopenapi.GatewayResourceFixSeverityWarning, 1)
+		}
+		acc.addEndpointFixes(row.Endpoints)
+	}
+	return acc.rows()
+}
+
+type gatewayResourceFixAccumulator struct {
+	items map[string]apiopenapi.GatewayResourceFix
+}
+
+func newGatewayResourceFixAccumulator() *gatewayResourceFixAccumulator {
+	return &gatewayResourceFixAccumulator{items: map[string]apiopenapi.GatewayResourceFix{}}
+}
+
+func (a *gatewayResourceFixAccumulator) add(
+	reason apiopenapi.GatewayProviderResourceReason,
+	area apiopenapi.GatewayResourceFixArea,
+	severity apiopenapi.GatewayResourceFixSeverity,
+	count int,
+) {
+	if count <= 0 {
+		return
+	}
+	key := string(area) + ":" + string(reason)
+	item, ok := a.items[key]
+	if !ok {
+		item = apiopenapi.GatewayResourceFix{
+			Area:     area,
+			Href:     gatewayResourceFixHref(area, reason),
+			Reason:   reason,
+			Severity: severity,
+		}
+	}
+	item.Count += count
+	if gatewayFixSeverityRank(severity) > gatewayFixSeverityRank(item.Severity) {
+		item.Severity = severity
+	}
+	a.items[key] = item
+}
+
+func (a *gatewayResourceFixAccumulator) addEndpointFixes(endpoints []apiopenapi.GatewayEndpointResourceRow) {
+	for _, endpoint := range endpoints {
+		if endpoint.Status != apiopenapi.GatewayProviderResourceStatusBlocked {
+			continue
+		}
+		a.add(apiopenapi.NoRoutableAccounts, apiopenapi.Endpoints, apiopenapi.GatewayResourceFixSeverityWarning, endpoint.UnsupportedAccounts+endpoint.UnavailableModelAccounts)
+	}
+}
+
+func (a *gatewayResourceFixAccumulator) rows() []apiopenapi.GatewayResourceFix {
+	out := make([]apiopenapi.GatewayResourceFix, 0, len(a.items))
+	for _, item := range a.items {
+		out = append(out, item)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		leftRank := gatewayFixSeverityRank(out[i].Severity)
+		rightRank := gatewayFixSeverityRank(out[j].Severity)
+		if leftRank != rightRank {
+			return leftRank > rightRank
+		}
+		if out[i].Count != out[j].Count {
+			return out[i].Count > out[j].Count
+		}
+		if out[i].Area != out[j].Area {
+			return out[i].Area < out[j].Area
+		}
+		return out[i].Reason < out[j].Reason
+	})
+	return out
+}
+
+func gatewayFixAreaForReason(reason apiopenapi.GatewayProviderResourceReason) apiopenapi.GatewayResourceFixArea {
+	switch reason {
+	case apiopenapi.ProviderDisabled:
+		return apiopenapi.Providers
+	case apiopenapi.NoActiveModels:
+		return apiopenapi.Models
+	case apiopenapi.NoModelMappings:
+		return apiopenapi.ModelMappings
+	case apiopenapi.NoActiveAccounts, apiopenapi.NoRoutableAccounts:
+		return apiopenapi.Accounts
+	case apiopenapi.ProxyAttention:
+		return apiopenapi.Proxies
+	case apiopenapi.NoApiKeys:
+		return apiopenapi.ApiKeys
+	case apiopenapi.PricingUncovered:
+		return apiopenapi.Pricing
+	default:
+		return apiopenapi.Endpoints
+	}
+}
+
+func gatewayFixSeverityForReason(reason apiopenapi.GatewayProviderResourceReason) apiopenapi.GatewayResourceFixSeverity {
+	switch reason {
+	case apiopenapi.ProviderDisabled, apiopenapi.NoActiveModels, apiopenapi.NoModelMappings, apiopenapi.NoActiveAccounts, apiopenapi.NoRoutableAccounts, apiopenapi.NoApiKeys:
+		return apiopenapi.GatewayResourceFixSeverityCritical
+	case apiopenapi.ProxyAttention, apiopenapi.PricingUncovered:
+		return apiopenapi.GatewayResourceFixSeverityWarning
+	default:
+		return apiopenapi.GatewayResourceFixSeverityInfo
+	}
+}
+
+func gatewayResourceFixHref(area apiopenapi.GatewayResourceFixArea, reason apiopenapi.GatewayProviderResourceReason) string {
+	switch area {
+	case apiopenapi.Providers:
+		return "/admin/providers"
+	case apiopenapi.Models:
+		return "/admin/models"
+	case apiopenapi.ModelMappings:
+		return "/admin/models"
+	case apiopenapi.Accounts:
+		if reason == apiopenapi.NoRoutableAccounts {
+			return "/admin/accounts?view=health"
+		}
+		return "/admin/accounts"
+	case apiopenapi.Proxies:
+		return "/admin/proxies"
+	case apiopenapi.ApiKeys:
+		return "/admin/api-keys"
+	case apiopenapi.Pricing:
+		return "/admin/channels/pricing"
+	default:
+		return "/admin/gateway-resources"
+	}
+}
+
+func gatewayFixSeverityRank(severity apiopenapi.GatewayResourceFixSeverity) int {
+	switch severity {
+	case apiopenapi.GatewayResourceFixSeverityCritical:
+		return 3
+	case apiopenapi.GatewayResourceFixSeverityWarning:
+		return 2
+	default:
+		return 1
+	}
 }
 
 func gatewayRouteDisplayUpstreamModel(model modelcontract.Model, mapping modelcontract.ModelProviderMapping, provider providercontract.Provider, account accountcontract.ProviderAccount, fallback string) string {

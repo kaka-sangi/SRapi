@@ -59,6 +59,15 @@ describe("AdminGatewayResourcesPage", () => {
     expect(screen.getByText("路由明细")).toBeInTheDocument();
     expect(screen.getByText("gpt-4.1-upstream")).toBeInTheDocument();
     expect(screen.getAllByText("就绪").length).toBeGreaterThan(0);
+    expect(screen.getByText("优先修复")).toBeInTheDocument();
+    expect(screen.getByTitle("有 2 个账号或资源当前不可路由。")).toHaveAttribute(
+      "href",
+      "/admin/accounts?view=health",
+    );
+    expect(screen.getByTitle("有 1 个账号的代理绑定需要处理。")).toHaveAttribute(
+      "href",
+      "/admin/proxies",
+    );
   });
 });
 
@@ -90,6 +99,22 @@ function summary(): GatewayResourceSummary {
     proxied_accounts: 1,
     proxy_attention_accounts: 0,
     scoped_api_keys: 1,
+    fixes: [
+      {
+        severity: "critical",
+        area: "accounts",
+        reason: "no_routable_accounts",
+        count: 2,
+        href: "/admin/accounts?view=health",
+      },
+      {
+        severity: "warning",
+        area: "proxies",
+        reason: "proxy_attention",
+        count: 1,
+        href: "/admin/proxies",
+      },
+    ],
     rows: [
       {
         provider: provider({ id: "p1", display_name: "OpenAI" }),

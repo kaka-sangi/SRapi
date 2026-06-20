@@ -21758,6 +21758,49 @@ components:
         - no_routable_accounts
         - proxy_attention
         - no_api_keys
+        - pricing_uncovered
+
+    GatewayResourceFixArea:
+      type: string
+      enum:
+        - providers
+        - models
+        - model_mappings
+        - accounts
+        - proxies
+        - api_keys
+        - pricing
+        - endpoints
+
+    GatewayResourceFixSeverity:
+      type: string
+      enum:
+        - critical
+        - warning
+        - info
+
+    GatewayResourceFix:
+      type: object
+      required:
+        - severity
+        - area
+        - reason
+        - count
+        - href
+      properties:
+        severity:
+          $ref: "#/components/schemas/GatewayResourceFixSeverity"
+        area:
+          $ref: "#/components/schemas/GatewayResourceFixArea"
+        reason:
+          $ref: "#/components/schemas/GatewayProviderResourceReason"
+        count:
+          type: integer
+          minimum: 0
+          description: Number of resource rows or affected accounts represented by this fix item.
+        href:
+          type: string
+          description: Admin console route that lets the operator fix or investigate the issue.
 
     GatewayAccountBlockers:
       type: object
@@ -22036,6 +22079,7 @@ components:
         - proxied_accounts
         - proxy_attention_accounts
         - scoped_api_keys
+        - fixes
         - rows
         - model_rows
         - route_rows
@@ -22079,6 +22123,10 @@ components:
         scoped_api_keys:
           type: integer
           minimum: 0
+        fixes:
+          type: array
+          items:
+            $ref: "#/components/schemas/GatewayResourceFix"
         rows:
           type: array
           items:

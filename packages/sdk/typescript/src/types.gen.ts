@@ -1700,7 +1700,25 @@ export type ModelProviderMappingPagedListResponse = {
 
 export type GatewayProviderResourceStatus = 'ready' | 'limited' | 'blocked';
 
-export type GatewayProviderResourceReason = 'provider_disabled' | 'no_active_models' | 'no_model_mappings' | 'no_active_accounts' | 'no_routable_accounts' | 'proxy_attention' | 'no_api_keys';
+export type GatewayProviderResourceReason = 'provider_disabled' | 'no_active_models' | 'no_model_mappings' | 'no_active_accounts' | 'no_routable_accounts' | 'proxy_attention' | 'no_api_keys' | 'pricing_uncovered';
+
+export type GatewayResourceFixArea = 'providers' | 'models' | 'model_mappings' | 'accounts' | 'proxies' | 'api_keys' | 'pricing' | 'endpoints';
+
+export type GatewayResourceFixSeverity = 'critical' | 'warning' | 'info';
+
+export type GatewayResourceFix = {
+    severity: GatewayResourceFixSeverity;
+    area: GatewayResourceFixArea;
+    reason: GatewayProviderResourceReason;
+    /**
+     * Number of resource rows or affected accounts represented by this fix item.
+     */
+    count: number;
+    /**
+     * Admin console route that lets the operator fix or investigate the issue.
+     */
+    href: string;
+};
 
 export type GatewayAccountBlockers = {
     /**
@@ -1813,6 +1831,7 @@ export type GatewayResourceSummary = {
     proxied_accounts: number;
     proxy_attention_accounts: number;
     scoped_api_keys: number;
+    fixes: Array<GatewayResourceFix>;
     rows: Array<GatewayProviderResourceRow>;
     model_rows: Array<GatewayModelResourceRow>;
     route_rows: Array<GatewayRouteResourceRow>;

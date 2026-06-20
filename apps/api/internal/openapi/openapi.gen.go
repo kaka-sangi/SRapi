@@ -1473,6 +1473,7 @@ const (
 	NoApiKeys          GatewayProviderResourceReason = "no_api_keys"
 	NoModelMappings    GatewayProviderResourceReason = "no_model_mappings"
 	NoRoutableAccounts GatewayProviderResourceReason = "no_routable_accounts"
+	PricingUncovered   GatewayProviderResourceReason = "pricing_uncovered"
 	ProviderDisabled   GatewayProviderResourceReason = "provider_disabled"
 	ProxyAttention     GatewayProviderResourceReason = "proxy_attention"
 )
@@ -1489,6 +1490,8 @@ func (e GatewayProviderResourceReason) Valid() bool {
 	case NoModelMappings:
 		return true
 	case NoRoutableAccounts:
+		return true
+	case PricingUncovered:
 		return true
 	case ProviderDisabled:
 		return true
@@ -1514,6 +1517,63 @@ func (e GatewayProviderResourceStatus) Valid() bool {
 	case GatewayProviderResourceStatusLimited:
 		return true
 	case GatewayProviderResourceStatusReady:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GatewayResourceFixArea.
+const (
+	Accounts      GatewayResourceFixArea = "accounts"
+	ApiKeys       GatewayResourceFixArea = "api_keys"
+	Endpoints     GatewayResourceFixArea = "endpoints"
+	ModelMappings GatewayResourceFixArea = "model_mappings"
+	Models        GatewayResourceFixArea = "models"
+	Pricing       GatewayResourceFixArea = "pricing"
+	Providers     GatewayResourceFixArea = "providers"
+	Proxies       GatewayResourceFixArea = "proxies"
+)
+
+// Valid indicates whether the value is a known member of the GatewayResourceFixArea enum.
+func (e GatewayResourceFixArea) Valid() bool {
+	switch e {
+	case Accounts:
+		return true
+	case ApiKeys:
+		return true
+	case Endpoints:
+		return true
+	case ModelMappings:
+		return true
+	case Models:
+		return true
+	case Pricing:
+		return true
+	case Providers:
+		return true
+	case Proxies:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GatewayResourceFixSeverity.
+const (
+	GatewayResourceFixSeverityCritical GatewayResourceFixSeverity = "critical"
+	GatewayResourceFixSeverityInfo     GatewayResourceFixSeverity = "info"
+	GatewayResourceFixSeverityWarning  GatewayResourceFixSeverity = "warning"
+)
+
+// Valid indicates whether the value is a known member of the GatewayResourceFixSeverity enum.
+func (e GatewayResourceFixSeverity) Valid() bool {
+	switch e {
+	case GatewayResourceFixSeverityCritical:
+		return true
+	case GatewayResourceFixSeverityInfo:
+		return true
+	case GatewayResourceFixSeverityWarning:
 		return true
 	default:
 		return false
@@ -3811,22 +3871,22 @@ func (e VideoObjectObject) Valid() bool {
 
 // Defines values for VideoObjectStatus.
 const (
-	VideoObjectStatusCompleted  VideoObjectStatus = "completed"
-	VideoObjectStatusFailed     VideoObjectStatus = "failed"
-	VideoObjectStatusInProgress VideoObjectStatus = "in_progress"
-	VideoObjectStatusQueued     VideoObjectStatus = "queued"
+	Completed  VideoObjectStatus = "completed"
+	Failed     VideoObjectStatus = "failed"
+	InProgress VideoObjectStatus = "in_progress"
+	Queued     VideoObjectStatus = "queued"
 )
 
 // Valid indicates whether the value is a known member of the VideoObjectStatus enum.
 func (e VideoObjectStatus) Valid() bool {
 	switch e {
-	case VideoObjectStatusCompleted:
+	case Completed:
 		return true
-	case VideoObjectStatusFailed:
+	case Failed:
 		return true
-	case VideoObjectStatusInProgress:
+	case InProgress:
 		return true
-	case VideoObjectStatusQueued:
+	case Queued:
 		return true
 	default:
 		return false
@@ -8122,6 +8182,25 @@ type GatewayProviderResourceRow struct {
 // GatewayProviderResourceStatus defines model for GatewayProviderResourceStatus.
 type GatewayProviderResourceStatus string
 
+// GatewayResourceFix defines model for GatewayResourceFix.
+type GatewayResourceFix struct {
+	Area GatewayResourceFixArea `json:"area"`
+
+	// Count Number of resource rows or affected accounts represented by this fix item.
+	Count int `json:"count"`
+
+	// Href Admin console route that lets the operator fix or investigate the issue.
+	Href     string                        `json:"href"`
+	Reason   GatewayProviderResourceReason `json:"reason"`
+	Severity GatewayResourceFixSeverity    `json:"severity"`
+}
+
+// GatewayResourceFixArea defines model for GatewayResourceFixArea.
+type GatewayResourceFixArea string
+
+// GatewayResourceFixSeverity defines model for GatewayResourceFixSeverity.
+type GatewayResourceFixSeverity string
+
 // GatewayResourceSummary defines model for GatewayResourceSummary.
 type GatewayResourceSummary struct {
 	ActiveAccounts         int                          `json:"active_accounts"`
@@ -8132,6 +8211,7 @@ type GatewayResourceSummary struct {
 	ActiveProxies          int                          `json:"active_proxies"`
 	AvailableProxies       int                          `json:"available_proxies"`
 	ExpiredProxies         int                          `json:"expired_proxies"`
+	Fixes                  []GatewayResourceFix         `json:"fixes"`
 	ModelRows              []GatewayModelResourceRow    `json:"model_rows"`
 	Providers              int                          `json:"providers"`
 	ProxiedAccounts        int                          `json:"proxied_accounts"`

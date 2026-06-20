@@ -559,6 +559,8 @@ func TestBuildGatewayResourceSummaryReportsProviderAccountBlockers(t *testing.T)
 		row.AccountBlockers.Proxy != 1 {
 		t.Fatalf("unexpected provider account blockers: %+v", row)
 	}
+	assertGatewayResourceFix(t, summary, apiopenapi.Accounts, apiopenapi.NoRoutableAccounts, apiopenapi.GatewayResourceFixSeverityCritical, 2, "/admin/accounts?view=health")
+	assertGatewayResourceFix(t, summary, apiopenapi.Proxies, apiopenapi.ProxyAttention, apiopenapi.GatewayResourceFixSeverityWarning, 1, "/admin/proxies")
 }
 
 func TestBuildGatewayResourceSummaryTreatsResetQuotaAsRoutable(t *testing.T) {
@@ -612,6 +614,27 @@ func findGatewayResourceRow(t *testing.T, summary apiopenapi.GatewayResourceSumm
 	}
 	t.Fatalf("provider %q not found in %+v", providerName, summary.Rows)
 	return apiopenapi.GatewayProviderResourceRow{}
+}
+
+func assertGatewayResourceFix(
+	t *testing.T,
+	summary apiopenapi.GatewayResourceSummary,
+	area apiopenapi.GatewayResourceFixArea,
+	reason apiopenapi.GatewayProviderResourceReason,
+	severity apiopenapi.GatewayResourceFixSeverity,
+	count int,
+	href string,
+) {
+	t.Helper()
+	for _, fix := range summary.Fixes {
+		if fix.Area == area && fix.Reason == reason {
+			if fix.Severity != severity || fix.Count != count || fix.Href != href {
+				t.Fatalf("fix %+v, want severity=%s count=%d href=%s", fix, severity, count, href)
+			}
+			return
+		}
+	}
+	t.Fatalf("fix area=%s reason=%s not found in %+v", area, reason, summary.Fixes)
 }
 
 func assertGatewayEndpointRow(t *testing.T, row apiopenapi.GatewayModelResourceRow, key apiopenapi.GatewayEndpointResourceRowKey, accounts int, status apiopenapi.GatewayProviderResourceStatus) {

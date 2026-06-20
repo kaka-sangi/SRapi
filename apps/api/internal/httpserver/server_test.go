@@ -7598,7 +7598,7 @@ func TestGatewayVideoRouteBindsFollowUpReadsToCreatedAccount(t *testing.T) {
 	if err := json.NewDecoder(createRec.Body).Decode(&created); err != nil {
 		t.Fatalf("decode video create response: %v", err)
 	}
-	if created.Id != "vid_123" || created.Status != apiopenapi.VideoObjectStatusQueued || created.Model != "sora-2" {
+	if created.Id != "vid_123" || created.Status != apiopenapi.Queued || created.Model != "sora-2" {
 		t.Fatalf("unexpected create video response: %+v", created)
 	}
 
@@ -7607,7 +7607,7 @@ func TestGatewayVideoRouteBindsFollowUpReadsToCreatedAccount(t *testing.T) {
 	if err := json.NewDecoder(retrieveRec.Body).Decode(&retrieved); err != nil {
 		t.Fatalf("decode video retrieve response: %v", err)
 	}
-	if retrieved.Id != "vid_123" || retrieved.Status != apiopenapi.VideoObjectStatusCompleted || retrieved.Progress == nil || *retrieved.Progress != 100 {
+	if retrieved.Id != "vid_123" || retrieved.Status != apiopenapi.Completed || retrieved.Progress == nil || *retrieved.Progress != 100 {
 		t.Fatalf("unexpected retrieve video response: %+v", retrieved)
 	}
 

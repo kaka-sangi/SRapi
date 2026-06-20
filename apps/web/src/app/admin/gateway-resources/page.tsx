@@ -24,6 +24,7 @@ import { useAdminGatewayResources } from "@/hooks/admin-queries";
 import type {
   GatewayAccountBlockers,
   GatewayEndpointResourceRow,
+  GatewayResourceFix,
   GatewayModelResourceRow,
   GatewayPricingCoverage,
   GatewayProviderResourceRow,
@@ -105,6 +106,8 @@ function GatewayResourcesContent() {
               value={`${summary?.scoped_api_keys ?? 0}/${summary?.active_api_keys ?? 0}`}
             />
           </div>
+
+          <GatewayFixQueue fixes={summary?.fixes ?? []} />
 
           <Card>
             <CardHeader>
@@ -237,6 +240,54 @@ function ResourceKpi({
       </div>
       <div className="text-srapi-text-primary tabular mt-3 font-serif text-3xl leading-none">
         {value}
+      </div>
+    </Card>
+  );
+}
+
+function GatewayFixQueue({ fixes }: { fixes: GatewayResourceFix[] }) {
+  const { t } = useLanguage();
+  if (fixes.length === 0) {
+    return null;
+  }
+  const visible = fixes.slice(0, 5);
+  return (
+    <Card className="p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-2xs text-srapi-text-tertiary font-mono uppercase">
+          {t("adminGatewayResources.fixQueue")}
+        </span>
+        {visible.map((fix) => (
+          <Link
+            key={`${fix.area}:${fix.reason}`}
+            href={fix.href}
+            className="border-srapi-border bg-srapi-card-muted hover:border-srapi-border-strong inline-flex min-w-0 items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-2xs transition-colors"
+            title={t(`adminGatewayResources.fixReason.${fix.reason}`, { count: fix.count })}
+          >
+            <QuietBadge
+              status={
+                fix.severity === "critical"
+                  ? "error"
+                  : fix.severity === "warning"
+                    ? "limited"
+                    : "disabled"
+              }
+              label={t(`adminGatewayResources.fixSeverity.${fix.severity}`)}
+            />
+            <span className="text-srapi-text-secondary truncate">
+              {t(`adminGatewayResources.fixArea.${fix.area}`)}
+            </span>
+            <span className="text-srapi-text-tertiary truncate">
+              {t(`adminGatewayResources.reason.${fix.reason}`)}
+            </span>
+            <span className="text-srapi-text-primary tabular">{fix.count}</span>
+          </Link>
+        ))}
+        {fixes.length > visible.length ? (
+          <span className="text-2xs text-srapi-text-tertiary font-mono">
+            +{fixes.length - visible.length}
+          </span>
+        ) : null}
       </div>
     </Card>
   );
