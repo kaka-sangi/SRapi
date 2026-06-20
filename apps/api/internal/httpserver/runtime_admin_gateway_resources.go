@@ -554,26 +554,24 @@ func gatewayFixSeverityForReason(reason apiopenapi.GatewayProviderResourceReason
 }
 
 func gatewayResourceFixHref(area apiopenapi.GatewayResourceFixArea, reason apiopenapi.GatewayProviderResourceReason) string {
+	base := "/admin/gateway-resources?f_reason=" + string(reason)
 	switch area {
 	case apiopenapi.Providers:
-		return "/admin/providers"
+		return base + "&f_scope=providers"
 	case apiopenapi.Models:
-		return "/admin/models"
+		return base + "&f_scope=models"
 	case apiopenapi.ModelMappings:
-		return "/admin/models"
+		return base + "&f_scope=routes"
 	case apiopenapi.Accounts:
-		if reason == apiopenapi.NoRoutableAccounts {
-			return "/admin/accounts?view=health"
-		}
-		return "/admin/accounts"
+		return base + "&f_scope=providers"
 	case apiopenapi.Proxies:
-		return "/admin/proxies"
+		return base + "&f_scope=providers"
 	case apiopenapi.ApiKeys:
-		return "/admin/api-keys"
+		return base
 	case apiopenapi.Pricing:
-		return "/admin/channels/pricing"
+		return base + "&f_scope=routes"
 	default:
-		return "/admin/gateway-resources"
+		return base
 	}
 }
 

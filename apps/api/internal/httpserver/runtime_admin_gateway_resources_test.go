@@ -559,8 +559,8 @@ func TestBuildGatewayResourceSummaryReportsProviderAccountBlockers(t *testing.T)
 		row.AccountBlockers.Proxy != 1 {
 		t.Fatalf("unexpected provider account blockers: %+v", row)
 	}
-	assertGatewayResourceFix(t, summary, apiopenapi.Accounts, apiopenapi.NoRoutableAccounts, apiopenapi.GatewayResourceFixSeverityCritical, 2, "/admin/accounts?view=health")
-	assertGatewayResourceFix(t, summary, apiopenapi.Proxies, apiopenapi.ProxyAttention, apiopenapi.GatewayResourceFixSeverityWarning, 1, "/admin/proxies")
+	assertGatewayResourceFix(t, summary, apiopenapi.Accounts, apiopenapi.NoRoutableAccounts, apiopenapi.GatewayResourceFixSeverityCritical, 2, "/admin/gateway-resources?f_reason=no_routable_accounts&f_scope=providers")
+	assertGatewayResourceFix(t, summary, apiopenapi.Proxies, apiopenapi.ProxyAttention, apiopenapi.GatewayResourceFixSeverityWarning, 1, "/admin/gateway-resources?f_reason=proxy_attention&f_scope=providers")
 }
 
 func TestBuildGatewayResourceSummaryTreatsResetQuotaAsRoutable(t *testing.T) {

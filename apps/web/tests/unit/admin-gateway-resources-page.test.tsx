@@ -30,6 +30,7 @@ vi.mock("@/hooks/admin-queries", () => ({
 }));
 
 beforeEach(() => {
+  window.history.replaceState(null, "", "/admin/gateway-resources");
   storage.clear();
   storage.set("srapi_lang", "zh");
 });
@@ -60,14 +61,34 @@ describe("AdminGatewayResourcesPage", () => {
     expect(screen.getByText("gpt-4.1-upstream")).toBeInTheDocument();
     expect(screen.getAllByText("就绪").length).toBeGreaterThan(0);
     expect(screen.getByText("优先修复")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("搜索供应商、模型、上游模型或端点…")).toBeInTheDocument();
+    expect(screen.getByText("全部状态")).toBeInTheDocument();
+    expect(screen.getByText("全部问题")).toBeInTheDocument();
+    expect(screen.getByText("全部矩阵")).toBeInTheDocument();
     expect(screen.getByTitle("有 2 个账号或资源当前不可路由。")).toHaveAttribute(
       "href",
-      "/admin/accounts?view=health",
+      "/admin/gateway-resources?f_reason=no_routable_accounts&f_scope=providers",
     );
     expect(screen.getByTitle("有 1 个账号的代理绑定需要处理。")).toHaveAttribute(
       "href",
-      "/admin/proxies",
+      "/admin/gateway-resources?f_reason=proxy_attention&f_scope=providers",
     );
+  });
+
+  it("filters matrices from gateway resource fix links", () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/admin/gateway-resources?f_scope=providers&f_reason=proxy_attention",
+    );
+
+    renderPage();
+
+    expect(screen.getByText("供应商可服务性")).toBeInTheDocument();
+    expect(screen.queryByText("模型可服务性")).not.toBeInTheDocument();
+    expect(screen.queryByText("路由明细")).not.toBeInTheDocument();
+    expect(screen.getAllByText("OpenAI").length).toBeGreaterThan(0);
+    expect(screen.queryByText("没有匹配的网关资源")).not.toBeInTheDocument();
   });
 });
 
@@ -97,7 +118,7 @@ function summary(): GatewayResourceSummary {
     available_proxies: 1,
     expired_proxies: 0,
     proxied_accounts: 1,
-    proxy_attention_accounts: 0,
+    proxy_attention_accounts: 1,
     scoped_api_keys: 1,
     fixes: [
       {
@@ -105,14 +126,14 @@ function summary(): GatewayResourceSummary {
         area: "accounts",
         reason: "no_routable_accounts",
         count: 2,
-        href: "/admin/accounts?view=health",
+        href: "/admin/gateway-resources?f_reason=no_routable_accounts&f_scope=providers",
       },
       {
         severity: "warning",
         area: "proxies",
         reason: "proxy_attention",
         count: 1,
-        href: "/admin/proxies",
+        href: "/admin/gateway-resources?f_reason=proxy_attention&f_scope=providers",
       },
     ],
     rows: [
@@ -128,12 +149,12 @@ function summary(): GatewayResourceSummary {
           proxy: 1,
         },
         proxied_accounts: 1,
-        proxy_attention_accounts: 0,
+        proxy_attention_accounts: 1,
         active_model_mappings: 1,
         api_key_count: 1,
         scoped_key_count: 1,
-        status: "ready",
-        reasons: [],
+        status: "limited",
+        reasons: ["proxy_attention"],
       },
     ],
     model_rows: [

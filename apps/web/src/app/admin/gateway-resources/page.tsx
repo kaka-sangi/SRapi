@@ -1,9 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, AlertTriangle, Cable, CheckCircle2, Globe, KeyRound, Route } from "lucide-react";
+import {
+  Activity,
+  AlertTriangle,
+  Cable,
+  CheckCircle2,
+  Globe,
+  KeyRound,
+  Route,
+  SearchX,
+} from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
+import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-toolbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
@@ -19,17 +29,36 @@ import {
   TableScroll,
 } from "@/components/ui/table";
 import { ADMIN_ROUTES } from "@/lib/routes";
+import { useAdminList } from "@/hooks/use-admin-list";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAdminGatewayResources } from "@/hooks/admin-queries";
 import type {
   GatewayAccountBlockers,
   GatewayEndpointResourceRow,
+  GatewayProviderResourceReason,
+  GatewayProviderResourceStatus,
   GatewayResourceFix,
   GatewayModelResourceRow,
   GatewayPricingCoverage,
   GatewayProviderResourceRow,
   GatewayRouteResourceRow,
+  GatewayResourceSummary,
 } from "@/lib/sdk-types";
+
+type GatewayResourceScope = "providers" | "models" | "routes";
+
+const GATEWAY_STATUSES: GatewayProviderResourceStatus[] = ["ready", "limited", "blocked"];
+const GATEWAY_REASONS: GatewayProviderResourceReason[] = [
+  "provider_disabled",
+  "no_active_models",
+  "no_model_mappings",
+  "no_active_accounts",
+  "no_routable_accounts",
+  "proxy_attention",
+  "no_api_keys",
+  "pricing_uncovered",
+];
+const GATEWAY_SCOPES: GatewayResourceScope[] = ["providers", "models", "routes"];
 
 export default function AdminGatewayResourcesPage() {
   return (
@@ -41,10 +70,15 @@ export default function AdminGatewayResourcesPage() {
 
 function GatewayResourcesContent() {
   const { t } = useLanguage();
+  const list = useAdminList({ pageSize: 1000 });
   const gatewayResources = useAdminGatewayResources();
   const loading = gatewayResources.isLoading;
   const error = gatewayResources.isError;
   const summary = gatewayResources.data;
+  const filters = gatewayResourceFilters(summary, list.search, list.filters);
+  const isFiltered = Boolean(
+    list.search || list.filters.status || list.filters.reason || list.filters.scope,
+  );
 
   return (
     <>
@@ -109,117 +143,234 @@ function GatewayResourcesContent() {
 
           <GatewayFixQueue fixes={summary?.fixes ?? []} />
 
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("adminGatewayResources.providerMatrix")}</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <TableScroll minWidth={760}>
-                <Table>
-                  <TableHeader>
-                    <tr>
-                      <TableHead>{t("adminProviders.name")}</TableHead>
-                      <TableHead>{t("adminProviders.adapterType")}</TableHead>
-                      <TableHead className="text-right">
-                        {t("adminGatewayResources.modelMappings")}
-                      </TableHead>
-                      <TableHead className="text-right">
-                        {t("adminGatewayResources.accounts")}
-                      </TableHead>
-                      <TableHead className="text-right">
-                        {t("adminGatewayResources.proxies")}
-                      </TableHead>
-                      <TableHead className="text-right">
-                        {t("adminGatewayResources.apiKeys")}
-                      </TableHead>
-                      <TableHead>{t("adminCommon.status")}</TableHead>
-                      <TableHead>{t("adminGatewayResources.blockers")}</TableHead>
-                    </tr>
-                  </TableHeader>
-                  <TableBody>
-                    {(summary?.rows ?? []).map((row) => (
-                      <ProviderResourceRow key={row.provider.id} row={row} />
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableScroll>
-            </CardContent>
-          </Card>
+          <GatewayResourceToolbar
+            search={list.searchInput}
+            onSearch={list.setSearchInput}
+            status={list.filters.status}
+            onStatus={(value) => list.setFilter("status", value)}
+            reason={list.filters.reason}
+            onReason={(value) => list.setFilter("reason", value)}
+            scope={list.filters.scope}
+            onScope={(value) => list.setFilter("scope", value)}
+            isFiltered={isFiltered}
+            onClearFilters={list.clearFilters}
+          />
 
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("adminGatewayResources.modelMatrix")}</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <TableScroll minWidth={900}>
-                <Table>
-                  <TableHeader>
-                    <tr>
-                      <TableHead>{t("adminGatewayResources.model")}</TableHead>
-                      <TableHead className="text-right">
-                        {t("adminGatewayResources.providers")}
-                      </TableHead>
-                      <TableHead className="text-right">
-                        {t("adminGatewayResources.modelMappings")}
-                      </TableHead>
-                      <TableHead className="text-right">
-                        {t("adminGatewayResources.routableAccountsShort")}
-                      </TableHead>
-                      <TableHead>{t("adminGatewayResources.endpoints")}</TableHead>
-                      <TableHead>{t("adminGatewayResources.pricing")}</TableHead>
-                      <TableHead className="text-right">
-                        {t("adminGatewayResources.apiKeys")}
-                      </TableHead>
-                      <TableHead>{t("adminCommon.status")}</TableHead>
-                      <TableHead>{t("adminGatewayResources.blockers")}</TableHead>
-                    </tr>
-                  </TableHeader>
-                  <TableBody>
-                    {(summary?.model_rows ?? []).map((row) => (
-                      <ModelResourceRow key={row.model.id} row={row} />
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableScroll>
-            </CardContent>
-          </Card>
+          {isFiltered && filters.total === 0 ? (
+            <EmptyState
+              icon={SearchX}
+              title={t("adminGatewayResources.emptyFilteredTitle")}
+              description={t("adminGatewayResources.emptyFilteredBody")}
+              action={
+                <Button variant="outline" size="sm" onClick={list.clearFilters}>
+                  {t("adminCommon.clearFilters")}
+                </Button>
+              }
+            />
+          ) : null}
 
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("adminGatewayResources.routeMatrix")}</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <TableScroll minWidth={1040}>
-                <Table>
-                  <TableHeader>
-                    <tr>
-                      <TableHead>{t("adminGatewayResources.model")}</TableHead>
-                      <TableHead>{t("adminGatewayResources.provider")}</TableHead>
-                      <TableHead>{t("adminGatewayResources.upstreamModel")}</TableHead>
-                      <TableHead className="text-right">
-                        {t("adminGatewayResources.routableAccountsShort")}
-                      </TableHead>
-                      <TableHead>{t("adminGatewayResources.endpoints")}</TableHead>
-                      <TableHead>{t("adminGatewayResources.pricing")}</TableHead>
-                      <TableHead className="text-right">
-                        {t("adminGatewayResources.apiKeys")}
-                      </TableHead>
-                      <TableHead>{t("adminCommon.status")}</TableHead>
-                      <TableHead>{t("adminGatewayResources.blockers")}</TableHead>
-                    </tr>
-                  </TableHeader>
-                  <TableBody>
-                    {(summary?.route_rows ?? []).map((row) => (
-                      <RouteResourceRow key={`${row.mapping_id}`} row={row} />
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableScroll>
-            </CardContent>
-          </Card>
+          {filters.providerRows !== null ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  {t("adminGatewayResources.providerMatrix")}{" "}
+                  <span className="text-2xs text-srapi-text-tertiary font-mono">
+                    {filters.providerRows.length}/{summary?.rows.length ?? 0}
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <TableScroll minWidth={760}>
+                  <Table>
+                    <TableHeader>
+                      <tr>
+                        <TableHead>{t("adminProviders.name")}</TableHead>
+                        <TableHead>{t("adminProviders.adapterType")}</TableHead>
+                        <TableHead className="text-right">
+                          {t("adminGatewayResources.modelMappings")}
+                        </TableHead>
+                        <TableHead className="text-right">
+                          {t("adminGatewayResources.accounts")}
+                        </TableHead>
+                        <TableHead className="text-right">
+                          {t("adminGatewayResources.proxies")}
+                        </TableHead>
+                        <TableHead className="text-right">
+                          {t("adminGatewayResources.apiKeys")}
+                        </TableHead>
+                        <TableHead>{t("adminCommon.status")}</TableHead>
+                        <TableHead>{t("adminGatewayResources.blockers")}</TableHead>
+                      </tr>
+                    </TableHeader>
+                    <TableBody>
+                      {filters.providerRows.map((row) => (
+                        <ProviderResourceRow key={row.provider.id} row={row} />
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableScroll>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {filters.modelRows !== null ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  {t("adminGatewayResources.modelMatrix")}{" "}
+                  <span className="text-2xs text-srapi-text-tertiary font-mono">
+                    {filters.modelRows.length}/{summary?.model_rows.length ?? 0}
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <TableScroll minWidth={900}>
+                  <Table>
+                    <TableHeader>
+                      <tr>
+                        <TableHead>{t("adminGatewayResources.model")}</TableHead>
+                        <TableHead className="text-right">
+                          {t("adminGatewayResources.providers")}
+                        </TableHead>
+                        <TableHead className="text-right">
+                          {t("adminGatewayResources.modelMappings")}
+                        </TableHead>
+                        <TableHead className="text-right">
+                          {t("adminGatewayResources.routableAccountsShort")}
+                        </TableHead>
+                        <TableHead>{t("adminGatewayResources.endpoints")}</TableHead>
+                        <TableHead>{t("adminGatewayResources.pricing")}</TableHead>
+                        <TableHead className="text-right">
+                          {t("adminGatewayResources.apiKeys")}
+                        </TableHead>
+                        <TableHead>{t("adminCommon.status")}</TableHead>
+                        <TableHead>{t("adminGatewayResources.blockers")}</TableHead>
+                      </tr>
+                    </TableHeader>
+                    <TableBody>
+                      {filters.modelRows.map((row) => (
+                        <ModelResourceRow key={row.model.id} row={row} />
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableScroll>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {filters.routeRows !== null ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  {t("adminGatewayResources.routeMatrix")}{" "}
+                  <span className="text-2xs text-srapi-text-tertiary font-mono">
+                    {filters.routeRows.length}/{summary?.route_rows.length ?? 0}
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <TableScroll minWidth={1040}>
+                  <Table>
+                    <TableHeader>
+                      <tr>
+                        <TableHead>{t("adminGatewayResources.model")}</TableHead>
+                        <TableHead>{t("adminGatewayResources.provider")}</TableHead>
+                        <TableHead>{t("adminGatewayResources.upstreamModel")}</TableHead>
+                        <TableHead className="text-right">
+                          {t("adminGatewayResources.routableAccountsShort")}
+                        </TableHead>
+                        <TableHead>{t("adminGatewayResources.endpoints")}</TableHead>
+                        <TableHead>{t("adminGatewayResources.pricing")}</TableHead>
+                        <TableHead className="text-right">
+                          {t("adminGatewayResources.apiKeys")}
+                        </TableHead>
+                        <TableHead>{t("adminCommon.status")}</TableHead>
+                        <TableHead>{t("adminGatewayResources.blockers")}</TableHead>
+                      </tr>
+                    </TableHeader>
+                    <TableBody>
+                      {filters.routeRows.map((row) => (
+                        <RouteResourceRow key={`${row.mapping_id}`} row={row} />
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableScroll>
+              </CardContent>
+            </Card>
+          ) : null}
         </div>
       ) : null}
     </>
+  );
+}
+
+function GatewayResourceToolbar({
+  search,
+  onSearch,
+  status,
+  onStatus,
+  reason,
+  onReason,
+  scope,
+  onScope,
+  isFiltered,
+  onClearFilters,
+}: {
+  search: string;
+  onSearch: (value: string) => void;
+  status: string | undefined;
+  onStatus: (value: string | undefined) => void;
+  reason: string | undefined;
+  onReason: (value: string | undefined) => void;
+  scope: string | undefined;
+  onScope: (value: string | undefined) => void;
+  isFiltered: boolean;
+  onClearFilters: () => void;
+}) {
+  const { t } = useLanguage();
+  return (
+    <Card className="overflow-hidden">
+      <ListToolbar>
+        <SearchInput
+          value={search}
+          onChange={onSearch}
+          placeholder={t("adminGatewayResources.searchPlaceholder")}
+          className="sm:max-w-sm"
+        />
+        <FilterSelect
+          value={validStatusFilter(status)}
+          onChange={onStatus}
+          options={GATEWAY_STATUSES.map((value) => ({
+            value,
+            label: t(`adminGatewayResources.${value}`),
+          }))}
+          allLabel={t("adminGatewayResources.allStatuses")}
+        />
+        <FilterSelect
+          value={validReasonFilter(reason)}
+          onChange={onReason}
+          options={GATEWAY_REASONS.map((value) => ({
+            value,
+            label: t(`adminGatewayResources.reason.${value}`),
+          }))}
+          allLabel={t("adminGatewayResources.allReasons")}
+        />
+        <FilterSelect
+          value={validScopeFilter(scope)}
+          onChange={onScope}
+          options={GATEWAY_SCOPES.map((value) => ({
+            value,
+            label: t(`adminGatewayResources.scope.${value}`),
+          }))}
+          allLabel={t("adminGatewayResources.allScopes")}
+        />
+        {isFiltered ? (
+          <Button variant="ghost" size="sm" onClick={onClearFilters}>
+            {t("adminCommon.clearFilters")}
+          </Button>
+        ) : null}
+      </ListToolbar>
+    </Card>
   );
 }
 
@@ -243,6 +394,140 @@ function ResourceKpi({
       </div>
     </Card>
   );
+}
+
+function gatewayResourceFilters(
+  summary: GatewayResourceSummary | undefined,
+  rawSearch: string,
+  filters: Record<string, string>,
+): {
+  providerRows: GatewayProviderResourceRow[] | null;
+  modelRows: GatewayModelResourceRow[] | null;
+  routeRows: GatewayRouteResourceRow[] | null;
+  total: number;
+} {
+  const scope = validScopeFilter(filters.scope);
+  const status = validStatusFilter(filters.status);
+  const reason = validReasonFilter(filters.reason);
+  const search = rawSearch.trim().toLowerCase();
+  const includeProviders = !scope || scope === "providers";
+  const includeModels = !scope || scope === "models";
+  const includeRoutes = !scope || scope === "routes";
+  const providerRows = includeProviders
+    ? (summary?.rows ?? []).filter((row) => providerResourceRowMatches(row, search, status, reason))
+    : null;
+  const modelRows = includeModels
+    ? (summary?.model_rows ?? []).filter((row) =>
+        modelResourceRowMatches(row, search, status, reason),
+      )
+    : null;
+  const routeRows = includeRoutes
+    ? (summary?.route_rows ?? []).filter((row) =>
+        routeResourceRowMatches(row, search, status, reason),
+      )
+    : null;
+  return {
+    providerRows,
+    modelRows,
+    routeRows,
+    total: (providerRows?.length ?? 0) + (modelRows?.length ?? 0) + (routeRows?.length ?? 0),
+  };
+}
+
+function providerResourceRowMatches(
+  row: GatewayProviderResourceRow,
+  search: string,
+  status: GatewayProviderResourceStatus | undefined,
+  reason: GatewayProviderResourceReason | undefined,
+) {
+  if (status && row.status !== status) return false;
+  if (reason && !rowMatchesReason(row.reasons, reason)) return false;
+  if (!search) return true;
+  return rowText([
+    row.provider.name,
+    row.provider.display_name,
+    row.provider.adapter_type,
+    row.status,
+    ...row.reasons,
+  ]).includes(search);
+}
+
+function modelResourceRowMatches(
+  row: GatewayModelResourceRow,
+  search: string,
+  status: GatewayProviderResourceStatus | undefined,
+  reason: GatewayProviderResourceReason | undefined,
+) {
+  if (status && row.status !== status) return false;
+  if (reason && !rowMatchesReason(row.reasons, reason)) return false;
+  if (!search) return true;
+  return rowText([
+    row.model.canonical_name,
+    row.model.display_name,
+    row.model.family,
+    row.status,
+    row.pricing.source,
+    row.pricing.status,
+    row.pricing.currency,
+    ...row.reasons,
+    ...row.endpoints.map((endpoint) => endpoint.source_endpoint),
+    ...row.endpoints.map((endpoint) => endpoint.key),
+  ]).includes(search);
+}
+
+function routeResourceRowMatches(
+  row: GatewayRouteResourceRow,
+  search: string,
+  status: GatewayProviderResourceStatus | undefined,
+  reason: GatewayProviderResourceReason | undefined,
+) {
+  if (status && row.status !== status) return false;
+  if (reason && !rowMatchesReason(row.reasons, reason)) return false;
+  if (!search) return true;
+  return rowText([
+    row.model.canonical_name,
+    row.model.display_name,
+    row.provider.name,
+    row.provider.display_name,
+    row.provider.adapter_type,
+    row.upstream_model,
+    row.status,
+    row.pricing.source,
+    row.pricing.status,
+    row.pricing.currency,
+    ...row.reasons,
+    ...row.endpoints.map((endpoint) => endpoint.source_endpoint),
+    ...row.endpoints.map((endpoint) => endpoint.key),
+  ]).includes(search);
+}
+
+function rowMatchesReason(
+  reasons: GatewayProviderResourceReason[],
+  reason: GatewayProviderResourceReason,
+) {
+  return reasons.includes(reason);
+}
+
+function rowText(values: Array<string | number | null | undefined>) {
+  return values.filter((value) => value !== null && value !== undefined).join(" ").toLowerCase();
+}
+
+function validStatusFilter(value: string | undefined): GatewayProviderResourceStatus | undefined {
+  return GATEWAY_STATUSES.includes(value as GatewayProviderResourceStatus)
+    ? (value as GatewayProviderResourceStatus)
+    : undefined;
+}
+
+function validReasonFilter(value: string | undefined): GatewayProviderResourceReason | undefined {
+  return GATEWAY_REASONS.includes(value as GatewayProviderResourceReason)
+    ? (value as GatewayProviderResourceReason)
+    : undefined;
+}
+
+function validScopeFilter(value: string | undefined): GatewayResourceScope | undefined {
+  return GATEWAY_SCOPES.includes(value as GatewayResourceScope)
+    ? (value as GatewayResourceScope)
+    : undefined;
 }
 
 function GatewayFixQueue({ fixes }: { fixes: GatewayResourceFix[] }) {
