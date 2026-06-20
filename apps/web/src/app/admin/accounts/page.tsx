@@ -78,8 +78,8 @@ import type { Provider, ProviderAccount, ProviderAccountStatus } from "@/lib/sdk
 import {
   accountCapacityFacts,
   accountIdentitySummary,
-  accountMetadataFacts,
   accountModelPolicyLabel,
+  accountProfileFacts,
   metadataString,
   type AccountListMode,
 } from "./account-types";
@@ -596,14 +596,9 @@ function AccountsContent() {
       key: "profile",
       header: t("adminAccounts.profile"),
       hideOnMobile: true,
-      sortValue: (a) => accountMetadataFacts(t, a).map((fact) => fact.value).join(" "),
+      sortValue: (a) => accountProfileFacts(t, a).map((fact) => fact.value).join(" "),
       render: (a) => {
-        const facts = accountMetadataFacts(t, a)
-          .filter(
-            (fact) =>
-              !["email", "max-concurrency", "max-sessions", "rpm"].includes(fact.key),
-          )
-          .slice(0, 4);
+        const facts = accountProfileFacts(t, a).slice(0, 4);
         if (facts.length === 0) {
           return <span className="font-mono text-2xs text-srapi-text-tertiary">—</span>;
         }
@@ -615,7 +610,7 @@ function AccountsContent() {
                 className="max-w-[8.5rem] truncate rounded-md border border-srapi-border bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary"
                 title={`${fact.label}: ${fact.value}`}
               >
-                {fact.value}
+                {fact.label}: {fact.value}
               </span>
             ))}
           </div>

@@ -162,6 +162,21 @@ export function accountMetadataFacts(
   return facts;
 }
 
+export function accountProfileFacts(
+  t: Translate,
+  account: ProviderAccount,
+): AccountMetadataFact[] {
+  return accountMetadataFacts(t, account).filter(
+    (fact) =>
+      ![
+        "email",
+        "max-concurrency",
+        "max-sessions",
+        "rpm",
+      ].includes(fact.key),
+  );
+}
+
 export function accountCapacityFacts(
   t: Translate,
   account: ProviderAccount,

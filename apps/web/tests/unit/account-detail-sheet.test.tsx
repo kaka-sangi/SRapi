@@ -168,7 +168,7 @@ describe("AccountDetailSheet", () => {
     ];
   });
 
-  it("starts daily usage at first real account usage and keeps identity compact", () => {
+  it("shows only active usage dates and keeps identity compact", () => {
     renderSheet();
 
     expect(screen.queryByText("https://internal-upstream.example/v1")).not.toBeInTheDocument();
@@ -177,12 +177,13 @@ describe("AccountDetailSheet", () => {
     expect(screen.getByText("允许 1 个")).toBeInTheDocument();
     expect(screen.getByText("Pooled accounts")).toBeInTheDocument();
     expect(screen.getAllByText("已绑定代理").length).toBeGreaterThan(0);
-    expect(screen.getByText(/首次使用/)).toBeInTheDocument();
+    expect(screen.getByText(/最近使用/)).toBeInTheDocument();
+    expect(screen.getAllByText(/2026年6月12日|Jun 12, 2026/).length).toBeGreaterThan(0);
     const usageTable = screen.getByRole("table");
     expect(within(usageTable).queryByText(/2026年5月18日|May 18, 2026/)).not.toBeInTheDocument();
     expect(within(usageTable).queryByText(/2026年6月10日|Jun 10, 2026/)).not.toBeInTheDocument();
     expect(within(usageTable).getByText(/2026年6月12日|Jun 12, 2026/)).toBeInTheDocument();
-    expect(within(usageTable).getByText(/2026年6月13日|Jun 13, 2026/)).toBeInTheDocument();
+    expect(within(usageTable).queryByText(/2026年6月13日|Jun 13, 2026/)).not.toBeInTheDocument();
   });
 
   it("does not treat account creation as usage when the daily series is empty", () => {

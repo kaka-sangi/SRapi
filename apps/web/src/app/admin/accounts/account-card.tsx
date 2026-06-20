@@ -18,8 +18,8 @@ import { AccountHealthCell, AccountQuotaCell } from "./account-health-cells";
 import {
   accountCapacityFacts,
   accountIdentitySummary,
-  accountMetadataFacts,
   accountModelPolicyLabel,
+  accountProfileFacts,
   type AccountSelection,
   type AccountPagination,
 } from "./account-types";
@@ -225,21 +225,7 @@ function AccountCard({
   const identity = accountIdentitySummary(t, account);
   const modelPolicy = accountModelPolicyLabel(t, account.metadata);
   const capacityFacts = accountCapacityFacts(t, account);
-  const metadataFacts = accountMetadataFacts(t, account);
-  const operationalFacts = metadataFacts
-    .filter(
-      (fact) =>
-        ![
-          "email",
-          "plan",
-          "upstream-id",
-          "client",
-          "max-concurrency",
-          "max-sessions",
-          "rpm",
-        ].includes(fact.key),
-    )
-    .slice(0, 3);
+  const profileFacts = accountProfileFacts(t, account).slice(0, 3);
   const proxyLabel = account.proxy_id ? t("adminAccounts.proxyConfigured") : t("adminAccounts.noProxy");
   const groups = account.group_ids ?? [];
   const visibleGroups = groups.slice(0, 3).map((id) => groupNameById.get(String(id)) ?? `#${id}`);
@@ -324,7 +310,7 @@ function AccountCard({
                 +{extraGroupCount}
               </span>
             ) : null}
-            {[...capacityFacts, ...operationalFacts].slice(0, 4).map((fact) => (
+            {[...capacityFacts, ...profileFacts].slice(0, 5).map((fact) => (
               <span
                 key={fact.key}
                 className="max-w-[10rem] truncate rounded-md bg-srapi-bg-muted px-1.5 py-0.5 font-mono text-[10px] text-srapi-text-tertiary"

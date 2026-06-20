@@ -37,8 +37,8 @@ import { Sparkline } from "@/components/charts/sparkline";
 import {
   accountIdentitySummary,
   accountCapacityFacts,
-  accountMetadataFacts,
   accountModelPolicyLabel,
+  accountProfileFacts,
 } from "@/app/admin/accounts/account-types";
 import {
   Table,
@@ -116,11 +116,8 @@ function accountGroupSummary(
   return extra > 0 ? `${names.join(", ")} +${extra}` : names.join(", ");
 }
 
-function compactDailyUsagePoints(points: AccountUsageDailyPoint[]): AccountUsageDailyPoint[] {
-  if (points.length === 0) return [];
-  const firstTrafficDay = points.find(hasDailyTraffic)?.date ?? null;
-  if (!firstTrafficDay) return [];
-  return points.filter((point) => point.date >= firstTrafficDay);
+function activeDailyUsagePoints(points: AccountUsageDailyPoint[]): AccountUsageDailyPoint[] {
+  return points.filter(hasDailyTraffic);
 }
 
 function AccountHealthEvidenceLinks({ links }: { links: AccountHealthInvestigationLinks }) {
@@ -290,14 +287,14 @@ function UsageTodayBody({ today }: { today: AccountUsageToday }) {
 /** Recent account usage as a requests sparkline above a dense mini-table. */
 function UsageDailyBody({ points }: { points: AccountUsageDailyPoint[] }) {
   const { t } = useLanguage();
-  const compactPoints = compactDailyUsagePoints(points);
-  if (compactPoints.length === 0) {
+  const activePoints = activeDailyUsagePoints(points);
+  if (activePoints.length === 0) {
     return <p className="text-2xs text-srapi-text-tertiary">{t("adminAccounts.detailNoData")}</p>;
   }
   // The series arrives oldest→newest from the read model; render most-recent
   // first in the table but keep chronological order for the sparkline.
-  const spark = compactPoints.map((p) => p.requests);
-  const rows = [...compactPoints].reverse().slice(0, DAILY_USAGE_VISIBLE_ROWS);
+  const spark = activePoints.map((p) => p.requests);
+  const rows = [...activePoints].reverse().slice(0, DAILY_USAGE_VISIBLE_ROWS);
   return (
     <div className="space-y-3">
       {spark.length >= 2 ? (
@@ -333,11 +330,11 @@ function UsageDailyBody({ points }: { points: AccountUsageDailyPoint[] }) {
           </TableBody>
         </Table>
       </TableScroll>
-      {compactPoints.length > rows.length ? (
+      {activePoints.length > rows.length ? (
         <p className="font-mono text-2xs text-srapi-text-tertiary">
           {t("adminAccounts.usageDailyRowsShown", {
             shown: rows.length,
-            total: compactPoints.length,
+            total: activePoints.length,
           })}
         </p>
       ) : null}
@@ -405,7 +402,7 @@ export function AccountDetailSheet({
   const usageDaily = useAccountUsageDaily(id, ACCOUNT_USAGE_DAILY_MAX_DAYS);
   const fetchQuota = useFetchAccountQuota();
   const identity = account ? accountIdentitySummary(t, account) : null;
-  const firstUsageDate = usageDaily.data?.find(hasDailyTraffic)?.date ?? "";
+  const lastUsageDate = [...(usageDaily.data ?? [])].reverse().find(hasDailyTraffic)?.date ?? "";
 
   async function refreshQuota() {
     if (!id) return;
@@ -492,8 +489,8 @@ export function AccountDetailSheet({
               value={formatDateTime(account.created_at)}
             />
             <DetailMetric
-              label={t("adminAccounts.firstUsedAt")}
-              value={firstUsageDate ? formatDate(firstUsageDate) : t("adminAccounts.neverUsed")}
+              label={t("adminAccounts.lastUsedAt")}
+              value={lastUsageDate ? formatDate(lastUsageDate) : t("adminAccounts.neverUsed")}
             />
             {account.last_refreshed_at ? (
               <DetailMetric
@@ -510,12 +507,10 @@ export function AccountDetailSheet({
             {accountCapacityFacts(t, account).map((fact) => (
               <DetailMetric key={fact.key} label={fact.label} value={fact.value} />
             ))}
-            {accountMetadataFacts(t, account)
+            {accountProfileFacts(t, account)
               .filter(
                 (fact) =>
                   ![
-                    "email",
-                    "upstream-id",
                     "max-concurrency",
                     "max-sessions",
                     "rpm",

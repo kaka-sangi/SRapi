@@ -143,11 +143,20 @@ func TestChatGPTWebPoWConfigUsesCompactPlaceholderFingerprint(t *testing.T) {
 	if len(config) != 23 {
 		t.Fatalf("fingerprint length = %d, want 23", len(config))
 	}
+	if config[1] != "" {
+		t.Fatalf("date slot = %#v, want empty placeholder", config[1])
+	}
 	if config[12] != "" {
 		t.Fatalf("random object-key slot = %#v, want empty placeholder", config[12])
 	}
 	if config[13] != "" {
 		t.Fatalf("random window-property slot = %#v, want empty placeholder", config[13])
+	}
+	if config[15] != "" || config[17] != "" {
+		t.Fatalf("session/platform slots = %#v/%#v, want empty placeholders", config[15], config[17])
+	}
+	if config[22] != 0 {
+		t.Fatalf("TextEncoder slot = %#v, want 0 placeholder", config[22])
 	}
 }
 

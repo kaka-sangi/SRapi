@@ -822,11 +822,9 @@ func chatGPTWebPoWConfig(req contract.ConversationRequest, scriptSources []strin
 	if len(scriptSources) > 0 && strings.TrimSpace(scriptSources[0]) != "" {
 		scriptSource = strings.TrimSpace(scriptSources[0])
 	}
-	now := time.Now()
-	nowSeconds := float64(now.UnixNano()/int64(time.Millisecond)) / 1000
 	return []any{
 		"0",
-		now.Format(time.RubyDate),
+		"",
 		"0",
 		0,
 		0.0,
@@ -835,19 +833,19 @@ func chatGPTWebPoWConfig(req contract.ConversationRequest, scriptSources []strin
 		dataBuild,
 		"en-US",
 		0,
-		"en-US,es-US,en,es",
+		"en-US",
 		0.0,
 		"",
 		"",
-		nowSeconds,
-		chatGPTWebStableID(req, fmt.Sprintf("pow-%d", now.UnixNano())),
+		0.0,
 		"",
-		"Win32",
-		nowSeconds,
+		"",
+		"",
+		0.0,
 		0,
 		0,
 		0,
-		1,
+		0,
 	}
 }
 

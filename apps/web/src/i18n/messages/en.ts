@@ -745,7 +745,7 @@ export const en = {
     capacity: "Capacity",
     identity: "Identity",
     createdAt: "Created",
-    firstUsedAt: "First used",
+    lastUsedAt: "Last used",
     neverUsed: "Never used",
     lastRefreshedAt: "Last refresh",
     tokenExpiresAt: "Token expiry",

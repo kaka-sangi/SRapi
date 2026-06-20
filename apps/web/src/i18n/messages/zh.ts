@@ -733,7 +733,7 @@ export const zh: Messages = {
     capacity: "容量",
     identity: "身份",
     createdAt: "创建时间",
-    firstUsedAt: "首次使用",
+    lastUsedAt: "最近使用",
     neverUsed: "未使用",
     lastRefreshedAt: "上次刷新",
     tokenExpiresAt: "令牌过期",
