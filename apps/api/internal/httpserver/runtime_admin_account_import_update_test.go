@@ -48,3 +48,33 @@ func TestAdminAccountImportUpdatesExistingGenericAccount(t *testing.T) {
 		t.Fatalf("expected updated metadata, got %+v", got.Data.Metadata)
 	}
 }
+
+func TestAdminAccountImportDoesNotCollapseSharedChatGPTAccountID(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	csrf := loginResp.Data.CsrfToken
+	providerResp := mustCreateProvider(t, handler, sessionCookie, csrf, `{"name":"chatgpt-shared-account-import-provider","display_name":"ChatGPT Shared Account Import","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
+	providerID := string(providerResp.Data.Id)
+
+	body := `{"accounts":[` +
+		`{"provider_id":"` + providerID + `","name":"alice@example.test","runtime_class":"oauth_refresh","upstream_client":"codex_cli","credential":{"access_token":"access-a","refresh_token":"refresh-a"},"metadata":{"chatgpt_account_id":"workspace-1","chatgpt_user_id":"user-a","email":"alice@example.test"},"status":"active"},` +
+		`{"provider_id":"` + providerID + `","name":"bob@example.test","runtime_class":"oauth_refresh","upstream_client":"codex_cli","credential":{"access_token":"access-b","refresh_token":"refresh-b"},"metadata":{"chatgpt_account_id":"workspace-1","chatgpt_user_id":"user-b","email":"bob@example.test"},"status":"active"},` +
+		`{"provider_id":"` + providerID + `","name":"carol@example.test","runtime_class":"oauth_refresh","upstream_client":"codex_cli","credential":{"access_token":"access-c","refresh_token":"refresh-c"},"metadata":{"chatgpt_account_id":"workspace-1","chatgpt_user_id":"user-c","email":"carol@example.test"},"status":"active"}` +
+		`]}`
+
+	importResp, raw := mustImportAdminAccountsRaw(t, handler, sessionCookie, csrf, body)
+	if importResp.Data.CreatedCount != 3 || importResp.Data.SkippedCount != 0 || importResp.Data.UpdatedCount != 0 || importResp.Data.FailedCount != 0 {
+		t.Fatalf("expected all shared-account-id rows to create, got %+v raw=%s", importResp.Data, raw)
+	}
+	if len(importResp.Data.CreatedIds) != 3 || len(importResp.Data.Items) != 3 {
+		t.Fatalf("expected three created ids/items, got %+v", importResp.Data)
+	}
+	for _, item := range importResp.Data.Items {
+		if item.Action != apiopenapi.CodexSessionImportItemActionCreated || item.AccountId == nil {
+			t.Fatalf("expected created item with account id, got %+v", item)
+		}
+	}
+	if strings.Contains(raw, "access-a") || strings.Contains(raw, "refresh-a") {
+		t.Fatalf("import response leaked credentials: %s", raw)
+	}
+}

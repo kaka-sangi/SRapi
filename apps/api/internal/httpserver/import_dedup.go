@@ -23,33 +23,38 @@ func buildImportIdentityKeys(providerID int, name string, runtimeClass accountco
 	if name = strings.ToLower(strings.TrimSpace(name)); name != "" {
 		keys = append(keys, prefix+"name:"+name)
 	}
-	for _, field := range []string{"codex_account_id", "account_id", "chatgpt_account_id"} {
-		if value := mapString(metadata, field); value != "" {
-			keys = append(keys, prefix+"account:"+strings.ToLower(value))
-			break
-		}
+	accountID := firstImportIdentityValue(metadata, []string{"codex_account_id", "account_id", "chatgpt_account_id"})
+	userID := firstImportIdentityValue(metadata, []string{"codex_user_id", "user_id", "chatgpt_user_id"})
+	email := firstImportIdentityValue(metadata, []string{"codex_email", "email"})
+	if accountID != "" && userID != "" {
+		keys = append(keys, prefix+"account_user:"+accountID+":"+userID)
+	} else if accountID != "" && email != "" {
+		keys = append(keys, prefix+"account_email:"+accountID+":"+email)
+	} else if accountID != "" {
+		// OpenAI/ChatGPT exports may reuse chatgpt_account_id across several
+		// distinct users in the same workspace. Only fall back to the bare
+		// account id when no per-user signal exists.
+		keys = append(keys, prefix+"account:"+accountID)
 	}
-	for _, field := range []string{"codex_user_id", "user_id", "chatgpt_user_id"} {
-		if value := mapString(metadata, field); value != "" {
-			keys = append(keys, prefix+"user:"+strings.ToLower(value))
-			break
-		}
+	if userID != "" {
+		keys = append(keys, prefix+"user:"+userID)
 	}
-	for _, field := range []string{"codex_email", "email"} {
-		if value := mapString(metadata, field); value != "" {
-			keys = append(keys, prefix+"email:"+strings.ToLower(value))
-			break
-		}
-	}
-	if upstreamClient != nil {
-		if value := strings.ToLower(strings.TrimSpace(*upstreamClient)); value != "" {
-			keys = append(keys, prefix+"runtime:"+strings.ToLower(string(runtimeClass))+":client:"+value)
-		}
+	if email != "" {
+		keys = append(keys, prefix+"email:"+email)
 	}
 	if fingerprint := importCredentialFingerprint(credential); fingerprint != "" {
 		keys = append(keys, prefix+"credential:"+fingerprint)
 	}
 	return keys
+}
+
+func firstImportIdentityValue(metadata map[string]any, fields []string) string {
+	for _, field := range fields {
+		if value := mapString(metadata, field); value != "" {
+			return strings.ToLower(value)
+		}
+	}
+	return ""
 }
 
 func buildCodexIdentityKeys(accountID, userID, email, accessToken string) []string {

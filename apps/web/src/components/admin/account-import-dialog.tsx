@@ -33,6 +33,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCreateAccount, useImportAccounts, useImportCodexSession } from "@/hooks/admin-queries";
 import { buildImportAccountsBody } from "@/lib/admin-account-form";
 import { adminApi, adminErrorMessage } from "@/lib/admin-api";
+import {
+  getProviderTemplate,
+  type AccountProviderOption,
+} from "@/components/admin/account-form-helpers";
 import type { CRSPreviewResult, CRSSyncResult } from "@/lib/admin-api";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
@@ -52,7 +56,7 @@ export function AccountImportDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  providerOptions: { value: string; label: string }[];
+  providerOptions: AccountProviderOption[];
   // Codex/ChatGPT sessions can only be imported into a codex-cli reverse-proxy
   // provider. When provided, the "Import Codex session" tab is restricted to
   // these (vs. listing every provider, which would let an operator pick an
@@ -70,6 +74,7 @@ export function AccountImportDialog({
   const createAccountMut = useCreateAccount();
   const [tab, setTab] = useState<"json" | "codex" | "oauth" | "batch" | "crs">("batch");
   const [json, setJson] = useState("");
+  const [jsonProviderId, setJsonProviderId] = useState<string>(defaultProviderId);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ProviderAccountImportResult | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -119,6 +124,7 @@ export function AccountImportDialog({
   function reset() {
     setTab("batch");
     setJson("");
+    setJsonProviderId(defaultProviderId);
     setError(null);
     setResult(null);
     setFileName(null);
@@ -152,7 +158,12 @@ export function AccountImportDialog({
     setError(null);
     let body: ReturnType<typeof buildImportAccountsBody>;
     try {
-      body = buildImportAccountsBody(json);
+      const template = getProviderTemplate(providerOptions, jsonProviderId);
+      body = buildImportAccountsBody(json, {
+        defaultProviderId: jsonProviderId as Id,
+        defaultRuntimeClass: "oauth_refresh",
+        defaultUpstreamClient: template?.upstream_client,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Invalid import JSON.");
       return;
@@ -534,6 +545,24 @@ export function AccountImportDialog({
           <TabsContent value="json">
             <div className="space-y-3">
               <div>
+                <Label htmlFor="import-json-provider">{t("adminAccounts.importTargetProvider")}</Label>
+                <Select value={jsonProviderId} onValueChange={setJsonProviderId} disabled={busy}>
+                  <SelectTrigger id="import-json-provider">
+                    <SelectValue placeholder={t("codexImport.providerPlaceholder")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {providerOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="mt-1 text-2xs text-srapi-text-tertiary">
+                  {t("adminAccounts.importTargetProviderHint")}
+                </p>
+              </div>
+              <div>
                 <Label htmlFor="import-json">{t("adminAccounts.importJson")}</Label>
                 <FileDropZone
                   accept=".json"
@@ -719,7 +748,7 @@ export function AccountImportDialog({
               type="button"
               variant="primary"
               loading={importMut.isPending}
-              disabled={!json.trim() || busy}
+              disabled={!json.trim() || !jsonProviderId || busy}
               onClick={() => void submitJson()}
             >
               {t("adminAccounts.importSubmit")}

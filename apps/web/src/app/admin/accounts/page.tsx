@@ -1170,7 +1170,7 @@ function AccountsContent() {
       <AccountImportDialog
         open={importOpen}
         onOpenChange={setImportOpen}
-        providerOptions={providerOptions.map((o) => ({ value: o.value, label: o.label }))}
+        providerOptions={providerOptions}
         codexProviderOptions={providerOptions
           .filter((o) => o.adapterType === "reverse-proxy-codex-cli")
           .map((o) => ({ value: o.value, label: o.label }))}

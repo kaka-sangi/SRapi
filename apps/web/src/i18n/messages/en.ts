@@ -912,7 +912,10 @@ export const en = {
     importTitle: "Import accounts",
     importAction: "Import",
     importHint:
-      "Paste an exported snapshot. Credentials are never exported, so add a credential to each account before importing.",
+      "Paste or drop SRapi JSON or a sub2api account export. Credentials in sub2api exports are imported.",
+    importTargetProvider: "Target provider",
+    importTargetProviderHint:
+      "Used when the file comes from sub2api and does not contain SRapi provider ids.",
     importJson: "Accounts JSON",
     importSubmit: "Import accounts",
     importDone: "Imported {created} accounts, skipped {skipped}",
@@ -938,6 +941,7 @@ export const en = {
       accessTokenLabel: "Access token",
       accessTokenHint: "The account's Bearer access token.",
       refreshTokenLabel: "Refresh token",
+      idTokenLabel: "ID token",
       cookieLabel: "Session cookie",
       cookieHint: "The full session cookie string.",
       oauthLabel: "OAuth tokens",

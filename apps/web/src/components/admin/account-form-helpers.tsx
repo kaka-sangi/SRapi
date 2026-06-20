@@ -119,6 +119,7 @@ export interface CredSpec {
 const OAUTH_FIELDS: CredFieldSpec[] = [
   { key: "access_token", cred: "accessToken", secret: true },
   { key: "refresh_token", cred: "refreshToken", secret: true },
+  { key: "id_token", cred: "idToken", secret: true },
 ];
 const CREDENTIAL_SPECS: Record<RuntimeClass, CredSpec> = {
   api_key: { kind: "password", credKey: "api_key", cred: "apiKey" },
@@ -181,6 +182,35 @@ export function buildCredentialJson(
   return v ? JSON.stringify({ [spec.credKey as string]: v }) : "";
 }
 
+export function credentialFieldsFromPaste(value: string): {
+  fields: Record<string, string>;
+  metadata: Record<string, unknown>;
+  name?: string;
+} {
+  const trimmed = value.trim();
+  if (!trimmed) return { fields: {}, metadata: {} };
+  const parsed = parsePastedJson(trimmed);
+  if (!parsed) return { fields: { access_token: trimmed }, metadata: {} };
+  const object = accountCredentialObject(parsed);
+  if (!object) return { fields: {}, metadata: {} };
+  const fields: Record<string, string> = {};
+  for (const key of ["access_token", "refresh_token", "id_token", "session_token", "api_key", "cookie"]) {
+    const value = stringField(object, key);
+    if (value) fields[key] = value;
+  }
+  const metadata: Record<string, unknown> = {};
+  const extra = isPlainObject(object.extra) ? object.extra : isPlainObject(parsed.extra) ? parsed.extra : null;
+  if (extra) {
+    Object.assign(metadata, extra);
+  }
+  for (const key of ["email", "chatgpt_account_id", "chatgpt_user_id", "organization_id", "plan_type"]) {
+    const value = stringField(object, key);
+    if (value && metadata[key] == null) metadata[key] = value;
+  }
+  const name = stringField(parsed, "name") || stringField(object, "email");
+  return { fields, metadata, name: name || undefined };
+}
+
 export function credentialNameSeed(
   rc: RuntimeClass,
   value: string,
@@ -210,4 +240,29 @@ function credentialTail(value: string): string {
   const normalized = value.trim().replace(/[^a-zA-Z0-9]/g, "");
   if (normalized.length < 6) return "";
   return normalized.slice(-8).toLowerCase();
+}
+
+function parsePastedJson(value: string): Record<string, unknown> | null {
+  if (!value.startsWith("{")) return null;
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return isPlainObject(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function accountCredentialObject(value: Record<string, unknown>): Record<string, unknown> | null {
+  if (isPlainObject(value.credentials)) return value.credentials;
+  if (isPlainObject(value.credential)) return value.credential;
+  return value;
+}
+
+function stringField(value: Record<string, unknown>, key: string): string {
+  const raw = value[key];
+  return typeof raw === "string" ? raw.trim() : "";
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }

@@ -52,6 +52,7 @@ import {
   buildCredentialJson,
   buildDefaultAccountName,
   credentialNameSeed,
+  credentialFieldsFromPaste,
   defaultCredInput,
   getProviderTemplate,
   groupProviders,
@@ -313,6 +314,50 @@ export function AccountFormDialog({
     setCredFields((prev) => ({ ...prev, [key]: value }));
   }
 
+  function applyPastedCredential(value: string) {
+    const parsed = credentialFieldsFromPaste(value);
+    if (Object.keys(parsed.fields).length === 0 && Object.keys(parsed.metadata).length === 0) {
+      return false;
+    }
+    if (Object.keys(parsed.fields).length > 0) {
+      setCredFields((prev) => ({ ...prev, ...parsed.fields }));
+    }
+    applyPastedMetadata(parsed.metadata);
+    if (mode === "create" && parsed.name && !name.trim()) {
+      setName(parsed.name);
+    }
+    return true;
+  }
+
+  function applyPastedSingleCredential(value: string) {
+    if (!value.trim().startsWith("{")) {
+      return false;
+    }
+    const parsed = credentialFieldsFromPaste(value);
+    const key = spec.credKey;
+    if (!key || !parsed.fields[key]) {
+      return applyPastedCredential(value);
+    }
+    setCredInput(parsed.fields[key]);
+    applyPastedMetadata(parsed.metadata);
+    if (mode === "create" && parsed.name && !name.trim()) {
+      setName(parsed.name);
+    }
+    return true;
+  }
+
+  function applyPastedMetadata(pasted: Record<string, unknown>) {
+    if (Object.keys(pasted).length === 0) return;
+    const nextMetadata = { ...pasted };
+    const pastedBaseUrl =
+      typeof nextMetadata.base_url === "string" ? String(nextMetadata.base_url).trim() : "";
+    delete nextMetadata.base_url;
+    if (pastedBaseUrl) {
+      setBaseUrl((prev) => prev || pastedBaseUrl);
+    }
+    setMetadata((prev) => ({ ...nextMetadata, ...prev }));
+  }
+
   function resetCredentialForNextAccount() {
     setName("");
     setCredInput(defaultCredInput(runtimeClass));
@@ -524,10 +569,18 @@ export function AccountFormDialog({
                           <Input
                             id={`cred-${f.key}`}
                             type={f.secret && !credVisible ? "password" : "text"}
-                            autoComplete="off"
+                            autoComplete="new-password"
+                            data-lpignore="true"
+                            data-1p-ignore="true"
                             className={cn("font-mono", f.secret && "pr-9")}
                             value={credFields[f.key] ?? ""}
                             disabled={busy}
+                            onPaste={(e) => {
+                              const text = e.clipboardData.getData("text");
+                              if (applyPastedCredential(text)) {
+                                e.preventDefault();
+                              }
+                            }}
                             onChange={(e) => setCredField(f.key, e.target.value)}
                           />
                           {f.secret ? (
@@ -557,13 +610,21 @@ export function AccountFormDialog({
                       <Input
                         id={credId}
                         type={credVisible ? "text" : "password"}
-                        autoComplete="off"
+                        autoComplete="new-password"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
                         className="pr-9 font-mono"
                         placeholder={
                           spec.cred === "apiKey" ? t("adminAccounts.cred.apiKeyPlaceholder") : undefined
                         }
                         value={credInput}
                         disabled={busy}
+                        onPaste={(e) => {
+                          const text = e.clipboardData.getData("text");
+                          if (applyPastedSingleCredential(text)) {
+                            e.preventDefault();
+                          }
+                        }}
                         onChange={(e) => setCredInput(e.target.value)}
                       />
                       <button
@@ -582,6 +643,9 @@ export function AccountFormDialog({
                       className={cn("mt-1.5", spec.kind === "json" && "min-h-28 font-mono text-xs")}
                       value={credInput}
                       disabled={busy}
+                      autoComplete="off"
+                      data-lpignore="true"
+                      data-1p-ignore="true"
                       onChange={(e) => setCredInput(e.target.value)}
                     />
                   )}

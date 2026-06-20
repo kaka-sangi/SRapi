@@ -227,21 +227,184 @@ export function canConfirmAccountModelDiscovery(
   return Boolean(state && state.confirmation.trim() === state.phrase);
 }
 
-export function buildImportAccountsBody(importJson: string): ImportAdminAccountsData["body"] {
+export function buildImportAccountsBody(
+  importJson: string,
+  options: { defaultProviderId?: Id; defaultRuntimeClass?: RuntimeClass; defaultUpstreamClient?: string } = {},
+): ImportAdminAccountsData["body"] {
   let parsed: unknown;
   try {
     parsed = JSON.parse(importJson || "{}") as unknown;
   } catch {
     throw new Error("Import JSON must be valid JSON.");
   }
+  return buildImportAccountsBodyFromValue(parsed, options);
+}
+
+export function buildImportAccountsBodyFromValue(
+  parsed: unknown,
+  options: { defaultProviderId?: Id; defaultRuntimeClass?: RuntimeClass; defaultUpstreamClient?: string } = {},
+): ImportAdminAccountsData["body"] {
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new Error("Import JSON must be an object.");
   }
-  const body = parsed as ImportAdminAccountsData["body"];
+  const body = parsed as { accounts?: unknown };
   if (!Array.isArray(body.accounts) || body.accounts.length === 0) {
     throw new Error("Import JSON must include a non-empty accounts array.");
   }
-  return body;
+  return {
+    accounts: body.accounts.map((account, index) =>
+      normalizeImportAccount(account, index, options),
+    ),
+  };
+}
+
+function normalizeImportAccount(
+  value: unknown,
+  index: number,
+  options: { defaultProviderId?: Id; defaultRuntimeClass?: RuntimeClass; defaultUpstreamClient?: string },
+): ImportAdminAccountsData["body"]["accounts"][number] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`accounts[${index}] must be an object.`);
+  }
+  const raw = value as Record<string, unknown>;
+  if (isSrapiImportAccount(raw)) {
+    return raw as ImportAdminAccountsData["body"]["accounts"][number];
+  }
+  if (looksLikeSub2apiAccount(raw)) {
+    return normalizeSub2apiAccount(raw, index, options);
+  }
+  throw new Error(`accounts[${index}] must include provider_id/runtime_class or sub2api platform/type.`);
+}
+
+function isSrapiImportAccount(raw: Record<string, unknown>): boolean {
+  return typeof raw.provider_id === "string" && typeof raw.runtime_class === "string";
+}
+
+function looksLikeSub2apiAccount(raw: Record<string, unknown>): boolean {
+  return typeof raw.platform === "string" || typeof raw.type === "string" || isRecord(raw.credentials);
+}
+
+function normalizeSub2apiAccount(
+  raw: Record<string, unknown>,
+  index: number,
+  options: { defaultProviderId?: Id; defaultRuntimeClass?: RuntimeClass; defaultUpstreamClient?: string },
+): ImportAdminAccountsData["body"]["accounts"][number] {
+  const providerId = stringValue(raw.provider_id) || options.defaultProviderId || "";
+  if (!providerId) {
+    throw new Error(`accounts[${index}].provider_id required. Select a target provider before importing sub2api data.`);
+  }
+  const credential = isRecord(raw.credentials) ? { ...raw.credentials } : {};
+  if (Object.keys(credential).length === 0) {
+    throw new Error(`accounts[${index}].credentials required.`);
+  }
+  const extra = isRecord(raw.extra) ? raw.extra : {};
+  const metadata = { ...extra };
+  if (typeof raw.auto_pause_on_expired === "boolean" && metadata.auto_pause_on_expired == null) {
+    metadata.auto_pause_on_expired = raw.auto_pause_on_expired;
+  }
+  const concurrency = numberValue(raw.concurrency);
+  if (concurrency !== undefined && metadata.max_concurrency == null) {
+    metadata.max_concurrency = concurrency;
+  }
+  for (const key of [
+    "email",
+    "chatgpt_account_id",
+    "chatgpt_user_id",
+    "organization_id",
+    "plan_type",
+  ]) {
+    const value = stringValue(credential[key]);
+    if (value && metadata[key] == null) metadata[key] = value;
+  }
+  const runtimeClass =
+    runtimeClassFromSub2apiType(stringValue(raw.type)) ??
+    options.defaultRuntimeClass ??
+    "oauth_refresh";
+  const upstreamClient =
+    stringValue(raw.upstream_client) ||
+    upstreamClientFromSub2apiPlatform(stringValue(raw.platform)) ||
+    options.defaultUpstreamClient ||
+    undefined;
+  return {
+    provider_id: providerId,
+    name: stringValue(raw.name) || stringValue(credential.email) || `sub2api-account-${index + 1}`,
+    runtime_class: runtimeClass,
+    ...(upstreamClient ? { upstream_client: upstreamClient } : {}),
+    credential,
+    status: providerAccountStatus(raw.status),
+    risk_level: "normal",
+    priority: numberValue(raw.priority),
+    weight: numberValue(raw.weight) ?? numberValue(raw.rate_multiplier) ?? 1,
+    metadata,
+  };
+}
+
+function runtimeClassFromSub2apiType(value: string): RuntimeClass | null {
+  switch (value.trim().toLowerCase()) {
+    case "api_key":
+    case "apikey":
+    case "api-key":
+      return "api_key";
+    case "oauth":
+    case "oauth_refresh":
+      return "oauth_refresh";
+    case "oauth_device_code":
+    case "device_code":
+      return "oauth_device_code";
+    case "cookie":
+    case "session_cookie":
+    case "web_session_cookie":
+      return "web_session_cookie";
+    case "cli":
+    case "cli_client_token":
+      return "cli_client_token";
+    case "custom_reverse_proxy":
+      return "custom_reverse_proxy";
+    default:
+      return null;
+  }
+}
+
+function upstreamClientFromSub2apiPlatform(value: string): string | null {
+  switch (value.trim().toLowerCase()) {
+    case "openai":
+    case "codex":
+    case "codex-cli":
+      return "codex_cli";
+    case "chatgpt":
+    case "chatgpt_web":
+      return "chatgpt_web";
+    case "claude":
+    case "claude_code":
+      return "claude_code_cli";
+    case "antigravity":
+      return "antigravity_desktop";
+    default:
+      return null;
+  }
+}
+
+function providerAccountStatus(value: unknown): ProviderAccountStatus {
+  return ACCOUNT_STATUSES.includes(value as ProviderAccountStatus)
+    ? (value as ProviderAccountStatus)
+    : "active";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function numberValue(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
 }
 
 export function buildBatchUpdateAccountsBody({

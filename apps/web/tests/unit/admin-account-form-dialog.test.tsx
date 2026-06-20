@@ -52,7 +52,7 @@ beforeEach(() => {
   submit.mockResolvedValue(undefined);
 });
 
-function renderDialog() {
+function renderDialog(options: AccountProviderOption[] = providerOptions, defaultProviderId = "codex-provider") {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -63,8 +63,8 @@ function renderDialog() {
           open
           mode="create"
           onOpenChange={() => {}}
-          providerOptions={providerOptions}
-          defaultProviderId="codex-provider"
+          providerOptions={options}
+          defaultProviderId={defaultProviderId}
           submit={submit}
         />
       </LanguageProvider>
@@ -90,6 +90,65 @@ describe("AccountFormDialog", () => {
         upstream_client: "codex_cli",
         credential: { access_token: "codex-clientjwt" },
         metadata: { base_url: "https://chatgpt.com/backend-api/codex" },
+      }),
+    );
+  });
+
+  it("splits pasted sub2api credential JSON into OAuth fields and metadata", async () => {
+    const user = userEvent.setup({ delay: null });
+    renderDialog([
+      {
+        value: "codex-oauth-provider",
+        label: "Codex OAuth",
+        authMethods: ["oauth_refresh"],
+        adapterType: "reverse-proxy-codex-cli",
+      },
+    ], "codex-oauth-provider");
+
+    const pasteData = {
+      getData: () =>
+        JSON.stringify({
+          name: "alice@example.test",
+          credentials: {
+            access_token: "access-token",
+            refresh_token: "refresh-token",
+            id_token: "id-token",
+            email: "alice@example.test",
+            chatgpt_account_id: "workspace-1",
+            chatgpt_user_id: "user-a",
+            organization_id: "org-a",
+            plan_type: "k12",
+          },
+          extra: {
+            source: "sub_bundle_input",
+            codex_5h_used_percent: 1,
+          },
+        }),
+    };
+    fireEvent.paste(screen.getByLabelText("访问令牌"), {
+      clipboardData: pasteData,
+    });
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    expect(submit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "alice@example.test",
+        runtime_class: "oauth_refresh",
+        credential: {
+          access_token: "access-token",
+          refresh_token: "refresh-token",
+          id_token: "id-token",
+        },
+        metadata: expect.objectContaining({
+          base_url: "https://chatgpt.com/backend-api/codex",
+          email: "alice@example.test",
+          chatgpt_account_id: "workspace-1",
+          chatgpt_user_id: "user-a",
+          organization_id: "org-a",
+          plan_type: "k12",
+          source: "sub_bundle_input",
+          codex_5h_used_percent: 1,
+        }),
       }),
     );
   });
