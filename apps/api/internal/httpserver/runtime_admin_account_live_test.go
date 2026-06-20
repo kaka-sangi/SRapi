@@ -202,9 +202,7 @@ func TestAdminAccountLiveTestPersistsCodexQuotaSignals(t *testing.T) {
 	if healthRec.Code != http.StatusOK {
 		t.Fatalf("expected health summary 200, got %d body=%s", healthRec.Code, healthRec.Body.String())
 	}
-	var healthResp struct {
-		Data []apiopenapi.AccountHealthSnapshot `json:"data"`
-	}
+	var healthResp apiopenapi.AccountHealthSummaryResponse
 	if err := json.NewDecoder(healthRec.Body).Decode(&healthResp); err != nil {
 		t.Fatalf("decode health summary: %v", err)
 	}

@@ -2006,9 +2006,9 @@ func (s *Server) handleAdminAccountsHealthSummary(w http.ResponseWriter, r *http
 		}
 		snapshots = append(snapshots, snap)
 	}
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       snapshots,
-		"request_id": requestID,
+	writeJSONAny(w, http.StatusOK, apiopenapi.AccountHealthSummaryResponse{
+		Data:      snapshots,
+		RequestId: requestID,
 	})
 }
 
