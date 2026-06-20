@@ -9,6 +9,8 @@ import (
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
+	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
+	billingservice "github.com/srapi/srapi/apps/api/internal/modules/billing/service"
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
@@ -75,6 +77,7 @@ func (s *Server) gatewayResourceSummaryInput(ctx context.Context) (gatewayResour
 		quotasByAccount = nil
 	}
 	return gatewayResourceSummaryInput{
+		Context:           ctx,
 		Providers:         providers,
 		Accounts:          accounts,
 		Proxies:           proxies,
@@ -84,11 +87,13 @@ func (s *Server) gatewayResourceSummaryInput(ctx context.Context) (gatewayResour
 		HealthByAccount:   healthByAccount,
 		QuotasByAccount:   quotasByAccount,
 		GroupIDsByAccount: groupIDsByAccount,
+		Billing:           s.runtime.billing,
 		Now:               time.Now().UTC(),
 	}, nil
 }
 
 type gatewayResourceSummaryInput struct {
+	Context           context.Context
 	Providers         []providercontract.Provider
 	Accounts          []accountcontract.ProviderAccount
 	Proxies           []accountcontract.ProxyDefinition
@@ -98,6 +103,7 @@ type gatewayResourceSummaryInput struct {
 	HealthByAccount   map[int]accountcontract.AccountHealthSnapshot
 	QuotasByAccount   map[int][]accountcontract.AccountQuotaSnapshot
 	GroupIDsByAccount map[int][]int
+	Billing           *billingservice.Service
 	Now               time.Time
 }
 
@@ -221,7 +227,7 @@ func buildGatewayResourceSummary(input gatewayResourceSummaryInput) apiopenapi.G
 		ActiveProxies:          activeProxies,
 		AvailableProxies:       availableProxies,
 		ExpiredProxies:         expiredProxies,
-		ModelRows:              buildGatewayModelResourceRows(activeModels, activeModelMappings, input.Providers, routableAccountsByProvider, activeKeys),
+		ModelRows:              buildGatewayModelResourceRows(input.Context, activeModels, activeModelMappings, input.Providers, routableAccountsByProvider, activeKeys, input.Billing, now),
 		Providers:              len(input.Providers),
 		ProxiedAccounts:        sumProviderResourceRows(rows, func(row apiopenapi.GatewayProviderResourceRow) int { return row.ProxiedAccounts }),
 		ProxyAttentionAccounts: sumProviderResourceRows(rows, func(row apiopenapi.GatewayProviderResourceRow) int { return row.ProxyAttentionAccounts }),
@@ -266,12 +272,21 @@ func activeProviderModelMappings(mappings []modelcontract.ModelProviderMapping, 
 }
 
 func buildGatewayModelResourceRows(
+	ctx context.Context,
 	models []modelcontract.Model,
 	mappings []modelcontract.ModelProviderMapping,
 	providers []providercontract.Provider,
 	routableAccountsByProvider map[int][]accountcontract.ProviderAccount,
 	activeKeys []apikeycontract.APIKey,
+	billing *billingservice.Service,
+	now time.Time,
 ) []apiopenapi.GatewayModelResourceRow {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
 	activeProviderIDs := make(map[int]struct{}, len(providers))
 	for _, provider := range providers {
 		if provider.Status == providercontract.StatusActive {
@@ -289,6 +304,7 @@ func buildGatewayModelResourceRows(
 		activeProviderCount := 0
 		seenProviders := make(map[int]struct{}, len(modelMappings))
 		endpointAccounts := newGatewayEndpointResourceCounts()
+		pricingCoverage := newGatewayPricingCoverageCounts()
 		for _, mapping := range modelMappings {
 			if _, ok := activeProviderIDs[mapping.ProviderID]; !ok {
 				continue
@@ -302,7 +318,7 @@ func buildGatewayModelResourceRows(
 				activeProviderCount++
 			}
 			for _, account := range routableAccountsByProvider[mapping.ProviderID] {
-				endpointAccounts.addAccount(model, mapping, provider, account)
+				endpointAccounts.addAccount(ctx, model, mapping, provider, account, billing, now, &pricingCoverage)
 			}
 		}
 		routableAccountCount := endpointAccounts.uniqueAccountCount()
@@ -321,6 +337,7 @@ func buildGatewayModelResourceRows(
 			ApiKeyCount:         apiKeyCount,
 			Endpoints:           endpointAccounts.rows(),
 			Model:               toAPIModel(model),
+			Pricing:             pricingCoverage.row(),
 			Reasons:             reasons,
 			RoutableAccounts:    routableAccountCount,
 			ScopedKeyCount:      scopedKeyCount,
@@ -334,8 +351,29 @@ type gatewayEndpointResourceCounts struct {
 	accountIDs map[string]map[int]struct{}
 }
 
+type gatewayPricingCoverageCounts struct {
+	TotalRoutes           int
+	PricedRoutes          int
+	MappingOverrideRoutes int
+	PricingRuleRoutes     int
+	DefaultZero           int
+	Errors                int
+	Source                apiopenapi.GatewayPricingCoverageSource
+	PricingRuleID         *int
+	Currency              string
+	BillingMode           apiopenapi.BillingMode
+}
+
 func newGatewayEndpointResourceCounts() gatewayEndpointResourceCounts {
 	return gatewayEndpointResourceCounts{accountIDs: make(map[string]map[int]struct{}, len(gatewayEndpointResourceKeys))}
+}
+
+func newGatewayPricingCoverageCounts() gatewayPricingCoverageCounts {
+	return gatewayPricingCoverageCounts{
+		Source:      apiopenapi.GatewayPricingCoverageSourceDefaultZero,
+		Currency:    "USD",
+		BillingMode: apiopenapi.Token,
+	}
 }
 
 var gatewayEndpointResourceKeys = []string{
@@ -349,7 +387,7 @@ var gatewayEndpointResourceKeys = []string{
 	capabilitiescontract.KeyGeminiCountTokens,
 }
 
-func (counts gatewayEndpointResourceCounts) addAccount(model modelcontract.Model, mapping modelcontract.ModelProviderMapping, provider providercontract.Provider, account accountcontract.ProviderAccount) {
+func (counts gatewayEndpointResourceCounts) addAccount(ctx context.Context, model modelcontract.Model, mapping modelcontract.ModelProviderMapping, provider providercontract.Provider, account accountcontract.ProviderAccount, billing *billingservice.Service, now time.Time, pricing *gatewayPricingCoverageCounts) {
 	supported := gatewaySupportedCapabilityKeys(effectiveCapabilities(model, mapping, provider, account))
 	for _, key := range gatewayEndpointResourceKeys {
 		if _, ok := supported[key]; !ok {
@@ -365,6 +403,90 @@ func (counts gatewayEndpointResourceCounts) addAccount(model modelcontract.Model
 			counts.accountIDs[key] = values
 		}
 		values[account.ID] = struct{}{}
+		if pricing != nil {
+			pricing.addRoute(ctx, model, effectiveMapping, provider, billing, now)
+		}
+	}
+}
+
+func (counts *gatewayPricingCoverageCounts) addRoute(ctx context.Context, model modelcontract.Model, mapping modelcontract.ModelProviderMapping, provider providercontract.Provider, billing *billingservice.Service, now time.Time) {
+	counts.TotalRoutes++
+	if billing == nil {
+		counts.Errors++
+		counts.Source = apiopenapi.GatewayPricingCoverageSourcePricingError
+		return
+	}
+	coverage, err := billing.PricingCoverage(ctx, billingcontract.PricingRequest{
+		ModelID:            model.ID,
+		ModelFamily:        optionalStringValue(model.Family),
+		ProviderID:         provider.ID,
+		RequestedModel:     model.CanonicalName,
+		UpstreamModel:      mapping.UpstreamModelName,
+		BillingModelSource: mapString(mapping.PricingOverride, "billing_model_source"),
+		At:                 now,
+		PricingOverride:    cloneAnyMap(mapping.PricingOverride),
+	})
+	if err != nil {
+		counts.Errors++
+		counts.Source = apiopenapi.GatewayPricingCoverageSourcePricingError
+		return
+	}
+	counts.Currency = strings.TrimSpace(coverage.Currency)
+	counts.BillingMode = apiopenapi.BillingMode(coverage.BillingMode)
+	switch coverage.Source {
+	case billingcontract.PricingCoverageSourceMappingOverride:
+		counts.PricedRoutes++
+		counts.MappingOverrideRoutes++
+		counts.Source = apiopenapi.GatewayPricingCoverageSourceMappingOverride
+	case billingcontract.PricingCoverageSourcePricingRule:
+		counts.PricedRoutes++
+		counts.PricingRuleRoutes++
+		counts.Source = apiopenapi.GatewayPricingCoverageSourcePricingRule
+		if counts.PricingRuleID == nil {
+			counts.PricingRuleID = cloneIntPtr(coverage.PricingRuleID)
+		}
+	default:
+		counts.DefaultZero++
+		if counts.Source != apiopenapi.GatewayPricingCoverageSourcePricingError {
+			counts.Source = apiopenapi.GatewayPricingCoverageSourceDefaultZero
+		}
+	}
+}
+
+func (counts gatewayPricingCoverageCounts) row() apiopenapi.GatewayPricingCoverage {
+	status := apiopenapi.GatewayPricingCoverageStatusEstimatedZero
+	if counts.Errors > 0 {
+		status = apiopenapi.GatewayPricingCoverageStatusError
+	} else if counts.TotalRoutes > 0 && counts.PricedRoutes == counts.TotalRoutes {
+		status = apiopenapi.GatewayPricingCoverageStatusPriced
+	}
+	source := counts.Source
+	switch {
+	case counts.Errors > 0:
+		source = apiopenapi.GatewayPricingCoverageSourcePricingError
+	case counts.DefaultZero > 0 || counts.PricedRoutes == 0:
+		source = apiopenapi.GatewayPricingCoverageSourceDefaultZero
+	case counts.MappingOverrideRoutes > 0:
+		source = apiopenapi.GatewayPricingCoverageSourceMappingOverride
+	case counts.PricingRuleRoutes > 0:
+		source = apiopenapi.GatewayPricingCoverageSourcePricingRule
+	}
+	currency := strings.TrimSpace(counts.Currency)
+	if currency == "" {
+		currency = "USD"
+	}
+	billingMode := counts.BillingMode
+	if billingMode == "" {
+		billingMode = apiopenapi.Token
+	}
+	return apiopenapi.GatewayPricingCoverage{
+		BillingMode:   &billingMode,
+		Currency:      &currency,
+		PricedRoutes:  counts.PricedRoutes,
+		PricingRuleId: cloneIntPtr(counts.PricingRuleID),
+		Source:        source,
+		Status:        status,
+		TotalRoutes:   counts.TotalRoutes,
 	}
 }
 

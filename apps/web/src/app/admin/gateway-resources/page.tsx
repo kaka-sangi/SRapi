@@ -141,7 +141,7 @@ function GatewayResourcesContent() {
               <CardTitle>{t("adminGatewayResources.modelMatrix")}</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <TableScroll minWidth={760}>
+              <TableScroll minWidth={900}>
                 <Table>
                   <TableHeader>
                     <tr>
@@ -156,6 +156,7 @@ function GatewayResourcesContent() {
                         {t("adminGatewayResources.routableAccountsShort")}
                       </TableHead>
                       <TableHead>{t("adminGatewayResources.endpoints")}</TableHead>
+                      <TableHead>{t("adminGatewayResources.pricing")}</TableHead>
                       <TableHead className="text-right">
                         {t("adminGatewayResources.apiKeys")}
                       </TableHead>
@@ -252,6 +253,9 @@ function ModelResourceRow({ row }: { row: GatewayModelResourceRow }) {
       <TableCell>
         <EndpointMatrix row={row} />
       </TableCell>
+      <TableCell>
+        <PricingCoverageBadge pricing={row.pricing} />
+      </TableCell>
       <TableCell className="text-2xs tabular text-right font-mono">
         <span className={row.api_key_count > 0 ? "text-srapi-text-primary" : "text-srapi-error"}>
           {row.api_key_count}
@@ -283,6 +287,41 @@ function ModelResourceRow({ row }: { row: GatewayModelResourceRow }) {
         )}
       </TableCell>
     </TableRow>
+  );
+}
+
+function PricingCoverageBadge({ pricing }: { pricing: GatewayModelResourceRow["pricing"] }) {
+  const { t } = useLanguage();
+  const status =
+    pricing.status === "priced"
+      ? "active"
+      : pricing.status === "error"
+        ? "error"
+        : "limited";
+  const routeCount = `${pricing.priced_routes}/${pricing.total_routes}`;
+  const billingMode = pricing.billing_mode
+    ? t(`adminGatewayResources.billingMode.${pricing.billing_mode}`)
+    : "-";
+  const titleParts = [
+    t(`adminGatewayResources.pricingSource.${pricing.source}`),
+    routeCount,
+    pricing.currency ?? "",
+    billingMode,
+    pricing.pricing_rule_id
+      ? `${t("adminGatewayResources.pricingRule")} #${pricing.pricing_rule_id}`
+      : "",
+  ].filter(Boolean);
+  return (
+    <div className="flex min-w-[120px] flex-col items-start gap-1" title={titleParts.join(" · ")}>
+      <QuietBadge
+        status={status}
+        label={t(`adminGatewayResources.pricingSource.${pricing.source}`)}
+      />
+      <span className="text-2xs text-srapi-text-tertiary font-mono tabular">
+        {routeCount}
+        {pricing.currency ? <span> · {pricing.currency}</span> : null}
+      </span>
+    </div>
   );
 }
 

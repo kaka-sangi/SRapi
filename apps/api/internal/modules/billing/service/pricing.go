@@ -149,11 +149,21 @@ func (s *Service) ListPricingRules(ctx context.Context) ([]contract.PricingRule,
 }
 
 func (s *Service) EstimatePrice(ctx context.Context, req contract.PricingRequest) (contract.PricingResult, error) {
+	result, _, err := s.estimatePriceWithCoverage(ctx, req)
+	return result, err
+}
+
+func (s *Service) PricingCoverage(ctx context.Context, req contract.PricingRequest) (contract.PricingCoverage, error) {
+	_, coverage, err := s.estimatePriceWithCoverage(ctx, req)
+	return coverage, err
+}
+
+func (s *Service) estimatePriceWithCoverage(ctx context.Context, req contract.PricingRequest) (contract.PricingResult, contract.PricingCoverage, error) {
 	if s == nil || s.pricing == nil {
-		return contract.PricingResult{}, ErrInvalidInput
+		return contract.PricingResult{}, contract.PricingCoverage{}, ErrInvalidInput
 	}
 	if req.ModelID <= 0 || req.ProviderID < 0 {
-		return contract.PricingResult{}, ErrInvalidInput
+		return contract.PricingResult{}, contract.PricingCoverage{}, ErrInvalidInput
 	}
 	at := req.At
 	if at.IsZero() {
@@ -163,7 +173,7 @@ func (s *Service) EstimatePrice(ctx context.Context, req contract.PricingRequest
 		req = applyPricingOverrideRequestOptions(req)
 		result, ok := priceFromPayload(req.PricingOverride, req, nil)
 		if ok {
-			return result, nil
+			return result, pricingCoverageFromResult(contract.PricingCoverageSourceMappingOverride, result), nil
 		}
 	}
 	rules, err := s.pricing.QueryPricingRules(ctx, contract.PricingRuleQuery{
@@ -176,29 +186,36 @@ func (s *Service) EstimatePrice(ctx context.Context, req contract.PricingRequest
 		At:                 at,
 	})
 	if err != nil {
-		return contract.PricingResult{}, err
+		return contract.PricingResult{}, contract.PricingCoverage{}, err
 	}
 	rule, ok := selectPricingRuleForRequest(rules, req, at)
 	if !ok {
 		rule, ok = selectFamilyPricingRule(rules, req.ModelFamily, req.ProviderID, at)
 		if !ok {
-			return contract.PricingResult{Amount: money.ZeroAmount, Currency: money.DefaultCurrency}, nil
+			result := contract.PricingResult{Amount: money.ZeroAmount, Currency: money.DefaultCurrency, BillingMode: contract.BillingModeToken}
+			coverage := contract.PricingCoverage{
+				Source:      contract.PricingCoverageSourceDefaultZero,
+				Currency:    money.DefaultCurrency,
+				BillingMode: contract.BillingModeToken,
+			}
+			return result, coverage, nil
 		}
 	}
 	ruleID := rule.ID
-	return priceFromRule(rule, req, &ruleID), nil
+	result := priceFromRule(rule, req, &ruleID)
+	coverage := contract.PricingCoverage{
+		Source:        contract.PricingCoverageSourcePricingRule,
+		PricingRuleID: &ruleID,
+		Currency:      money.NormalizeCurrency(rule.Currency),
+		BillingMode:   billingModeOrToken(rule.BillingMode),
+	}
+	return result, coverage, nil
 }
 
 func (s *Service) PriceGatewayUsage(ctx context.Context, req contract.GatewayPricingRequest) (contract.GatewayPricingResult, error) {
-	pricing, err := s.EstimatePrice(ctx, req.PricingRequest)
+	pricing, coverage, err := s.estimatePriceWithCoverage(ctx, req.PricingRequest)
 	if err != nil {
 		return contract.GatewayPricingResult{}, err
-	}
-	source := "default_zero"
-	if len(req.PricingOverride) > 0 {
-		source = "mapping_override"
-	} else if pricing.PricingRuleID != nil {
-		source = "pricing_rule"
 	}
 	return priceGatewayCost(contract.GatewayCostRequest{
 		Amount:               pricing.Amount,
@@ -209,7 +226,7 @@ func (s *Service) PriceGatewayUsage(ctx context.Context, req contract.GatewayPri
 		OutputCost:           pricing.OutputCost,
 		CacheReadCost:        pricing.CacheReadCost,
 		CacheWriteCost:       pricing.CacheWriteCost,
-		Source:               source,
+		Source:               string(coverage.Source),
 		Estimated:            req.Estimated,
 		RateMultiplier:       req.RateMultiplier,
 		Success:              req.Success,
@@ -221,6 +238,15 @@ func (s *Service) PriceGatewayUsage(ctx context.Context, req contract.GatewayPri
 		WeeklyUsedCost:       req.WeeklyUsedCost,
 		UsedCost:             req.UsedCost,
 	}), nil
+}
+
+func pricingCoverageFromResult(source contract.PricingCoverageSource, result contract.PricingResult) contract.PricingCoverage {
+	return contract.PricingCoverage{
+		Source:        source,
+		PricingRuleID: cloneIntPtr(result.PricingRuleID),
+		Currency:      money.NormalizeCurrency(result.Currency),
+		BillingMode:   billingModeOrToken(result.BillingMode),
+	}
 }
 
 func (s *Service) PriceGatewayCost(req contract.GatewayCostRequest) contract.GatewayPricingResult {

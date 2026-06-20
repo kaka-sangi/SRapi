@@ -1358,6 +1358,51 @@ func (e GatewayErrorObjectType) Valid() bool {
 	}
 }
 
+// Defines values for GatewayPricingCoverageSource.
+const (
+	GatewayPricingCoverageSourceDefaultZero     GatewayPricingCoverageSource = "default_zero"
+	GatewayPricingCoverageSourceMappingOverride GatewayPricingCoverageSource = "mapping_override"
+	GatewayPricingCoverageSourcePricingError    GatewayPricingCoverageSource = "pricing_error"
+	GatewayPricingCoverageSourcePricingRule     GatewayPricingCoverageSource = "pricing_rule"
+)
+
+// Valid indicates whether the value is a known member of the GatewayPricingCoverageSource enum.
+func (e GatewayPricingCoverageSource) Valid() bool {
+	switch e {
+	case GatewayPricingCoverageSourceDefaultZero:
+		return true
+	case GatewayPricingCoverageSourceMappingOverride:
+		return true
+	case GatewayPricingCoverageSourcePricingError:
+		return true
+	case GatewayPricingCoverageSourcePricingRule:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GatewayPricingCoverageStatus.
+const (
+	GatewayPricingCoverageStatusError         GatewayPricingCoverageStatus = "error"
+	GatewayPricingCoverageStatusEstimatedZero GatewayPricingCoverageStatus = "estimated_zero"
+	GatewayPricingCoverageStatusPriced        GatewayPricingCoverageStatus = "priced"
+)
+
+// Valid indicates whether the value is a known member of the GatewayPricingCoverageStatus enum.
+func (e GatewayPricingCoverageStatus) Valid() bool {
+	switch e {
+	case GatewayPricingCoverageStatusError:
+		return true
+	case GatewayPricingCoverageStatusEstimatedZero:
+		return true
+	case GatewayPricingCoverageStatusPriced:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GatewayProviderResourceReason.
 const (
 	NoActiveAccounts   GatewayProviderResourceReason = "no_active_accounts"
@@ -3112,19 +3157,19 @@ func (e ResponsesResponseObject) Valid() bool {
 
 // Defines values for RiskControlLogLevel.
 const (
-	RiskControlLogLevelBlock RiskControlLogLevel = "block"
-	RiskControlLogLevelInfo  RiskControlLogLevel = "info"
-	RiskControlLogLevelWarn  RiskControlLogLevel = "warn"
+	Block RiskControlLogLevel = "block"
+	Info  RiskControlLogLevel = "info"
+	Warn  RiskControlLogLevel = "warn"
 )
 
 // Valid indicates whether the value is a known member of the RiskControlLogLevel enum.
 func (e RiskControlLogLevel) Valid() bool {
 	switch e {
-	case RiskControlLogLevelBlock:
+	case Block:
 		return true
-	case RiskControlLogLevelInfo:
+	case Info:
 		return true
-	case RiskControlLogLevelWarn:
+	case Warn:
 		return true
 	default:
 		return false
@@ -7936,11 +7981,29 @@ type GatewayModelResourceRow struct {
 	ApiKeyCount         int                             `json:"api_key_count"`
 	Endpoints           []GatewayEndpointResourceRow    `json:"endpoints"`
 	Model               Model                           `json:"model"`
+	Pricing             GatewayPricingCoverage          `json:"pricing"`
 	Reasons             []GatewayProviderResourceReason `json:"reasons"`
 	RoutableAccounts    int                             `json:"routable_accounts"`
 	ScopedKeyCount      int                             `json:"scoped_key_count"`
 	Status              GatewayProviderResourceStatus   `json:"status"`
 }
+
+// GatewayPricingCoverage defines model for GatewayPricingCoverage.
+type GatewayPricingCoverage struct {
+	BillingMode   *BillingMode                 `json:"billing_mode,omitempty"`
+	Currency      *string                      `json:"currency,omitempty"`
+	PricedRoutes  int                          `json:"priced_routes"`
+	PricingRuleId *int                         `json:"pricing_rule_id,omitempty"`
+	Source        GatewayPricingCoverageSource `json:"source"`
+	Status        GatewayPricingCoverageStatus `json:"status"`
+	TotalRoutes   int                          `json:"total_routes"`
+}
+
+// GatewayPricingCoverageSource defines model for GatewayPricingCoverageSource.
+type GatewayPricingCoverageSource string
+
+// GatewayPricingCoverageStatus defines model for GatewayPricingCoverageStatus.
+type GatewayPricingCoverageStatus string
 
 // GatewayProviderResourceReason defines model for GatewayProviderResourceReason.
 type GatewayProviderResourceReason string

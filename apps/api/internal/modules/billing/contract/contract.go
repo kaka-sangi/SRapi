@@ -171,6 +171,21 @@ type PricingResult struct {
 	CacheWriteCost string
 }
 
+type PricingCoverageSource string
+
+const (
+	PricingCoverageSourceMappingOverride PricingCoverageSource = "mapping_override"
+	PricingCoverageSourcePricingRule     PricingCoverageSource = "pricing_rule"
+	PricingCoverageSourceDefaultZero     PricingCoverageSource = "default_zero"
+)
+
+type PricingCoverage struct {
+	Source        PricingCoverageSource
+	PricingRuleID *int
+	Currency      string
+	BillingMode   BillingMode
+}
+
 type GatewayPricingRequest struct {
 	PricingRequest
 	RateMultiplier       string

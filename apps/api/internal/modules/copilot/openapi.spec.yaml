@@ -21831,6 +21831,48 @@ components:
         status:
           $ref: "#/components/schemas/GatewayProviderResourceStatus"
 
+    GatewayPricingCoverageStatus:
+      type: string
+      enum:
+        - priced
+        - estimated_zero
+        - error
+
+    GatewayPricingCoverageSource:
+      type: string
+      enum:
+        - mapping_override
+        - pricing_rule
+        - default_zero
+        - pricing_error
+
+    GatewayPricingCoverage:
+      type: object
+      required:
+        - status
+        - source
+        - priced_routes
+        - total_routes
+      properties:
+        status:
+          $ref: "#/components/schemas/GatewayPricingCoverageStatus"
+        source:
+          $ref: "#/components/schemas/GatewayPricingCoverageSource"
+        pricing_rule_id:
+          type: integer
+          minimum: 1
+          nullable: true
+        priced_routes:
+          type: integer
+          minimum: 0
+        total_routes:
+          type: integer
+          minimum: 0
+        currency:
+          type: string
+        billing_mode:
+          $ref: "#/components/schemas/BillingMode"
+
     GatewayModelResourceRow:
       type: object
       required:
@@ -21839,6 +21881,7 @@ components:
         - active_model_mappings
         - routable_accounts
         - endpoints
+        - pricing
         - api_key_count
         - scoped_key_count
         - status
@@ -21859,6 +21902,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/GatewayEndpointResourceRow"
+        pricing:
+          $ref: "#/components/schemas/GatewayPricingCoverage"
         api_key_count:
           type: integer
           minimum: 0

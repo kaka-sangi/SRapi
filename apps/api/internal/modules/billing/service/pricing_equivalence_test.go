@@ -169,6 +169,47 @@ func TestEstimatePriceUsesDecimalSafeProviderSpecificRulesAndOverrides(t *testin
 	}
 }
 
+func TestPriceGatewayUsageReportsActualPricingSource(t *testing.T) {
+	svc, err := service.NewPricing(billingmemory.New(), nil)
+	if err != nil {
+		t.Fatalf("new billing pricing service: %v", err)
+	}
+	rule, err := svc.CreatePricingRule(t.Context(), contract.CreatePricingRuleRequest{
+		ModelID:                         1,
+		ProviderID:                      7,
+		InputPricePerMillionTokens:      "1",
+		OutputPricePerMillionTokens:     "2",
+		CacheReadPricePerMillionTokens:  "0",
+		CacheWritePricePerMillionTokens: "0",
+		Currency:                        "usd",
+	})
+	if err != nil {
+		t.Fatalf("create pricing rule: %v", err)
+	}
+
+	result, err := svc.PriceGatewayUsage(t.Context(), contract.GatewayPricingRequest{
+		PricingRequest: contract.PricingRequest{
+			ModelID:      1,
+			ProviderID:   7,
+			InputTokens:  1000,
+			OutputTokens: 1000,
+			PricingOverride: map[string]any{
+				"billing_model_source": "requested",
+			},
+		},
+		RateMultiplier: "1.00000000",
+		Success:        true,
+	})
+	if err != nil {
+		t.Fatalf("price gateway usage: %v", err)
+	}
+	if result.Source != string(contract.PricingCoverageSourcePricingRule) ||
+		result.PricingRuleID == nil ||
+		*result.PricingRuleID != rule.ID {
+		t.Fatalf("expected pricing_rule source %d, got %+v", rule.ID, result)
+	}
+}
+
 func TestEstimatePriceFallsBackToModelFamilyRule(t *testing.T) {
 	store := billingmemory.New()
 	svc, err := service.NewPricing(store, nil)

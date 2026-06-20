@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,9 @@ import (
 	"github.com/srapi/srapi/apps/api/internal/config"
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
+	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
+	billingservice "github.com/srapi/srapi/apps/api/internal/modules/billing/service"
+	billingmemory "github.com/srapi/srapi/apps/api/internal/modules/billing/store/memory"
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
@@ -214,6 +218,58 @@ func TestBuildGatewayResourceSummaryReportsEndpointCapabilities(t *testing.T) {
 	assertGatewayEndpointRow(t, row, apiopenapi.ChatCompletions, 1, apiopenapi.GatewayProviderResourceStatusReady)
 	assertGatewayEndpointRow(t, row, apiopenapi.Responses, 1, apiopenapi.GatewayProviderResourceStatusReady)
 	assertGatewayEndpointRow(t, row, apiopenapi.ResponsesCompact, 0, apiopenapi.GatewayProviderResourceStatusBlocked)
+}
+
+func TestBuildGatewayResourceSummaryReportsPricingCoverage(t *testing.T) {
+	now := time.Date(2026, 6, 20, 12, 0, 0, 0, time.UTC)
+	billing, err := billingservice.NewPricing(billingmemory.New(), nil)
+	if err != nil {
+		t.Fatalf("new billing pricing service: %v", err)
+	}
+	rule, err := billing.CreatePricingRule(t.Context(), billingcontract.CreatePricingRuleRequest{
+		ModelID:                         1000,
+		ProviderID:                      1,
+		BillingMode:                     billingcontract.BillingModeToken,
+		InputPricePerMillionTokens:      "1",
+		OutputPricePerMillionTokens:     "2",
+		CacheReadPricePerMillionTokens:  "0",
+		CacheWritePricePerMillionTokens: "0",
+		Currency:                        "usd",
+	})
+	if err != nil {
+		t.Fatalf("create pricing rule: %v", err)
+	}
+
+	summary := buildGatewayResourceSummary(gatewayResourceSummaryInput{
+		Context: context.Background(),
+		Billing: billing,
+		Providers: []providercontract.Provider{
+			testGatewayResourceProvider(1, "priced-provider", providercontract.StatusActive),
+		},
+		Accounts: []accountcontract.ProviderAccount{
+			testGatewayResourceAccount(10, 1, accountcontract.StatusActive, nil),
+		},
+		Models: []modelcontract.Model{
+			testGatewayResourceModel(1000, modelcontract.StatusActive),
+		},
+		ModelMappings: []modelcontract.ModelProviderMapping{
+			{ID: 500, ModelID: 1000, ProviderID: 1, UpstreamModelName: "upstream-model", Status: modelcontract.StatusActive},
+		},
+		APIKeys: []apikeycontract.APIKey{
+			{ID: 1, Status: apikeycontract.StatusActive},
+		},
+		Now: now,
+	})
+
+	row := findGatewayModelResourceRow(t, summary, "model-1000")
+	if row.Pricing.Status != apiopenapi.GatewayPricingCoverageStatusPriced ||
+		row.Pricing.Source != apiopenapi.GatewayPricingCoverageSourcePricingRule ||
+		row.Pricing.PricingRuleId == nil ||
+		*row.Pricing.PricingRuleId != rule.ID ||
+		row.Pricing.PricedRoutes == 0 ||
+		row.Pricing.PricedRoutes != row.Pricing.TotalRoutes {
+		t.Fatalf("unexpected priced coverage: %+v", row.Pricing)
+	}
 }
 
 func TestAdminGatewayResourcesEndpointReturnsSummary(t *testing.T) {

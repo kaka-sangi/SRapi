@@ -1186,6 +1186,8 @@ export const zh: Messages = {
     accounts: "账号",
     routableAccountsShort: "可路由",
     endpoints: "端点",
+    pricing: "计费",
+    pricingRule: "定价规则",
     modelMappings: "模型映射",
     proxies: "代理",
     apiKeys: "API Keys",
@@ -1221,6 +1223,17 @@ export const zh: Messages = {
       anthropic_count_tokens: "Anthropic Count Tokens",
       gemini_generate_content: "Gemini Generate Content",
       gemini_count_tokens: "Gemini Count Tokens",
+    },
+    pricingSource: {
+      mapping_override: "映射定价",
+      pricing_rule: "规则定价",
+      default_zero: "默认零价",
+      pricing_error: "定价错误",
+    },
+    billingMode: {
+      token: "Token",
+      per_request: "按次",
+      image: "图片",
     },
   },
   adminProviders: {

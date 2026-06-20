@@ -1219,6 +1219,8 @@ export const en = {
     accounts: "Accounts",
     routableAccountsShort: "Routable",
     endpoints: "Endpoints",
+    pricing: "Pricing",
+    pricingRule: "Pricing rule",
     modelMappings: "Model mappings",
     proxies: "Proxies",
     apiKeys: "API keys",
@@ -1254,6 +1256,17 @@ export const en = {
       anthropic_count_tokens: "Anthropic Count Tokens",
       gemini_generate_content: "Gemini Generate Content",
       gemini_count_tokens: "Gemini Count Tokens",
+    },
+    pricingSource: {
+      mapping_override: "Mapping price",
+      pricing_rule: "Rule price",
+      default_zero: "Default zero",
+      pricing_error: "Pricing error",
+    },
+    billingMode: {
+      token: "Token",
+      per_request: "Per request",
+      image: "Image",
     },
   },
   adminProviders: {

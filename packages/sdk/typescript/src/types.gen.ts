@@ -1722,12 +1722,27 @@ export type GatewayEndpointResourceRow = {
     status: GatewayProviderResourceStatus;
 };
 
+export type GatewayPricingCoverageStatus = 'priced' | 'estimated_zero' | 'error';
+
+export type GatewayPricingCoverageSource = 'mapping_override' | 'pricing_rule' | 'default_zero' | 'pricing_error';
+
+export type GatewayPricingCoverage = {
+    status: GatewayPricingCoverageStatus;
+    source: GatewayPricingCoverageSource;
+    pricing_rule_id?: number | null;
+    priced_routes: number;
+    total_routes: number;
+    currency?: string;
+    billing_mode?: BillingMode;
+};
+
 export type GatewayModelResourceRow = {
     model: Model;
     active_providers: number;
     active_model_mappings: number;
     routable_accounts: number;
     endpoints: Array<GatewayEndpointResourceRow>;
+    pricing: GatewayPricingCoverage;
     api_key_count: number;
     scoped_key_count: number;
     status: GatewayProviderResourceStatus;

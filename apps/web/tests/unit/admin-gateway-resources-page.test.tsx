@@ -48,6 +48,9 @@ describe("AdminGatewayResourcesPage", () => {
     expect(screen.getByText("端点")).toBeInTheDocument();
     expect(screen.getByText("Chat")).toBeInTheDocument();
     expect(screen.getByText("Compact")).toBeInTheDocument();
+    expect(screen.getByText("计费")).toBeInTheDocument();
+    expect(screen.getByText("规则定价")).toBeInTheDocument();
+    expect(screen.getByText("3/3")).toBeInTheDocument();
     expect(screen.getAllByText("就绪").length).toBeGreaterThan(0);
   });
 });
@@ -111,6 +114,15 @@ function summary(): GatewayResourceSummary {
           { key: "gemini_generate_content", routable_accounts: 0, status: "blocked" },
           { key: "gemini_count_tokens", routable_accounts: 0, status: "blocked" },
         ],
+        pricing: {
+          status: "priced",
+          source: "pricing_rule",
+          pricing_rule_id: 1,
+          priced_routes: 3,
+          total_routes: 3,
+          currency: "USD",
+          billing_mode: "token",
+        },
         api_key_count: 1,
         scoped_key_count: 1,
         status: "ready",
