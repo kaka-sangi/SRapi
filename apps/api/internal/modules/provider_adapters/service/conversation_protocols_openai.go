@@ -35,6 +35,7 @@ type openAIEmbeddingRequest struct {
 type openAIImageGenerationRequest struct {
 	Model          string         `json:"model"`
 	Prompt         string         `json:"prompt"`
+	Stream         bool           `json:"stream,omitempty"`
 	N              int            `json:"n,omitempty"`
 	Size           string         `json:"size,omitempty"`
 	Quality        string         `json:"quality,omitempty"`
@@ -146,6 +147,7 @@ func openAIImageGenerationPayload(req contract.ImageGenerationRequest) openAIIma
 	return openAIImageGenerationRequest{
 		Model:          req.Mapping.UpstreamModelName,
 		Prompt:         strings.TrimSpace(req.Prompt),
+		Stream:         req.Stream,
 		N:              req.Count,
 		Size:           strings.TrimSpace(req.Size),
 		Quality:        strings.TrimSpace(req.Quality),

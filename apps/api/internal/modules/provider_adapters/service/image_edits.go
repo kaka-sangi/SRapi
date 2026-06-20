@@ -47,7 +47,7 @@ func (s *Service) InvokeImageEdit(ctx context.Context, req contract.ImageEditReq
 }
 
 func (s *Service) StreamImageEdit(ctx context.Context, req contract.ImageEditRequest) (contract.ImageGenerationResponse, error) {
-	if !req.Stream || !isCodexImageEditReverseProxy(req) {
+	if !req.Stream {
 		return contract.ImageGenerationResponse{}, contract.ErrStreamingUnsupported
 	}
 	if strings.TrimSpace(req.RequestID) == "" || strings.TrimSpace(req.Model) == "" || strings.TrimSpace(req.Mapping.UpstreamModelName) == "" || strings.TrimSpace(req.Prompt) == "" || len(req.Images) == 0 {
@@ -65,7 +65,13 @@ func (s *Service) StreamImageEdit(ctx context.Context, req contract.ImageEditReq
 	if baseURL == "" {
 		return contract.ImageGenerationResponse{}, contract.ErrStreamingUnsupported
 	}
-	return s.streamReverseProxyCodexImageEdit(ctx, req, baseURL)
+	if isReverseProxyImageEditRuntime(req) {
+		if isCodexImageEditReverseProxy(req) {
+			return s.streamReverseProxyCodexImageEdit(ctx, req, baseURL)
+		}
+		return s.streamReverseProxyOpenAICompatibleImageEdit(ctx, req, baseURL)
+	}
+	return s.streamOpenAICompatibleImageEdit(ctx, req, baseURL)
 }
 
 func (s *Service) invokeOpenAICompatibleImageEdit(ctx context.Context, req contract.ImageEditRequest, baseURL string) (contract.ImageGenerationResponse, error) {
@@ -161,6 +167,9 @@ func openAIImageEditMultipart(req contract.ImageEditRequest) ([]byte, string, er
 	writeFormField(writer, "size", req.Size)
 	writeFormField(writer, "quality", req.Quality)
 	writeFormField(writer, "response_format", req.ResponseFormat)
+	if req.Stream {
+		writeFormField(writer, "stream", "true")
+	}
 	writeFormField(writer, "user", req.User)
 	for key, value := range req.Extra {
 		if key == "" || value == nil || reservedImageEditField(key) {

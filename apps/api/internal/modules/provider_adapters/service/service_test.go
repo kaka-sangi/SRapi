@@ -9016,6 +9016,231 @@ func TestReverseProxyCodexCLIAdapterStreamsImageEditEvents(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatibleAdapterStreamsImageGenerationEvents(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/images/generations" {
+			t.Fatalf("expected image generations upstream path, got %s", r.URL.Path)
+		}
+		if r.Header.Get("Accept") != "text/event-stream" {
+			t.Fatalf("expected stream accept header, got %q", r.Header.Get("Accept"))
+		}
+		if r.Header.Get("Authorization") != "Bearer upstream-secret" {
+			t.Fatalf("expected authorization header, got %q", r.Header.Get("Authorization"))
+		}
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream image payload: %v", err)
+		}
+		if payload["model"] != "gpt-image-upstream" || payload["prompt"] != "draw a cat" || payload["stream"] != true {
+			t.Fatalf("unexpected upstream image payload: %+v", payload)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("X-Request-Id", "req_openai_image_stream")
+		_, _ = w.Write([]byte(
+			"data: {\"type\":\"response.created\",\"response\":{\"created_at\":1710000001,\"tools\":[{\"type\":\"image_generation\",\"model\":\"gpt-image-upstream\",\"background\":\"auto\",\"output_format\":\"png\",\"quality\":\"high\",\"size\":\"1024x1024\"}]}}\n\n" +
+				"data: {\"type\":\"response.image_generation_call.partial_image\",\"partial_image_b64\":\"cGFydGlhbA==\",\"partial_image_index\":0,\"output_format\":\"png\"}\n\n" +
+				"data: {\"type\":\"response.completed\",\"response\":{\"created_at\":1710000001,\"usage\":{\"input_tokens\":5,\"output_tokens\":9,\"total_tokens\":14,\"output_tokens_details\":{\"image_tokens\":7}},\"output\":[{\"type\":\"image_generation_call\",\"result\":\"ZmluYWw=\",\"output_format\":\"png\",\"revised_prompt\":\"draw a cat, revised\"}]}}\n\n" +
+				"data: [DONE]\n\n",
+		))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.StreamImageGeneration(context.Background(), contract.ImageGenerationRequest{
+		RequestID:      "req_openai_image_stream",
+		Model:          "gpt-image-local",
+		Prompt:         "draw a cat",
+		Stream:         true,
+		Size:           "1024x1024",
+		Quality:        "high",
+		ResponseFormat: "url",
+		Extra:          map[string]any{"background": "auto", "output_format": "png"},
+		Provider: providercontract.Provider{
+			AdapterType: "openai-compatible",
+			Protocol:    "openai-compatible",
+		},
+		Account:    accountcontract.ProviderAccount{ID: 4, RuntimeClass: accountcontract.RuntimeClassAPIKey, Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-image-upstream"},
+		Credential: map[string]any{"api_key": "upstream-secret"},
+	})
+	if err != nil {
+		t.Fatalf("stream openai-compatible image generation: %v", err)
+	}
+	raw, err := io.ReadAll(resp.StreamBody)
+	if err != nil {
+		t.Fatalf("read openai-compatible image stream: %v", err)
+	}
+	body := string(raw)
+	for _, expected := range []string{
+		"event: image_generation.partial_image",
+		`"type":"image_generation.partial_image"`,
+		`"b64_json":"cGFydGlhbA=="`,
+		`"url":"data:image/png;base64,cGFydGlhbA=="`,
+		"event: image_generation.completed",
+		`"b64_json":"ZmluYWw="`,
+		`"url":"data:image/png;base64,ZmluYWw="`,
+		`"revised_prompt":"draw a cat, revised"`,
+		`"input_tokens":5`,
+		`"output_tokens":9`,
+		"data: [DONE]",
+	} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("expected transformed openai-compatible image stream to contain %q, got %s", expected, body)
+		}
+	}
+	parsed, err := resp.StreamParse(raw, resp.StatusCode)
+	if err != nil {
+		t.Fatalf("parse rendered openai-compatible image stream: %v", err)
+	}
+	if len(parsed.Data) != 1 || parsed.Data[0].URL != "data:image/png;base64,ZmluYWw=" || parsed.Data[0].Base64JSON != "ZmluYWw=" || parsed.Usage.InputTokens != 5 || parsed.Usage.OutputTokens != 9 || parsed.Usage.ImageOutputTokens != 7 || parsed.Usage.Estimated {
+		t.Fatalf("unexpected parsed openai-compatible image stream: %+v", parsed)
+	}
+}
+
+func TestReverseProxyOpenAICompatibleAdapterStreamsImageEditEvents(t *testing.T) {
+	runtime := capturingRuntime{
+		streamResponse: reverseproxycontract.StreamResponse{
+			StatusCode: http.StatusOK,
+			Headers:    http.Header{"X-Request-Id": {"req_reverse_proxy_image_edit_stream"}},
+			Body: io.NopCloser(strings.NewReader(
+				"data: {\"type\":\"image_generation.partial_image\",\"partial_image_index\":1,\"b64_json\":\"cGFydGlhbA==\",\"output_format\":\"webp\"}\n\n" +
+					"data: {\"type\":\"image_generation.completed\",\"b64_json\":\"ZmluYWw=\",\"output_format\":\"webp\",\"revised_prompt\":\"replace background, revised\",\"usage\":{\"input_tokens\":6,\"output_tokens\":10,\"output_tokens_details\":{\"image_tokens\":8}}}\n\n" +
+					"data: [DONE]\n\n",
+			)),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.StreamImageEdit(context.Background(), contract.ImageEditRequest{
+		RequestID:      "req_reverse_proxy_image_edit_stream",
+		Model:          "gpt-image-local",
+		Prompt:         "replace background",
+		Stream:         true,
+		Images:         []contract.ImageInput{{FileName: "source.png", ContentType: "image/png", Bytes: []byte("PNG-source")}},
+		ResponseFormat: "url",
+		Extra:          map[string]any{"output_format": "webp"},
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-openai-compatible",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             7,
+			RuntimeClass:   accountcontract.RuntimeClassCustomReverseProxy,
+			UpstreamClient: ptrString("generic_openai"),
+			Metadata:       map[string]any{"base_url": "https://upstream.example/v1"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-image-upstream"},
+		Credential: map[string]any{"api_key": "upstream-secret"},
+	})
+	if err != nil {
+		t.Fatalf("stream reverse-proxy openai-compatible image edit: %v", err)
+	}
+	raw, err := io.ReadAll(resp.StreamBody)
+	if err != nil {
+		t.Fatalf("read reverse-proxy openai-compatible image edit stream: %v", err)
+	}
+	body := string(raw)
+	for _, expected := range []string{
+		"event: image_generation.partial_image",
+		`"partial_image_index":1`,
+		`"url":"data:image/webp;base64,cGFydGlhbA=="`,
+		"event: image_generation.completed",
+		`"url":"data:image/webp;base64,ZmluYWw="`,
+		`"revised_prompt":"replace background, revised"`,
+		`"input_tokens":6`,
+		`"output_tokens":10`,
+		"data: [DONE]",
+	} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("expected transformed reverse-proxy image edit stream to contain %q, got %s", expected, body)
+		}
+	}
+	parsed, err := resp.StreamParse(raw, resp.StatusCode)
+	if err != nil {
+		t.Fatalf("parse rendered reverse-proxy image edit stream: %v", err)
+	}
+	if len(parsed.Data) != 1 || parsed.Data[0].URL != "data:image/webp;base64,ZmluYWw=" || parsed.Usage.InputTokens != 6 || parsed.Usage.OutputTokens != 10 || parsed.Usage.ImageOutputTokens != 8 || parsed.Usage.Estimated {
+		t.Fatalf("unexpected parsed reverse-proxy image edit stream: %+v", parsed)
+	}
+	if !runtime.request.ExpectStream || runtime.request.URL != "https://upstream.example/v1/images/edits" {
+		t.Fatalf("expected reverse-proxy image edit DoStream request, got %+v", runtime.request)
+	}
+	if runtime.request.Headers.Get("Accept") != "text/event-stream" || !strings.Contains(runtime.request.Headers.Get("Content-Type"), "multipart/form-data") {
+		t.Fatalf("unexpected reverse-proxy image edit headers: %+v", runtime.request.Headers)
+	}
+	requestBody := string(runtime.request.Body)
+	for _, expected := range []string{`name="model"`, "gpt-image-upstream", `name="prompt"`, "replace background", `name="stream"`, "true", `name="image"`} {
+		if !strings.Contains(requestBody, expected) {
+			t.Fatalf("expected reverse-proxy image edit multipart body to contain %q, got %s", expected, requestBody)
+		}
+	}
+}
+
+func TestOpenAICompatibleAdapterStreamsImageGenerationBuffersJSONFallback(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream image payload: %v", err)
+		}
+		if payload["stream"] != true {
+			t.Fatalf("expected stream request upstream, got %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"created":1710000002,"model":"gpt-image-upstream","data":[{"b64_json":"ZmluYWw=","revised_prompt":"draw a cat, revised"}],"usage":{"input_tokens":4,"output_tokens":8,"output_tokens_details":{"image_tokens":6}}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.StreamImageGeneration(context.Background(), contract.ImageGenerationRequest{
+		RequestID: "req_openai_image_json_stream_fallback",
+		Model:     "gpt-image-local",
+		Prompt:    "draw a cat",
+		Stream:    true,
+		Provider: providercontract.Provider{
+			AdapterType: "openai-compatible",
+			Protocol:    "openai-compatible",
+		},
+		Account:    accountcontract.ProviderAccount{ID: 4, RuntimeClass: accountcontract.RuntimeClassAPIKey, Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-image-upstream"},
+		Credential: map[string]any{"api_key": "upstream-secret"},
+	})
+	if err != nil {
+		t.Fatalf("stream openai-compatible image generation with json fallback: %v", err)
+	}
+	raw, err := io.ReadAll(resp.StreamBody)
+	if err != nil {
+		t.Fatalf("read json fallback image stream: %v", err)
+	}
+	body := string(raw)
+	for _, expected := range []string{
+		"event: image_generation.completed",
+		`"b64_json":"ZmluYWw="`,
+		`"revised_prompt":"draw a cat, revised"`,
+		`"input_tokens":4`,
+		`"output_tokens":8`,
+		"data: [DONE]",
+	} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("expected json fallback image stream to contain %q, got %s", expected, body)
+		}
+	}
+	parsed, err := resp.StreamParse(raw, resp.StatusCode)
+	if err != nil {
+		t.Fatalf("parse json fallback image stream: %v", err)
+	}
+	if len(parsed.Data) != 1 || parsed.Data[0].Base64JSON != "ZmluYWw=" || parsed.Usage.InputTokens != 4 || parsed.Usage.OutputTokens != 8 || parsed.Usage.ImageOutputTokens != 6 || parsed.Usage.Estimated {
+		t.Fatalf("unexpected parsed json fallback image stream: %+v", parsed)
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterImageGenerationConfusesSessionIdentity(t *testing.T) {
 	runtime := codexImageIdentityRuntime{}
 	svc, err := service.NewWithReverseProxy(nil, &runtime)

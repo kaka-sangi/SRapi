@@ -572,7 +572,7 @@ Images generations endpoint
 - 请求仍进入 API Key auth、模型可见性、entitlement、Scheduler、Provider Adapter、usage、billing 和 feedback 证据链。
 - Scheduler 使用 `image_generations` endpoint capability；Provider 或 account/mapping 必须显式声明 image generation 能力，text-only provider 不会被误选。
 - OpenAI-compatible provider alias（例如 `/api/provider/openai-compatible/v1/images/generations`）强制 provider context。
-- OpenAI-compatible API-key 和 reverse-proxy accounts 上游调用 `/images/generations` 并解析 `url`、`b64_json` 和 `revised_prompt`。
+- OpenAI-compatible API-key 和 reverse-proxy accounts 上游调用 `/images/generations` 并解析 `url`、`b64_json` 和 `revised_prompt`。`stream=true` 会向上游发送 OpenAI-compatible image stream 请求；当上游返回 `response.image_generation_call.partial_image` / `response.completed` 或原生 `image_generation.partial_image` / `image_generation.completed` SSE 时，Provider Adapter 会实时转换为下游 `image_generation.partial_image` / `image_generation.completed`，并从最终事件解析 usage。
 - Image edits 和 variations 不在 WP-290 范围内。
 
 WP-480 已实现：
@@ -585,12 +585,12 @@ Images edits endpoint
 
 - `POST /v1/images/edits` 接受 OpenAI-compatible multipart form-data：`model`、`prompt`、一个或多个 `image` / `image[]`、可选 `mask`、`n`、`size`、`quality`、`response_format`、`output_format`、`output_compression`、`background`、`moderation`、`input_fidelity` 和 `user`。
 - WP-510 起，同一路由也接受 JSON image references：单个 `image`、多个 `images` 或可选 `mask` 可使用 data URL、`{"image_url":"data:..."}`、`{"image_url":{"url":"data:..."}}` 或 `{"b64_json":"...","mime_type":"...","filename":"..."}`。JSON references 会解码进同一个 canonical image edit request；OpenAI-compatible API-key / 普通 reverse-proxy accounts 以上游 multipart `/images/edits` 发出，`reverse-proxy-codex-cli` accounts 转换为 Codex `/responses` 的 `image_generation` tool edit action，源图像使用 `input_image` data URL，mask 使用 `input_image_mask.image_url`。
-- WP-520 起，`stream=true` 的 image edit 请求会在同一 Gateway auth / Scheduler / Provider Adapter / usage path 上返回 `text/event-stream`。`reverse-proxy-codex-cli` accounts 会把 Codex upstream progressive image SSE 转换为 downstream `image_generation.partial_image` / `image_generation.completed` 事件；OpenAI-compatible API-key / 普通 reverse-proxy edit path 仍只渲染最终 `image.generation.result` chunk 和 `[DONE]`，不会伪造 upstream 增量。
+- WP-520 起，`stream=true` 的 image edit 请求会在同一 Gateway auth / Scheduler / Provider Adapter / usage path 上返回 `text/event-stream`。`reverse-proxy-codex-cli`、OpenAI-compatible API-key 和普通 reverse-proxy accounts 都会把上游 progressive image SSE 转换为 downstream `image_generation.partial_image` / `image_generation.completed` 事件；普通 OpenAI-compatible path 支持 Responses 风格 `response.image_generation_call.partial_image` / `response.completed` 以及原生 `image_generation.partial_image` / `image_generation.completed` 两种上游事件形状。
 - 请求仍进入 API Key auth、模型可见性、entitlement、Scheduler、Provider Adapter、usage、billing 和 feedback 证据链。
 - Scheduler 使用 `image_edits` endpoint capability；Provider 或 account/mapping 必须显式声明 image edit 能力，generation-only provider 不会被误选。
 - OpenAI-compatible provider alias（例如 `/api/provider/openai-compatible/v1/images/edits`）强制 provider context。
 - OpenAI-compatible API-key 和普通 reverse-proxy accounts 上游调用 multipart `/images/edits`；`reverse-proxy-codex-cli` accounts 上游调用 `/responses`，使用 `image_generation` tool 的 `action=edit`。两条路径都解析 `url`、`b64_json` 和 `revised_prompt`。
-- Remote `image_url` 和 `file_id` references 仍明确拒绝，直到后续 Files API / remote-fetch 安全边界实现；非 Codex image edit 的 upstream progressive relay 仍留给后续包。
+- Remote `image_url` 和 `file_id` references 仍明确拒绝，直到后续 Files API / remote-fetch 安全边界实现。
 
 WP-490 已实现：
 

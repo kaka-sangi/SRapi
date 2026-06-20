@@ -196,18 +196,31 @@ func (s *Service) streamReverseProxyCodexImageEdit(ctx context.Context, req cont
 }
 
 func (s *Service) StreamImageGeneration(ctx context.Context, req contract.ImageGenerationRequest) (contract.ImageGenerationResponse, error) {
-	if !req.Stream || !isCodexImageGenerationReverseProxy(req) {
+	if !req.Stream {
 		return contract.ImageGenerationResponse{}, contract.ErrStreamingUnsupported
 	}
 	if strings.TrimSpace(req.RequestID) == "" || strings.TrimSpace(req.Model) == "" || strings.TrimSpace(req.Mapping.UpstreamModelName) == "" || strings.TrimSpace(req.Prompt) == "" {
 		return contract.ImageGenerationResponse{}, ErrInvalidInput
 	}
-	streamer, ok := s.reverseProxy.(reverseproxycontract.StreamRuntime)
-	if !ok {
-		return contract.ImageGenerationResponse{}, contract.ErrStreamingUnsupported
-	}
 	baseURL := upstreamBaseURLImages(req)
 	if baseURL == "" {
+		return contract.ImageGenerationResponse{}, contract.ErrStreamingUnsupported
+	}
+	if isReverseProxyImageRuntime(req) {
+		if isCodexImageGenerationReverseProxy(req) {
+			return s.streamReverseProxyCodexImageGeneration(ctx, req, baseURL)
+		}
+		if openAICompatibleImageStreamReverseProxy(req) {
+			return s.streamReverseProxyOpenAICompatibleImages(ctx, req, baseURL)
+		}
+		return contract.ImageGenerationResponse{}, contract.ErrStreamingUnsupported
+	}
+	return s.streamOpenAICompatibleImages(ctx, req, baseURL)
+}
+
+func (s *Service) streamReverseProxyCodexImageGeneration(ctx context.Context, req contract.ImageGenerationRequest, baseURL string) (contract.ImageGenerationResponse, error) {
+	streamer, ok := s.reverseProxy.(reverseproxycontract.StreamRuntime)
+	if !ok {
 		return contract.ImageGenerationResponse{}, contract.ErrStreamingUnsupported
 	}
 	if codexImageGenerationRuntimeIsAPIKey(req) {

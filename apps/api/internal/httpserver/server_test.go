@@ -7470,14 +7470,19 @@ func TestGatewayImageGenerationStreamReturnsSSE(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			t.Fatalf("decode upstream request: %v", err)
 		}
-		if _, ok := payload["stream"]; ok {
-			t.Fatalf("expected stream to stay local, got payload %+v", payload)
+		if payload["stream"] != true {
+			t.Fatalf("expected stream request upstream, got payload %+v", payload)
 		}
 		if payload["model"] != "image-generation-stream-upstream" || payload["prompt"] != "stream image generation" {
 			t.Fatalf("unexpected upstream image generation payload: %+v", payload)
 		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"created":1710000700,"data":[{"b64_json":"c3RyZWFtLWdlbmVyYXRpb24=","revised_prompt":"streamed generation"}],"model":"image-generation-stream-upstream","usage":{"input_tokens":31,"output_tokens":8,"total_tokens":39}}`))
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte(
+			"data: {\"type\":\"response.created\",\"response\":{\"created_at\":1710000700,\"tools\":[{\"type\":\"image_generation\",\"model\":\"image-generation-stream-upstream\",\"output_format\":\"png\"}]}}\n\n" +
+				"data: {\"type\":\"response.image_generation_call.partial_image\",\"partial_image_b64\":\"cGFydGlhbA==\",\"partial_image_index\":0,\"output_format\":\"png\"}\n\n" +
+				"data: {\"type\":\"response.completed\",\"response\":{\"created_at\":1710000700,\"usage\":{\"input_tokens\":31,\"output_tokens\":8,\"total_tokens\":39},\"output\":[{\"type\":\"image_generation_call\",\"result\":\"c3RyZWFtLWdlbmVyYXRpb24=\",\"output_format\":\"png\",\"revised_prompt\":\"streamed generation\"}]}}\n\n" +
+				"data: [DONE]\n\n",
+		))
 	}))
 	defer upstream.Close()
 
@@ -7494,7 +7499,7 @@ func TestGatewayImageGenerationStreamReturnsSSE(t *testing.T) {
 		t.Fatalf("expected event stream content type, got %q", got)
 	}
 	body := rec.Body.String()
-	for _, expected := range []string{"data:", "image.generation.result", "streamed generation", "data: [DONE]"} {
+	for _, expected := range []string{"event: image_generation.partial_image", "event: image_generation.completed", "streamed generation", "data: [DONE]"} {
 		if !strings.Contains(body, expected) {
 			t.Fatalf("expected SSE body to contain %q, got %s", expected, body)
 		}
@@ -7948,11 +7953,15 @@ func TestGatewayImageEditStreamReturnsSSE(t *testing.T) {
 		if err := r.ParseMultipartForm(16 << 20); err != nil {
 			t.Fatalf("parse upstream multipart: %v", err)
 		}
-		if got := r.FormValue("stream"); got != "" {
-			t.Fatalf("expected stream to stay local, got %q", got)
+		if got := r.FormValue("stream"); got != "true" {
+			t.Fatalf("expected stream to be forwarded upstream, got %q", got)
 		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"created":1710000500,"data":[{"b64_json":"c3RyZWFtLWVkaXQ=","revised_prompt":"stream edit"}],"model":"image-edit-stream-upstream","usage":{"input_tokens":22,"output_tokens":6,"total_tokens":28}}`))
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte(
+			"data: {\"type\":\"image_generation.partial_image\",\"partial_image_index\":0,\"b64_json\":\"cGFydGlhbA==\",\"output_format\":\"png\"}\n\n" +
+				"data: {\"type\":\"image_generation.completed\",\"b64_json\":\"c3RyZWFtLWVkaXQ=\",\"output_format\":\"png\",\"revised_prompt\":\"stream edit\",\"usage\":{\"input_tokens\":22,\"output_tokens\":6,\"total_tokens\":28}}\n\n" +
+				"data: [DONE]\n\n",
+		))
 	}))
 	defer upstream.Close()
 
@@ -7975,7 +7984,7 @@ func TestGatewayImageEditStreamReturnsSSE(t *testing.T) {
 		t.Fatalf("expected event stream content type, got %q", got)
 	}
 	body := rec.Body.String()
-	for _, expected := range []string{"data:", "image.generation.result", "stream edit", "data: [DONE]"} {
+	for _, expected := range []string{"event: image_generation.partial_image", "event: image_generation.completed", "stream edit", "data: [DONE]"} {
 		if !strings.Contains(body, expected) {
 			t.Fatalf("expected SSE body to contain %q, got %s", expected, body)
 		}
@@ -8006,8 +8015,8 @@ func TestGatewayImageEditJSONStreamReturnsSSE(t *testing.T) {
 		if err := r.ParseMultipartForm(16 << 20); err != nil {
 			t.Fatalf("parse upstream multipart: %v", err)
 		}
-		if got := r.FormValue("stream"); got != "" {
-			t.Fatalf("expected stream to stay local, got %q", got)
+		if got := r.FormValue("stream"); got != "true" {
+			t.Fatalf("expected stream to be forwarded upstream, got %q", got)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"created":1710000600,"data":[{"url":"https://example.test/wp520-json-stream.png","revised_prompt":"json stream edit"}],"model":"image-edit-json-stream-upstream","usage":{"input_tokens":23,"output_tokens":7,"total_tokens":30}}`))
@@ -8027,7 +8036,7 @@ func TestGatewayImageEditJSONStreamReturnsSSE(t *testing.T) {
 	if got := rec.Header().Get("Content-Type"); got != "text/event-stream" {
 		t.Fatalf("expected event stream content type, got %q", got)
 	}
-	if got := rec.Body.String(); !strings.Contains(got, "image.generation.result") || !strings.Contains(got, "json stream edit") || !strings.Contains(got, "data: [DONE]") {
+	if got := rec.Body.String(); !strings.Contains(got, "image_generation.completed") || !strings.Contains(got, "json stream edit") || !strings.Contains(got, "data: [DONE]") {
 		t.Fatalf("unexpected SSE body: %s", got)
 	}
 
