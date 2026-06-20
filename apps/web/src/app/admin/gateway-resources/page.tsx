@@ -155,6 +155,7 @@ function GatewayResourcesContent() {
                       <TableHead className="text-right">
                         {t("adminGatewayResources.routableAccountsShort")}
                       </TableHead>
+                      <TableHead>{t("adminGatewayResources.endpoints")}</TableHead>
                       <TableHead className="text-right">
                         {t("adminGatewayResources.apiKeys")}
                       </TableHead>
@@ -248,6 +249,9 @@ function ModelResourceRow({ row }: { row: GatewayModelResourceRow }) {
           {row.routable_accounts}
         </span>
       </TableCell>
+      <TableCell>
+        <EndpointMatrix row={row} />
+      </TableCell>
       <TableCell className="text-2xs tabular text-right font-mono">
         <span className={row.api_key_count > 0 ? "text-srapi-text-primary" : "text-srapi-error"}>
           {row.api_key_count}
@@ -279,6 +283,31 @@ function ModelResourceRow({ row }: { row: GatewayModelResourceRow }) {
         )}
       </TableCell>
     </TableRow>
+  );
+}
+
+function EndpointMatrix({ row }: { row: GatewayModelResourceRow }) {
+  const { t } = useLanguage();
+  return (
+    <div className="grid min-w-[260px] grid-cols-2 gap-1 lg:grid-cols-4">
+      {row.endpoints.map((endpoint) => {
+        const available = endpoint.routable_accounts > 0 && endpoint.status !== "blocked";
+        return (
+          <span
+            key={endpoint.key}
+            title={`${t(`adminGatewayResources.endpoint.${endpoint.key}`)}: ${endpoint.routable_accounts}`}
+            className={
+              available
+                ? "border-srapi-success/30 bg-srapi-success/10 text-srapi-success inline-flex items-center justify-between gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[10px]"
+                : "border-srapi-border bg-srapi-card-muted text-srapi-text-tertiary inline-flex items-center justify-between gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[10px]"
+            }
+          >
+            <span>{t(`adminGatewayResources.endpointShort.${endpoint.key}`)}</span>
+            <span className="tabular">{endpoint.routable_accounts}</span>
+          </span>
+        );
+      })}
+    </div>
   );
 }
 

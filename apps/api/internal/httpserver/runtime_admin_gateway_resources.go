@@ -9,6 +9,7 @@ import (
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
+	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
@@ -286,19 +287,25 @@ func buildGatewayModelResourceRows(
 	for _, model := range models {
 		modelMappings := mappingsByModelID[model.ID]
 		activeProviderCount := 0
-		routableAccountCount := 0
 		seenProviders := make(map[int]struct{}, len(modelMappings))
+		endpointAccounts := newGatewayEndpointResourceCounts()
 		for _, mapping := range modelMappings {
-			if _, ok := seenProviders[mapping.ProviderID]; ok {
-				continue
-			}
-			seenProviders[mapping.ProviderID] = struct{}{}
 			if _, ok := activeProviderIDs[mapping.ProviderID]; !ok {
 				continue
 			}
-			activeProviderCount++
-			routableAccountCount += len(routableAccountsByProvider[mapping.ProviderID])
+			provider, ok := providerByID(providers, mapping.ProviderID)
+			if !ok {
+				continue
+			}
+			if _, ok := seenProviders[mapping.ProviderID]; !ok {
+				seenProviders[mapping.ProviderID] = struct{}{}
+				activeProviderCount++
+			}
+			for _, account := range routableAccountsByProvider[mapping.ProviderID] {
+				endpointAccounts.addAccount(model, mapping, provider, account)
+			}
 		}
+		routableAccountCount := endpointAccounts.uniqueAccountCount()
 		apiKeyCount, scopedKeyCount := apiKeysForGatewayModel(activeKeys, model)
 		reasons := gatewayModelResourceReasons(len(modelMappings), activeProviderCount, routableAccountCount, apiKeyCount)
 		status := apiopenapi.GatewayProviderResourceStatusReady
@@ -312,6 +319,7 @@ func buildGatewayModelResourceRows(
 			ActiveModelMappings: len(modelMappings),
 			ActiveProviders:     activeProviderCount,
 			ApiKeyCount:         apiKeyCount,
+			Endpoints:           endpointAccounts.rows(),
 			Model:               toAPIModel(model),
 			Reasons:             reasons,
 			RoutableAccounts:    routableAccountCount,
@@ -320,6 +328,126 @@ func buildGatewayModelResourceRows(
 		})
 	}
 	return rows
+}
+
+type gatewayEndpointResourceCounts struct {
+	accountIDs map[string]map[int]struct{}
+}
+
+func newGatewayEndpointResourceCounts() gatewayEndpointResourceCounts {
+	return gatewayEndpointResourceCounts{accountIDs: make(map[string]map[int]struct{}, len(gatewayEndpointResourceKeys))}
+}
+
+var gatewayEndpointResourceKeys = []string{
+	capabilitiescontract.KeyChatCompletions,
+	capabilitiescontract.KeyResponses,
+	capabilitiescontract.KeyResponsesCompact,
+	capabilitiescontract.KeyResponsesInputItems,
+	capabilitiescontract.KeyMessages,
+	capabilitiescontract.KeyAnthropicCountTokens,
+	capabilitiescontract.KeyGeminiGenerateContent,
+	capabilitiescontract.KeyGeminiCountTokens,
+}
+
+func (counts gatewayEndpointResourceCounts) addAccount(model modelcontract.Model, mapping modelcontract.ModelProviderMapping, provider providercontract.Provider, account accountcontract.ProviderAccount) {
+	supported := gatewaySupportedCapabilityKeys(effectiveCapabilities(model, mapping, provider, account))
+	for _, key := range gatewayEndpointResourceKeys {
+		if _, ok := supported[key]; !ok {
+			continue
+		}
+		effectiveMapping := gatewayResourceEffectiveModelMapping(model, mapping, provider, account, gatewayEndpointSourceEndpoint(key))
+		if !gatewayResourceAccountCanServeMapping(model, provider, account, effectiveMapping) {
+			continue
+		}
+		values, ok := counts.accountIDs[key]
+		if !ok {
+			values = make(map[int]struct{})
+			counts.accountIDs[key] = values
+		}
+		values[account.ID] = struct{}{}
+	}
+}
+
+func gatewaySupportedCapabilityKeys(capabilities []capabilitiescontract.Descriptor) map[string]struct{} {
+	supported := make(map[string]struct{}, len(capabilities))
+	for _, capability := range capabilities {
+		if capability.Level == capabilitiescontract.DescriptorLevelUnsupported || capability.Status == capabilitiescontract.DescriptorStatusDeprecated {
+			continue
+		}
+		supported[strings.TrimSpace(capability.Key)] = struct{}{}
+	}
+	return supported
+}
+
+func gatewayResourceEffectiveModelMapping(model modelcontract.Model, mapping modelcontract.ModelProviderMapping, provider providercontract.Provider, account accountcontract.ProviderAccount, sourceEndpoint string) modelcontract.ModelProviderMapping {
+	effectiveMapping := accountEffectiveModelMapping(mapping, account, model.CanonicalName, sourceEndpoint)
+	return providerEffectiveModelMapping(provider, effectiveMapping)
+}
+
+func gatewayResourceAccountCanServeMapping(model modelcontract.Model, provider providercontract.Provider, account accountcontract.ProviderAccount, mapping modelcontract.ModelProviderMapping) bool {
+	if accountExcludesModel(account.Metadata, model.CanonicalName, mapping.UpstreamModelName) {
+		return false
+	}
+	return accountRoutableForModel(provider, account.Metadata, mapping.UpstreamModelName)
+}
+
+func gatewayEndpointSourceEndpoint(key string) string {
+	switch key {
+	case capabilitiescontract.KeyChatCompletions:
+		return "/v1/chat/completions"
+	case capabilitiescontract.KeyResponses:
+		return "/v1/responses"
+	case capabilitiescontract.KeyResponsesCompact:
+		return "/v1/responses/compact"
+	case capabilitiescontract.KeyResponsesInputItems:
+		return "/v1/responses/{response_id}/input_items"
+	case capabilitiescontract.KeyMessages:
+		return "/v1/messages"
+	case capabilitiescontract.KeyAnthropicCountTokens:
+		return "/v1/messages/count_tokens"
+	case capabilitiescontract.KeyGeminiGenerateContent:
+		return "/v1beta/models/{model}:generateContent"
+	case capabilitiescontract.KeyGeminiCountTokens:
+		return "/v1beta/models/{model}:countTokens"
+	default:
+		return ""
+	}
+}
+
+func (counts gatewayEndpointResourceCounts) uniqueAccountCount() int {
+	seen := make(map[int]struct{})
+	for _, values := range counts.accountIDs {
+		for accountID := range values {
+			seen[accountID] = struct{}{}
+		}
+	}
+	return len(seen)
+}
+
+func (counts gatewayEndpointResourceCounts) rows() []apiopenapi.GatewayEndpointResourceRow {
+	rows := make([]apiopenapi.GatewayEndpointResourceRow, 0, len(gatewayEndpointResourceKeys))
+	for _, key := range gatewayEndpointResourceKeys {
+		status := apiopenapi.GatewayProviderResourceStatusBlocked
+		routableAccounts := len(counts.accountIDs[key])
+		if routableAccounts > 0 {
+			status = apiopenapi.GatewayProviderResourceStatusReady
+		}
+		rows = append(rows, apiopenapi.GatewayEndpointResourceRow{
+			Key:              apiopenapi.GatewayEndpointResourceRowKey(key),
+			RoutableAccounts: routableAccounts,
+			Status:           status,
+		})
+	}
+	return rows
+}
+
+func providerByID(providers []providercontract.Provider, providerID int) (providercontract.Provider, bool) {
+	for _, provider := range providers {
+		if provider.ID == providerID {
+			return provider, true
+		}
+	}
+	return providercontract.Provider{}, false
 }
 
 func apiKeysForGatewayModel(keys []apikeycontract.APIKey, model modelcontract.Model) (int, int) {

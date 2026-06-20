@@ -13,6 +13,7 @@ import (
 	"github.com/srapi/srapi/apps/api/internal/config"
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
+	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
@@ -121,6 +122,8 @@ func TestBuildGatewayResourceSummaryAggregatesReadiness(t *testing.T) {
 		len(modelRow.Reasons) != 0 {
 		t.Fatalf("unexpected model resource row: %+v", modelRow)
 	}
+	assertGatewayEndpointRow(t, modelRow, apiopenapi.ChatCompletions, 1, apiopenapi.GatewayProviderResourceStatusReady)
+	assertGatewayEndpointRow(t, modelRow, apiopenapi.Responses, 1, apiopenapi.GatewayProviderResourceStatusReady)
 }
 
 func TestBuildGatewayResourceSummaryReportsBlockedModels(t *testing.T) {
@@ -178,6 +181,39 @@ func TestBuildGatewayResourceSummaryReportsBlockedModels(t *testing.T) {
 		}) {
 		t.Fatalf("unexpected unmapped model row: %+v", unmapped)
 	}
+}
+
+func TestBuildGatewayResourceSummaryReportsEndpointCapabilities(t *testing.T) {
+	now := time.Date(2026, 6, 20, 12, 0, 0, 0, time.UTC)
+	provider := testGatewayResourceProvider(1, "compact-disabled-provider", providercontract.StatusActive)
+	provider.Capabilities = map[string]any{
+		capabilitiescontract.KeyResponsesCompact: false,
+	}
+
+	summary := buildGatewayResourceSummary(gatewayResourceSummaryInput{
+		Providers: []providercontract.Provider{provider},
+		Accounts: []accountcontract.ProviderAccount{
+			testGatewayResourceAccount(10, 1, accountcontract.StatusActive, nil),
+		},
+		Models: []modelcontract.Model{
+			testGatewayResourceModel(1000, modelcontract.StatusActive),
+		},
+		ModelMappings: []modelcontract.ModelProviderMapping{
+			{ID: 500, ModelID: 1000, ProviderID: 1, UpstreamModelName: "upstream-model", Status: modelcontract.StatusActive},
+		},
+		APIKeys: []apikeycontract.APIKey{
+			{ID: 1, Status: apikeycontract.StatusActive},
+		},
+		Now: now,
+	})
+
+	row := findGatewayModelResourceRow(t, summary, "model-1000")
+	if row.Status != apiopenapi.GatewayProviderResourceStatusReady || row.RoutableAccounts != 1 {
+		t.Fatalf("unexpected model endpoint row status: %+v", row)
+	}
+	assertGatewayEndpointRow(t, row, apiopenapi.ChatCompletions, 1, apiopenapi.GatewayProviderResourceStatusReady)
+	assertGatewayEndpointRow(t, row, apiopenapi.Responses, 1, apiopenapi.GatewayProviderResourceStatusReady)
+	assertGatewayEndpointRow(t, row, apiopenapi.ResponsesCompact, 0, apiopenapi.GatewayProviderResourceStatusBlocked)
 }
 
 func TestAdminGatewayResourcesEndpointReturnsSummary(t *testing.T) {
@@ -334,6 +370,20 @@ func findGatewayResourceRow(t *testing.T, summary apiopenapi.GatewayResourceSumm
 	}
 	t.Fatalf("provider %q not found in %+v", providerName, summary.Rows)
 	return apiopenapi.GatewayProviderResourceRow{}
+}
+
+func assertGatewayEndpointRow(t *testing.T, row apiopenapi.GatewayModelResourceRow, key apiopenapi.GatewayEndpointResourceRowKey, accounts int, status apiopenapi.GatewayProviderResourceStatus) {
+	t.Helper()
+	for _, endpoint := range row.Endpoints {
+		if endpoint.Key != key {
+			continue
+		}
+		if endpoint.RoutableAccounts != accounts || endpoint.Status != status {
+			t.Fatalf("endpoint %s = %+v, want accounts=%d status=%s", key, endpoint, accounts, status)
+		}
+		return
+	}
+	t.Fatalf("endpoint %s not found in %+v", key, row.Endpoints)
 }
 
 func testGatewayResourceProvider(id int, name string, status providercontract.Status) providercontract.Provider {

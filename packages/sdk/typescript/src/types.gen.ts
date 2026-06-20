@@ -1716,11 +1716,18 @@ export type GatewayProviderResourceRow = {
     reasons: Array<GatewayProviderResourceReason>;
 };
 
+export type GatewayEndpointResourceRow = {
+    key: 'chat_completions' | 'responses' | 'responses_compact' | 'responses_input_items' | 'messages' | 'anthropic_count_tokens' | 'gemini_generate_content' | 'gemini_count_tokens';
+    routable_accounts: number;
+    status: GatewayProviderResourceStatus;
+};
+
 export type GatewayModelResourceRow = {
     model: Model;
     active_providers: number;
     active_model_mappings: number;
     routable_accounts: number;
+    endpoints: Array<GatewayEndpointResourceRow>;
     api_key_count: number;
     scoped_key_count: number;
     status: GatewayProviderResourceStatus;

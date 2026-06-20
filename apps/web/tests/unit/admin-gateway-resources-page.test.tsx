@@ -45,6 +45,9 @@ describe("AdminGatewayResourcesPage", () => {
     expect(screen.getByText("OpenAI")).toBeInTheDocument();
     expect(screen.getByText("模型可服务性")).toBeInTheDocument();
     expect(screen.getByText("gpt-4.1")).toBeInTheDocument();
+    expect(screen.getByText("端点")).toBeInTheDocument();
+    expect(screen.getByText("Chat")).toBeInTheDocument();
+    expect(screen.getByText("Compact")).toBeInTheDocument();
     expect(screen.getAllByText("就绪").length).toBeGreaterThan(0);
   });
 });
@@ -98,6 +101,16 @@ function summary(): GatewayResourceSummary {
         active_providers: 1,
         active_model_mappings: 1,
         routable_accounts: 1,
+        endpoints: [
+          { key: "chat_completions", routable_accounts: 1, status: "ready" },
+          { key: "responses", routable_accounts: 1, status: "ready" },
+          { key: "responses_compact", routable_accounts: 0, status: "blocked" },
+          { key: "responses_input_items", routable_accounts: 0, status: "blocked" },
+          { key: "messages", routable_accounts: 1, status: "ready" },
+          { key: "anthropic_count_tokens", routable_accounts: 0, status: "blocked" },
+          { key: "gemini_generate_content", routable_accounts: 0, status: "blocked" },
+          { key: "gemini_count_tokens", routable_accounts: 0, status: "blocked" },
+        ],
         api_key_count: 1,
         scoped_key_count: 1,
         status: "ready",

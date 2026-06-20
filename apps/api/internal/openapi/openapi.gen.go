@@ -1289,6 +1289,42 @@ func (e ErrorPassthroughRuleAction) Valid() bool {
 	}
 }
 
+// Defines values for GatewayEndpointResourceRowKey.
+const (
+	AnthropicCountTokens  GatewayEndpointResourceRowKey = "anthropic_count_tokens"
+	ChatCompletions       GatewayEndpointResourceRowKey = "chat_completions"
+	GeminiCountTokens     GatewayEndpointResourceRowKey = "gemini_count_tokens"
+	GeminiGenerateContent GatewayEndpointResourceRowKey = "gemini_generate_content"
+	Messages              GatewayEndpointResourceRowKey = "messages"
+	Responses             GatewayEndpointResourceRowKey = "responses"
+	ResponsesCompact      GatewayEndpointResourceRowKey = "responses_compact"
+	ResponsesInputItems   GatewayEndpointResourceRowKey = "responses_input_items"
+)
+
+// Valid indicates whether the value is a known member of the GatewayEndpointResourceRowKey enum.
+func (e GatewayEndpointResourceRowKey) Valid() bool {
+	switch e {
+	case AnthropicCountTokens:
+		return true
+	case ChatCompletions:
+		return true
+	case GeminiCountTokens:
+		return true
+	case GeminiGenerateContent:
+		return true
+	case Messages:
+		return true
+	case Responses:
+		return true
+	case ResponsesCompact:
+		return true
+	case ResponsesInputItems:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GatewayErrorObjectType.
 const (
 	AuthenticationError     GatewayErrorObjectType = "authentication_error"
@@ -7867,6 +7903,16 @@ type ErrorResponse struct {
 	RequestId RequestId   `json:"request_id"`
 }
 
+// GatewayEndpointResourceRow defines model for GatewayEndpointResourceRow.
+type GatewayEndpointResourceRow struct {
+	Key              GatewayEndpointResourceRowKey `json:"key"`
+	RoutableAccounts int                           `json:"routable_accounts"`
+	Status           GatewayProviderResourceStatus `json:"status"`
+}
+
+// GatewayEndpointResourceRowKey defines model for GatewayEndpointResourceRow.Key.
+type GatewayEndpointResourceRowKey string
+
 // GatewayErrorObject defines model for GatewayErrorObject.
 type GatewayErrorObject struct {
 	Code    *string                `json:"code,omitempty"`
@@ -7888,6 +7934,7 @@ type GatewayModelResourceRow struct {
 	ActiveModelMappings int                             `json:"active_model_mappings"`
 	ActiveProviders     int                             `json:"active_providers"`
 	ApiKeyCount         int                             `json:"api_key_count"`
+	Endpoints           []GatewayEndpointResourceRow    `json:"endpoints"`
 	Model               Model                           `json:"model"`
 	Reasons             []GatewayProviderResourceReason `json:"reasons"`
 	RoutableAccounts    int                             `json:"routable_accounts"`

@@ -21807,6 +21807,30 @@ components:
           items:
             $ref: "#/components/schemas/GatewayProviderResourceReason"
 
+    GatewayEndpointResourceRow:
+      type: object
+      required:
+        - key
+        - routable_accounts
+        - status
+      properties:
+        key:
+          type: string
+          enum:
+            - chat_completions
+            - responses
+            - responses_compact
+            - responses_input_items
+            - messages
+            - anthropic_count_tokens
+            - gemini_generate_content
+            - gemini_count_tokens
+        routable_accounts:
+          type: integer
+          minimum: 0
+        status:
+          $ref: "#/components/schemas/GatewayProviderResourceStatus"
+
     GatewayModelResourceRow:
       type: object
       required:
@@ -21814,6 +21838,7 @@ components:
         - active_providers
         - active_model_mappings
         - routable_accounts
+        - endpoints
         - api_key_count
         - scoped_key_count
         - status
@@ -21830,6 +21855,10 @@ components:
         routable_accounts:
           type: integer
           minimum: 0
+        endpoints:
+          type: array
+          items:
+            $ref: "#/components/schemas/GatewayEndpointResourceRow"
         api_key_count:
           type: integer
           minimum: 0
