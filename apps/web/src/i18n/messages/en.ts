@@ -1227,6 +1227,7 @@ export const en = {
     activeModels: "Active models",
     availableProxies: "Available proxies",
     scopedApiKeys: "Scoped API keys",
+    endpointSummary: "Endpoint summary",
     providerMatrix: "Provider readiness",
     modelMatrix: "Model readiness",
     routeMatrix: "Route details",
@@ -1252,6 +1253,11 @@ export const en = {
     ready: "Ready",
     limited: "Limited",
     blocked: "Blocked",
+    endpointModels: "Models",
+    endpointRoutes: "Routes",
+    endpointAccounts: "Accounts",
+    endpointUnsupported: "Unsupported",
+    endpointModelBlocked: "Model blocked",
     fixQueue: "Fix first",
     fixSeverity: {
       critical: "Critical",
@@ -1269,6 +1275,7 @@ export const en = {
       endpoints: "Endpoints",
     },
     scope: {
+      endpoints: "Endpoint summary",
       providers: "Provider matrix",
       models: "Model matrix",
       routes: "Route matrix",

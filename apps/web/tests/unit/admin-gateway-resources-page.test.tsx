@@ -47,6 +47,8 @@ describe("AdminGatewayResourcesPage", () => {
     expect(screen.getByText("健康")).toBeInTheDocument();
     expect(screen.getByText("配额")).toBeInTheDocument();
     expect(screen.getAllByText("代理").length).toBeGreaterThan(1);
+    expect(screen.getByRole("heading", { name: /端点总览/ })).toBeInTheDocument();
+    expect(screen.getAllByText("路由").length).toBeGreaterThan(0);
     expect(screen.getByText("模型可服务性")).toBeInTheDocument();
     expect(screen.getAllByText("gpt-4.1").length).toBeGreaterThan(0);
     expect(screen.getAllByText("端点").length).toBeGreaterThan(0);
@@ -88,6 +90,24 @@ describe("AdminGatewayResourcesPage", () => {
     expect(screen.queryByText("模型可服务性")).not.toBeInTheDocument();
     expect(screen.queryByText("路由明细")).not.toBeInTheDocument();
     expect(screen.getAllByText("OpenAI").length).toBeGreaterThan(0);
+    expect(screen.queryByText("没有匹配的网关资源")).not.toBeInTheDocument();
+  });
+
+  it("filters endpoint summary from shared scope links", () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/admin/gateway-resources?f_scope=endpoints&f_status=blocked&q=compact",
+    );
+
+    renderPage();
+
+    expect(screen.getByRole("heading", { name: /端点总览/ })).toBeInTheDocument();
+    expect(screen.getByText("Responses Compact")).toBeInTheDocument();
+    expect(screen.getByText("/v1/responses/compact")).toBeInTheDocument();
+    expect(screen.queryByText("供应商可服务性")).not.toBeInTheDocument();
+    expect(screen.queryByText("模型可服务性")).not.toBeInTheDocument();
+    expect(screen.queryByText("路由明细")).not.toBeInTheDocument();
     expect(screen.queryByText("没有匹配的网关资源")).not.toBeInTheDocument();
   });
 });
@@ -136,6 +156,82 @@ function summary(): GatewayResourceSummary {
         href: "/admin/gateway-resources?f_reason=proxy_attention&f_scope=providers",
       },
     ],
+    endpoint_rows: [
+      endpointSummary("chat_completions", "/v1/chat/completions", 1, 1, 1, 1, 1, 1, "ready"),
+      endpointSummary("responses", "/v1/responses", 1, 1, 1, 1, 1, 1, "ready"),
+      endpointSummary("responses_websocket", "/v1/responses/ws", 0, 1, 0, 1, 0, 1, "blocked", 1),
+      endpointSummary("responses_compact", "/v1/responses/compact", 0, 1, 0, 1, 0, 1, "blocked", 1),
+      endpointSummary(
+        "responses_input_items",
+        "/v1/responses/{response_id}/input_items",
+        0,
+        1,
+        0,
+        1,
+        0,
+        1,
+        "blocked",
+        1,
+      ),
+      endpointSummary("messages", "/v1/messages", 1, 1, 1, 1, 1, 1, "ready"),
+      endpointSummary(
+        "anthropic_count_tokens",
+        "/v1/messages/count_tokens",
+        0,
+        1,
+        0,
+        1,
+        0,
+        1,
+        "blocked",
+        1,
+      ),
+      endpointSummary(
+        "gemini_generate_content",
+        "/v1beta/models/{model}:generateContent",
+        0,
+        1,
+        0,
+        1,
+        0,
+        1,
+        "blocked",
+        1,
+      ),
+      endpointSummary(
+        "gemini_count_tokens",
+        "/v1beta/models/{model}:countTokens",
+        0,
+        1,
+        0,
+        1,
+        0,
+        1,
+        "blocked",
+        1,
+      ),
+      endpointSummary("embeddings", "/v1/embeddings", 1, 1, 1, 1, 1, 1, "ready"),
+      endpointSummary("image_generations", "/v1/images/generations", 1, 1, 1, 1, 1, 1, "ready"),
+      endpointSummary("image_edits", "/v1/images/edits", 0, 1, 0, 1, 0, 1, "blocked", 1),
+      endpointSummary("image_variations", "/v1/images/variations", 0, 1, 0, 1, 0, 1, "blocked", 1),
+      endpointSummary("videos", "/v1/videos", 0, 1, 0, 1, 0, 1, "blocked", 1),
+      endpointSummary(
+        "audio_transcriptions",
+        "/v1/audio/transcriptions",
+        0,
+        1,
+        0,
+        1,
+        0,
+        1,
+        "blocked",
+        1,
+      ),
+      endpointSummary("audio_speech", "/v1/audio/speech", 0, 1, 0, 1, 0, 1, "blocked", 1),
+      endpointSummary("moderations", "/v1/moderations", 0, 1, 0, 1, 0, 1, "blocked", 1),
+      endpointSummary("rerank", "/v1/rerank", 0, 1, 0, 1, 0, 1, "blocked", 1),
+      endpointSummary("realtime_websocket", "/v1/realtime", 0, 1, 0, 1, 0, 1, "blocked", 1),
+    ],
     rows: [
       {
         provider: provider({ id: "p1", display_name: "OpenAI" }),
@@ -168,10 +264,24 @@ function summary(): GatewayResourceSummary {
           endpoint("responses", "/v1/responses", 1, 1, "ready"),
           endpoint("responses_websocket", "/v1/responses/ws", 0, 1, "blocked", 1),
           endpoint("responses_compact", "/v1/responses/compact", 0, 1, "blocked", 1),
-          endpoint("responses_input_items", "/v1/responses/{response_id}/input_items", 0, 1, "blocked", 1),
+          endpoint(
+            "responses_input_items",
+            "/v1/responses/{response_id}/input_items",
+            0,
+            1,
+            "blocked",
+            1,
+          ),
           endpoint("messages", "/v1/messages", 1, 1, "ready"),
           endpoint("anthropic_count_tokens", "/v1/messages/count_tokens", 0, 1, "blocked", 1),
-          endpoint("gemini_generate_content", "/v1beta/models/{model}:generateContent", 0, 1, "blocked", 1),
+          endpoint(
+            "gemini_generate_content",
+            "/v1beta/models/{model}:generateContent",
+            0,
+            1,
+            "blocked",
+            1,
+          ),
           endpoint("gemini_count_tokens", "/v1beta/models/{model}:countTokens", 0, 1, "blocked", 1),
           endpoint("embeddings", "/v1/embeddings", 1, 1, "ready"),
           endpoint("image_generations", "/v1/images/generations", 1, 1, "ready"),
@@ -211,10 +321,24 @@ function summary(): GatewayResourceSummary {
           endpoint("responses", "/v1/responses", 1, 1, "ready"),
           endpoint("responses_websocket", "/v1/responses/ws", 0, 1, "blocked", 1),
           endpoint("responses_compact", "/v1/responses/compact", 0, 1, "blocked", 1),
-          endpoint("responses_input_items", "/v1/responses/{response_id}/input_items", 0, 1, "blocked", 1),
+          endpoint(
+            "responses_input_items",
+            "/v1/responses/{response_id}/input_items",
+            0,
+            1,
+            "blocked",
+            1,
+          ),
           endpoint("messages", "/v1/messages", 1, 1, "ready"),
           endpoint("anthropic_count_tokens", "/v1/messages/count_tokens", 0, 1, "blocked", 1),
-          endpoint("gemini_generate_content", "/v1beta/models/{model}:generateContent", 0, 1, "blocked", 1),
+          endpoint(
+            "gemini_generate_content",
+            "/v1beta/models/{model}:generateContent",
+            0,
+            1,
+            "blocked",
+            1,
+          ),
           endpoint("gemini_count_tokens", "/v1beta/models/{model}:countTokens", 0, 1, "blocked", 1),
           endpoint("embeddings", "/v1/embeddings", 1, 1, "ready"),
           endpoint("image_generations", "/v1/images/generations", 1, 1, "ready"),
@@ -260,6 +384,34 @@ function endpoint(
     candidate_accounts: candidateAccounts,
     unsupported_accounts: unsupportedAccounts,
     unavailable_model_accounts: 0,
+    status,
+  };
+}
+
+function endpointSummary(
+  key: GatewayResourceSummary["endpoint_rows"][number]["key"],
+  sourceEndpoint: string,
+  readyModels: number,
+  models: number,
+  readyRoutes: number,
+  routes: number,
+  routableAccountRoutes: number,
+  candidateAccountRoutes: number,
+  status: "ready" | "limited" | "blocked",
+  unsupportedAccountRoutes = 0,
+  unavailableModelAccountRoutes = 0,
+) {
+  return {
+    key,
+    source_endpoint: sourceEndpoint,
+    ready_models: readyModels,
+    models,
+    ready_routes: readyRoutes,
+    routes,
+    routable_account_routes: routableAccountRoutes,
+    candidate_account_routes: candidateAccountRoutes,
+    unsupported_account_routes: unsupportedAccountRoutes,
+    unavailable_model_account_routes: unavailableModelAccountRoutes,
     status,
   };
 }

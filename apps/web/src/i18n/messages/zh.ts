@@ -1194,6 +1194,7 @@ export const zh: Messages = {
     activeModels: "启用模型",
     availableProxies: "可用代理",
     scopedApiKeys: "有限定密钥",
+    endpointSummary: "端点总览",
     providerMatrix: "供应商可服务性",
     modelMatrix: "模型可服务性",
     routeMatrix: "路由明细",
@@ -1219,6 +1220,11 @@ export const zh: Messages = {
     ready: "就绪",
     limited: "受限",
     blocked: "阻塞",
+    endpointModels: "模型",
+    endpointRoutes: "路由",
+    endpointAccounts: "账号",
+    endpointUnsupported: "缺能力",
+    endpointModelBlocked: "模型屏蔽",
     fixQueue: "优先修复",
     fixSeverity: {
       critical: "严重",
@@ -1236,6 +1242,7 @@ export const zh: Messages = {
       endpoints: "端点",
     },
     scope: {
+      endpoints: "端点总览",
       providers: "供应商矩阵",
       models: "模型矩阵",
       routes: "路由矩阵",

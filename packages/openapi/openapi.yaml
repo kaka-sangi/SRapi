@@ -21932,6 +21932,81 @@ components:
         status:
           $ref: "#/components/schemas/GatewayProviderResourceStatus"
 
+    GatewayEndpointResourceSummaryRow:
+      type: object
+      required:
+        - key
+        - source_endpoint
+        - ready_models
+        - models
+        - ready_routes
+        - routes
+        - routable_account_routes
+        - candidate_account_routes
+        - unsupported_account_routes
+        - unavailable_model_account_routes
+        - status
+      properties:
+        key:
+          type: string
+          enum:
+            - chat_completions
+            - responses
+            - responses_websocket
+            - responses_compact
+            - responses_input_items
+            - messages
+            - anthropic_count_tokens
+            - gemini_generate_content
+            - gemini_count_tokens
+            - embeddings
+            - image_generations
+            - image_edits
+            - image_variations
+            - videos
+            - audio_transcriptions
+            - audio_speech
+            - moderations
+            - rerank
+            - realtime_websocket
+        source_endpoint:
+          type: string
+          description: Gateway route or route template represented by this endpoint readiness row.
+        ready_models:
+          type: integer
+          minimum: 0
+          description: Active model rows with at least one routable account for this endpoint.
+        models:
+          type: integer
+          minimum: 0
+          description: Active model rows evaluated for this endpoint.
+        ready_routes:
+          type: integer
+          minimum: 0
+          description: Active model-provider route rows with at least one routable account for this endpoint.
+        routes:
+          type: integer
+          minimum: 0
+          description: Active model-provider route rows evaluated for this endpoint.
+        routable_account_routes:
+          type: integer
+          minimum: 0
+          description: Sum of routable account-route observations across active model-provider route rows.
+        candidate_account_routes:
+          type: integer
+          minimum: 0
+          description: Sum of candidate account-route observations before endpoint capability and model availability filters.
+        unsupported_account_routes:
+          type: integer
+          minimum: 0
+          description: Sum of account-route observations whose effective capabilities do not include this endpoint.
+        unavailable_model_account_routes:
+          type: integer
+          minimum: 0
+          description: Sum of account-route observations whose effective model mapping is blocked by excluded_models or supported_models metadata.
+        status:
+          $ref: "#/components/schemas/GatewayProviderResourceStatus"
+
     GatewayPricingCoverageStatus:
       type: string
       enum:
@@ -22083,6 +22158,7 @@ components:
         - rows
         - model_rows
         - route_rows
+        - endpoint_rows
       properties:
         providers:
           type: integer
@@ -22139,6 +22215,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/GatewayRouteResourceRow"
+        endpoint_rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/GatewayEndpointResourceSummaryRow"
 
     GatewayResourceSummaryResponse:
       type: object

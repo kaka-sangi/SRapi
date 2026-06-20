@@ -1776,6 +1776,47 @@ export type GatewayEndpointResourceRow = {
     status: GatewayProviderResourceStatus;
 };
 
+export type GatewayEndpointResourceSummaryRow = {
+    key: 'chat_completions' | 'responses' | 'responses_websocket' | 'responses_compact' | 'responses_input_items' | 'messages' | 'anthropic_count_tokens' | 'gemini_generate_content' | 'gemini_count_tokens' | 'embeddings' | 'image_generations' | 'image_edits' | 'image_variations' | 'videos' | 'audio_transcriptions' | 'audio_speech' | 'moderations' | 'rerank' | 'realtime_websocket';
+    /**
+     * Gateway route or route template represented by this endpoint readiness row.
+     */
+    source_endpoint: string;
+    /**
+     * Active model rows with at least one routable account for this endpoint.
+     */
+    ready_models: number;
+    /**
+     * Active model rows evaluated for this endpoint.
+     */
+    models: number;
+    /**
+     * Active model-provider route rows with at least one routable account for this endpoint.
+     */
+    ready_routes: number;
+    /**
+     * Active model-provider route rows evaluated for this endpoint.
+     */
+    routes: number;
+    /**
+     * Sum of routable account-route observations across active model-provider route rows.
+     */
+    routable_account_routes: number;
+    /**
+     * Sum of candidate account-route observations before endpoint capability and model availability filters.
+     */
+    candidate_account_routes: number;
+    /**
+     * Sum of account-route observations whose effective capabilities do not include this endpoint.
+     */
+    unsupported_account_routes: number;
+    /**
+     * Sum of account-route observations whose effective model mapping is blocked by excluded_models or supported_models metadata.
+     */
+    unavailable_model_account_routes: number;
+    status: GatewayProviderResourceStatus;
+};
+
 export type GatewayPricingCoverageStatus = 'priced' | 'estimated_zero' | 'error';
 
 export type GatewayPricingCoverageSource = 'mapping_override' | 'pricing_rule' | 'default_zero' | 'pricing_error';
@@ -1835,6 +1876,7 @@ export type GatewayResourceSummary = {
     rows: Array<GatewayProviderResourceRow>;
     model_rows: Array<GatewayModelResourceRow>;
     route_rows: Array<GatewayRouteResourceRow>;
+    endpoint_rows: Array<GatewayEndpointResourceSummaryRow>;
 };
 
 export type GatewayResourceSummaryResponse = {

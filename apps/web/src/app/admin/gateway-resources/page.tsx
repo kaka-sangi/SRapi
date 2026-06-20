@@ -35,6 +35,7 @@ import { useAdminGatewayResources } from "@/hooks/admin-queries";
 import type {
   GatewayAccountBlockers,
   GatewayEndpointResourceRow,
+  GatewayEndpointResourceSummaryRow,
   GatewayProviderResourceReason,
   GatewayProviderResourceStatus,
   GatewayResourceFix,
@@ -45,7 +46,7 @@ import type {
   GatewayResourceSummary,
 } from "@/lib/sdk-types";
 
-type GatewayResourceScope = "providers" | "models" | "routes";
+type GatewayResourceScope = "endpoints" | "providers" | "models" | "routes";
 
 const GATEWAY_STATUSES: GatewayProviderResourceStatus[] = ["ready", "limited", "blocked"];
 const GATEWAY_REASONS: GatewayProviderResourceReason[] = [
@@ -58,7 +59,7 @@ const GATEWAY_REASONS: GatewayProviderResourceReason[] = [
   "no_api_keys",
   "pricing_uncovered",
 ];
-const GATEWAY_SCOPES: GatewayResourceScope[] = ["providers", "models", "routes"];
+const GATEWAY_SCOPES: GatewayResourceScope[] = ["endpoints", "providers", "models", "routes"];
 
 export default function AdminGatewayResourcesPage() {
   return (
@@ -166,6 +167,13 @@ function GatewayResourcesContent() {
                   {t("adminCommon.clearFilters")}
                 </Button>
               }
+            />
+          ) : null}
+
+          {filters.endpointRows !== null ? (
+            <GatewayEndpointSummary
+              rows={filters.endpointRows}
+              total={summary?.endpoint_rows.length ?? 0}
             />
           ) : null}
 
@@ -401,6 +409,7 @@ function gatewayResourceFilters(
   rawSearch: string,
   filters: Record<string, string>,
 ): {
+  endpointRows: GatewayEndpointResourceSummaryRow[] | null;
   providerRows: GatewayProviderResourceRow[] | null;
   modelRows: GatewayModelResourceRow[] | null;
   routeRows: GatewayRouteResourceRow[] | null;
@@ -410,9 +419,15 @@ function gatewayResourceFilters(
   const status = validStatusFilter(filters.status);
   const reason = validReasonFilter(filters.reason);
   const search = rawSearch.trim().toLowerCase();
+  const includeEndpoints = !scope || scope === "endpoints";
   const includeProviders = !scope || scope === "providers";
   const includeModels = !scope || scope === "models";
   const includeRoutes = !scope || scope === "routes";
+  const endpointRows = includeEndpoints
+    ? (summary?.endpoint_rows ?? []).filter((row) =>
+        endpointSummaryRowMatches(row, search, status, reason),
+      )
+    : null;
   const providerRows = includeProviders
     ? (summary?.rows ?? []).filter((row) => providerResourceRowMatches(row, search, status, reason))
     : null;
@@ -427,11 +442,37 @@ function gatewayResourceFilters(
       )
     : null;
   return {
+    endpointRows,
     providerRows,
     modelRows,
     routeRows,
-    total: (providerRows?.length ?? 0) + (modelRows?.length ?? 0) + (routeRows?.length ?? 0),
+    total:
+      (endpointRows?.length ?? 0) +
+      (providerRows?.length ?? 0) +
+      (modelRows?.length ?? 0) +
+      (routeRows?.length ?? 0),
   };
+}
+
+function endpointSummaryRowMatches(
+  row: GatewayEndpointResourceSummaryRow,
+  search: string,
+  status: GatewayProviderResourceStatus | undefined,
+  reason: GatewayProviderResourceReason | undefined,
+) {
+  if (status && row.status !== status) return false;
+  if (reason) {
+    if (reason !== "no_routable_accounts") return false;
+    if (
+      row.ready_routes === row.routes &&
+      row.unsupported_account_routes === 0 &&
+      row.unavailable_model_account_routes === 0
+    ) {
+      return false;
+    }
+  }
+  if (!search) return true;
+  return rowText([row.key, row.source_endpoint, row.status]).includes(search);
 }
 
 function providerResourceRowMatches(
@@ -509,7 +550,10 @@ function rowMatchesReason(
 }
 
 function rowText(values: Array<string | number | null | undefined>) {
-  return values.filter((value) => value !== null && value !== undefined).join(" ").toLowerCase();
+  return values
+    .filter((value) => value !== null && value !== undefined)
+    .join(" ")
+    .toLowerCase();
 }
 
 function validStatusFilter(value: string | undefined): GatewayProviderResourceStatus | undefined {
@@ -546,7 +590,7 @@ function GatewayFixQueue({ fixes }: { fixes: GatewayResourceFix[] }) {
           <Link
             key={`${fix.area}:${fix.reason}`}
             href={fix.href}
-            className="border-srapi-border bg-srapi-card-muted hover:border-srapi-border-strong inline-flex min-w-0 items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-2xs transition-colors"
+            className="border-srapi-border bg-srapi-card-muted hover:border-srapi-border-strong text-2xs inline-flex min-w-0 items-center gap-1.5 rounded-md border px-2 py-1 font-mono transition-colors"
             title={t(`adminGatewayResources.fixReason.${fix.reason}`, { count: fix.count })}
           >
             <QuietBadge
@@ -578,22 +622,147 @@ function GatewayFixQueue({ fixes }: { fixes: GatewayResourceFix[] }) {
   );
 }
 
+function GatewayEndpointSummary({
+  rows,
+  total,
+}: {
+  rows: GatewayEndpointResourceSummaryRow[];
+  total: number;
+}) {
+  const { t } = useLanguage();
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          {t("adminGatewayResources.endpointSummary")}{" "}
+          <span className="text-2xs text-srapi-text-tertiary font-mono">
+            {rows.length}/{total}
+          </span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          {rows.map((row) => (
+            <GatewayEndpointSummaryItem key={row.key} row={row} />
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function GatewayEndpointSummaryItem({ row }: { row: GatewayEndpointResourceSummaryRow }) {
+  const { t } = useLanguage();
+  const status = resourceStatusMeta(row.status, t);
+  const StatusIcon = status.icon;
+  const modelCoverage = `${row.ready_models}/${row.models}`;
+  const routeCoverage = `${row.ready_routes}/${row.routes}`;
+  const accountCoverage = `${row.routable_account_routes}/${row.candidate_account_routes}`;
+  return (
+    <Link
+      href={`${ADMIN_ROUTES.gatewayResources}?f_scope=routes&q=${encodeURIComponent(row.source_endpoint)}`}
+      className="border-srapi-border bg-srapi-card-muted hover:border-srapi-border-strong grid gap-3 rounded-md border p-3 transition-colors"
+      title={endpointSummaryTitle(row, t)}
+    >
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-srapi-text-primary truncate text-sm font-medium">
+            {t(`adminGatewayResources.endpoint.${row.key}`)}
+          </div>
+          <div className="text-2xs text-srapi-text-tertiary truncate font-mono">
+            {row.source_endpoint}
+          </div>
+        </div>
+        <span className="inline-flex shrink-0 items-center gap-1.5">
+          <StatusIcon className="text-srapi-text-tertiary size-3.5" />
+          <QuietBadge status={status.quiet} label={status.label} />
+        </span>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <EndpointSummaryMetric
+          label={t("adminGatewayResources.endpointModels")}
+          value={modelCoverage}
+          ready={row.ready_models === row.models && row.models > 0}
+        />
+        <EndpointSummaryMetric
+          label={t("adminGatewayResources.endpointRoutes")}
+          value={routeCoverage}
+          ready={row.ready_routes === row.routes && row.routes > 0}
+        />
+        <EndpointSummaryMetric
+          label={t("adminGatewayResources.endpointAccounts")}
+          value={accountCoverage}
+          ready={row.routable_account_routes > 0}
+        />
+      </div>
+      {row.unsupported_account_routes > 0 || row.unavailable_model_account_routes > 0 ? (
+        <div className="flex flex-wrap gap-1">
+          {row.unsupported_account_routes > 0 ? (
+            <span className="border-srapi-border text-srapi-text-tertiary rounded-md border px-1.5 py-0.5 font-mono text-[10px]">
+              {t("adminGatewayResources.endpointUnsupported")}:{" "}
+              <span className="text-srapi-text-primary tabular">
+                {row.unsupported_account_routes}
+              </span>
+            </span>
+          ) : null}
+          {row.unavailable_model_account_routes > 0 ? (
+            <span className="border-srapi-border text-srapi-text-tertiary rounded-md border px-1.5 py-0.5 font-mono text-[10px]">
+              {t("adminGatewayResources.endpointModelBlocked")}:{" "}
+              <span className="text-srapi-text-primary tabular">
+                {row.unavailable_model_account_routes}
+              </span>
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+    </Link>
+  );
+}
+
+function EndpointSummaryMetric({
+  label,
+  value,
+  ready,
+}: {
+  label: string;
+  value: string;
+  ready: boolean;
+}) {
+  return (
+    <div className="min-w-0">
+      <div className="text-srapi-text-tertiary truncate font-mono text-[10px] uppercase">
+        {label}
+      </div>
+      <div
+        className={
+          ready
+            ? "text-srapi-success tabular font-mono text-sm"
+            : "text-srapi-text-secondary tabular font-mono text-sm"
+        }
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function endpointSummaryTitle(
+  row: GatewayEndpointResourceSummaryRow,
+  t: (key: string, params?: Record<string, string | number>) => string,
+) {
+  return [
+    `${t(`adminGatewayResources.endpoint.${row.key}`)} · ${row.source_endpoint}`,
+    `${t("adminGatewayResources.endpointModels")}: ${row.ready_models}/${row.models}`,
+    `${t("adminGatewayResources.endpointRoutes")}: ${row.ready_routes}/${row.routes}`,
+    `${t("adminGatewayResources.endpointAccounts")}: ${row.routable_account_routes}/${row.candidate_account_routes}`,
+    `${t("adminGatewayResources.endpointUnsupported")}: ${row.unsupported_account_routes}`,
+    `${t("adminGatewayResources.endpointModelBlocked")}: ${row.unavailable_model_account_routes}`,
+  ].join("\n");
+}
+
 function ModelResourceRow({ row }: { row: GatewayModelResourceRow }) {
   const { t } = useLanguage();
-  const status =
-    row.status === "ready"
-      ? { quiet: "active" as const, label: t("adminGatewayResources.ready"), icon: CheckCircle2 }
-      : row.status === "limited"
-        ? {
-            quiet: "limited" as const,
-            label: t("adminGatewayResources.limited"),
-            icon: AlertTriangle,
-          }
-        : {
-            quiet: "error" as const,
-            label: t("adminGatewayResources.blocked"),
-            icon: AlertTriangle,
-          };
+  const status = resourceStatusMeta(row.status, t);
   const StatusIcon = status.icon;
   return (
     <TableRow>
@@ -669,20 +838,7 @@ function ModelResourceRow({ row }: { row: GatewayModelResourceRow }) {
 
 function RouteResourceRow({ row }: { row: GatewayRouteResourceRow }) {
   const { t } = useLanguage();
-  const status =
-    row.status === "ready"
-      ? { quiet: "active" as const, label: t("adminGatewayResources.ready"), icon: CheckCircle2 }
-      : row.status === "limited"
-        ? {
-            quiet: "limited" as const,
-            label: t("adminGatewayResources.limited"),
-            icon: AlertTriangle,
-          }
-        : {
-            quiet: "error" as const,
-            label: t("adminGatewayResources.blocked"),
-            icon: AlertTriangle,
-          };
+  const status = resourceStatusMeta(row.status, t);
   const StatusIcon = status.icon;
   return (
     <TableRow>
@@ -763,11 +919,7 @@ function RouteResourceRow({ row }: { row: GatewayRouteResourceRow }) {
 function PricingCoverageBadge({ pricing }: { pricing: GatewayPricingCoverage }) {
   const { t } = useLanguage();
   const status =
-    pricing.status === "priced"
-      ? "active"
-      : pricing.status === "error"
-        ? "error"
-        : "limited";
+    pricing.status === "priced" ? "active" : pricing.status === "error" ? "error" : "limited";
   const routeCount = `${pricing.priced_routes}/${pricing.total_routes}`;
   const billingMode = pricing.billing_mode
     ? t(`adminGatewayResources.billingMode.${pricing.billing_mode}`)
@@ -787,7 +939,7 @@ function PricingCoverageBadge({ pricing }: { pricing: GatewayPricingCoverage }) 
         status={status}
         label={t(`adminGatewayResources.pricingSource.${pricing.source}`)}
       />
-      <span className="text-2xs text-srapi-text-tertiary font-mono tabular">
+      <span className="text-2xs text-srapi-text-tertiary tabular font-mono">
         {routeCount}
         {pricing.currency ? <span> · {pricing.currency}</span> : null}
       </span>
@@ -840,22 +992,34 @@ function endpointTitle(
   ].join("\n");
 }
 
+function resourceStatusMeta(
+  status: GatewayProviderResourceStatus,
+  t: (key: string, params?: Record<string, string | number>) => string,
+) {
+  if (status === "ready") {
+    return {
+      quiet: "active" as const,
+      label: t("adminGatewayResources.ready"),
+      icon: CheckCircle2,
+    };
+  }
+  if (status === "limited") {
+    return {
+      quiet: "limited" as const,
+      label: t("adminGatewayResources.limited"),
+      icon: AlertTriangle,
+    };
+  }
+  return {
+    quiet: "error" as const,
+    label: t("adminGatewayResources.blocked"),
+    icon: AlertTriangle,
+  };
+}
+
 function ProviderResourceRow({ row }: { row: GatewayProviderResourceRow }) {
   const { t } = useLanguage();
-  const status =
-    row.status === "ready"
-      ? { quiet: "active" as const, label: t("adminGatewayResources.ready"), icon: CheckCircle2 }
-      : row.status === "limited"
-        ? {
-            quiet: "limited" as const,
-            label: t("adminGatewayResources.limited"),
-            icon: AlertTriangle,
-          }
-        : {
-            quiet: "error" as const,
-            label: t("adminGatewayResources.blocked"),
-            icon: AlertTriangle,
-          };
+  const status = resourceStatusMeta(row.status, t);
   const StatusIcon = status.icon;
   return (
     <TableRow>
@@ -959,7 +1123,7 @@ function AccountBlockersStrip({ blockers }: { blockers: GatewayAccountBlockers }
           className="border-srapi-error/20 bg-srapi-error/10 text-srapi-error rounded px-1 py-0.5 text-[10px] leading-none"
         >
           {t(`adminGatewayResources.accountBlockersShort.${item.key}`)}
-          <span className="ml-0.5 tabular">{item.value}</span>
+          <span className="tabular ml-0.5">{item.value}</span>
         </span>
       ))}
     </div>

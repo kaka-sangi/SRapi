@@ -149,6 +149,20 @@ func TestBuildGatewayResourceSummaryAggregatesReadiness(t *testing.T) {
 	}
 	assertGatewayRouteEndpointRow(t, routeRow, apiopenapi.GatewayEndpointResourceRowKeyChatCompletions, 1, apiopenapi.GatewayProviderResourceStatusReady)
 	assertGatewayRouteEndpointRow(t, routeRow, apiopenapi.GatewayEndpointResourceRowKeyResponses, 1, apiopenapi.GatewayProviderResourceStatusReady)
+
+	chatEndpoint := findGatewayEndpointSummaryRow(t, summary, apiopenapi.GatewayEndpointResourceSummaryRowKeyChatCompletions)
+	if chatEndpoint.Status != apiopenapi.GatewayProviderResourceStatusReady ||
+		chatEndpoint.ReadyModels != 1 ||
+		chatEndpoint.Models != 1 ||
+		chatEndpoint.ReadyRoutes != 1 ||
+		chatEndpoint.Routes != 1 ||
+		chatEndpoint.CandidateAccountRoutes != 1 ||
+		chatEndpoint.RoutableAccountRoutes != 1 ||
+		chatEndpoint.UnsupportedAccountRoutes != 0 ||
+		chatEndpoint.UnavailableModelAccountRoutes != 0 ||
+		chatEndpoint.SourceEndpoint != "/v1/chat/completions" {
+		t.Fatalf("unexpected chat endpoint summary: %+v", chatEndpoint)
+	}
 }
 
 func TestBuildGatewayResourceSummaryReportsBlockedModels(t *testing.T) {
@@ -246,6 +260,20 @@ func TestBuildGatewayResourceSummaryReportsEndpointCapabilities(t *testing.T) {
 		routableAccounts:    0,
 		status:              apiopenapi.GatewayProviderResourceStatusBlocked,
 	})
+
+	compact := findGatewayEndpointSummaryRow(t, summary, apiopenapi.GatewayEndpointResourceSummaryRowKeyResponsesCompact)
+	if compact.Status != apiopenapi.GatewayProviderResourceStatusBlocked ||
+		compact.ReadyModels != 0 ||
+		compact.Models != 1 ||
+		compact.ReadyRoutes != 0 ||
+		compact.Routes != 1 ||
+		compact.CandidateAccountRoutes != 1 ||
+		compact.RoutableAccountRoutes != 0 ||
+		compact.UnsupportedAccountRoutes != 1 ||
+		compact.UnavailableModelAccountRoutes != 0 ||
+		compact.SourceEndpoint != "/v1/responses/compact" {
+		t.Fatalf("unexpected compact endpoint summary: %+v", compact)
+	}
 }
 
 func TestBuildGatewayResourceSummaryReportsEndpointModelAvailability(t *testing.T) {
@@ -408,6 +436,9 @@ func TestAdminGatewayResourcesEndpointReturnsSummary(t *testing.T) {
 	if len(resp.Data.ModelRows) == 0 || len(resp.Data.RouteRows) == 0 {
 		t.Fatalf("expected model resource rows in summary: %+v", resp.Data)
 	}
+	if len(resp.Data.EndpointRows) == 0 {
+		t.Fatalf("expected endpoint resource summary rows: %+v", resp.Data)
+	}
 	row := findGatewayResourceRow(t, resp.Data, "gateway-resources-provider")
 	if row.Status != apiopenapi.GatewayProviderResourceStatusReady ||
 		row.RoutableAccounts != 1 ||
@@ -438,6 +469,18 @@ func findGatewayRouteResourceRow(t *testing.T, summary apiopenapi.GatewayResourc
 	}
 	t.Fatalf("route %q/%q not found in %+v", modelName, providerName, summary.RouteRows)
 	return apiopenapi.GatewayRouteResourceRow{}
+}
+
+func findGatewayEndpointSummaryRow(t *testing.T, summary apiopenapi.GatewayResourceSummary, key apiopenapi.GatewayEndpointResourceSummaryRowKey) apiopenapi.GatewayEndpointResourceSummaryRow {
+	t.Helper()
+	for _, row := range summary.EndpointRows {
+		if row.Key != key {
+			continue
+		}
+		return row
+	}
+	t.Fatalf("endpoint summary %s not found in %+v", key, summary.EndpointRows)
+	return apiopenapi.GatewayEndpointResourceSummaryRow{}
 }
 
 func TestAdminGatewayResourcesEndpointRequiresAdmin(t *testing.T) {

@@ -222,6 +222,7 @@ func buildGatewayResourceSummary(input gatewayResourceSummaryInput) apiopenapi.G
 	}
 	modelRows := buildGatewayModelResourceRows(input.Context, activeModels, activeModelMappings, input.Providers, routableAccountsByProvider, activeKeys, input.Billing, now)
 	routeRows := buildGatewayRouteResourceRows(input.Context, activeModels, activeModelMappings, input.Providers, routableAccountsByProvider, providerGroupIDs, activeKeys, input.Billing, now)
+	endpointRows := buildGatewayEndpointResourceSummaryRows(modelRows, routeRows)
 	return apiopenapi.GatewayResourceSummary{
 		ActiveAccounts:         activeAccounts,
 		ActiveApiKeys:          len(activeKeys),
@@ -230,6 +231,7 @@ func buildGatewayResourceSummary(input gatewayResourceSummaryInput) apiopenapi.G
 		ActiveProviders:        activeProviders,
 		ActiveProxies:          activeProxies,
 		AvailableProxies:       availableProxies,
+		EndpointRows:           endpointRows,
 		ExpiredProxies:         expiredProxies,
 		Fixes:                  gatewayResourceFixes(rows, modelRows, routeRows),
 		ModelRows:              modelRows,
@@ -416,6 +418,91 @@ func buildGatewayRouteResourceRows(
 		})
 	}
 	return rows
+}
+
+type gatewayEndpointResourceSummaryStats struct {
+	Models                        int
+	ReadyModels                   int
+	Routes                        int
+	ReadyRoutes                   int
+	RoutableAccountRoutes         int
+	CandidateAccountRoutes        int
+	UnsupportedAccountRoutes      int
+	UnavailableModelAccountRoutes int
+}
+
+func buildGatewayEndpointResourceSummaryRows(
+	modelRows []apiopenapi.GatewayModelResourceRow,
+	routeRows []apiopenapi.GatewayRouteResourceRow,
+) []apiopenapi.GatewayEndpointResourceSummaryRow {
+	statsByKey := make(map[string]*gatewayEndpointResourceSummaryStats, len(gatewayEndpointResourceKeys))
+	for _, key := range gatewayEndpointResourceKeys {
+		statsByKey[key] = &gatewayEndpointResourceSummaryStats{}
+	}
+	for _, row := range modelRows {
+		for _, endpoint := range row.Endpoints {
+			stats := gatewayEndpointSummaryStats(statsByKey, string(endpoint.Key))
+			stats.Models++
+			if endpoint.RoutableAccounts > 0 && endpoint.Status != apiopenapi.GatewayProviderResourceStatusBlocked {
+				stats.ReadyModels++
+			}
+		}
+	}
+	for _, row := range routeRows {
+		for _, endpoint := range row.Endpoints {
+			stats := gatewayEndpointSummaryStats(statsByKey, string(endpoint.Key))
+			stats.Routes++
+			stats.CandidateAccountRoutes += endpoint.CandidateAccounts
+			stats.RoutableAccountRoutes += endpoint.RoutableAccounts
+			stats.UnavailableModelAccountRoutes += endpoint.UnavailableModelAccounts
+			stats.UnsupportedAccountRoutes += endpoint.UnsupportedAccounts
+			if endpoint.RoutableAccounts > 0 && endpoint.Status != apiopenapi.GatewayProviderResourceStatusBlocked {
+				stats.ReadyRoutes++
+			}
+		}
+	}
+
+	rows := make([]apiopenapi.GatewayEndpointResourceSummaryRow, 0, len(gatewayEndpointResourceKeys))
+	for _, key := range gatewayEndpointResourceKeys {
+		stats := gatewayEndpointSummaryStats(statsByKey, key)
+		rows = append(rows, apiopenapi.GatewayEndpointResourceSummaryRow{
+			CandidateAccountRoutes:        stats.CandidateAccountRoutes,
+			Key:                           apiopenapi.GatewayEndpointResourceSummaryRowKey(key),
+			Models:                        stats.Models,
+			ReadyModels:                   stats.ReadyModels,
+			ReadyRoutes:                   stats.ReadyRoutes,
+			RoutableAccountRoutes:         stats.RoutableAccountRoutes,
+			Routes:                        stats.Routes,
+			SourceEndpoint:                gatewayEndpointSourceEndpoint(key),
+			Status:                        gatewayEndpointSummaryStatus(*stats),
+			UnavailableModelAccountRoutes: stats.UnavailableModelAccountRoutes,
+			UnsupportedAccountRoutes:      stats.UnsupportedAccountRoutes,
+		})
+	}
+	return rows
+}
+
+func gatewayEndpointSummaryStats(statsByKey map[string]*gatewayEndpointResourceSummaryStats, key string) *gatewayEndpointResourceSummaryStats {
+	stats, ok := statsByKey[key]
+	if ok {
+		return stats
+	}
+	stats = &gatewayEndpointResourceSummaryStats{}
+	statsByKey[key] = stats
+	return stats
+}
+
+func gatewayEndpointSummaryStatus(stats gatewayEndpointResourceSummaryStats) apiopenapi.GatewayProviderResourceStatus {
+	if stats.ReadyRoutes == 0 {
+		return apiopenapi.GatewayProviderResourceStatusBlocked
+	}
+	if stats.ReadyRoutes < stats.Routes ||
+		stats.ReadyModels < stats.Models ||
+		stats.UnsupportedAccountRoutes > 0 ||
+		stats.UnavailableModelAccountRoutes > 0 {
+		return apiopenapi.GatewayProviderResourceStatusLimited
+	}
+	return apiopenapi.GatewayProviderResourceStatusReady
 }
 
 func gatewayResourceFixes(

@@ -1388,6 +1388,75 @@ func (e GatewayEndpointResourceRowKey) Valid() bool {
 	}
 }
 
+// Defines values for GatewayEndpointResourceSummaryRowKey.
+const (
+	GatewayEndpointResourceSummaryRowKeyAnthropicCountTokens  GatewayEndpointResourceSummaryRowKey = "anthropic_count_tokens"
+	GatewayEndpointResourceSummaryRowKeyAudioSpeech           GatewayEndpointResourceSummaryRowKey = "audio_speech"
+	GatewayEndpointResourceSummaryRowKeyAudioTranscriptions   GatewayEndpointResourceSummaryRowKey = "audio_transcriptions"
+	GatewayEndpointResourceSummaryRowKeyChatCompletions       GatewayEndpointResourceSummaryRowKey = "chat_completions"
+	GatewayEndpointResourceSummaryRowKeyEmbeddings            GatewayEndpointResourceSummaryRowKey = "embeddings"
+	GatewayEndpointResourceSummaryRowKeyGeminiCountTokens     GatewayEndpointResourceSummaryRowKey = "gemini_count_tokens"
+	GatewayEndpointResourceSummaryRowKeyGeminiGenerateContent GatewayEndpointResourceSummaryRowKey = "gemini_generate_content"
+	GatewayEndpointResourceSummaryRowKeyImageEdits            GatewayEndpointResourceSummaryRowKey = "image_edits"
+	GatewayEndpointResourceSummaryRowKeyImageGenerations      GatewayEndpointResourceSummaryRowKey = "image_generations"
+	GatewayEndpointResourceSummaryRowKeyImageVariations       GatewayEndpointResourceSummaryRowKey = "image_variations"
+	GatewayEndpointResourceSummaryRowKeyMessages              GatewayEndpointResourceSummaryRowKey = "messages"
+	GatewayEndpointResourceSummaryRowKeyModerations           GatewayEndpointResourceSummaryRowKey = "moderations"
+	GatewayEndpointResourceSummaryRowKeyRealtimeWebsocket     GatewayEndpointResourceSummaryRowKey = "realtime_websocket"
+	GatewayEndpointResourceSummaryRowKeyRerank                GatewayEndpointResourceSummaryRowKey = "rerank"
+	GatewayEndpointResourceSummaryRowKeyResponses             GatewayEndpointResourceSummaryRowKey = "responses"
+	GatewayEndpointResourceSummaryRowKeyResponsesCompact      GatewayEndpointResourceSummaryRowKey = "responses_compact"
+	GatewayEndpointResourceSummaryRowKeyResponsesInputItems   GatewayEndpointResourceSummaryRowKey = "responses_input_items"
+	GatewayEndpointResourceSummaryRowKeyResponsesWebsocket    GatewayEndpointResourceSummaryRowKey = "responses_websocket"
+	GatewayEndpointResourceSummaryRowKeyVideos                GatewayEndpointResourceSummaryRowKey = "videos"
+)
+
+// Valid indicates whether the value is a known member of the GatewayEndpointResourceSummaryRowKey enum.
+func (e GatewayEndpointResourceSummaryRowKey) Valid() bool {
+	switch e {
+	case GatewayEndpointResourceSummaryRowKeyAnthropicCountTokens:
+		return true
+	case GatewayEndpointResourceSummaryRowKeyAudioSpeech:
+		return true
+	case GatewayEndpointResourceSummaryRowKeyAudioTranscriptions:
+		return true
+	case GatewayEndpointResourceSummaryRowKeyChatCompletions:
+		return true
+	case GatewayEndpointResourceSummaryRowKeyEmbeddings:
+		return true
+	case GatewayEndpointResourceSummaryRowKeyGeminiCountTokens:
+		return true
+	case GatewayEndpointResourceSummaryRowKeyGeminiGenerateContent:
+		return true
+	case GatewayEndpointResourceSummaryRowKeyImageEdits:
+		return true
+	case GatewayEndpointResourceSummaryRowKeyImageGenerations:
+		return true
+	case GatewayEndpointResourceSummaryRowKeyImageVariations:
+		return true
+	case GatewayEndpointResourceSummaryRowKeyMessages:
+		return true
+	case GatewayEndpointResourceSummaryRowKeyModerations:
+		return true
+	case GatewayEndpointResourceSummaryRowKeyRealtimeWebsocket:
+		return true
+	case GatewayEndpointResourceSummaryRowKeyRerank:
+		return true
+	case GatewayEndpointResourceSummaryRowKeyResponses:
+		return true
+	case GatewayEndpointResourceSummaryRowKeyResponsesCompact:
+		return true
+	case GatewayEndpointResourceSummaryRowKeyResponsesInputItems:
+		return true
+	case GatewayEndpointResourceSummaryRowKeyResponsesWebsocket:
+		return true
+	case GatewayEndpointResourceSummaryRowKeyVideos:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GatewayErrorObjectType.
 const (
 	AuthenticationError     GatewayErrorObjectType = "authentication_error"
@@ -3025,16 +3094,16 @@ func (e RealtimeActiveSlotSourceEndpoint) Valid() bool {
 
 // Defines values for RealtimeSlotKind.
 const (
-	RealtimeSlotKindRealtimeWebsocket  RealtimeSlotKind = "realtime_websocket"
-	RealtimeSlotKindResponsesWebsocket RealtimeSlotKind = "responses_websocket"
+	RealtimeWebsocket  RealtimeSlotKind = "realtime_websocket"
+	ResponsesWebsocket RealtimeSlotKind = "responses_websocket"
 )
 
 // Valid indicates whether the value is a known member of the RealtimeSlotKind enum.
 func (e RealtimeSlotKind) Valid() bool {
 	switch e {
-	case RealtimeSlotKindRealtimeWebsocket:
+	case RealtimeWebsocket:
 		return true
-	case RealtimeSlotKindResponsesWebsocket:
+	case ResponsesWebsocket:
 		return true
 	default:
 		return false
@@ -8113,6 +8182,41 @@ type GatewayEndpointResourceRow struct {
 // GatewayEndpointResourceRowKey defines model for GatewayEndpointResourceRow.Key.
 type GatewayEndpointResourceRowKey string
 
+// GatewayEndpointResourceSummaryRow defines model for GatewayEndpointResourceSummaryRow.
+type GatewayEndpointResourceSummaryRow struct {
+	// CandidateAccountRoutes Sum of candidate account-route observations before endpoint capability and model availability filters.
+	CandidateAccountRoutes int                                  `json:"candidate_account_routes"`
+	Key                    GatewayEndpointResourceSummaryRowKey `json:"key"`
+
+	// Models Active model rows evaluated for this endpoint.
+	Models int `json:"models"`
+
+	// ReadyModels Active model rows with at least one routable account for this endpoint.
+	ReadyModels int `json:"ready_models"`
+
+	// ReadyRoutes Active model-provider route rows with at least one routable account for this endpoint.
+	ReadyRoutes int `json:"ready_routes"`
+
+	// RoutableAccountRoutes Sum of routable account-route observations across active model-provider route rows.
+	RoutableAccountRoutes int `json:"routable_account_routes"`
+
+	// Routes Active model-provider route rows evaluated for this endpoint.
+	Routes int `json:"routes"`
+
+	// SourceEndpoint Gateway route or route template represented by this endpoint readiness row.
+	SourceEndpoint string                        `json:"source_endpoint"`
+	Status         GatewayProviderResourceStatus `json:"status"`
+
+	// UnavailableModelAccountRoutes Sum of account-route observations whose effective model mapping is blocked by excluded_models or supported_models metadata.
+	UnavailableModelAccountRoutes int `json:"unavailable_model_account_routes"`
+
+	// UnsupportedAccountRoutes Sum of account-route observations whose effective capabilities do not include this endpoint.
+	UnsupportedAccountRoutes int `json:"unsupported_account_routes"`
+}
+
+// GatewayEndpointResourceSummaryRowKey defines model for GatewayEndpointResourceSummaryRow.Key.
+type GatewayEndpointResourceSummaryRowKey string
+
 // GatewayErrorObject defines model for GatewayErrorObject.
 type GatewayErrorObject struct {
 	Code    *string                `json:"code,omitempty"`
@@ -8203,23 +8307,24 @@ type GatewayResourceFixSeverity string
 
 // GatewayResourceSummary defines model for GatewayResourceSummary.
 type GatewayResourceSummary struct {
-	ActiveAccounts         int                          `json:"active_accounts"`
-	ActiveApiKeys          int                          `json:"active_api_keys"`
-	ActiveModelMappings    int                          `json:"active_model_mappings"`
-	ActiveModels           int                          `json:"active_models"`
-	ActiveProviders        int                          `json:"active_providers"`
-	ActiveProxies          int                          `json:"active_proxies"`
-	AvailableProxies       int                          `json:"available_proxies"`
-	ExpiredProxies         int                          `json:"expired_proxies"`
-	Fixes                  []GatewayResourceFix         `json:"fixes"`
-	ModelRows              []GatewayModelResourceRow    `json:"model_rows"`
-	Providers              int                          `json:"providers"`
-	ProxiedAccounts        int                          `json:"proxied_accounts"`
-	ProxyAttentionAccounts int                          `json:"proxy_attention_accounts"`
-	RoutableAccounts       int                          `json:"routable_accounts"`
-	RouteRows              []GatewayRouteResourceRow    `json:"route_rows"`
-	Rows                   []GatewayProviderResourceRow `json:"rows"`
-	ScopedApiKeys          int                          `json:"scoped_api_keys"`
+	ActiveAccounts         int                                 `json:"active_accounts"`
+	ActiveApiKeys          int                                 `json:"active_api_keys"`
+	ActiveModelMappings    int                                 `json:"active_model_mappings"`
+	ActiveModels           int                                 `json:"active_models"`
+	ActiveProviders        int                                 `json:"active_providers"`
+	ActiveProxies          int                                 `json:"active_proxies"`
+	AvailableProxies       int                                 `json:"available_proxies"`
+	EndpointRows           []GatewayEndpointResourceSummaryRow `json:"endpoint_rows"`
+	ExpiredProxies         int                                 `json:"expired_proxies"`
+	Fixes                  []GatewayResourceFix                `json:"fixes"`
+	ModelRows              []GatewayModelResourceRow           `json:"model_rows"`
+	Providers              int                                 `json:"providers"`
+	ProxiedAccounts        int                                 `json:"proxied_accounts"`
+	ProxyAttentionAccounts int                                 `json:"proxy_attention_accounts"`
+	RoutableAccounts       int                                 `json:"routable_accounts"`
+	RouteRows              []GatewayRouteResourceRow           `json:"route_rows"`
+	Rows                   []GatewayProviderResourceRow        `json:"rows"`
+	ScopedApiKeys          int                                 `json:"scoped_api_keys"`
 }
 
 // GatewayResourceSummaryResponse defines model for GatewayResourceSummaryResponse.
