@@ -97,6 +97,8 @@ func TestBuildGatewayResourceSummaryAggregatesReadiness(t *testing.T) {
 		readyRow.TotalAccounts != 2 ||
 		readyRow.RoutableAccounts != 1 ||
 		readyRow.AttentionAccounts != 0 ||
+		readyRow.AccountBlockers.Inactive != 1 ||
+		readyRow.AccountBlockers.Proxy != 0 ||
 		readyRow.ProxiedAccounts != 1 ||
 		readyRow.ProxyAttentionAccounts != 1 ||
 		readyRow.ActiveModelMappings != 1 ||
@@ -489,8 +491,73 @@ func TestBuildGatewayResourceSummaryBlocksUnroutableAccounts(t *testing.T) {
 	if row.Status != apiopenapi.GatewayProviderResourceStatusBlocked ||
 		row.RoutableAccounts != 0 ||
 		row.AttentionAccounts != 2 ||
+		row.AccountBlockers.Health != 1 ||
+		row.AccountBlockers.Quota != 1 ||
 		!slices.Equal(row.Reasons, []apiopenapi.GatewayProviderResourceReason{apiopenapi.NoRoutableAccounts}) {
 		t.Fatalf("unexpected blocked row: %+v", row)
+	}
+}
+
+func TestBuildGatewayResourceSummaryReportsProviderAccountBlockers(t *testing.T) {
+	now := time.Date(2026, 6, 20, 12, 0, 0, 0, time.UTC)
+	expiredAt := now.Add(-time.Minute)
+
+	summary := buildGatewayResourceSummary(gatewayResourceSummaryInput{
+		Providers: []providercontract.Provider{
+			testGatewayResourceProvider(1, "blocker-provider", providercontract.StatusActive),
+		},
+		Accounts: []accountcontract.ProviderAccount{
+			testGatewayResourceAccount(10, 1, accountcontract.StatusDisabled, nil),
+			testGatewayResourceAccount(11, 1, accountcontract.StatusActive, nil),
+			testGatewayResourceAccount(12, 1, accountcontract.StatusActive, nil),
+			testGatewayResourceAccount(13, 1, accountcontract.StatusActive, ptrString("1")),
+			testGatewayResourceAccount(14, 1, accountcontract.StatusActive, nil),
+		},
+		Proxies: []accountcontract.ProxyDefinition{
+			{
+				ID:            1,
+				Name:          "expired",
+				URLCiphertext: "encrypted",
+				Status:        accountcontract.ProxyStatusActive,
+				ExpiresAt:     &expiredAt,
+				FallbackMode:  accountcontract.ProxyFallbackModeNone,
+			},
+		},
+		Models: []modelcontract.Model{
+			testGatewayResourceModel(1000, modelcontract.StatusActive),
+		},
+		ModelMappings: []modelcontract.ModelProviderMapping{
+			{ID: 500, ModelID: 1000, ProviderID: 1, Status: modelcontract.StatusActive},
+		},
+		APIKeys: []apikeycontract.APIKey{
+			{ID: 1, Status: apikeycontract.StatusActive},
+		},
+		HealthByAccount: map[int]accountcontract.AccountHealthSnapshot{
+			11: {AccountID: 11, ProviderID: 1, Status: string(accountcontract.StatusSuspended), CircuitState: "closed"},
+		},
+		QuotasByAccount: map[int][]accountcontract.AccountQuotaSnapshot{
+			12: {
+				{
+					AccountID:      12,
+					ProviderID:     1,
+					QuotaType:      accountcontract.QuotaTypeProviderCredits,
+					RemainingRatio: 0,
+					SnapshotAt:     now,
+				},
+			},
+		},
+		Now: now,
+	})
+
+	row := findGatewayResourceRow(t, summary, "blocker-provider")
+	if row.Status != apiopenapi.GatewayProviderResourceStatusLimited ||
+		row.RoutableAccounts != 1 ||
+		row.AttentionAccounts != 3 ||
+		row.AccountBlockers.Inactive != 1 ||
+		row.AccountBlockers.Health != 1 ||
+		row.AccountBlockers.Quota != 1 ||
+		row.AccountBlockers.Proxy != 1 {
+		t.Fatalf("unexpected provider account blockers: %+v", row)
 	}
 }
 

@@ -1249,6 +1249,18 @@ export const en = {
       proxy_attention: "proxy binding needs attention",
       no_api_keys: "no API keys",
     },
+    accountBlockersShort: {
+      inactive: "off",
+      health: "health",
+      quota: "quota",
+      proxy: "proxy",
+    },
+    accountBlockers: {
+      inactive: "inactive accounts",
+      health: "health or circuit blocked",
+      quota: "quota exhausted",
+      proxy: "proxy unavailable",
+    },
     endpointShort: {
       chat_completions: "Chat",
       responses: "Resp",

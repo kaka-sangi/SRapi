@@ -8017,6 +8017,21 @@ type ErrorResponse struct {
 	RequestId RequestId   `json:"request_id"`
 }
 
+// GatewayAccountBlockers defines model for GatewayAccountBlockers.
+type GatewayAccountBlockers struct {
+	// Health Active accounts blocked by health status or an open circuit.
+	Health int `json:"health"`
+
+	// Inactive Accounts under this provider that are not active and therefore cannot be scheduled.
+	Inactive int `json:"inactive"`
+
+	// Proxy Active accounts blocked by a missing, disabled, expired, or otherwise unavailable proxy binding.
+	Proxy int `json:"proxy"`
+
+	// Quota Active accounts blocked by exhausted runtime quota.
+	Quota int `json:"quota"`
+}
+
 // GatewayEndpointResourceRow defines model for GatewayEndpointResourceRow.
 type GatewayEndpointResourceRow struct {
 	// CandidateAccounts Active, provider-routable accounts considered for this model route before endpoint capability and model availability filters.
@@ -8090,6 +8105,7 @@ type GatewayProviderResourceReason string
 
 // GatewayProviderResourceRow defines model for GatewayProviderResourceRow.
 type GatewayProviderResourceRow struct {
+	AccountBlockers        GatewayAccountBlockers          `json:"account_blockers"`
 	ActiveModelMappings    int                             `json:"active_model_mappings"`
 	ApiKeyCount            int                             `json:"api_key_count"`
 	AttentionAccounts      int                             `json:"attention_accounts"`

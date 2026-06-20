@@ -157,11 +157,11 @@ func buildGatewayResourceSummary(input gatewayResourceSummaryInput) apiopenapi.G
 	for _, provider := range input.Providers {
 		accounts := providerAccounts[provider.ID]
 		activeAccounts := filterActiveAccounts(accounts)
+		accountBlockers := gatewayAccountBlockersForProvider(accounts, healthByAccount, quotaExhaustedByAccount, proxyStates)
 		routableAccounts := make([]accountcontract.ProviderAccount, 0, len(activeAccounts))
 		for _, account := range activeAccounts {
 			health, hasHealth := healthByAccount[account.ID]
-			if accountIsGatewayResourceRoutable(account, health, hasHealth, quotaExhaustedByAccount[account.ID]) &&
-				accountProxyCanRouteResource(account, proxyStates) {
+			if accountGatewayRouteBlockers(account, health, hasHealth, quotaExhaustedByAccount[account.ID], proxyStates).routable() {
 				routableAccounts = append(routableAccounts, account)
 			}
 		}
@@ -194,6 +194,7 @@ func buildGatewayResourceSummary(input gatewayResourceSummaryInput) apiopenapi.G
 		}
 		rows = append(rows, apiopenapi.GatewayProviderResourceRow{
 			ActiveModelMappings:    len(providerMappings[provider.ID]),
+			AccountBlockers:        accountBlockers,
 			ApiKeyCount:            len(providerKeys),
 			AttentionAccounts:      len(activeAccounts) - len(routableAccounts),
 			Provider:               toAPIProvider(provider),
@@ -841,25 +842,69 @@ func apiKeyIsScoped(key apikeycontract.APIKey) bool {
 	return len(key.AllowedModels) > 0 || len(key.GroupIDs) > 0
 }
 
+type gatewayAccountRouteBlockers struct {
+	inactive bool
+	health   bool
+	quota    bool
+	proxy    bool
+}
+
+func (blockers gatewayAccountRouteBlockers) routable() bool {
+	return !blockers.inactive && !blockers.health && !blockers.quota && !blockers.proxy
+}
+
+func gatewayAccountBlockersForProvider(
+	accounts []accountcontract.ProviderAccount,
+	healthByAccount map[int]accountcontract.AccountHealthSnapshot,
+	quotaExhaustedByAccount map[int]bool,
+	proxyStates map[string]proxyResourceState,
+) apiopenapi.GatewayAccountBlockers {
+	out := apiopenapi.GatewayAccountBlockers{}
+	for _, account := range accounts {
+		health, hasHealth := healthByAccount[account.ID]
+		blockers := accountGatewayRouteBlockers(account, health, hasHealth, quotaExhaustedByAccount[account.ID], proxyStates)
+		if blockers.inactive {
+			out.Inactive++
+		}
+		if blockers.health {
+			out.Health++
+		}
+		if blockers.quota {
+			out.Quota++
+		}
+		if blockers.proxy {
+			out.Proxy++
+		}
+	}
+	return out
+}
+
 func accountIsGatewayResourceRoutable(account accountcontract.ProviderAccount, health accountcontract.AccountHealthSnapshot, hasHealth bool, quotaExhausted bool) bool {
+	return accountGatewayRouteBlockers(account, health, hasHealth, quotaExhausted, nil).routable()
+}
+
+func accountGatewayRouteBlockers(account accountcontract.ProviderAccount, health accountcontract.AccountHealthSnapshot, hasHealth bool, quotaExhausted bool, proxyStates map[string]proxyResourceState) gatewayAccountRouteBlockers {
+	blockers := gatewayAccountRouteBlockers{}
 	if account.Status != accountcontract.StatusActive {
-		return false
+		blockers.inactive = true
+		return blockers
 	}
 	if quotaExhausted || accountQuotaExhausted(account, accountQuotaRemainingRatio(account)) {
-		return false
+		blockers.quota = true
 	}
-	if !hasHealth {
-		return true
+	if hasHealth {
+		if health.CircuitState == "open" {
+			blockers.health = true
+		}
+		switch health.Status {
+		case string(accountcontract.StatusDead), string(accountcontract.StatusSuspended):
+			blockers.health = true
+		}
 	}
-	if health.CircuitState == "open" {
-		return false
+	if proxyStates != nil && !accountProxyCanRouteResource(account, proxyStates) {
+		blockers.proxy = true
 	}
-	switch health.Status {
-	case string(accountcontract.StatusDead), string(accountcontract.StatusSuspended):
-		return false
-	default:
-		return true
-	}
+	return blockers
 }
 
 func quotaExhaustedAccounts(quotasByAccount map[int][]accountcontract.AccountQuotaSnapshot, now time.Time) map[int]bool {

@@ -1702,11 +1702,31 @@ export type GatewayProviderResourceStatus = 'ready' | 'limited' | 'blocked';
 
 export type GatewayProviderResourceReason = 'provider_disabled' | 'no_active_models' | 'no_model_mappings' | 'no_active_accounts' | 'no_routable_accounts' | 'proxy_attention' | 'no_api_keys';
 
+export type GatewayAccountBlockers = {
+    /**
+     * Accounts under this provider that are not active and therefore cannot be scheduled.
+     */
+    inactive: number;
+    /**
+     * Active accounts blocked by health status or an open circuit.
+     */
+    health: number;
+    /**
+     * Active accounts blocked by exhausted runtime quota.
+     */
+    quota: number;
+    /**
+     * Active accounts blocked by a missing, disabled, expired, or otherwise unavailable proxy binding.
+     */
+    proxy: number;
+};
+
 export type GatewayProviderResourceRow = {
     provider: Provider;
     total_accounts: number;
     routable_accounts: number;
     attention_accounts: number;
+    account_blockers: GatewayAccountBlockers;
     proxied_accounts: number;
     proxy_attention_accounts: number;
     active_model_mappings: number;

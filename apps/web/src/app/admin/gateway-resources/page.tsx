@@ -22,6 +22,7 @@ import { ADMIN_ROUTES } from "@/lib/routes";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAdminGatewayResources } from "@/hooks/admin-queries";
 import type {
+  GatewayAccountBlockers,
   GatewayEndpointResourceRow,
   GatewayModelResourceRow,
   GatewayPricingCoverage,
@@ -546,8 +547,13 @@ function ProviderResourceRow({ row }: { row: GatewayProviderResourceRow }) {
         </span>
       </TableCell>
       <TableCell className="text-2xs tabular text-right font-mono">
-        <span className="text-srapi-success">{row.routable_accounts}</span>
-        <span className="text-srapi-text-tertiary"> / {row.total_accounts}</span>
+        <div className="flex min-w-[120px] flex-col items-end gap-1">
+          <div>
+            <span className="text-srapi-success">{row.routable_accounts}</span>
+            <span className="text-srapi-text-tertiary"> / {row.total_accounts}</span>
+          </div>
+          <AccountBlockersStrip blockers={row.account_blockers} />
+        </div>
       </TableCell>
       <TableCell className="text-2xs tabular text-right font-mono">
         <span
@@ -590,6 +596,37 @@ function ProviderResourceRow({ row }: { row: GatewayProviderResourceRow }) {
         )}
       </TableCell>
     </TableRow>
+  );
+}
+
+function AccountBlockersStrip({ blockers }: { blockers: GatewayAccountBlockers }) {
+  const { t } = useLanguage();
+  const items = [
+    { key: "inactive", value: blockers.inactive },
+    { key: "health", value: blockers.health },
+    { key: "quota", value: blockers.quota },
+    { key: "proxy", value: blockers.proxy },
+  ].filter((item) => item.value > 0);
+  if (items.length === 0) {
+    return null;
+  }
+  return (
+    <div
+      className="flex flex-wrap justify-end gap-1"
+      title={items
+        .map((item) => `${t(`adminGatewayResources.accountBlockers.${item.key}`)}: ${item.value}`)
+        .join("\n")}
+    >
+      {items.map((item) => (
+        <span
+          key={item.key}
+          className="border-srapi-error/20 bg-srapi-error/10 text-srapi-error rounded px-1 py-0.5 text-[10px] leading-none"
+        >
+          {t(`adminGatewayResources.accountBlockersShort.${item.key}`)}
+          <span className="ml-0.5 tabular">{item.value}</span>
+        </span>
+      ))}
+    </div>
   );
 }
 

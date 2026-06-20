@@ -43,6 +43,9 @@ describe("AdminGatewayResourcesPage", () => {
     expect(screen.getAllByText("模型映射").length).toBeGreaterThan(0);
     expect(screen.getAllByText("1/1").length).toBeGreaterThan(0);
     expect(screen.getAllByText("OpenAI").length).toBeGreaterThan(0);
+    expect(screen.getByText("健康")).toBeInTheDocument();
+    expect(screen.getByText("配额")).toBeInTheDocument();
+    expect(screen.getAllByText("代理").length).toBeGreaterThan(1);
     expect(screen.getByText("模型可服务性")).toBeInTheDocument();
     expect(screen.getAllByText("gpt-4.1").length).toBeGreaterThan(0);
     expect(screen.getAllByText("端点").length).toBeGreaterThan(0);
@@ -93,6 +96,12 @@ function summary(): GatewayResourceSummary {
         total_accounts: 1,
         routable_accounts: 1,
         attention_accounts: 0,
+        account_blockers: {
+          inactive: 0,
+          health: 1,
+          quota: 1,
+          proxy: 1,
+        },
         proxied_accounts: 1,
         proxy_attention_accounts: 0,
         active_model_mappings: 1,

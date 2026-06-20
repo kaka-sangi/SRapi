@@ -21759,6 +21759,31 @@ components:
         - proxy_attention
         - no_api_keys
 
+    GatewayAccountBlockers:
+      type: object
+      required:
+        - inactive
+        - health
+        - quota
+        - proxy
+      properties:
+        inactive:
+          type: integer
+          minimum: 0
+          description: Accounts under this provider that are not active and therefore cannot be scheduled.
+        health:
+          type: integer
+          minimum: 0
+          description: Active accounts blocked by health status or an open circuit.
+        quota:
+          type: integer
+          minimum: 0
+          description: Active accounts blocked by exhausted runtime quota.
+        proxy:
+          type: integer
+          minimum: 0
+          description: Active accounts blocked by a missing, disabled, expired, or otherwise unavailable proxy binding.
+
     GatewayProviderResourceRow:
       type: object
       required:
@@ -21766,6 +21791,7 @@ components:
         - total_accounts
         - routable_accounts
         - attention_accounts
+        - account_blockers
         - proxied_accounts
         - proxy_attention_accounts
         - active_model_mappings
@@ -21785,6 +21811,8 @@ components:
         attention_accounts:
           type: integer
           minimum: 0
+        account_blockers:
+          $ref: "#/components/schemas/GatewayAccountBlockers"
         proxied_accounts:
           type: integer
           minimum: 0

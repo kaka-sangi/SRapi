@@ -160,6 +160,7 @@ export type {
   GatewayUsageResponse,
   GatewayUsageModel,
   GatewayUsageRequest,
+  GatewayAccountBlockers,
   GatewayEndpointResourceRow,
   GatewayModelResourceRow,
   GatewayPricingCoverage,

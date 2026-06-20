@@ -1216,6 +1216,18 @@ export const zh: Messages = {
       proxy_attention: "代理绑定需处理",
       no_api_keys: "无 API Key",
     },
+    accountBlockersShort: {
+      inactive: "停",
+      health: "健康",
+      quota: "配额",
+      proxy: "代理",
+    },
+    accountBlockers: {
+      inactive: "停用账号",
+      health: "健康或熔断阻塞",
+      quota: "配额耗尽",
+      proxy: "代理不可用",
+    },
     endpointShort: {
       chat_completions: "Chat",
       responses: "Resp",
