@@ -16,6 +16,7 @@ import type { ProviderAccount, AccountHealthSnapshot, AccountUsageToday } from "
 import { cn } from "@/lib/cn";
 import { AccountHealthCell, AccountQuotaCell } from "./account-health-cells";
 import {
+  accountCapacityFacts,
   accountIdentitySummary,
   accountMetadataFacts,
   accountModelPolicyLabel,
@@ -223,9 +224,21 @@ function AccountCard({
   const { t } = useLanguage();
   const identity = accountIdentitySummary(t, account);
   const modelPolicy = accountModelPolicyLabel(t, account.metadata);
+  const capacityFacts = accountCapacityFacts(t, account);
   const metadataFacts = accountMetadataFacts(t, account);
   const operationalFacts = metadataFacts
-    .filter((fact) => !["email", "plan", "upstream-id", "client"].includes(fact.key))
+    .filter(
+      (fact) =>
+        ![
+          "email",
+          "plan",
+          "upstream-id",
+          "client",
+          "max-concurrency",
+          "max-sessions",
+          "rpm",
+        ].includes(fact.key),
+    )
     .slice(0, 3);
   const proxyLabel = account.proxy_id ? t("adminAccounts.proxyConfigured") : t("adminAccounts.noProxy");
   const groups = account.group_ids ?? [];
@@ -311,13 +324,13 @@ function AccountCard({
                 +{extraGroupCount}
               </span>
             ) : null}
-            {operationalFacts.map((fact) => (
+            {[...capacityFacts, ...operationalFacts].slice(0, 4).map((fact) => (
               <span
                 key={fact.key}
                 className="max-w-[10rem] truncate rounded-md bg-srapi-bg-muted px-1.5 py-0.5 font-mono text-[10px] text-srapi-text-tertiary"
                 title={`${fact.label}: ${fact.value}`}
               >
-                {fact.value}
+                {fact.label}: {fact.value}
               </span>
             ))}
           </div>

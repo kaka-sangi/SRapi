@@ -14,6 +14,7 @@ import {
   useAccountUsageWindows,
   useAccountUsageToday,
   useAccountUsageDaily,
+  ACCOUNT_USAGE_DAILY_MAX_DAYS,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
@@ -22,13 +23,20 @@ import {
   adminAccountHealthInvestigationLinks,
   type AccountHealthInvestigationLinks,
 } from "@/lib/admin-account-health-investigation";
-import { formatCompactNumber, formatDate, formatMoney, formatPercent } from "@/lib/admin-format";
+import {
+  formatCompactNumber,
+  formatDate,
+  formatDateTime,
+  formatMoney,
+  formatPercent,
+} from "@/lib/admin-format";
 import { runtimeClassLabel } from "@/lib/admin-account-form";
 import { cn } from "@/lib/cn";
 import { StatCard } from "@/components/ui/stat-card";
 import { Sparkline } from "@/components/charts/sparkline";
 import {
   accountIdentitySummary,
+  accountCapacityFacts,
   accountMetadataFacts,
   accountModelPolicyLabel,
 } from "@/app/admin/accounts/account-types";
@@ -394,9 +402,10 @@ export function AccountDetailSheet({
   const proxy = useAccountProxyQuality(id);
   const usageWindows = useAccountUsageWindows(id);
   const usageToday = useAccountUsageToday(id);
-  const usageDaily = useAccountUsageDaily(id);
+  const usageDaily = useAccountUsageDaily(id, ACCOUNT_USAGE_DAILY_MAX_DAYS);
   const fetchQuota = useFetchAccountQuota();
   const identity = account ? accountIdentitySummary(t, account) : null;
+  const firstUsageDate = usageDaily.data?.find(hasDailyTraffic)?.date ?? "";
 
   async function refreshQuota() {
     if (!id) return;
@@ -478,8 +487,40 @@ export function AccountDetailSheet({
               label={t("adminAccounts.routing")}
               value={`P${account.priority ?? 0} / W${account.weight ?? 1}`}
             />
+            <DetailMetric
+              label={t("adminAccounts.createdAt")}
+              value={formatDateTime(account.created_at)}
+            />
+            <DetailMetric
+              label={t("adminAccounts.firstUsedAt")}
+              value={firstUsageDate ? formatDate(firstUsageDate) : t("adminAccounts.neverUsed")}
+            />
+            {account.last_refreshed_at ? (
+              <DetailMetric
+                label={t("adminAccounts.lastRefreshedAt")}
+                value={formatDateTime(account.last_refreshed_at)}
+              />
+            ) : null}
+            {account.token_expires_at ? (
+              <DetailMetric
+                label={t("adminAccounts.tokenExpiresAt")}
+                value={formatDateTime(account.token_expires_at)}
+              />
+            ) : null}
+            {accountCapacityFacts(t, account).map((fact) => (
+              <DetailMetric key={fact.key} label={fact.label} value={fact.value} />
+            ))}
             {accountMetadataFacts(t, account)
-              .filter((fact) => !["email", "upstream-id"].includes(fact.key))
+              .filter(
+                (fact) =>
+                  ![
+                    "email",
+                    "upstream-id",
+                    "max-concurrency",
+                    "max-sessions",
+                    "rpm",
+                  ].includes(fact.key),
+              )
               .slice(0, 4)
               .map((fact) => (
                 <DetailMetric key={fact.key} label={fact.label} value={fact.value} />

@@ -162,6 +162,50 @@ export function accountMetadataFacts(
   return facts;
 }
 
+export function accountCapacityFacts(
+  t: Translate,
+  account: ProviderAccount,
+): AccountMetadataFact[] {
+  const metadata = account.metadata;
+  const facts: AccountMetadataFact[] = [];
+
+  const maxConcurrency = metadataNumber(metadata, "max_concurrency");
+  if (maxConcurrency !== null) {
+    const currentConcurrency = metadataNumber(metadata, "current_concurrency");
+    facts.push({
+      key: "max-concurrency",
+      label: t("adminAccounts.factMaxConcurrency"),
+      value:
+        currentConcurrency !== null
+          ? `${currentConcurrency}/${maxConcurrency}`
+          : String(maxConcurrency),
+    });
+  }
+
+  const maxSessions = metadataNumber(metadata, "max_sessions");
+  if (maxSessions !== null) {
+    const activeSessions =
+      metadataNumber(metadata, "active_sessions") ?? metadataNumber(metadata, "current_sessions");
+    facts.push({
+      key: "max-sessions",
+      label: t("adminAccounts.factMaxSessions"),
+      value: activeSessions !== null ? `${activeSessions}/${maxSessions}` : String(maxSessions),
+    });
+  }
+
+  const rpm = metadataNumber(metadata, "rpm_override") ?? metadataNumber(metadata, "rpm_limit");
+  if (rpm !== null) {
+    const used = metadataNumber(metadata, "rpm_used");
+    facts.push({
+      key: "rpm",
+      label: t("adminAccounts.factRpm"),
+      value: used !== null ? `${used}/${rpm}` : String(rpm),
+    });
+  }
+
+  return facts;
+}
+
 export interface AccountIdentitySummary {
   primary: string;
   secondary: string[];

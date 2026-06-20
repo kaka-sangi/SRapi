@@ -568,7 +568,11 @@ func (s *Service) fetchChatGPTWebRequirements(ctx context.Context, req contract.
 	powSources, dataBuild := chatGPTWebPoWResources(bootstrapResp.Body)
 	legacyToken := requestSetting(req, "chatgpt_requirements_p", "chatgpt_legacy_requirements_token", "sentinel_requirements_p")
 	if legacyToken == "" {
-		legacyToken = chatGPTWebLegacyRequirementsToken(req, powSources, dataBuild)
+		var solved bool
+		legacyToken, solved = chatGPTWebLegacyRequirementsToken(req, powSources, dataBuild)
+		if !solved {
+			return chatGPTWebSentinelRequirements{}, contract.ProviderError{Class: "challenge_required", StatusCode: http.StatusForbidden, Message: "chatgpt web legacy requirements proof token challenge not solved within budget"}
+		}
 	}
 	raw, err := json.Marshal(map[string]string{"p": legacyToken})
 	if err != nil {
@@ -712,11 +716,14 @@ func chatGPTWebPoWResources(body []byte) ([]string, string) {
 	return sources, dataBuild
 }
 
-func chatGPTWebLegacyRequirementsToken(req contract.ConversationRequest, scriptSources []string, dataBuild string) string {
+func chatGPTWebLegacyRequirementsToken(req contract.ConversationRequest, scriptSources []string, dataBuild string) (string, bool) {
 	seed := fmt.Sprintf("0.%d", time.Now().UnixNano())
 	config := chatGPTWebPoWConfig(req, scriptSources, dataBuild)
-	answer, _ := chatGPTWebPoWGenerate(seed, "0fffff", config, chatGPTWebPoWLimit)
-	return "gAAAAAC" + answer
+	answer, solved := chatGPTWebPoWGenerate(seed, "0fffff", config, chatGPTWebPoWLimit)
+	if !solved {
+		return "", false
+	}
+	return "gAAAAAC" + answer, true
 }
 
 func chatGPTWebProofToken(req contract.ConversationRequest, seed string, difficulty string, scriptSources []string, dataBuild string) (string, error) {
@@ -736,22 +743,22 @@ func chatGPTWebProofToken(req contract.ConversationRequest, seed string, difficu
 func chatGPTWebPoWGenerate(seed string, difficulty string, config []any, limit int) (string, bool) {
 	difficulty = strings.ToLower(strings.TrimSpace(difficulty))
 	if difficulty == "" || len(difficulty) > 8 || !chatGPTWebPoWHexDifficulty(difficulty) {
-		return chatGPTWebPoWFallback(seed), false
+		return "", false
 	}
 	if limit <= 0 {
-		return chatGPTWebPoWFallback(seed), false
+		return "", false
 	}
 	start := time.Now()
 	for nonce := 0; nonce < limit; nonce++ {
 		answer, err := chatGPTWebPoWRunCheck(start, seed, difficulty, config, nonce)
 		if err != nil {
-			return chatGPTWebPoWFallback(seed), false
+			return "", false
 		}
 		if answer != "" {
 			return answer, true
 		}
 	}
-	return chatGPTWebPoWFallback(seed), false
+	return "", false
 }
 
 func chatGPTWebPoWRunCheck(start time.Time, seed string, difficulty string, config []any, nonce int) (string, error) {
@@ -808,14 +815,6 @@ func chatGPTWebPoWFNV1a32(value string) uint32 {
 
 func chatGPTWebPoWFNV1aHex(value string) string {
 	return fmt.Sprintf("%08x", chatGPTWebPoWFNV1a32(value))
-}
-
-func chatGPTWebPoWFallback(seed string) string {
-	raw, err := json.Marshal(seed)
-	if err != nil {
-		raw = []byte(strconv.Quote(seed))
-	}
-	return "wQ8Lk5FbGpA2NcR9dShT6gYjU7VxZ4D" + base64.StdEncoding.EncodeToString(raw)
 }
 
 func chatGPTWebPoWConfig(req contract.ConversationRequest, scriptSources []string, dataBuild string) []any {

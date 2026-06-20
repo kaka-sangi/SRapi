@@ -15,6 +15,7 @@ import { queryKeys } from "@/lib/query-keys";
 
 /** Default lookback for the daily series — matches the sub2api 30-day mini-table. */
 export const ACCOUNT_USAGE_DAILY_DAYS = 30;
+export const ACCOUNT_USAGE_DAILY_MAX_DAYS = 365;
 
 export function useAccountUsageWindows(id: string | null) {
   return useQuery({

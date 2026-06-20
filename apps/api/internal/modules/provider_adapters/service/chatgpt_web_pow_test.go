@@ -118,6 +118,26 @@ func TestChatGPTWebPoWRunCheckMatchesSentinelAlgorithm(t *testing.T) {
 	}
 }
 
+func TestChatGPTWebPoWGenerateReportsUnsolvedWithoutFallback(t *testing.T) {
+	config := chatGPTWebPoWConfig(contractConversationRequestForPoWTest(), nil, "")
+
+	answer, ok := chatGPTWebPoWGenerate("seed", "0", config, 0)
+	if ok {
+		t.Fatal("expected zero-attempt proof to be unsolved")
+	}
+	if answer != "" {
+		t.Fatalf("unsolved proof returned fallback answer %q", answer)
+	}
+
+	answer, ok = chatGPTWebPoWGenerate("seed", "not-hex", config, 1)
+	if ok {
+		t.Fatal("expected invalid difficulty to be unsolved")
+	}
+	if answer != "" {
+		t.Fatalf("invalid difficulty returned fallback answer %q", answer)
+	}
+}
+
 func TestChatGPTWebPoWConfigUsesCompactPlaceholderFingerprint(t *testing.T) {
 	config := chatGPTWebPoWConfig(contractConversationRequestForPoWTest(), nil, "")
 	if len(config) != 23 {

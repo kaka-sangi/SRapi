@@ -118,11 +118,12 @@ vi.mock("@/hooks/admin-queries", () => ({
     isLoading: false,
     isError: false,
   }),
-  useAccountUsageDaily: () => ({
-    data: mocks.dailyUsage,
+  ACCOUNT_USAGE_DAILY_MAX_DAYS: 365,
+  useAccountUsageDaily: vi.fn((_id: string | null, days?: number) => ({
+    data: days === 365 ? mocks.dailyUsage : [],
     isLoading: false,
     isError: false,
-  }),
+  })),
 }));
 
 vi.mock("@/context/ToastContext", () => ({
@@ -176,7 +177,7 @@ describe("AccountDetailSheet", () => {
     expect(screen.getByText("允许 1 个")).toBeInTheDocument();
     expect(screen.getByText("Pooled accounts")).toBeInTheDocument();
     expect(screen.getAllByText("已绑定代理").length).toBeGreaterThan(0);
-    expect(screen.queryByText(/2026年6月10日|Jun 10, 2026/)).not.toBeInTheDocument();
+    expect(screen.getByText(/首次使用/)).toBeInTheDocument();
     const usageTable = screen.getByRole("table");
     expect(within(usageTable).queryByText(/2026年5月18日|May 18, 2026/)).not.toBeInTheDocument();
     expect(within(usageTable).queryByText(/2026年6月10日|Jun 10, 2026/)).not.toBeInTheDocument();

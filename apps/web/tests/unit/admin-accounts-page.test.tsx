@@ -224,7 +224,7 @@ describe("AdminAccountsPage", () => {
     expect(screen.getByText("允许 2 个")).toBeInTheDocument();
     expect(screen.getByText(/ada@example.com/)).toBeInTheDocument();
     expect(screen.getByText("pro")).toBeInTheDocument();
-    expect(screen.getByTitle("并发: 4")).toBeInTheDocument();
+    expect(screen.getByText("并发: 4")).toBeInTheDocument();
     expect(screen.getByText("已绑定代理")).toBeInTheDocument();
     expect(screen.getByText("Pooled accounts")).toBeInTheDocument();
     expect(screen.getByText(/12.*请求/i)).toBeInTheDocument();
@@ -234,13 +234,14 @@ describe("AdminAccountsPage", () => {
 
     expect(screen.getByRole("columnheader", { name: "模型" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "画像" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "容量" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "代理" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "路由" })).toBeInTheDocument();
     expect(screen.getAllByText("允许 2 个").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/ada@example.com/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/pro/).length).toBeGreaterThan(0);
-    expect(screen.getAllByTitle("并发: 4").length).toBeGreaterThan(0);
-    expect(screen.getByTitle("会话: 2")).toBeInTheDocument();
+    expect(screen.getAllByText("并发: 4").length).toBeGreaterThan(0);
+    expect(screen.getByText("会话: 2")).toBeInTheDocument();
     expect(screen.getByText("P2")).toBeInTheDocument();
     expect(screen.getByText("W3")).toBeInTheDocument();
     expect(screen.queryByText("https://internal-upstream.example/v1")).not.toBeInTheDocument();
