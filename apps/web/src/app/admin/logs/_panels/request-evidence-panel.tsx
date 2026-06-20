@@ -29,7 +29,7 @@ import {
 import {
   LOG_WINDOW_PRESETS,
   LOG_WINDOW_ALL_LABEL_KEY,
-  logWindowSince,
+  logWindowSinceAt,
 } from "@/lib/log-window-filter";
 import type { RequestEvidenceDetailResponse, RequestEvidenceRow } from "@/lib/sdk-types";
 
@@ -37,6 +37,7 @@ export function RequestEvidencePanel() {
   const { t } = useLanguage();
   const list = useAdminList({ pageSize: 50 });
   const [detailRequestID, setDetailRequestID] = useState<string | undefined>();
+  const [mountedAtMS] = useState(() => Date.now());
   const kind = list.filters.kind || undefined;
   const source = list.filters.source || undefined;
   const windowFilter = list.filters.window || "1h";
@@ -51,7 +52,7 @@ export function RequestEvidencePanel() {
   const maxLatencyMS = latencyFilterValue(list.filters.max_latency_ms);
   const exactStart = list.filters.start || undefined;
   const exactEnd = list.filters.end || undefined;
-  const start = exactStart || logWindowSince(windowFilter)?.toISOString();
+  const start = exactStart || logWindowSinceAt(windowFilter, mountedAtMS)?.toISOString();
   const query = useOpsRequestEvidence({
     page: list.page,
     page_size: list.pageSize,

@@ -337,20 +337,13 @@ func codexApplyResponsesPayloadDefaults(req contract.ConversationRequest, payloa
 	applyDisableImageGenerationToResponsesPayload(req, payload)
 	codexNormalizeResponsesTools(payload)
 	applyDisableImageGenerationToResponsesPayload(req, payload)
-	// Compact and non-compact require completely different normalization.
-	// sub2api openai_codex_transform.go:131-165 makes the rule explicit:
-	// the compact endpoint is delete-only — strip the fields Codex rejects,
-	// add NOTHING. The non-compact path is the additive one (store=false,
-	// stream=true, parallel_tool_calls=true, include=[reasoning.encrypted_content],
-	// default instructions, image_generation tool, etc.). Earlier srapi
-	// borrowed CLIProxyAPI's translator and tried to add include + parallel
-	// + instructions="" for compact too, which upstream Codex rejects with
-	// {"error":{"code":"unknown_parameter","param":"include", ...}} —
-	// diagnosed live against srapi.senran.net production traffic. This
-	// commit aligns srapi with sub2api: compact is delete-only.
+	// Compact and non-compact require different normalization. Compact strips
+	// the additive Responses fields Codex rejects (include, parallel tool calls,
+	// store, stream, client metadata, etc.) and must never inject the long model
+	// base prompt. Live Codex /compact does require the top-level instructions
+	// key, though, so absent/null/empty instructions normalize to the explicit
+	// empty string.
 	if codexResponsesCompactRequest(req) {
-		// sub2api applyCodexOAuthTransform openai_codex_transform.go:131-139:
-		// for compact, delete store + stream; do nothing else.
 		delete(payload, "store")
 		delete(payload, "stream")
 		// Codex /v1/responses/compact rejects srapi-specific client_metadata
@@ -362,6 +355,9 @@ func codexApplyResponsesPayloadDefaults(req contract.ConversationRequest, payloa
 		// codexApplyClientMetadataSettings runs unconditionally so we
 		// strip it back out here.
 		delete(payload, "client_metadata")
+		if strings.TrimSpace(codexStringValue(payload["instructions"])) == "" {
+			payload["instructions"] = ""
+		}
 	} else {
 		codexApplyImageGenerationInstructions(payload)
 		codexEnsureReasoningEncryptedInclude(payload)

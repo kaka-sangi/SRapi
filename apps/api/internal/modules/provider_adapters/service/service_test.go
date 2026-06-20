@@ -1272,9 +1272,11 @@ func TestOpenAICompatibleAdapterUsesResponsesCompactEndpoint(t *testing.T) {
 			t.Fatalf("decode compact upstream request: %v", err)
 		}
 		if payload["model"] != "gpt-upstream" ||
-			payload["previous_response_id"] != "resp_previous" ||
-			payload["stream"] != false {
+			payload["previous_response_id"] != "resp_previous" {
 			t.Fatalf("expected mapped raw compact payload, got %+v", payload)
+		}
+		if _, ok := payload["stream"]; ok {
+			t.Fatalf("expected compact payload to strip stream, got %+v", payload)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"id":"cmp_openai","object":"response.compaction","input_tokens":9,"output_tokens":2}`))
@@ -1292,7 +1294,7 @@ func TestOpenAICompatibleAdapterUsesResponsesCompactEndpoint(t *testing.T) {
 		TargetProtocol: "openai-compatible",
 		Model:          "gpt-local",
 		InputParts:     textParts("compact me"),
-		RawBody:        []byte(`{"model":"gpt-local","input":"compact me","previous_response_id":"resp_previous","stream":false}`),
+		RawBody:        []byte(`{"model":"gpt-local","input":"compact me","previous_response_id":"resp_previous","stream":true}`),
 		Provider:       providercontract.Provider{AdapterType: "openai-compatible", Protocol: "openai-compatible"},
 		Account:        accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
 		Mapping:        modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
@@ -1405,8 +1407,11 @@ func TestReverseProxyOpenAICompatibleAdapterUsesResponsesCompactEndpoint(t *test
 	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
 		t.Fatalf("decode reverse compact payload: %v", err)
 	}
-	if payload["model"] != "gpt-upstream" || payload["stream"] != false {
+	if payload["model"] != "gpt-upstream" {
 		t.Fatalf("expected mapped reverse compact payload, got %+v", payload)
+	}
+	if _, ok := payload["stream"]; ok {
+		t.Fatalf("expected reverse compact payload to strip stream, got %+v", payload)
 	}
 	if string(resp.Raw) != `{"id":"cmp_reverse","object":"response.compaction","input_tokens":7,"output_tokens":1}` {
 		t.Fatalf("expected raw reverse compact response, got %q", string(resp.Raw))
@@ -11149,12 +11154,9 @@ func TestReverseProxyCodexCLIAdapterBridgeEnabledDoesNotInjectImageToolForSpark(
 }
 
 func TestReverseProxyCodexCLIAdapterCompactInstructionsMatchesSub2API(t *testing.T) {
-	// sub2api applyCodexOAuthTransform (openai_codex_transform.go:131-165)
-	// does NOT inject default instructions for compact requests — it
-	// passes the caller-supplied instructions field through unchanged (or
-	// leaves it absent if the caller didn't send one). Codex's compact
-	// endpoint accepts the absent case; what it rejects is the model base
-	// prompt we used to inject via codexEnsureResponsesInstructions.
+	// Compact must not inject the non-compact model base prompt, but live
+	// Codex /compact rejects an absent instructions key. Missing caller
+	// instructions normalize to an explicit empty string.
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{
 			StatusCode: http.StatusOK,
@@ -11191,16 +11193,11 @@ func TestReverseProxyCodexCLIAdapterCompactInstructionsMatchesSub2API(t *testing
 	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
 		t.Fatalf("decode codex compact payload: %v", err)
 	}
-	// sub2api parity: compact must NOT carry the model base prompt that the
-	// non-compact path injects. The caller's input string ("compact me" here)
-	// did not supply an instructions field, so the field must be absent OR
-	// empty — never the long Codex base instructions. The non-compact path's
-	// codexEnsureResponsesInstructions (which injects codexBaseInstructionsForModel)
-	// must NOT have run.
-	if value, exists := payload["instructions"]; exists {
-		if str, ok := value.(string); !ok || str != "" {
-			t.Fatalf("compact must not carry injected model base prompt, got instructions=%v", value)
-		}
+	// Compact must NOT carry the model base prompt that the non-compact path
+	// injects. The non-compact path's codexEnsureResponsesInstructions must
+	// not have run.
+	if value, exists := payload["instructions"]; !exists || value != "" {
+		t.Fatalf("compact must carry explicit empty instructions, got instructions=%v payload=%+v", value, payload)
 	}
 }
 

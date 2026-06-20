@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RequestEvidencePanel } from "@/app/admin/logs/_panels/request-evidence-panel";
 import { LanguageProvider } from "@/context/LanguageContext";
 import type { RequestEvidenceRow } from "@/lib/sdk-types";
@@ -156,6 +156,8 @@ function wrap({ children }: PropsWithChildren) {
 
 describe("RequestEvidencePanel", () => {
   beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-19T08:00:00.000Z"));
     storage.clear();
     mocks.refetch.mockReset();
     mocks.useOpsRequestEvidence.mockReset();
@@ -168,6 +170,9 @@ describe("RequestEvidencePanel", () => {
       refetch: mocks.refetch,
     });
     window.history.replaceState(null, "", "/admin/logs?tab=request-evidence");
+  });
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("renders request-level evidence and correlated links", () => {
@@ -244,6 +249,17 @@ describe("RequestEvidencePanel", () => {
         end: "2026-06-19T08:00:00Z",
       }),
     );
+  });
+
+  it("keeps the default relative window stable across rerenders", () => {
+    const { rerender } = render(<RequestEvidencePanel />, { wrapper: wrap });
+    const firstStart = mocks.useOpsRequestEvidence.mock.calls.at(-1)?.[0].start;
+    expect(firstStart).toBe("2026-06-19T07:00:00.000Z");
+
+    vi.setSystemTime(new Date("2026-06-19T08:05:00.000Z"));
+    rerender(<RequestEvidencePanel />);
+
+    expect(mocks.useOpsRequestEvidence.mock.calls.at(-1)?.[0].start).toBe(firstStart);
   });
 
   it("clears scoped investigation chips without dropping unrelated filters", () => {

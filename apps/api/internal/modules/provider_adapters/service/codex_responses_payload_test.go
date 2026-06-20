@@ -256,7 +256,7 @@ func TestCodexResponsesCompactPayloadMatchesSub2API(t *testing.T) {
 	// list (user, metadata, prompt_cache_retention, safety_identifier,
 	// stream_options, max_output_tokens, max_completion_tokens, temperature,
 	// top_p, frequency_penalty, presence_penalty). It explicitly DOES NOT add
-	// include, parallel_tool_calls, or default instructions for compact —
+	// include, parallel_tool_calls, or default model instructions for compact —
 	// the comment at openai_codex_transform.go:161-162 reads "compact 端点形态
 	// 不同，单独处理，此处跳过 ensureCodexReasoningInclude".
 	//
@@ -290,12 +290,11 @@ func TestCodexResponsesCompactPayloadMatchesSub2API(t *testing.T) {
 			t.Fatalf("compact must NOT carry %q (sub2api parity, Codex /compact rejects), got payload=%+v", field, payload)
 		}
 	}
-	// instructions: sub2api compact does NOT force it to "". It only forces
-	// "" when the caller explicitly sent null/empty (via
-	// codexInstructionsWasNormalizedEmpty). For a minimal request without
-	// instructions, the field is simply absent.
-	if value, exists := payload["instructions"]; exists && value != "" && value != nil {
-		// non-empty string instructions is fine — caller supplied it
+	// Live Codex /compact rejects an absent instructions field with
+	// {"detail":"Instructions are required"}. Keep the field explicit but
+	// empty; never inject the non-compact model base prompt.
+	if payload["instructions"] != "" {
+		t.Fatalf("compact must carry explicit empty instructions, got %+v", payload)
 	}
 	// stream return MUST be false for compact even though payload["stream"]
 	// was deleted. The historical codexResponsesPayloadStream returns true

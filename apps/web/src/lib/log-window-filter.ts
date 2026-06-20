@@ -33,3 +33,13 @@ export function logWindowSince(value: string | undefined): Date | null {
   if (!preset) return null;
   return new Date(Date.now() - preset.minutes * 60 * 1000);
 }
+
+// Resolve a preset relative to a fixed timestamp. This is for remote query
+// keys: callers can keep "Last 1h" stable for the mounted view instead of
+// generating a fresh ISO timestamp on every render and refetching forever.
+export function logWindowSinceAt(value: string | undefined, nowMs: number): Date | null {
+  if (!value) return null;
+  const preset = LOG_WINDOW_PRESETS.find((p) => p.value === value);
+  if (!preset) return null;
+  return new Date(nowMs - preset.minutes * 60 * 1000);
+}

@@ -1167,6 +1167,7 @@ func openAIResponsesCompactBody(req contract.ConversationRequest) ([]byte, error
 		if model := strings.TrimSpace(req.Mapping.UpstreamModelName); model != "" {
 			payload["model"] = model
 		}
+		delete(payload, "stream")
 		normalizeOpenAIResponsesServiceTier(payload)
 		return json.Marshal(payload)
 	}
