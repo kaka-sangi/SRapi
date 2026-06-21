@@ -1259,7 +1259,7 @@ export const en = {
     proxies: "Proxies",
     apiKeys: "API keys",
     blockers: "Blockers",
-    fixActions: "Fix",
+    rowActions: "Actions",
     ready: "Ready",
     limited: "Limited",
     blocked: "Blocked",
@@ -1333,6 +1333,8 @@ export const en = {
       pricing: "Pricing",
       endpointSwitches: "Endpoints",
       accountModels: "Account models",
+      requestEvidence: "Evidence",
+      schedulerDecisions: "Decisions",
     },
     accountBlockersShort: {
       inactive: "off",

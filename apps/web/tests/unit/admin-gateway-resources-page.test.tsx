@@ -80,6 +80,14 @@ describe("AdminGatewayResourcesPage", () => {
       "/admin/accounts?f_providerId=p1",
     );
     expect(screen.getByRole("link", { name: "代理" })).toHaveAttribute("href", "/admin/proxies");
+    expect(screen.getAllByRole("link", { name: "证据" })[0]).toHaveAttribute(
+      "href",
+      "/admin/logs?tab=request-evidence&f_provider_id=p1",
+    );
+    expect(screen.getAllByRole("link", { name: "决策" })[0]).toHaveAttribute(
+      "href",
+      "/admin/ops?tab=scheduler-decisions&f_provider_id=p1",
+    );
     expect(screen.getByRole("heading", { name: /端点总览/ })).toBeInTheDocument();
     expect(screen.getAllByText("路由").length).toBeGreaterThan(0);
     expect(screen.getByText("模型可服务性")).toBeInTheDocument();
@@ -180,6 +188,14 @@ describe("AdminGatewayResourcesPage", () => {
     expect(screen.getByRole("link", { name: "定价" })).toHaveAttribute(
       "href",
       "/admin/channels/pricing?f_modelId=m2&f_providerId=p1",
+    );
+    expect(screen.getByRole("link", { name: "证据" })).toHaveAttribute(
+      "href",
+      "/admin/logs?tab=request-evidence&f_provider_id=p1&f_source_endpoint=%2Fv1%2Fchat%2Fcompletions&f_model=gpt-4.1-free",
+    );
+    expect(screen.getByRole("link", { name: "决策" })).toHaveAttribute(
+      "href",
+      "/admin/ops?tab=scheduler-decisions&f_provider_id=p1&f_model=gpt-4.1-free&f_source_endpoint=%2Fv1%2Fchat%2Fcompletions",
     );
     expect(screen.queryByText("gpt-4.1-upstream")).not.toBeInTheDocument();
     expect(screen.queryByText("没有匹配的网关资源")).not.toBeInTheDocument();

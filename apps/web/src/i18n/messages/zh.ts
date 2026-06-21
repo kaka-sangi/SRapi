@@ -1226,7 +1226,7 @@ export const zh: Messages = {
     proxies: "代理",
     apiKeys: "API Keys",
     blockers: "阻塞项",
-    fixActions: "修复",
+    rowActions: "操作",
     ready: "就绪",
     limited: "受限",
     blocked: "阻塞",
@@ -1299,6 +1299,8 @@ export const zh: Messages = {
       pricing: "定价",
       endpointSwitches: "端点",
       accountModels: "账号模型",
+      requestEvidence: "证据",
+      schedulerDecisions: "决策",
     },
     accountBlockersShort: {
       inactive: "停",

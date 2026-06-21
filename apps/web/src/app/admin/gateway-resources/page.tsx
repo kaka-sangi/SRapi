@@ -41,6 +41,7 @@ import {
 } from "@/hooks/admin-queries";
 import { useToast } from "@/context/ToastContext";
 import { adminErrorMessage } from "@/lib/admin-api";
+import { adminRequestEvidenceHref, adminSchedulerDecisionsHref } from "@/lib/admin-log-links";
 import {
   PROTOCOL_CONVERSION_ROUTES,
   type ProtocolConversionRoute,
@@ -260,7 +261,7 @@ function GatewayResourcesContent() {
                         </TableHead>
                         <TableHead>{t("adminCommon.status")}</TableHead>
                         <TableHead>{t("adminGatewayResources.blockers")}</TableHead>
-                        <TableHead>{t("adminGatewayResources.fixActions")}</TableHead>
+                        <TableHead>{t("adminGatewayResources.rowActions")}</TableHead>
                       </tr>
                     </TableHeader>
                     <TableBody>
@@ -306,7 +307,7 @@ function GatewayResourcesContent() {
                         </TableHead>
                         <TableHead>{t("adminCommon.status")}</TableHead>
                         <TableHead>{t("adminGatewayResources.blockers")}</TableHead>
-                        <TableHead>{t("adminGatewayResources.fixActions")}</TableHead>
+                        <TableHead>{t("adminGatewayResources.rowActions")}</TableHead>
                       </tr>
                     </TableHeader>
                     <TableBody>
@@ -348,7 +349,7 @@ function GatewayResourcesContent() {
                         </TableHead>
                         <TableHead>{t("adminCommon.status")}</TableHead>
                         <TableHead>{t("adminGatewayResources.blockers")}</TableHead>
-                        <TableHead>{t("adminGatewayResources.fixActions")}</TableHead>
+                        <TableHead>{t("adminGatewayResources.rowActions")}</TableHead>
                       </tr>
                     </TableHeader>
                     <TableBody>
@@ -1045,7 +1046,7 @@ function ModelResourceRow({ row }: { row: GatewayModelResourceRow }) {
         )}
       </TableCell>
       <TableCell>
-        <GatewayRowFixActions row={row} />
+        <GatewayRowActions row={row} />
       </TableCell>
     </TableRow>
   );
@@ -1128,7 +1129,7 @@ function RouteResourceRow({ row }: { row: GatewayRouteResourceRow }) {
         )}
       </TableCell>
       <TableCell>
-        <GatewayRowFixActions row={row} />
+        <GatewayRowActions row={row} />
       </TableCell>
     </TableRow>
   );
@@ -1237,15 +1238,15 @@ interface GatewayFixAction {
   labelKey: string;
 }
 
-function GatewayRowFixActions({ row }: { row: GatewayFixActionRow }) {
+function GatewayRowActions({ row }: { row: GatewayFixActionRow }) {
   const { t } = useLanguage();
-  const actions = gatewayRowFixActions(row);
+  const actions = gatewayRowActions(row);
   if (actions.length === 0) {
     return <span className="text-2xs text-srapi-text-tertiary">-</span>;
   }
   return (
-    <div className="flex min-w-[130px] flex-wrap gap-1">
-      {actions.slice(0, 3).map((action) => (
+    <div className="flex min-w-[170px] flex-wrap gap-1">
+      {actions.slice(0, 5).map((action) => (
         <Link
           key={action.key}
           href={action.href}
@@ -1254,14 +1255,14 @@ function GatewayRowFixActions({ row }: { row: GatewayFixActionRow }) {
           {t(`adminGatewayResources.fixAction.${action.labelKey}`)}
         </Link>
       ))}
-      {actions.length > 3 ? (
-        <span className="text-2xs text-srapi-text-tertiary font-mono">+{actions.length - 3}</span>
+      {actions.length > 5 ? (
+        <span className="text-2xs text-srapi-text-tertiary font-mono">+{actions.length - 5}</span>
       ) : null}
     </div>
   );
 }
 
-function gatewayRowFixActions(row: GatewayFixActionRow): GatewayFixAction[] {
+function gatewayRowActions(row: GatewayFixActionRow): GatewayFixAction[] {
   const actions: GatewayFixAction[] = [];
   const add = (action: GatewayFixAction) => {
     if (!actions.some((existing) => existing.key === action.key)) {
@@ -1391,7 +1392,52 @@ function gatewayRowFixActions(row: GatewayFixActionRow): GatewayFixAction[] {
     }
   }
 
+  for (const action of gatewayRuntimeEvidenceActions(row)) {
+    add(action);
+  }
+
   return actions;
+}
+
+function gatewayRuntimeEvidenceActions(row: GatewayFixActionRow): GatewayFixAction[] {
+  const params = gatewayRuntimeEvidenceParams(row);
+  const requestEvidenceHref = adminRequestEvidenceHref(params);
+  const schedulerDecisionsHref = adminSchedulerDecisionsHref(params);
+  return [
+    requestEvidenceHref
+      ? { key: "requestEvidence", href: requestEvidenceHref, labelKey: "requestEvidence" }
+      : null,
+    schedulerDecisionsHref
+      ? { key: "schedulerDecisions", href: schedulerDecisionsHref, labelKey: "schedulerDecisions" }
+      : null,
+  ].filter((action): action is GatewayFixAction => action !== null);
+}
+
+function gatewayRuntimeEvidenceParams(row: GatewayFixActionRow) {
+  if (hasProvider(row) && hasModel(row)) {
+    return {
+      provider_id: row.provider.id,
+      model: row.model.canonical_name,
+      source_endpoint: firstGatewayEndpoint(row.endpoints),
+    };
+  }
+  if (hasProvider(row)) {
+    return { provider_id: row.provider.id };
+  }
+  if (hasModel(row)) {
+    return {
+      model: row.model.canonical_name,
+      source_endpoint: firstGatewayEndpoint(row.endpoints),
+    };
+  }
+  return {};
+}
+
+function firstGatewayEndpoint(endpoints: GatewayEndpointResourceRow[]) {
+  return (
+    endpoints.find((endpoint) => endpoint.routable_accounts > 0)?.source_endpoint ||
+    endpoints[0]?.source_endpoint
+  );
 }
 
 function hasProvider(row: GatewayFixActionRow): row is GatewayProviderResourceRow | GatewayRouteResourceRow {
@@ -1556,7 +1602,7 @@ function ProviderResourceRow({ row }: { row: GatewayProviderResourceRow }) {
         )}
       </TableCell>
       <TableCell>
-        <GatewayRowFixActions row={row} />
+        <GatewayRowActions row={row} />
       </TableCell>
     </TableRow>
   );
