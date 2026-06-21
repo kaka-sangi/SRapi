@@ -91,6 +91,12 @@ func (s *Service) invokeReverseProxyAntigravity(ctx context.Context, req contrac
 		raw,
 		req.Stream,
 	)
+	// Pre-request: splice cached thoughtSignature / functionCall items into
+	// `request.contents` for the Gemini-shaped Antigravity path so the
+	// upstream accepts the continuation. Best-effort; on any parse failure
+	// the original bytes are sent unchanged.
+	replayScope := antigravityReasoningReplayScopeFromRequest(req, raw)
+	raw = applyAntigravityReasoningReplayPayload(ctx, DefaultAntigravityReasoningReplayCache, replayScope, raw)
 	runtimeResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
 		Account:      antigravityReverseProxyAccount(req),
 		Method:       http.MethodPost,
@@ -103,15 +109,26 @@ func (s *Service) invokeReverseProxyAntigravity(ctx context.Context, req contrac
 		return contract.ConversationResponse{}, providerErrorFromReverseProxy(err)
 	}
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
+		// Failure: invalidate the cached scope if the upstream is rejecting
+		// signatures. Falls through to the normal classified error.
+		clearAntigravityReasoningReplayOnSignatureFailure(DefaultAntigravityReasoningReplayCache, replayScope, runtimeResp.StatusCode, runtimeResp.Body)
 		return contract.ConversationResponse{}, classifyGeminiProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
 	if req.Stream {
+		// Capture replay items before parsing the stream — parseAntigravityStream
+		// rebuilds the canonical response and we want to observe upstream parts
+		// directly, including signatures the canonical shape drops.
+		if frames, err := parseSSEFrames(runtimeResp.Body); err == nil {
+			captureAntigravityReasoningReplayFromSSEFrames(ctx, DefaultAntigravityReasoningReplayCache, replayScope, frames)
+		}
 		parsed, err := parseAntigravityStream(runtimeResp.Body, runtimeResp.StatusCode)
 		if err != nil {
 			return contract.ConversationResponse{}, err
 		}
 		return withConversationResponseHeaders(parsed, runtimeResp.Headers), nil
 	}
+	// Capture replay items from the unwrapped response.
+	captureAntigravityReasoningReplayFromResponse(ctx, DefaultAntigravityReasoningReplayCache, replayScope, runtimeResp.Body)
 	unwrapped, err := parseAntigravityResponse(runtimeResp.Body)
 	if err != nil {
 		return contract.ConversationResponse{}, err
