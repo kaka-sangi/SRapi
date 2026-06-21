@@ -186,9 +186,11 @@ func (s *Server) serveChatCompletion(w http.ResponseWriter, r *http.Request, aut
 		writeGatewayError(w, gatewayEntitlementHTTPStatus(errorClass), gatewayEntitlementErrorType(errorClass), gatewayEntitlementMessage(errorClass), errorClass)
 		return
 	}
-	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
-	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
-	failover := s.invokeProviderConversationWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
+	invocation := s.invokeProviderConversationWithModelFallback(r.Context(), r, authed, canonical, modelResolution, admission, forcedProviderKey, startedAt)
+	canonical = invocation.Canonical
+	model = invocation.Model
+	admission = invocation.Admission
+	failover := invocation.Failover
 	result := failover.ScheduleResult
 	if failover.Err != nil {
 		s.writeGatewayFailoverFailure(w, r, authed, canonical, result, failover.FailureRecorded, failover.Err, admission, startedAt)
@@ -213,7 +215,7 @@ func (s *Server) serveChatCompletion(w http.ResponseWriter, r *http.Request, aut
 		SourceEndpoint:        canonical.SourceEndpoint,
 		TargetProtocol:        result.Candidate.Provider.Protocol,
 		Model:                 canonical.CanonicalModel,
-		RequestedModel:        gatewayUsageRequestedSnapshot(canonical, result.Candidate),
+		RequestedModel:        invocation.RequestedModel,
 		UpstreamModel:         gatewayUsageUpstreamSnapshot(canonical, result.Candidate),
 		Success:               true,
 		StatusCode:            ptrInt(http.StatusOK),
@@ -388,9 +390,11 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 		writeGatewayError(w, gatewayEntitlementHTTPStatus(errorClass), gatewayEntitlementErrorType(errorClass), gatewayEntitlementMessage(errorClass), errorClass)
 		return
 	}
-	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
-	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
-	failover := s.invokeProviderConversationWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
+	invocation := s.invokeProviderConversationWithModelFallback(r.Context(), r, authed, canonical, modelResolution, admission, forcedProviderKey, startedAt)
+	canonical = invocation.Canonical
+	model = invocation.Model
+	admission = invocation.Admission
+	failover := invocation.Failover
 	result := failover.ScheduleResult
 	if failover.Err != nil {
 		s.writeGatewayFailoverFailure(w, r, authed, canonical, result, failover.FailureRecorded, failover.Err, admission, startedAt)
@@ -415,7 +419,7 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 		SourceEndpoint:        canonical.SourceEndpoint,
 		TargetProtocol:        result.Candidate.Provider.Protocol,
 		Model:                 canonical.CanonicalModel,
-		RequestedModel:        gatewayUsageRequestedSnapshot(canonical, result.Candidate),
+		RequestedModel:        invocation.RequestedModel,
 		UpstreamModel:         gatewayUsageUpstreamSnapshot(canonical, result.Candidate),
 		Success:               true,
 		StatusCode:            ptrInt(http.StatusOK),
