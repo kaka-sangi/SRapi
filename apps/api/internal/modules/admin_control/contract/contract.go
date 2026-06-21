@@ -710,12 +710,31 @@ func (m ContentSafetyMode) Valid() bool {
 }
 
 type ContentSafetyConfig struct {
-	Enabled              bool              `json:"enabled"`
-	Mode                 ContentSafetyMode `json:"mode"`
-	RedactPII            bool              `json:"redact_pii"`
-	BlockPII             bool              `json:"block_pii"`
-	BlockPromptInjection bool              `json:"block_prompt_injection"`
-	BlockCustomKeywords  bool              `json:"block_custom_keywords"`
-	CustomKeywords       []string          `json:"custom_keywords"`
-	ModelScopes          []string          `json:"model_scopes"`
+	Enabled              bool                          `json:"enabled"`
+	Mode                 ContentSafetyMode             `json:"mode"`
+	RedactPII            bool                          `json:"redact_pii"`
+	BlockPII             bool                          `json:"block_pii"`
+	BlockPromptInjection bool                          `json:"block_prompt_injection"`
+	BlockCustomKeywords  bool                          `json:"block_custom_keywords"`
+	CustomKeywords       []string                      `json:"custom_keywords"`
+	ModelScopes          []string                      `json:"model_scopes"`
+	Moderation           ContentSafetyModerationConfig `json:"moderation"`
+}
+
+// ContentSafetyModerationConfig wires an upstream classification provider
+// (currently only OpenAI's /v1/moderations) into the request pre-scan. When
+// disabled the gateway falls back to the existing local regex/keyword pass
+// only. The API key ciphertext is encrypted at rest and never crosses the
+// API boundary — the OpenAPI surface exposes a write-only field and a
+// read-only `configured` indicator following the copilot pattern.
+type ContentSafetyModerationConfig struct {
+	Enabled          bool               `json:"enabled"`
+	Provider         string             `json:"provider"`
+	Model            string             `json:"model"`
+	BaseURL          string             `json:"base_url"`
+	APIKeyCiphertext string             `json:"api_key_ciphertext,omitempty"`
+	BlockOnFlag      bool               `json:"block_on_flag"`
+	Categories       map[string]float64 `json:"categories"`
+	TimeoutMS        int                `json:"timeout_ms"`
+	CacheTTLSeconds  int                `json:"cache_ttl_seconds"`
 }

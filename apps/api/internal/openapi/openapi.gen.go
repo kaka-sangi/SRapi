@@ -1061,6 +1061,21 @@ func (e ContentSafetyMode) Valid() bool {
 	}
 }
 
+// Defines values for ContentSafetyModerationConfigProvider.
+const (
+	Openai ContentSafetyModerationConfigProvider = "openai"
+)
+
+// Valid indicates whether the value is a known member of the ContentSafetyModerationConfigProvider enum.
+func (e ContentSafetyModerationConfigProvider) Valid() bool {
+	switch e {
+	case Openai:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateErrorPassthroughRuleRequestAction.
 const (
 	CreateErrorPassthroughRuleRequestActionExpose CreateErrorPassthroughRuleRequestAction = "expose"
@@ -7360,7 +7375,10 @@ type ContentSafetyConfig struct {
 
 	// ModelScopes Canonical model names or prefix scopes ending in '*'. Empty means all models.
 	ModelScopes []string `json:"model_scopes"`
-	RedactPii   bool     `json:"redact_pii"`
+
+	// Moderation Upstream classification pass that runs after the local regex/keyword scan. Only the OpenAI Moderation contract is wired today; future providers register under the `provider` key once their client lands. The API key is encrypted at rest; the wire schema exposes only a write-only `api_key` and a read-only `api_key_configured` indicator.
+	Moderation ContentSafetyModerationConfig `json:"moderation"`
+	RedactPii  bool                          `json:"redact_pii"`
 }
 
 // ContentSafetyConfigResponse defines model for ContentSafetyConfigResponse.
@@ -7371,6 +7389,42 @@ type ContentSafetyConfigResponse struct {
 
 // ContentSafetyMode defines model for ContentSafetyMode.
 type ContentSafetyMode string
+
+// ContentSafetyModerationConfig Upstream classification pass that runs after the local regex/keyword scan. Only the OpenAI Moderation contract is wired today; future providers register under the `provider` key once their client lands. The API key is encrypted at rest; the wire schema exposes only a write-only `api_key` and a read-only `api_key_configured` indicator.
+type ContentSafetyModerationConfig struct {
+	// ApiKey API key for the upstream moderation provider. Write-only; supplied to set or rotate the key and never returned. Omit to keep the stored key.
+	ApiKey *string `json:"api_key,omitempty"`
+
+	// ApiKeyConfigured True when a moderation API key is stored.
+	ApiKeyConfigured bool `json:"api_key_configured"`
+
+	// BaseUrl HTTPS base URL for OpenAI-compatible deployments.
+	BaseUrl string `json:"base_url"`
+
+	// BlockOnFlag When mode is `enforce`, refuse the request once the upstream returns flagged or a category exceeds its threshold.
+	BlockOnFlag bool `json:"block_on_flag"`
+
+	// CacheTtlSeconds In-process LRU TTL; 0 disables the cache.
+	CacheTtlSeconds int `json:"cache_ttl_seconds"`
+
+	// Categories Per-category minimum score in [0, 1] to flag. Empty falls back to the upstream `flagged` boolean.
+	Categories map[string]float32 `json:"categories"`
+
+	// Enabled Master switch for the upstream moderation pass.
+	Enabled bool `json:"enabled"`
+
+	// Model Upstream model id (e.g. `omni-moderation-latest`).
+	Model string `json:"model"`
+
+	// Provider Upstream classifier vendor. Only `openai` is supported today.
+	Provider ContentSafetyModerationConfigProvider `json:"provider"`
+
+	// TimeoutMs HTTP call timeout for the upstream moderation request.
+	TimeoutMs int `json:"timeout_ms"`
+}
+
+// ContentSafetyModerationConfigProvider Upstream classifier vendor. Only `openai` is supported today.
+type ContentSafetyModerationConfigProvider string
 
 // CopilotConversation A saved copilot conversation with its full transcript.
 type CopilotConversation struct {

@@ -195,6 +195,7 @@ type runtimeState struct {
 	accountProvisioning  *accountprovisioningservice.Service
 	channelMonitors      *channelmonitorsservice.Service
 	copilotEngine        *copilot.Engine
+	moderationClients    moderationClientCache
 	internalRouter       http.Handler
 	userStore            userscontract.Store
 	sessionStore         authcontract.Store

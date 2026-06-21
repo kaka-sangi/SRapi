@@ -149,8 +149,27 @@ func defaultContentSafetyConfig() admincontrol.ContentSafetyConfig {
 		BlockCustomKeywords:  false,
 		CustomKeywords:       []string{},
 		ModelScopes:          []string{},
+		Moderation: admincontrol.ContentSafetyModerationConfig{
+			Enabled:         false,
+			Provider:        "openai",
+			Model:           "omni-moderation-latest",
+			BaseURL:         "https://api.openai.com/v1",
+			BlockOnFlag:     false,
+			Categories:      map[string]float64{},
+			TimeoutMS:       1500,
+			CacheTTLSeconds: 3600,
+		},
 	}
 }
+
+const (
+	// moderationMinTimeoutMS bounds the operator-tunable upstream call timeout
+	// so an empty/zero value falls back to a usable default rather than
+	// immediately tripping the fail-open guard.
+	moderationMinTimeoutMS = 250
+	moderationMaxTimeoutMS = 30_000
+	moderationMaxCacheTTL  = 7 * 24 * 60 * 60
+)
 
 func normalizeContentSafetyConfig(config admincontrol.ContentSafetyConfig) (admincontrol.ContentSafetyConfig, error) {
 	if !config.Mode.Valid() {
@@ -158,6 +177,61 @@ func normalizeContentSafetyConfig(config admincontrol.ContentSafetyConfig) (admi
 	}
 	config.CustomKeywords = lowerUniqueTrimmedStrings(config.CustomKeywords)
 	config.ModelScopes = lowerUniqueTrimmedStrings(config.ModelScopes)
+	moderation, err := normalizeContentSafetyModerationConfig(config.Moderation)
+	if err != nil {
+		return admincontrol.ContentSafetyConfig{}, err
+	}
+	config.Moderation = moderation
+	return config, nil
+}
+
+func normalizeContentSafetyModerationConfig(config admincontrol.ContentSafetyModerationConfig) (admincontrol.ContentSafetyModerationConfig, error) {
+	config.Provider = strings.TrimSpace(strings.ToLower(config.Provider))
+	if config.Provider == "" {
+		config.Provider = "openai"
+	}
+	if config.Provider != "openai" {
+		// Only the OpenAI Moderation contract is wired today. Future
+		// providers register here once their client lands; rejecting unknown
+		// keys keeps the gateway from silently dropping the safety pass.
+		return admincontrol.ContentSafetyModerationConfig{}, admincontrol.ErrInvalidInput
+	}
+	config.Model = strings.TrimSpace(config.Model)
+	if config.Model == "" {
+		config.Model = "omni-moderation-latest"
+	}
+	config.BaseURL = strings.TrimRight(strings.TrimSpace(config.BaseURL), "/")
+	if config.BaseURL == "" {
+		config.BaseURL = "https://api.openai.com/v1"
+	}
+	switch {
+	case config.TimeoutMS <= 0:
+		config.TimeoutMS = 1500
+	case config.TimeoutMS < moderationMinTimeoutMS:
+		config.TimeoutMS = moderationMinTimeoutMS
+	case config.TimeoutMS > moderationMaxTimeoutMS:
+		config.TimeoutMS = moderationMaxTimeoutMS
+	}
+	switch {
+	case config.CacheTTLSeconds < 0:
+		config.CacheTTLSeconds = 0
+	case config.CacheTTLSeconds > moderationMaxCacheTTL:
+		config.CacheTTLSeconds = moderationMaxCacheTTL
+	}
+	cleaned := map[string]float64{}
+	for key, score := range config.Categories {
+		category := strings.ToLower(strings.TrimSpace(key))
+		if category == "" {
+			continue
+		}
+		if score < 0 {
+			score = 0
+		} else if score > 1 {
+			score = 1
+		}
+		cleaned[category] = score
+	}
+	config.Categories = cleaned
 	return config, nil
 }
 

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
+	admincontrolcontract "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
@@ -145,6 +146,7 @@ func (rt *runtimeState) applyGatewayContentSafety(ctx context.Context, canonical
 		return canonical, contentsafetycontract.Result{}, nil
 	}
 	config := contentsafetyservice.DefaultConfig()
+	var storedModeration admincontrolcontract.ContentSafetyModerationConfig
 	if rt.adminControl != nil {
 		stored, err := rt.adminControl.GetContentSafetyConfig(ctx)
 		if err != nil {
@@ -153,9 +155,23 @@ func (rt *runtimeState) applyGatewayContentSafety(ctx context.Context, canonical
 			}
 		} else {
 			config = contentSafetyConfigFromAdminControl(stored)
+			storedModeration = stored.Moderation
 		}
 	}
-	updated, result := rt.contentSafety.ApplyWithConfig(canonical, config)
+	if config.Moderation.Enabled {
+		if provider, err := rt.buildModerationProvider(storedModeration); err != nil {
+			// Fail-open: skip the upstream pass and record the warning so the
+			// next /v1/* request surfaces the misconfiguration via the audit
+			// log without dropping the user's traffic.
+			if rt.logger != nil {
+				rt.logger.Warn("moderation provider build failed; skipping upstream pass", "error", err, "request_id", canonical.RequestID)
+			}
+			config.Moderation.Enabled = false
+		} else {
+			config.Moderation.Provider = provider
+		}
+	}
+	updated, result := rt.contentSafety.ApplyWithContext(ctx, canonical, config)
 	if result.Changed {
 		updated.RawBody = nil
 	}

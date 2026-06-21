@@ -4889,6 +4889,51 @@ export type ContentSafetyConfig = {
      * Canonical model names or prefix scopes ending in '*'. Empty means all models.
      */
     model_scopes: Array<string>;
+    moderation: ContentSafetyModerationConfig;
+};
+
+/**
+ * Upstream classification pass that runs after the local regex/keyword scan. Only the OpenAI Moderation contract is wired today; future providers register under the `provider` key once their client lands. The API key is encrypted at rest; the wire schema exposes only a write-only `api_key` and a read-only `api_key_configured` indicator.
+ */
+export type ContentSafetyModerationConfig = {
+    /**
+     * Master switch for the upstream moderation pass.
+     */
+    enabled: boolean;
+    /**
+     * Upstream classifier vendor. Only `openai` is supported today.
+     */
+    provider: 'openai';
+    /**
+     * Upstream model id (e.g. `omni-moderation-latest`).
+     */
+    model: string;
+    /**
+     * HTTPS base URL for OpenAI-compatible deployments.
+     */
+    base_url: string;
+    /**
+     * When mode is `enforce`, refuse the request once the upstream returns flagged or a category exceeds its threshold.
+     */
+    block_on_flag: boolean;
+    /**
+     * Per-category minimum score in [0, 1] to flag. Empty falls back to the upstream `flagged` boolean.
+     */
+    categories: {
+        [key: string]: number;
+    };
+    /**
+     * HTTP call timeout for the upstream moderation request.
+     */
+    timeout_ms: number;
+    /**
+     * In-process LRU TTL; 0 disables the cache.
+     */
+    cache_ttl_seconds: number;
+    /**
+     * True when a moderation API key is stored.
+     */
+    api_key_configured: boolean;
 };
 
 export type ContentSafetyConfigResponse = {
@@ -8457,6 +8502,74 @@ export type CaptchaSettingsWritable = {
 
 export type CaptchaSettingsResponseWritable = {
     data: CaptchaSettingsWritable;
+    request_id: RequestId;
+};
+
+export type ContentSafetyConfigWritable = {
+    enabled: boolean;
+    mode: ContentSafetyMode;
+    redact_pii: boolean;
+    block_pii: boolean;
+    block_prompt_injection: boolean;
+    block_custom_keywords: boolean;
+    custom_keywords: Array<string>;
+    /**
+     * Canonical model names or prefix scopes ending in '*'. Empty means all models.
+     */
+    model_scopes: Array<string>;
+    moderation: ContentSafetyModerationConfigWritable;
+};
+
+/**
+ * Upstream classification pass that runs after the local regex/keyword scan. Only the OpenAI Moderation contract is wired today; future providers register under the `provider` key once their client lands. The API key is encrypted at rest; the wire schema exposes only a write-only `api_key` and a read-only `api_key_configured` indicator.
+ */
+export type ContentSafetyModerationConfigWritable = {
+    /**
+     * Master switch for the upstream moderation pass.
+     */
+    enabled: boolean;
+    /**
+     * Upstream classifier vendor. Only `openai` is supported today.
+     */
+    provider: 'openai';
+    /**
+     * Upstream model id (e.g. `omni-moderation-latest`).
+     */
+    model: string;
+    /**
+     * HTTPS base URL for OpenAI-compatible deployments.
+     */
+    base_url: string;
+    /**
+     * When mode is `enforce`, refuse the request once the upstream returns flagged or a category exceeds its threshold.
+     */
+    block_on_flag: boolean;
+    /**
+     * Per-category minimum score in [0, 1] to flag. Empty falls back to the upstream `flagged` boolean.
+     */
+    categories: {
+        [key: string]: number;
+    };
+    /**
+     * HTTP call timeout for the upstream moderation request.
+     */
+    timeout_ms: number;
+    /**
+     * In-process LRU TTL; 0 disables the cache.
+     */
+    cache_ttl_seconds: number;
+    /**
+     * API key for the upstream moderation provider. Write-only; supplied to set or rotate the key and never returned. Omit to keep the stored key.
+     */
+    api_key?: string;
+    /**
+     * True when a moderation API key is stored.
+     */
+    api_key_configured: boolean;
+};
+
+export type ContentSafetyConfigResponseWritable = {
+    data: ContentSafetyConfigWritable;
     request_id: RequestId;
 };
 
@@ -21370,7 +21483,7 @@ export type GetAdminContentSafetyConfigResponses = {
 export type GetAdminContentSafetyConfigResponse = GetAdminContentSafetyConfigResponses[keyof GetAdminContentSafetyConfigResponses];
 
 export type UpdateAdminContentSafetyConfigData = {
-    body: ContentSafetyConfig;
+    body: ContentSafetyConfigWritable;
     path?: never;
     query?: never;
     url: '/api/v1/admin/content-safety/config';

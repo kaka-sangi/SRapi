@@ -670,13 +670,34 @@ func (s *Server) handleUpdateAdminContentSafetyConfig(w http.ResponseWriter, r *
 		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid content safety request", requestID)
 		return
 	}
-	updated, err := s.runtime.adminControl.UpdateContentSafetyConfig(r.Context(), contentSafetyConfigFromAPI(body), session.User.ID)
+	mapped := contentSafetyConfigFromAPI(body)
+	// The wire schema is write-only for the moderation API key — an omitted
+	// field MUST preserve the stored ciphertext; a non-empty plaintext key
+	// rotates it. Always carry the existing ciphertext forward first so an
+	// empty field in the PUT does not silently delete the key.
+	mapped.Moderation.APIKeyCiphertext = before.Moderation.APIKeyCiphertext
+	if body.Moderation.ApiKey != nil {
+		plaintext := strings.TrimSpace(*body.Moderation.ApiKey)
+		if plaintext != "" {
+			ciphertext, err := s.encryptModerationSecret(plaintext)
+			if err != nil {
+				writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to encrypt moderation key", requestID)
+				return
+			}
+			mapped.Moderation.APIKeyCiphertext = ciphertext
+		}
+	}
+	updated, err := s.runtime.adminControl.UpdateContentSafetyConfig(r.Context(), mapped, session.User.ID)
 	if err != nil {
 		writeAdminControlError(w, err, requestID)
 		return
 	}
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "content_safety.update", "content_safety", "config", adminControlAuditSnapshot(before), adminControlAuditSnapshot(updated)))
 	writeJSONAny(w, http.StatusOK, apiopenapi.ContentSafetyConfigResponse{Data: toAPIContentSafetyConfig(updated), RequestId: requestID})
+}
+
+func (s *Server) encryptModerationSecret(plaintext string) (string, error) {
+	return s.encryptMasterSecret(plaintext, moderationSecretVersion)
 }
 
 func pathID(w http.ResponseWriter, r *http.Request, requestID string) (int, bool) {
@@ -1509,6 +1530,25 @@ func toAPIContentSafetyConfig(in admincontrol.ContentSafetyConfig) apiopenapi.Co
 		Mode:                 apiopenapi.ContentSafetyMode(in.Mode),
 		ModelScopes:          modelScopes,
 		RedactPii:            in.RedactPII,
+		Moderation:           toAPIContentSafetyModerationConfig(in.Moderation),
+	}
+}
+
+func toAPIContentSafetyModerationConfig(in admincontrol.ContentSafetyModerationConfig) apiopenapi.ContentSafetyModerationConfig {
+	categories := map[string]float32{}
+	for key, value := range in.Categories {
+		categories[key] = float32(value)
+	}
+	return apiopenapi.ContentSafetyModerationConfig{
+		ApiKeyConfigured: strings.TrimSpace(in.APIKeyCiphertext) != "",
+		BaseUrl:          in.BaseURL,
+		BlockOnFlag:      in.BlockOnFlag,
+		CacheTtlSeconds:  in.CacheTTLSeconds,
+		Categories:       categories,
+		Enabled:          in.Enabled,
+		Model:            in.Model,
+		Provider:         apiopenapi.ContentSafetyModerationConfigProvider(in.Provider),
+		TimeoutMs:        in.TimeoutMS,
 	}
 }
 
@@ -1522,6 +1562,26 @@ func contentSafetyConfigFromAPI(in apiopenapi.ContentSafetyConfig) admincontrol.
 		Mode:                 admincontrol.ContentSafetyMode(in.Mode),
 		ModelScopes:          append([]string(nil), in.ModelScopes...),
 		RedactPII:            in.RedactPii,
+		Moderation:           contentSafetyModerationConfigFromAPI(in.Moderation),
+	}
+}
+
+func contentSafetyModerationConfigFromAPI(in apiopenapi.ContentSafetyModerationConfig) admincontrol.ContentSafetyModerationConfig {
+	categories := map[string]float64{}
+	for key, value := range in.Categories {
+		categories[key] = float64(value)
+	}
+	return admincontrol.ContentSafetyModerationConfig{
+		BaseURL:         in.BaseUrl,
+		BlockOnFlag:     in.BlockOnFlag,
+		CacheTTLSeconds: in.CacheTtlSeconds,
+		Categories:      categories,
+		Enabled:         in.Enabled,
+		Model:           in.Model,
+		Provider:        string(in.Provider),
+		TimeoutMS:       in.TimeoutMs,
+		// APIKeyCiphertext is set by the handler (encrypt-new or
+		// preserve-existing); never sourced from the inbound body.
 	}
 }
 

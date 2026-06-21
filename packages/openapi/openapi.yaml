@@ -28672,6 +28672,7 @@ components:
         - block_custom_keywords
         - custom_keywords
         - model_scopes
+        - moderation
       properties:
         enabled:
           type: boolean
@@ -28694,6 +28695,69 @@ components:
           description: Canonical model names or prefix scopes ending in '*'. Empty means all models.
           items:
             type: string
+        moderation:
+          $ref: "#/components/schemas/ContentSafetyModerationConfig"
+
+    ContentSafetyModerationConfig:
+      type: object
+      description: >-
+        Upstream classification pass that runs after the local regex/keyword
+        scan. Only the OpenAI Moderation contract is wired today; future
+        providers register under the `provider` key once their client lands.
+        The API key is encrypted at rest; the wire schema exposes only a
+        write-only `api_key` and a read-only `api_key_configured` indicator.
+      required:
+        - enabled
+        - provider
+        - model
+        - base_url
+        - block_on_flag
+        - categories
+        - timeout_ms
+        - cache_ttl_seconds
+        - api_key_configured
+      properties:
+        enabled:
+          type: boolean
+          description: Master switch for the upstream moderation pass.
+        provider:
+          type: string
+          enum:
+            - openai
+          description: Upstream classifier vendor. Only `openai` is supported today.
+        model:
+          type: string
+          description: Upstream model id (e.g. `omni-moderation-latest`).
+        base_url:
+          type: string
+          description: HTTPS base URL for OpenAI-compatible deployments.
+        block_on_flag:
+          type: boolean
+          description: When mode is `enforce`, refuse the request once the upstream returns flagged or a category exceeds its threshold.
+        categories:
+          type: object
+          additionalProperties:
+            type: number
+            minimum: 0
+            maximum: 1
+          description: Per-category minimum score in [0, 1] to flag. Empty falls back to the upstream `flagged` boolean.
+        timeout_ms:
+          type: integer
+          minimum: 250
+          maximum: 30000
+          description: HTTP call timeout for the upstream moderation request.
+        cache_ttl_seconds:
+          type: integer
+          minimum: 0
+          maximum: 604800
+          description: In-process LRU TTL; 0 disables the cache.
+        api_key:
+          type: string
+          writeOnly: true
+          description: API key for the upstream moderation provider. Write-only; supplied to set or rotate the key and never returned. Omit to keep the stored key.
+        api_key_configured:
+          type: boolean
+          description: True when a moderation API key is stored.
 
     ContentSafetyConfigResponse:
       type: object

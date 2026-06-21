@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"regexp"
 	"sort"
 	"strings"
@@ -10,8 +11,12 @@ import (
 )
 
 const (
-	warningPIIRedacted             = "content_safety_pii_redacted"
-	warningPromptInjectionDetected = "content_safety_prompt_injection_detected"
+	warningPIIRedacted              = "content_safety_pii_redacted"
+	warningPromptInjectionDetected  = "content_safety_prompt_injection_detected"
+	warningModerationFlagged        = "content_safety_moderation_flagged"
+	warningModerationCallFailed     = "content_safety_moderation_failed"
+	moderationDefaultFlaggedScore   = 1.0
+	moderationMaxInputCharacters    = 50_000
 )
 
 var piiPatterns = []redactionPattern{
@@ -104,10 +109,23 @@ func NormalizeConfig(config contentsafetycontract.Config) contentsafetycontract.
 
 // Apply redacts detected PII from gateway request text fields and records safe finding evidence.
 func (s *Service) Apply(req gatewaycontract.CanonicalRequest) (gatewaycontract.CanonicalRequest, contentsafetycontract.Result) {
-	return s.ApplyWithConfig(req, s.config)
+	return s.ApplyWithContext(context.Background(), req, s.config)
 }
 
+// ApplyWithConfig retains the synchronous, provider-less call shape used by
+// tests and the runtime initialization path. Callers that need the upstream
+// moderation pass should invoke ApplyWithContext with a ctx the caller
+// controls so the upstream classifier can be timed out.
 func (s *Service) ApplyWithConfig(req gatewaycontract.CanonicalRequest, config contentsafetycontract.Config) (gatewaycontract.CanonicalRequest, contentsafetycontract.Result) {
+	return s.ApplyWithContext(context.Background(), req, config)
+}
+
+// ApplyWithContext runs the local regex/keyword pass followed by the
+// optional upstream moderation pass. The moderation pass is skipped when
+// config.Moderation.Provider is nil so the runtime can fail-open (missing
+// credentials, transient API key decryption errors) without aborting the
+// request.
+func (s *Service) ApplyWithContext(ctx context.Context, req gatewaycontract.CanonicalRequest, config contentsafetycontract.Config) (gatewaycontract.CanonicalRequest, contentsafetycontract.Result) {
 	config = NormalizeConfig(config)
 	result := contentsafetycontract.Result{}
 	if !config.Enabled {
@@ -128,11 +146,153 @@ func (s *Service) ApplyWithConfig(req gatewaycontract.CanonicalRequest, config c
 	req.ModerationInput = s.scanStrings(req.ModerationInput, config, &result)
 	req.RerankQuery = s.scanText(req.RerankQuery, config, &result)
 	req.RerankDocuments = s.scanRerankDocuments(req.RerankDocuments, config, &result)
+	applyModeration(ctx, config, req, &result)
 	applyContentSafetyConfig(config, &result)
 	result.Findings = sortedFindings(result.Findings)
-	result.Warnings = resultWarnings(result.Findings)
+	// Merge the warnings derived from findings with any warnings the
+	// moderation pass appended directly (e.g. upstream-failure surface).
+	// Re-assigning to resultWarnings(result.Findings) would silently drop
+	// those direct appends.
+	result.Warnings = mergeWarnings(result.Warnings, resultWarnings(result.Findings))
 	req.CompatibilityWarnings = mergeWarnings(req.CompatibilityWarnings, result.Warnings)
 	return req, result
+}
+
+// applyModeration concatenates all scanned text fields into a single
+// classifier input and adds findings for every category that exceeds its
+// configured threshold (or fires the upstream `flagged` boolean when no
+// thresholds are set). On upstream error the call is recorded as a
+// warning rather than failing the request.
+func applyModeration(ctx context.Context, config contentsafetycontract.Config, req gatewaycontract.CanonicalRequest, result *contentsafetycontract.Result) {
+	if result == nil || !config.Moderation.Enabled || config.Moderation.Provider == nil {
+		return
+	}
+	text := collectModerationInput(req)
+	if text == "" {
+		return
+	}
+	if len(text) > moderationMaxInputCharacters {
+		text = text[:moderationMaxInputCharacters]
+	}
+	classification, err := config.Moderation.Provider.Classify(ctx, text)
+	if err != nil {
+		result.Warnings = append(result.Warnings, warningModerationCallFailed)
+		return
+	}
+	categories := classifierTriggeredCategories(classification, config.Moderation.Thresholds)
+	// Without operator thresholds, defer to the upstream `flagged` boolean.
+	// With thresholds, the operator is explicitly opting in to per-category
+	// gating: a flagged-but-below-threshold response must NOT be added back
+	// in as a generic finding — that would defeat the threshold.
+	if len(categories) == 0 {
+		if !classification.Flagged || len(config.Moderation.Thresholds) > 0 {
+			return
+		}
+		// Upstream said flagged but did not break it down — record a single
+		// catch-all so the audit log shows the verdict instead of dropping it.
+		categories = append(categories, classifierCategory{Name: "flagged", Score: moderationDefaultFlaggedScore})
+	}
+	for _, category := range categories {
+		result.Findings = append(result.Findings, contentsafetycontract.Finding{
+			Kind:     contentsafetycontract.FindingKindModerationCategory,
+			Severity: contentsafetycontract.SeverityHigh,
+			Count:    1,
+			Category: category.Name,
+			Score:    category.Score,
+		})
+	}
+	if config.Mode == contentsafetycontract.ModeEnforce && config.Moderation.BlockOnFlag {
+		result.Blocked = true
+		result.Reason = "moderation_flagged"
+	}
+}
+
+type classifierCategory struct {
+	Name  string
+	Score float64
+}
+
+func classifierTriggeredCategories(result contentsafetycontract.ModerationResult, thresholds map[string]float64) []classifierCategory {
+	if len(result.Categories) == 0 && len(result.Scores) == 0 {
+		return nil
+	}
+	triggered := map[string]classifierCategory{}
+	for category, hit := range result.Categories {
+		category = strings.ToLower(strings.TrimSpace(category))
+		if category == "" || !hit {
+			continue
+		}
+		if threshold, ok := thresholds[category]; ok && threshold > 0 {
+			if score := result.Scores[category]; score < threshold {
+				continue
+			}
+		}
+		triggered[category] = classifierCategory{Name: category, Score: result.Scores[category]}
+	}
+	for category, threshold := range thresholds {
+		if threshold <= 0 {
+			continue
+		}
+		score, ok := result.Scores[category]
+		if !ok {
+			continue
+		}
+		if score < threshold {
+			continue
+		}
+		if _, already := triggered[category]; already {
+			continue
+		}
+		triggered[category] = classifierCategory{Name: category, Score: score}
+	}
+	out := make([]classifierCategory, 0, len(triggered))
+	for _, value := range triggered {
+		out = append(out, value)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}
+
+// collectModerationInput stitches every text field the regex pass walks
+// into one input — the moderation API takes a single string per call and
+// running it once per request is far cheaper than per-field.
+func collectModerationInput(req gatewaycontract.CanonicalRequest) string {
+	var b strings.Builder
+	appendField := func(value string) {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return
+		}
+		if b.Len() > 0 {
+			b.WriteString("\n\n")
+		}
+		b.WriteString(value)
+	}
+	appendField(req.Prompt)
+	appendField(req.Instructions)
+	appendField(req.ImagePrompt)
+	appendField(req.AudioPrompt)
+	appendField(req.SpeechInput)
+	appendField(req.SpeechInstructions)
+	appendField(req.RerankQuery)
+	for _, item := range req.InputItems {
+		appendField(item.Text)
+	}
+	for _, msg := range req.Messages {
+		for _, block := range msg.Content {
+			appendField(block.Text)
+		}
+	}
+	for _, value := range req.EmbeddingInput {
+		appendField(value)
+	}
+	for _, value := range req.ModerationInput {
+		appendField(value)
+	}
+	for _, doc := range req.RerankDocuments {
+		appendField(doc.Text)
+	}
+	return b.String()
 }
 
 func (s *Service) scanMessages(values []gatewaycontract.Message, config contentsafetycontract.Config, result *contentsafetycontract.Result) []gatewaycontract.Message {
@@ -392,9 +552,14 @@ func sortedFindings(values []contentsafetycontract.Finding) []contentsafetycontr
 func resultWarnings(findings []contentsafetycontract.Finding) []string {
 	hasPII := false
 	hasPromptInjection := false
+	hasModeration := false
 	for _, finding := range findings {
-		if finding.Kind == contentsafetycontract.FindingKindPromptInjection {
+		switch finding.Kind {
+		case contentsafetycontract.FindingKindPromptInjection:
 			hasPromptInjection = true
+			continue
+		case contentsafetycontract.FindingKindModerationCategory:
+			hasModeration = true
 			continue
 		}
 		if finding.Redacted {
@@ -407,6 +572,9 @@ func resultWarnings(findings []contentsafetycontract.Finding) []string {
 	}
 	if hasPromptInjection {
 		warnings = append(warnings, warningPromptInjectionDetected)
+	}
+	if hasModeration {
+		warnings = append(warnings, warningModerationFlagged)
 	}
 	return warnings
 }

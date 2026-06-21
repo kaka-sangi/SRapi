@@ -159,6 +159,46 @@ function RiskContent() {
       placeholder: t("adminRisk.modelScopesPlaceholder"),
       hint: t("adminRisk.modelScopesHint"),
     },
+    {
+      name: "moderationEnabled",
+      label: t("adminRisk.moderationEnabled"),
+      type: "switch",
+      hint: t("adminRisk.moderationEnabledHint"),
+    },
+    {
+      name: "moderationModel",
+      label: t("adminRisk.moderationModel"),
+      placeholder: "omni-moderation-latest",
+    },
+    {
+      name: "moderationBaseUrl",
+      label: t("adminRisk.moderationBaseUrl"),
+      placeholder: "https://api.openai.com/v1",
+    },
+    {
+      name: "moderationApiKey",
+      label: t("adminRisk.moderationApiKey"),
+      type: "password",
+      placeholder: t("adminRisk.moderationApiKeyPlaceholder"),
+      hint: t("adminRisk.moderationApiKeyHint"),
+    },
+    {
+      name: "moderationBlockOnFlag",
+      label: t("adminRisk.moderationBlockOnFlag"),
+      type: "switch",
+      hint: t("adminRisk.moderationBlockOnFlagHint"),
+    },
+    {
+      name: "moderationTimeoutMs",
+      label: t("adminRisk.moderationTimeoutMs"),
+      type: "number",
+    },
+    {
+      name: "moderationCacheTtlSeconds",
+      label: t("adminRisk.moderationCacheTtlSeconds"),
+      type: "number",
+      hint: t("adminRisk.moderationCacheTtlHint"),
+    },
   ];
 
   return (
