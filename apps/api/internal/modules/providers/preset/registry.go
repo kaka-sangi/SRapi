@@ -121,6 +121,7 @@ func Default() *Registry {
 		openAIPreset("qwen", "通义千问", "https://dashscope.aliyuncs.com/compatible-mode/v1", append(providerAliases("qwen"), providerAliases("tongyi")...)),
 		rerankPreset("rerank-compatible", "Rerank Compatible", "https://api.cohere.com/v2", []string{"/api/provider/rerank-compatible", "/api/provider/rerank-compatible/v1"}),
 		openAIPreset("together", "Together AI", "https://api.together.ai/v1", providerAliases("together")),
+		vertexPreset(),
 		openAIPreset("zai", "Z.AI", "https://api.z.ai/api/paas/v4", providerAliases("zai")),
 		openAIPreset("zhipu", "Zhipu", "https://open.bigmodel.cn/api/paas/v4", providerAliases("zhipu")),
 	)
@@ -288,6 +289,50 @@ func geminiPreset() Preset {
 		Capabilities: geminiCapabilities(),
 		AccountTemplate: &AccountTemplate{
 			ModelCatalog: []string{"gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"},
+		},
+	}
+}
+
+// vertexPreset describes Google Cloud Vertex AI accounts. Vertex shares the
+// Gemini wire format (generateContent / streamGenerateContent) but is
+// authenticated via a GCP service-account JSON blob — the runtime signs a
+// short-lived JWT with the embedded private_key and exchanges it for an
+// OAuth2 access token before each upstream call. The base URL is per-region
+// (us-central1-aiplatform.googleapis.com etc.); the adapter resolves the
+// final URL from the account's `region` + `project_id` metadata at
+// dispatch time.
+func vertexPreset() Preset {
+	return Preset{
+		ProviderKey:       "vertex",
+		PlatformFamily:    PlatformFamilyGeminiCompatible,
+		DisplayName:       "Vertex AI",
+		RouteAliases:      []string{"/api/provider/vertex", "/api/provider/vertex/v1"},
+		DefaultBaseURL:    "https://{region}-aiplatform.googleapis.com/v1",
+		AuthModes:         []AuthMode{AuthModeBearer},
+		ModelCatalogOwner: "vertex",
+		RuntimeClassAllowlist: []accountscontract.RuntimeClass{
+			accountscontract.RuntimeClassServiceAccountJSON,
+			accountscontract.RuntimeClassCustomReverseProxy,
+		},
+		Capabilities: geminiCapabilities(),
+		AccountTemplate: &AccountTemplate{
+			DefaultMetadata: map[string]any{
+				"region":     "us-central1",
+				"project_id": "",
+			},
+			ModelCatalog: []string{
+				"gemini-2.5-pro",
+				"gemini-2.5-flash",
+				"gemini-2.0-flash",
+				"gemini-3-pro-preview",
+				"gemini-3-pro-high",
+				"gemini-3-pro-low",
+			},
+			MetadataHints: map[string]string{
+				"region":               "GCP region for the Vertex AI endpoint (e.g. us-central1, asia-northeast1)",
+				"project_id":           "GCP project id that owns the Vertex AI quota",
+				"service_account_json": "Paste the service-account JSON; the private_key is normalized + encrypted at rest",
+			},
 		},
 	}
 }

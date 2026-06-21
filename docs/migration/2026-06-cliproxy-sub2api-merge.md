@@ -156,12 +156,13 @@
 | 9 ROOTCAUSE 收口 | 🟡 | `Replace, not append, on Codex import drop` | Codex 拖拽 bug 修复；其余 7 项核查后确认已修 |
 | Codex reasoning 缓存 | ✅（已具备） | — | `provider_adapters/service/codex_reasoning_replay_cache.go` + wiring 已在历史 commit 落地 |
 | channel_monitors 模板 | ✅（已具备） | — | `channel_monitors/contract/contract.go` 已实现 Template/CreateTemplate/Update 路径 |
+| 2 Vertex AI 基础底座 | 🟡 部分 | `Lay groundwork for Vertex AI provider` | RuntimeClass + preset + key util；adapter 暂未接入 |
 
 ## 7. 留给下个会话
 
 | 阶段 | 状态 | 说明 |
 |------|------|------|
-| 2 Vertex AI provider | ⏳ | 需要：Provider preset + RuntimeClassServiceAccountJSON + service-account JWT→access-token 交换 + Vertex 端点 URL 模板（region/project 注入）+ 凭据加密落库 + 前端表单。预估 2–3 小时工程量。 |
+| 2 Vertex AI provider | 🟡 部分 | 已落：Provider preset `vertex`、`RuntimeClassServiceAccountJSON`、`internal/platform/vertex` 服务账号密钥规整 + 测试（PKCS#1/PKCS#8 互转、CRLF/ANSI 噪声恢复）。**剩余**：JWT→access-token 交换器、`{region}-aiplatform.googleapis.com` URL 模板解析、provider_adapter 注册（Gemini 翻译器复用 + Bearer 注入）、前端 account 表单的 service-account JSON 上传 + 加密落库。 |
 | 4 GCP 项目切换 | ⏳ | 依赖 2 完成；accounts metadata 增加 `project_ids: []string` + 游标推进 + 网关 `RESOURCE_EXHAUSTED` 拦截 + 短冷却。 |
 | 10 前端密度整理 | ⏳ | 初判的"稀疏页"实际多已迭代过；下次需要先用 `wc -l` 与人工挑选真稀疏的，再决定收紧策略。/admin/logs 已是聚合 tab，/admin/announcements 已是 ListView。 |
 

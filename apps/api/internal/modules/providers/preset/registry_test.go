@@ -40,6 +40,7 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 		"qwen",
 		"rerank-compatible",
 		"together",
+		"vertex",
 		"zai",
 		"zai-anthropic",
 		"zhipu",
@@ -480,12 +481,13 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 
 func TestPresetRuntimeAllowlistsOnlyExposeSignableAuthMethods(t *testing.T) {
 	signable := map[accountscontract.RuntimeClass]string{
-		accountscontract.RuntimeClassAPIKey:             "native adapter signs API keys",
-		accountscontract.RuntimeClassOauthRefresh:       "reverse proxy injects bearer tokens and supports refresh for wired upstream clients",
-		accountscontract.RuntimeClassOauthDeviceCode:    "device-code provisioning mints the same refreshable OAuth credential",
-		accountscontract.RuntimeClassWebSessionCookie:   "reverse proxy injects session cookies",
-		accountscontract.RuntimeClassCliClientToken:     "reverse proxy injects CLI bearer tokens",
-		accountscontract.RuntimeClassCustomReverseProxy: "reverse proxy injects custom bearer tokens",
+		accountscontract.RuntimeClassAPIKey:              "native adapter signs API keys",
+		accountscontract.RuntimeClassOauthRefresh:        "reverse proxy injects bearer tokens and supports refresh for wired upstream clients",
+		accountscontract.RuntimeClassOauthDeviceCode:     "device-code provisioning mints the same refreshable OAuth credential",
+		accountscontract.RuntimeClassWebSessionCookie:    "reverse proxy injects session cookies",
+		accountscontract.RuntimeClassCliClientToken:      "reverse proxy injects CLI bearer tokens",
+		accountscontract.RuntimeClassCustomReverseProxy:  "reverse proxy injects custom bearer tokens",
+		accountscontract.RuntimeClassServiceAccountJSON:  "vertex adapter signs a short-lived JWT from the service-account private key and exchanges it for an OAuth2 access token",
 	}
 
 	for _, preset := range Default().List() {

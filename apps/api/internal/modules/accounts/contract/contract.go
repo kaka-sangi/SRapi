@@ -11,12 +11,17 @@ import (
 type RuntimeClass string
 
 const (
-	RuntimeClassAPIKey             RuntimeClass = "api_key"
-	RuntimeClassOauthRefresh       RuntimeClass = "oauth_refresh"
-	RuntimeClassOauthDeviceCode    RuntimeClass = "oauth_device_code"
-	RuntimeClassWebSessionCookie   RuntimeClass = "web_session_cookie"
-	RuntimeClassCliClientToken     RuntimeClass = "cli_client_token"
-	RuntimeClassCustomReverseProxy RuntimeClass = "custom_reverse_proxy"
+	RuntimeClassAPIKey              RuntimeClass = "api_key"
+	RuntimeClassOauthRefresh        RuntimeClass = "oauth_refresh"
+	RuntimeClassOauthDeviceCode     RuntimeClass = "oauth_device_code"
+	RuntimeClassWebSessionCookie    RuntimeClass = "web_session_cookie"
+	RuntimeClassCliClientToken      RuntimeClass = "cli_client_token"
+	RuntimeClassCustomReverseProxy  RuntimeClass = "custom_reverse_proxy"
+	// RuntimeClassServiceAccountJSON marks an account whose credential is a
+	// Google Cloud service-account JSON blob. The runtime signs a short-lived
+	// JWT with the embedded private_key and exchanges it for an OAuth2
+	// access token before each upstream call. Used by Vertex AI accounts.
+	RuntimeClassServiceAccountJSON RuntimeClass = "service_account_json"
 )
 
 type Status string
