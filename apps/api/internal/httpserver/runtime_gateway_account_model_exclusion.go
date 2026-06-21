@@ -166,5 +166,5 @@ func accountUnavailableForModel(provider providercontract.Provider, account acco
 	if providerAccountExcludesModel(provider, account, canonicalModel, upstreamModel) {
 		return true
 	}
-	return !accountRoutableForModel(provider, account.Metadata, upstreamModel)
+	return !accountRoutableForModel(provider, account, upstreamModel)
 }

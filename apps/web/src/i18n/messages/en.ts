@@ -1493,6 +1493,9 @@ export const en = {
     endpointMessages: "Messages endpoint",
     endpointCapabilityHint:
       "Auto follows the provider preset. Use on/off only when this upstream is known to support or reject the endpoint conversion.",
+    supportedModels: "Supported models",
+    supportedModelsHint:
+      "Only route these canonical or upstream model patterns for every account under this provider. Leave empty for no provider-wide allowlist. Use * wildcards.",
     excludedModels: "Excluded models",
     excludedModelsHint:
       "Hide these canonical or upstream model patterns for every account under this provider. Use * wildcards.",

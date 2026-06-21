@@ -59,6 +59,7 @@ export interface ProviderFormState {
   responsesCompactCapability: ProviderEndpointCapabilityMode;
   responsesInputItemsCapability: ProviderEndpointCapabilityMode;
   messagesCapability: ProviderEndpointCapabilityMode;
+  supportedModels: string[];
   excludedModels: string[];
   capabilities: Record<string, unknown>;
   configSchema: Record<string, unknown>;
@@ -79,6 +80,7 @@ export function emptyProviderForm(): ProviderFormState {
     responsesCompactCapability: "auto",
     responsesInputItemsCapability: "auto",
     messagesCapability: "auto",
+    supportedModels: [],
     excludedModels: [],
     capabilities: {},
     configSchema: {},
@@ -99,6 +101,7 @@ export function providerFormFromProvider(provider: Provider): ProviderFormState 
     responsesCompactCapability: capabilityMode(capabilities.responses_compact),
     responsesInputItemsCapability: capabilityMode(capabilities.responses_input_items),
     messagesCapability: capabilityMode(capabilities.messages),
+    supportedModels: stringListFromValue(configSchema.supported_models ?? configSchema["supported-models"]),
     excludedModels: stringListFromValue(configSchema.excluded_models ?? configSchema["excluded-models"]),
     capabilities,
     configSchema,
@@ -144,8 +147,15 @@ function composeProviderCapabilities(form: ProviderFormState): Record<string, un
 
 function composeProviderConfigSchema(form: ProviderFormState): Record<string, unknown> {
   const next: Record<string, unknown> = { ...form.configSchema };
+  delete next["supported-models"];
   delete next["excluded-models"];
+  const supportedModels = cleanStringList(form.supportedModels);
   const excludedModels = cleanStringList(form.excludedModels);
+  if (supportedModels.length > 0) {
+    next.supported_models = supportedModels;
+  } else {
+    delete next.supported_models;
+  }
   if (excludedModels.length > 0) {
     next.excluded_models = excludedModels;
   } else {

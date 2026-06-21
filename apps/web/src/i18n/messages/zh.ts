@@ -1455,6 +1455,9 @@ export const zh: Messages = {
     endpointMessages: "Messages 端点",
     endpointCapabilityHint:
       "自动表示跟随供应商预设。只有明确知道该上游支持或不支持该端点转换时，才强制开启/关闭。",
+    supportedModels: "支持模型",
+    supportedModelsHint:
+      "该供应商下所有账号只路由这些 canonical 或上游模型规则。留空表示不设置供应商级 allowlist。支持 * 通配符。",
     excludedModels: "排除模型",
     excludedModelsHint: "对该供应商下所有账号隐藏这些 canonical 或上游模型规则。支持 * 通配符。",
     capabilityAuto: "自动",

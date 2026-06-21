@@ -732,6 +732,7 @@ Authorization header, cookie, credential material, or provider secret.
 - WP-500 起，`reverse-proxy-antigravity` 非 API-key 账号也支持 discovery，source 为 `reverse-proxy-antigravity`，通过 Reverse Proxy Runtime 使用选中账号凭证 POST 到 `{base_url}/v1internal:fetchAvailableModels`。
 - WP-530 起，Antigravity discovery 在账号缺少 project metadata 时会先通过同一 Reverse Proxy Runtime / selected account credential 调用 `{base_url}/v1internal:loadCodeAssist`，必要时调用 `{base_url}/v1internal:onboardUser`，再进行模型发现；`persist=true` 时写回解析到的 project metadata。
 - 该 discovery 结果必须用于后续 Provider Account model 选择，保持 `supported_models` 与现有 Scheduler/Gateway 边界一致。
+- Provider `config_schema.supported_models` 是供应商级 upstream/canonical model allowlist，会和账号 metadata `supported_models` 一起参与 Scheduler、Admin live test 与模型列表可见性；Codex CLI 只绕过账号级 discovery allowlist，不绕过供应商级显式 allowlist。
 
 ### 4.17 Admin Config Snapshot / Import
 

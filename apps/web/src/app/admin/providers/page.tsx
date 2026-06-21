@@ -196,6 +196,13 @@ function ProvidersContent() {
       hint: t("adminProviders.endpointCapabilityHint"),
     },
     {
+      name: "supportedModels",
+      label: t("adminProviders.supportedModels"),
+      type: "tags",
+      placeholder: "gpt-4o, claude-*",
+      hint: t("adminProviders.supportedModelsHint"),
+    },
+    {
       name: "excludedModels",
       label: t("adminProviders.excludedModels"),
       type: "tags",

@@ -698,8 +698,14 @@ func metadataStringList(metadata map[string]any, key string) ([]string, bool) {
 	}
 }
 
-func accountSupportsUpstreamModel(metadata map[string]any, upstreamModelName string) bool {
-	supportedModels, ok := metadataStringList(metadata, "supported_models")
+const supportedModelsMetadataKey = "supported_models"
+const supportedModelsHyphenMetadataKey = "supported-models"
+
+func supportedModelsAllowUpstreamModel(metadata map[string]any, upstreamModelName string) bool {
+	supportedModels, ok := metadataStringList(metadata, supportedModelsMetadataKey)
+	if !ok {
+		supportedModels, ok = metadataStringList(metadata, supportedModelsHyphenMetadataKey)
+	}
 	if !ok {
 		return true
 	}
@@ -722,6 +728,14 @@ func accountSupportsUpstreamModel(metadata map[string]any, upstreamModelName str
 	return false
 }
 
+func accountSupportsUpstreamModel(metadata map[string]any, upstreamModelName string) bool {
+	return supportedModelsAllowUpstreamModel(metadata, upstreamModelName)
+}
+
+func providerSupportsUpstreamModel(configSchema map[string]any, upstreamModelName string) bool {
+	return supportedModelsAllowUpstreamModel(configSchema, upstreamModelName)
+}
+
 // isCodexCLIReverseProxyProvider reports whether the provider proxies to the
 // ChatGPT/Codex backend through the Codex CLI reverse-proxy adapter.
 func isCodexCLIReverseProxyProvider(provider providercontract.Provider) bool {
@@ -731,19 +745,18 @@ func isCodexCLIReverseProxyProvider(provider providercontract.Provider) bool {
 // accountRoutableForModel reports whether the account may be selected to serve
 // the given upstream model.
 //
-// For most providers this enforces the discovery-derived supported_models
-// allowlist. Codex CLI accounts deliberately skip it: the ChatGPT/Codex
-// model-discovery list under-reports what the /responses endpoint actually
-// serves — a free account can call gpt-5.5 even though discovery never
-// advertises it — so enforcing the allowlist here pre-emptively rejects
-// requests the upstream would accept. Mirror the sub2api reference: forward and
-// let the upstream decide. Explicit admin exclusions (accountExcludesModel) are
-// applied separately and still hold.
-func accountRoutableForModel(provider providercontract.Provider, metadata map[string]any, upstreamModelName string) bool {
+// Provider-level supported_models is an explicit operator allowlist and always
+// applies. Account-level supported_models is usually discovery-derived; Codex
+// CLI accounts deliberately skip that account allowlist because the ChatGPT/
+// Codex discovery list under-reports what /responses can actually serve.
+func accountRoutableForModel(provider providercontract.Provider, account accountcontract.ProviderAccount, upstreamModelName string) bool {
+	if !providerSupportsUpstreamModel(provider.ConfigSchema, upstreamModelName) {
+		return false
+	}
 	if isCodexCLIReverseProxyProvider(provider) {
 		return true
 	}
-	return accountSupportsUpstreamModel(metadata, upstreamModelName)
+	return accountSupportsUpstreamModel(account.Metadata, upstreamModelName)
 }
 
 func (rt *runtimeState) gatewayCandidates(ctx context.Context, modelID int, forcedProviderKey string, apiKey apikeycontract.APIKey, sourceEndpoint string) ([]schedulercontract.Candidate, error) {
@@ -800,7 +813,7 @@ func (rt *runtimeState) gatewayCandidates(ctx context.Context, modelID int, forc
 			if providerAccountExcludesModel(provider, account, model.CanonicalName, effectiveMapping.UpstreamModelName) {
 				continue
 			}
-			if !accountRoutableForModel(provider, account.Metadata, effectiveMapping.UpstreamModelName) {
+			if !accountRoutableForModel(provider, account, effectiveMapping.UpstreamModelName) {
 				continue
 			}
 			if len(apiKey.GroupIDs) > 0 && !intersectsInt(apiKey.GroupIDs, groupIDsByAccount[account.ID]) {

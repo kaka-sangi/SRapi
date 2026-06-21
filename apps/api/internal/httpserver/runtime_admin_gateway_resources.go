@@ -1148,7 +1148,7 @@ func gatewayResourceAccountCanServeMapping(model modelcontract.Model, provider p
 	if providerAccountExcludesModel(provider, account, model.CanonicalName, mapping.UpstreamModelName) {
 		return false
 	}
-	return accountRoutableForModel(provider, account.Metadata, mapping.UpstreamModelName)
+	return accountRoutableForModel(provider, account, mapping.UpstreamModelName)
 }
 
 func gatewayEndpointSourceEndpoint(key string) string {

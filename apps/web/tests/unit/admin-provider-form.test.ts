@@ -78,6 +78,7 @@ describe("admin provider form endpoint capability switches", () => {
       responsesCompactCapability: "auto",
       responsesInputItemsCapability: "auto",
       messagesCapability: "off",
+      supportedModels: [],
       excludedModels: [],
       capabilities: {
         responses: true,
@@ -89,6 +90,28 @@ describe("admin provider form endpoint capability switches", () => {
     expect(body.capabilities).toEqual({
       messages: false,
       custom_flag: true,
+    });
+  });
+
+  it("round-trips provider-level supported model patterns through config_schema", () => {
+    const form = providerFormFromProvider({
+      ...baseProvider,
+      config_schema: {
+        "supported-models": " gpt-4o, GPT-4O, claude-* ",
+        oauth_config: { client_id: "client-1" },
+      },
+    });
+
+    expect(form.supportedModels).toEqual(["gpt-4o", "claude-*"]);
+
+    const body = buildUpdateProviderBody({
+      ...form,
+      supportedModels: ["o3", "O3", "", "gemini-*"],
+    });
+
+    expect(body.config_schema).toEqual({
+      supported_models: ["o3", "gemini-*"],
+      oauth_config: { client_id: "client-1" },
     });
   });
 
