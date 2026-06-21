@@ -143,7 +143,7 @@ func defaultAdminSettings(now time.Time) admincontrol.AdminSettings {
 			StreamTimeoutSeconds:                 600,
 			RequestShaperEnabled:                 true,
 			ProtocolConversionRoutes:             cloneStringSlice(defaultGatewayProtocolConversionRoutes),
-			RetryCount:                           3,
+			RetryCount:                           gatewayRetryCountDefault,
 			MaxRetryCredentials:                  0,
 			MaxRetryIntervalMS:                   2000,
 			SchedulerStrategyRolloutEnabled:      false,
@@ -370,7 +370,7 @@ func validGeneralSettings(settings admincontrol.AdminSettingsGeneral) bool {
 // AdminSettingsGateway.retry_count and keep the failover hot path within a sane
 // envelope even if persisted settings predate the field.
 const (
-	gatewayRetryCountDefault       = 3
+	gatewayRetryCountDefault       = 20
 	gatewayRetryCountMax           = 20
 	gatewayMaxRetryIntervalDefault = 2000
 )

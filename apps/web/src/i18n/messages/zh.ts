@@ -3108,7 +3108,7 @@ export const zh: Messages = {
       rate_limit_cooldown_seconds: "限流冷却（秒）",
       stream_timeout_seconds: "流式超时（秒）",
       request_shaper_enabled: "请求整形",
-      retry_count: "最大重试次数",
+      retry_count: "最大故障转移账号数",
       max_retry_credentials: "最大重试凭据数（0=不限）",
       max_retry_interval_ms: "最大重试间隔（毫秒）",
       scheduler_strategy_rollout_enabled: "调度策略灰度",

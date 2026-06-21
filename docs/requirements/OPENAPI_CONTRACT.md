@@ -1154,6 +1154,8 @@ GET  /api/v1/admin/scheduler/strategies/{id}/versions
 
 当前 dry-run / shadow comparison 使用 `POST /api/v1/admin/scheduler/simulate`，以同一请求 profile 显式传入 current 与 shadow strategy；可选 `shadow_rollout_percent` + `rollout_key` 返回稳定灰度 bucket 与 shadow 命中预览。K1.6.4 起 `AdminSettingsGateway` 还包含真实 Gateway 流量的 Scheduler shadow strategy rollout 控制字段：`scheduler_strategy_rollout_enabled`、`scheduler_strategy_shadow_strategy`、`scheduler_strategy_rollout_percent`、`scheduler_strategy_rollout_models`、`scheduler_strategy_rollout_api_key_hashes`。这些字段是可选字段；旧 settings payload 不带这些字段时默认不启用真实灰度。策略 descriptor、配置 schema、版本、批量历史回放和回滚规则以 `SCHEDULER_STRATEGY_EXTENSION_SPEC.md` 为准。
 
+`AdminSettingsGateway.retry_count` 是跨候选账号的 Gateway failover 最大尝试次数，不是同账号重试次数；默认值为 20，使 `session_invalid`、`auth_failed`、`rate_limit`、`provider_5xx` 等账号/上游级失败优先继续尝试账号池，管理员仍可显式调低该上限。
+
 ### 16.8 Gateway
 
 ```txt

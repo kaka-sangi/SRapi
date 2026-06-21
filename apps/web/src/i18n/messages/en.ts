@@ -3178,7 +3178,7 @@ export const en = {
       rate_limit_cooldown_seconds: "Rate-limit cooldown (s)",
       stream_timeout_seconds: "Stream timeout (s)",
       request_shaper_enabled: "Request shaper",
-      retry_count: "Max retry attempts",
+      retry_count: "Max failover accounts",
       max_retry_credentials: "Max retry credentials (0 = unlimited)",
       max_retry_interval_ms: "Max retry interval (ms)",
       scheduler_strategy_rollout_enabled: "Scheduler rollout",

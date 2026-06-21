@@ -6269,6 +6269,75 @@ func TestGatewayChatCompletionFailoverRecordsAttemptEvidence(t *testing.T) {
 	}
 }
 
+func TestGatewayChatCompletionFailoverContinuesPastThreeSessionInvalidAccounts(t *testing.T) {
+	var (
+		mu    sync.Mutex
+		calls = map[string]int{}
+	)
+	failUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/backend-api/conversation" {
+			t.Fatalf("expected failing ChatGPT Web conversation path, got %s", r.URL.Path)
+		}
+		auth := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		mu.Lock()
+		calls[auth]++
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"error":{"code":"session_invalid","message":"session expired"}}`))
+	}))
+	defer failUpstream.Close()
+
+	successUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/backend-api/conversation" {
+			t.Fatalf("expected healthy ChatGPT Web conversation path, got %s", r.URL.Path)
+		}
+		auth := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		mu.Lock()
+		calls[auth]++
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`data: {"message":{"author":{"role":"assistant"},"content":{"parts":["healthy account ok"]}}}` + "\n\ndata: [DONE]\n\n"))
+	}))
+	defer successUpstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	csrf := loginResp.Data.CsrfToken
+	modelResp := mustCreateModel(t, handler, sessionCookie, csrf, `{"canonical_name":"session-failover-model","display_name":"Session Failover Model","status":"active"}`)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, csrf, `{"name":"session-failover-provider","display_name":"Session Failover Provider","adapter_type":"reverse-proxy-chatgpt-web","protocol":"openai-compatible","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, csrf, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"session-failover-upstream","status":"active"}`)
+
+	for i := 1; i <= 3; i++ {
+		secret := fmt.Sprintf("session-invalid-secret-%d", i)
+		body := fmt.Sprintf(`{"provider_id":"%s","name":"session-invalid-account-%d","runtime_class":"oauth_refresh","upstream_client":"chatgpt_web","credential":{"access_token":"%s","refresh_token":"refresh-%d"},"metadata":{"base_url":"%s","user_agent":"ChatGPT/1.0","chatgpt_requirements_token":"requirements-token","health_score":0.99,"latency_p95_ms":%d,"quality_score":0.99},"status":"active","priority":1}`, providerResp.Data.Id, i, secret, i, failUpstream.URL, 50+i)
+		mustCreateAccount(t, handler, sessionCookie, csrf, body)
+	}
+	mustCreateAccount(t, handler, sessionCookie, csrf, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"session-valid-account","runtime_class":"oauth_refresh","upstream_client":"chatgpt_web","credential":{"access_token":"session-valid-secret","refresh_token":"refresh-valid"},"metadata":{"base_url":"`+successUpstream.URL+`","user_agent":"ChatGPT/1.0","chatgpt_requirements_token":"requirements-token","health_score":0.99,"latency_p95_ms":100,"quality_score":0.99},"status":"active","priority":1}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, csrf)
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/chat/completions", `{"model":"session-failover-model","messages":[{"role":"user","content":"exercise session failover"}]}`)
+	var chatResp apiopenapi.ChatCompletionResponse
+	if err := json.NewDecoder(rec.Body).Decode(&chatResp); err != nil {
+		t.Fatalf("decode failover chat response: %v", err)
+	}
+	if len(chatResp.Choices) != 1 || decodeChatMessageText(t, chatResp.Choices[0].Message.Content) != "healthy account ok" {
+		t.Fatalf("expected healthy account response, got %+v", chatResp)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	for i := 1; i <= 3; i++ {
+		secret := fmt.Sprintf("session-invalid-secret-%d", i)
+		if calls[secret] != 1 {
+			t.Fatalf("expected invalid account %d to be tried once, calls=%+v", i, calls)
+		}
+	}
+	if calls["session-valid-secret"] != 1 {
+		t.Fatalf("expected healthy fourth account to be tried once, calls=%+v", calls)
+	}
+}
+
 // setGatewayRetryCount reads current admin settings, sets the operator-tunable
 // gateway.retry_count cross-candidate failover cap, and saves.
 func setGatewayRetryCount(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrf string, retryCount int) {

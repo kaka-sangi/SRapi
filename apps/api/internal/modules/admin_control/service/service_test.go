@@ -596,7 +596,7 @@ func TestUpdateAdminSettingsRoundTripsGatewayRetryKnobs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get admin settings: %v", err)
 	}
-	if settings.Gateway.RetryCount != 3 || settings.Gateway.MaxRetryCredentials != 0 || settings.Gateway.MaxRetryIntervalMS != 2000 {
+	if settings.Gateway.RetryCount != 20 || settings.Gateway.MaxRetryCredentials != 0 || settings.Gateway.MaxRetryIntervalMS != 2000 {
 		t.Fatalf("unexpected default gateway retry knobs: %+v", settings.Gateway)
 	}
 
@@ -641,8 +641,8 @@ func TestUpdateAdminSettingsNormalizesGatewayRetryKnobs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("update admin settings: %v", err)
 	}
-	if updated.Gateway.RetryCount != 3 {
-		t.Fatalf("expected retry_count to default to 3, got %d", updated.Gateway.RetryCount)
+	if updated.Gateway.RetryCount != 20 {
+		t.Fatalf("expected retry_count to default to 20, got %d", updated.Gateway.RetryCount)
 	}
 	if updated.Gateway.MaxRetryCredentials != 0 {
 		t.Fatalf("expected negative max_retry_credentials to clamp to 0, got %d", updated.Gateway.MaxRetryCredentials)

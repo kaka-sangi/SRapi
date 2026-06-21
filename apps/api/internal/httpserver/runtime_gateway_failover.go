@@ -24,9 +24,9 @@ import (
 
 // defaultGatewayFailoverAttempts is the fallback cross-candidate failover cap
 // used when the operator-tunable AdminSettingsGateway.retry_count is unset or
-// the settings read fails. Operators tune this via admin settings; per-account
-// metadata still governs same-candidate retries on top of it.
-const defaultGatewayFailoverAttempts = 3
+// the settings read fails. Keep the default high enough to walk a real account
+// pool before surfacing the last provider error to the caller.
+const defaultGatewayFailoverAttempts = 20
 
 const defaultGatewayMaxRetryIntervalMS = 2000
 
