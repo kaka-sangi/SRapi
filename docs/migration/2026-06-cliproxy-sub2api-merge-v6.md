@@ -165,4 +165,40 @@ K. **Frontend density / UX**. The goal directive calls out
 
 ## Outcomes
 
-(Filled in after the commit lands.)
+Shipped:
+
+- `ratelimit.FailureMode` operator setting on the Limiter. Default
+  `FailOpen` matches sub2api and the common production posture;
+  `FailClose` is available for compliance-sensitive deployments.
+  Redis transport errors (connection refused, EOF, i/o timeout,
+  cluster down, dataset loading) route through the configured
+  mode; script-logic errors and context cancellations always
+  propagate untouched.
+
+Refused as architectural regression / wrong fit:
+
+- Web search tool emulation — would break the gateway's "translate
+  → dispatch → translate" dispatch invariant; new product feature,
+  not a port.
+- WeChat / DingTalk OAuth handlers — non-OIDC flows that contradict
+  the hash-only pending-session contract; identity-provider type
+  constants are already declared so the day a customer asks, the
+  cost to add a provider-specific handler is bounded.
+
+Acknowledged but not addressed in this wave:
+
+- Frontend density / UX (`整理前端`) — better answered by a
+  dedicated frontend pass with before/after screenshots than
+  interleaved with backend parity ports.
+
+Already-covered / re-verified:
+
+- OpenAI Messages → OpenAI model bridge (SRapi handles via
+  `ModelProviderMapping` instead of a per-key knob).
+- Per-group `/v1/models` overlay (covered by `Group.allowed_models`
+  + admin filter).
+- Server middleware (CORS, recovery, X-Request-Id, body limits,
+  security headers, JWT/admin auth) — every sub2api middleware has
+  an SRapi equivalent.
+- `domain/constants.go` (replaced by typed contracts).
+- `ent/migrate` (replaced by Atlas).

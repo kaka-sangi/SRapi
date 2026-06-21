@@ -19,6 +19,25 @@ var (
 	ErrInvalidCheck = errors.New("invalid rate limit check")
 )
 
+// FailureMode controls how the limiter behaves when Redis errors out
+// during a check. Operators pick the trade-off:
+//
+//   - FailOpen (default): allow the request through. Trades quota
+//     fidelity for availability. Matches sub2api's default and the
+//     common production posture — Redis unavailability should not
+//     take down the gateway.
+//   - FailClose: reject the request. Trades availability for quota
+//     fidelity. Correct for compliance-sensitive deployments where
+//     unbounded traffic during Redis outages is unacceptable.
+type FailureMode int
+
+const (
+	// FailOpen allows the request through on Redis errors. Default.
+	FailOpen FailureMode = iota
+	// FailClose rejects the request on Redis errors.
+	FailClose
+)
+
 const (
 	defaultKeyPrefix = "srapi:rl:"
 	defaultWindow    = time.Minute
@@ -63,16 +82,48 @@ type ConcurrencyLease struct {
 
 // Limiter enforces fixed-window counters in Redis.
 type Limiter struct {
-	client *redis.Client
-	prefix string
+	client      *redis.Client
+	prefix      string
+	failureMode FailureMode
 }
 
-// New creates a Redis-backed rate limiter.
+// New creates a Redis-backed rate limiter. Default failure mode is
+// FailOpen — see FailureMode for the rationale.
 func New(client *redis.Client) (*Limiter, error) {
 	if client == nil {
 		return nil, ErrInvalidLimiter
 	}
-	return &Limiter{client: client, prefix: defaultKeyPrefix}, nil
+	return &Limiter{client: client, prefix: defaultKeyPrefix, failureMode: FailOpen}, nil
+}
+
+// SetFailureMode reconfigures the limiter's behavior on Redis errors.
+// Safe to call at any time; subsequent Allow / AcquireConcurrency
+// calls honor the new mode.
+func (l *Limiter) SetFailureMode(mode FailureMode) {
+	if l == nil {
+		return
+	}
+	l.failureMode = mode
+}
+
+// FailureMode reports the limiter's current configured mode.
+func (l *Limiter) FailureMode() FailureMode {
+	if l == nil {
+		return FailOpen
+	}
+	return l.failureMode
+}
+
+// failureModeAllowed returns the Decision to surface (and the error
+// to propagate) when a Redis call errored out. FailOpen swallows the
+// error and returns Allowed=true; FailClose surfaces the error so
+// the caller rejects the request. Concurrency call sites use the
+// same convention by treating a returned error as "rejected".
+func (l *Limiter) failureModeAllowed(err error) (Decision, error) {
+	if l == nil || l.failureMode == FailOpen {
+		return Decision{Allowed: true}, nil
+	}
+	return Decision{}, err
 }
 
 // Allow atomically evaluates every check and increments counters only when all pass.
@@ -99,6 +150,12 @@ func (l *Limiter) Allow(ctx context.Context, checks []Check, now time.Time) (Dec
 	}
 	result, err := multiLimitScript.Run(ctx, l.client, keys, args...).Slice()
 	if err != nil {
+		// Distinguish Redis transport errors (eligible for the
+		// configured failure mode) from script logic errors
+		// (always propagate — those indicate a code bug).
+		if isRedisAvailabilityError(err) {
+			return l.failureModeAllowed(err)
+		}
 		return Decision{}, err
 	}
 	decision, err := parseScriptDecision(result, now)
@@ -106,6 +163,45 @@ func (l *Limiter) Allow(ctx context.Context, checks []Check, now time.Time) (Dec
 		return Decision{}, err
 	}
 	return decision, nil
+}
+
+// isRedisAvailabilityError reports whether err looks like a Redis
+// availability failure (connection refused, EOF, timeout, redis
+// not loaded) — the class the failure-mode setting governs. Script
+// logic errors and our own parse errors are NOT availability
+// failures and stay opaque to the caller.
+func isRedisAvailabilityError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, redis.ErrClosed) {
+		return true
+	}
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		// Context cancellation is the caller's signal; do not
+		// fail-open through it. Treat as a non-availability
+		// error.
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	for _, marker := range []string{
+		"connection refused",
+		"connection reset",
+		"i/o timeout",
+		"broken pipe",
+		"network is unreachable",
+		"no route to host",
+		"eof",
+		"dial tcp",
+		"loading the dataset",
+		"masterdown",
+		"clusterdown",
+	} {
+		if strings.Contains(msg, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 // AcquireConcurrency atomically acquires one concurrent request slot.
@@ -131,6 +227,10 @@ func (l *Limiter) AcquireConcurrency(ctx context.Context, check ConcurrencyCheck
 	ttl := ttlMillis(normalized.TTL)
 	result, err := acquireConcurrencyScript.Run(ctx, l.client, []string{key}, normalized.Name, normalized.Limit, now.UnixMilli(), ttl, token).Slice()
 	if err != nil {
+		if isRedisAvailabilityError(err) {
+			decision, modeErr := l.failureModeAllowed(err)
+			return ConcurrencyLease{}, decision, modeErr
+		}
 		return ConcurrencyLease{}, Decision{}, err
 	}
 	decision, err := parseConcurrencyDecision(result, normalized.Name, now)
