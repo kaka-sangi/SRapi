@@ -4832,6 +4832,13 @@ type AccountsAvailabilitySummaryResponse struct {
 	RequestId  RequestId                    `json:"request_id"`
 }
 
+// AdminAccountManualPauseRequest defines model for AdminAccountManualPauseRequest.
+type AdminAccountManualPauseRequest struct {
+	// Reason Optional operator-supplied free-form context surfaced to other operators (e.g. "investigating slow upstream", "rotating proxy"). Trimmed and truncated server-side.
+	Reason *string   `json:"reason,omitempty"`
+	Until  Timestamp `json:"until"`
+}
+
 // AdminAccountTestRequest defines model for AdminAccountTestRequest.
 type AdminAccountTestRequest struct {
 	// Mode Use `live` for a real upstream round-trip; default only validates local configuration.
@@ -14565,6 +14572,9 @@ type UpdateAdminAccountJSONRequestBody = UpdateProviderAccountRequest
 // DiscoverAdminAccountModelsJSONRequestBody defines body for DiscoverAdminAccountModels for application/json ContentType.
 type DiscoverAdminAccountModelsJSONRequestBody = DiscoverAccountModelsRequest
 
+// ApplyAdminAccountManualPauseJSONRequestBody defines body for ApplyAdminAccountManualPause for application/json ContentType.
+type ApplyAdminAccountManualPauseJSONRequestBody = AdminAccountManualPauseRequest
+
 // BindAdminAccountProxyJSONRequestBody defines body for BindAdminAccountProxy for application/json ContentType.
 type BindAdminAccountProxyJSONRequestBody = BindProviderAccountProxyRequest
 
@@ -23157,6 +23167,12 @@ type ServerInterface interface {
 	// Get provider account health snapshot.
 	// (GET /api/v1/admin/accounts/{id}/health)
 	GetAdminAccountHealth(w http.ResponseWriter, r *http.Request, id Id)
+	// Clear the operator-initiated scheduling skip on this account.
+	// (DELETE /api/v1/admin/accounts/{id}/manual-pause)
+	ClearAdminAccountManualPause(w http.ResponseWriter, r *http.Request, id Id)
+	// Skip this account during scheduling until a wall-clock instant.
+	// (POST /api/v1/admin/accounts/{id}/manual-pause)
+	ApplyAdminAccountManualPause(w http.ResponseWriter, r *http.Request, id Id)
 	// Bind or clear a provider account proxy.
 	// (PATCH /api/v1/admin/accounts/{id}/proxy)
 	BindAdminAccountProxy(w http.ResponseWriter, r *http.Request, id Id)
@@ -26405,6 +26421,74 @@ func (siw *ServerInterfaceWrapper) GetAdminAccountHealth(w http.ResponseWriter, 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetAdminAccountHealth(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ClearAdminAccountManualPause operation middleware
+func (siw *ServerInterfaceWrapper) ClearAdminAccountManualPause(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ClearAdminAccountManualPause(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ApplyAdminAccountManualPause operation middleware
+func (siw *ServerInterfaceWrapper) ApplyAdminAccountManualPause(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ApplyAdminAccountManualPause(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -40795,6 +40879,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/discover-models", wrapper.DiscoverAdminAccountModels)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/enable", wrapper.EnableAdminAccount)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/health", wrapper.GetAdminAccountHealth)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/manual-pause", wrapper.ClearAdminAccountManualPause)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/manual-pause", wrapper.ApplyAdminAccountManualPause)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/proxy", wrapper.BindAdminAccountProxy)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/proxy-quality", wrapper.GetAdminAccountProxyQuality)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/quota", wrapper.GetAdminAccountQuota)

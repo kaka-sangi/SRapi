@@ -373,12 +373,20 @@ func TestEffectiveCapabilitiesImageSubresourcesRequireExplicitCapability(t *test
 			wantEdits:      true,
 		},
 		{
-			name: "codex preset advertises image generation only",
+			// Codex CLI declares the full image trio because the
+			// reverse-proxy adapter implements all three endpoints
+			// (codex_images.go: invokeReverseProxyCodexImageGeneration /
+			// ImageEdit / ImageVariation). The capability declaration
+			// previously omitted edits / variations even though the
+			// implementation was already in place.
+			name: "codex preset advertises full image trio",
 			provider: providercontract.Provider{
 				Name:        "codex-cli",
 				AdapterType: "reverse-proxy-codex-cli",
 			},
 			wantGeneration: true,
+			wantEdits:      true,
+			wantVariations: true,
 		},
 		{
 			name: "antigravity preset advertises image generation only",

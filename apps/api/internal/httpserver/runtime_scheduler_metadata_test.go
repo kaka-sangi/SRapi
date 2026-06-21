@@ -66,6 +66,24 @@ func TestSchedulerRuntimeMetadataParsesHealthQuotaLatency(t *testing.T) {
 	if resetState.QuotaExhausted || resetState.QuotaRemainingRatio != nil {
 		t.Fatalf("expected reset quota metadata to be ignored, got %+v", resetState)
 	}
+
+	// Operator-initiated pause flows into RuntimeState.CooldownActive without
+	// depending on the probe-driven cooldown_until key — that way a probe
+	// success path (which clears cooldown_*) cannot silently lift the
+	// operator's pause.
+	manualState := schedulerRuntimeState(map[string]any{
+		"manual_pause_until": time.Now().UTC().Add(15 * time.Minute).Format(time.RFC3339),
+	})
+	if !manualState.CooldownActive {
+		t.Fatalf("expected manual_pause_until in the future to mark CooldownActive, got %+v", manualState)
+	}
+
+	expiredManual := schedulerRuntimeState(map[string]any{
+		"manual_pause_until": time.Now().UTC().Add(-time.Minute).Format(time.RFC3339),
+	})
+	if expiredManual.CooldownActive {
+		t.Fatalf("expected expired manual_pause_until to NOT mark CooldownActive, got %+v", expiredManual)
+	}
 }
 
 func TestGatewaySchedulerScoresUseAccountRuntimeMetadata(t *testing.T) {

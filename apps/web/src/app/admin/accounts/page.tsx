@@ -31,6 +31,8 @@ import {
   useCreateAccount,
   useUpdateAccount,
   useClearAccountError,
+  useApplyAccountManualPause,
+  useClearAccountManualPause,
   useRecoverAccount,
   useRefreshAccount,
   useResetAccountQuota,
@@ -121,6 +123,36 @@ function isRecoverable(status: ProviderAccount["status"]): boolean {
   return status !== "active" && status !== "disabled";
 }
 
+/**
+ * manualPauseActive reads the operator-initiated scheduling pause that the
+ * /admin/accounts/{id}/manual-pause endpoint writes onto account.metadata.
+ * Distinct from the probe-driven cooldown_until: the operator pause survives
+ * a successful health probe and only clears on explicit resume / expiry.
+ */
+function manualPauseActive(account: ProviderAccount): boolean {
+  const metadata = account.metadata as Record<string, unknown> | undefined;
+  const raw = metadata?.manual_pause_until;
+  if (typeof raw !== "string" || raw === "") return false;
+  const parsed = Date.parse(raw);
+  return Number.isFinite(parsed) && parsed > Date.now();
+}
+
+/**
+ * formatLocalDateTime renders an ISO timestamp in the operator's local zone
+ * with seconds suppressed — admin toasts only need minute-level granularity.
+ */
+function formatLocalDateTime(iso: string): string {
+  const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return iso;
+  return date.toLocaleString(undefined, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function downloadJson(filename: string, data: unknown) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -183,6 +215,8 @@ function AccountsContent() {
   const recover = useRecoverAccount();
   const refreshToken = useRefreshAccount();
   const resetQuota = useResetAccountQuota();
+  const applyManualPause = useApplyAccountManualPause();
+  const clearManualPause = useClearAccountManualPause();
   const batchAction = useBatchActionAccounts();
   const batchDelete = useBatchDeleteAccounts();
   const batchConcurrency = useBatchUpdateAccountConcurrency();
@@ -1204,6 +1238,38 @@ function AccountsContent() {
         label: t("adminAccounts.quotaReset"),
         onSelect: () =>
           void runAction(() => resetQuota.mutateAsync(a.id), t("adminAccounts.quotaResetDone")),
+      });
+    }
+    if (manualPauseActive(a)) {
+      actions.push({
+        label: t("adminAccounts.manualResumeAction"),
+        onSelect: () =>
+          void runAction(
+            () => clearManualPause.mutateAsync(a.id),
+            t("adminAccounts.manualResumeDone"),
+          ),
+      });
+    } else {
+      actions.push({
+        label: t("adminAccounts.manualPauseAction"),
+        onSelect: () => {
+          const raw = window.prompt(t("adminAccounts.manualPausePrompt"), "30");
+          if (raw == null) return;
+          const minutes = parseInt(raw, 10);
+          if (Number.isNaN(minutes) || minutes < 1 || minutes > 1440) {
+            toast({
+              title: t("feedback.failed"),
+              description: t("adminAccounts.manualPauseInvalid"),
+              tone: "error",
+            });
+            return;
+          }
+          const until = new Date(Date.now() + minutes * 60_000).toISOString();
+          void runAction(
+            () => applyManualPause.mutateAsync({ id: a.id, body: { until } }),
+            t("adminAccounts.manualPauseDone", { until: formatLocalDateTime(until) }),
+          );
+        },
       });
     }
     actions.push({

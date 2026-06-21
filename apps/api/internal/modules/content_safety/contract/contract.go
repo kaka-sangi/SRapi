@@ -9,14 +9,14 @@ import (
 type FindingKind string
 
 const (
-	FindingKindPIIEmail            FindingKind = "pii_email"
-	FindingKindPIIPhone            FindingKind = "pii_phone"
-	FindingKindPIISSN              FindingKind = "pii_ssn"
-	FindingKindPIINationalID       FindingKind = "pii_national_id"
-	FindingKindPIICreditCard       FindingKind = "pii_credit_card"
-	FindingKindPromptInjection     FindingKind = "prompt_injection"
-	FindingKindCustomKeyword       FindingKind = "custom_keyword"
-	FindingKindModerationCategory  FindingKind = "moderation_category"
+	FindingKindPIIEmail           FindingKind = "pii_email"
+	FindingKindPIIPhone           FindingKind = "pii_phone"
+	FindingKindPIISSN             FindingKind = "pii_ssn"
+	FindingKindPIINationalID      FindingKind = "pii_national_id"
+	FindingKindPIICreditCard      FindingKind = "pii_credit_card"
+	FindingKindPromptInjection    FindingKind = "prompt_injection"
+	FindingKindCustomKeyword      FindingKind = "custom_keyword"
+	FindingKindModerationCategory FindingKind = "moderation_category"
 )
 
 // Severity describes the operational severity of a finding.

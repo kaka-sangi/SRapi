@@ -40,13 +40,13 @@ type OpenAIModerationClient struct {
 // All fields except APIKey have sensible defaults; an empty APIKey returns
 // a typed error so the runtime can fail-open when credentials aren't set.
 type OpenAIModerationOptions struct {
-	APIKey      string
-	BaseURL     string
-	Model       string
-	Timeout     time.Duration
-	HTTPClient  *http.Client
-	CacheSize   int
-	CacheTTL    time.Duration
+	APIKey     string
+	BaseURL    string
+	Model      string
+	Timeout    time.Duration
+	HTTPClient *http.Client
+	CacheSize  int
+	CacheTTL   time.Duration
 }
 
 // ErrModerationNotConfigured indicates the operator enabled moderation in
@@ -201,12 +201,12 @@ func firstNonEmpty(values ...string) string {
 // same system prompt — caching the moderation verdict eliminates 70%+ of
 // upstream calls in steady state without changing the result semantics.
 type moderationCache struct {
-	mu       sync.Mutex
-	max      int
-	ttl      time.Duration
-	order    *list.List
-	entries  map[string]*list.Element
-	nowFn    func() time.Time
+	mu      sync.Mutex
+	max     int
+	ttl     time.Duration
+	order   *list.List
+	entries map[string]*list.Element
+	nowFn   func() time.Time
 }
 
 type moderationCacheEntry struct {

@@ -366,7 +366,22 @@ func metadataCooldownActive(metadata map[string]any, now time.Time) bool {
 	if metadata == nil {
 		return false
 	}
-	value, ok := metadata["cooldown_until"]
+	if metadataTimestampInFuture(metadata, "cooldown_until", now) {
+		return true
+	}
+	// manual_pause_until is the operator-initiated sibling of cooldown_until.
+	// Health probes own cooldown_until and may clear it on success; operators
+	// own manual_pause_until and it only clears on explicit resume / expiry.
+	// Both flow into RuntimeState.CooldownActive so the scheduler skips the
+	// account during either window.
+	return metadataTimestampInFuture(metadata, "manual_pause_until", now)
+}
+
+// metadataTimestampInFuture parses a metadata RFC3339 string and reports
+// whether it is strictly after the supplied wall clock. Missing key, malformed
+// value, or past timestamps return false.
+func metadataTimestampInFuture(metadata map[string]any, key string, now time.Time) bool {
+	value, ok := metadata[key]
 	if !ok {
 		return false
 	}

@@ -34,10 +34,10 @@ func TestResolveThinkingProtocolFamily_TableCovers(t *testing.T) {
 		{"", thinkingFamilyUnknown},
 		{"gpt-4o", thinkingFamilyUnknown},
 		{"gemini-2.5-pro", thinkingFamilyUnknown},
-		{"qwen-3-72b-chat", thinkingFamilyUnknown},                       // qwen without -thinking
-		{"minimax-text-01", thinkingFamilyUnknown},                       // minimax not -m series
-		{"claudette-fork", thinkingFamilyUnknown},                        // "claudette-" does NOT have prefix "claude-"
-		{"claude-foreign-relay-x", thinkingFamilyAnthropicStrict},        // documented limitation — anything starting with "claude-" is strict
+		{"qwen-3-72b-chat", thinkingFamilyUnknown},                // qwen without -thinking
+		{"minimax-text-01", thinkingFamilyUnknown},                // minimax not -m series
+		{"claudette-fork", thinkingFamilyUnknown},                 // "claudette-" does NOT have prefix "claude-"
+		{"claude-foreign-relay-x", thinkingFamilyAnthropicStrict}, // documented limitation — anything starting with "claude-" is strict
 		{"deepseek-but-not-real", thinkingFamilyPassbackRequired},
 	}
 	for _, tc := range cases {

@@ -31,7 +31,7 @@ import (
 // HTTP pipeline against the synthesized URL.
 
 const (
-	vertexScope        = "https://www.googleapis.com/auth/cloud-platform"
+	vertexScope         = "https://www.googleapis.com/auth/cloud-platform"
 	vertexDefaultRegion = "us-central1"
 )
 

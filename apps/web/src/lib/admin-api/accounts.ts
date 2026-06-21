@@ -2,7 +2,9 @@
 
 import {
   addAdminAccountGroupMember,
+  applyAdminAccountManualPause,
   batchActionAdminAccounts,
+  clearAdminAccountManualPause,
   batchCreateAdminAccounts,
   batchDeleteAdminAccounts,
   batchQuotaFetchAdminAccounts,
@@ -312,6 +314,23 @@ export const accountsApi = {
 
   resetAccountQuota(id: Id): Promise<ProviderAccount> {
     return unwrapData(() => resetAdminAccountQuota({ path: { id }, throwOnError: true }));
+  },
+
+  // Operator-initiated scheduling skip until `until` (auto-resumes at expiry).
+  // Distinct from disable: the account stays logically active. The scheduler
+  // treats the window like a health-probe cooldown so candidate selection
+  // skips the account; probe-driven cooldown_until is kept in different
+  // metadata keys, so a successful probe can NOT silently lift this pause.
+  applyAccountManualPause(id: Id, body: { until: string; reason?: string }): Promise<ProviderAccount> {
+    return unwrapData(() =>
+      applyAdminAccountManualPause({ path: { id }, body, throwOnError: true }),
+    );
+  },
+
+  // Idempotent. Clearing an unpaused account is a no-op and returns the
+  // current account snapshot.
+  clearAccountManualPause(id: Id): Promise<ProviderAccount> {
+    return unwrapData(() => clearAdminAccountManualPause({ path: { id }, throwOnError: true }));
   },
 
   bindAccountProxy(id: Id, proxyId: string | null): Promise<ProviderAccount> {

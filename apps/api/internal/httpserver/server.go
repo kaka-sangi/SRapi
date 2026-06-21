@@ -611,6 +611,8 @@ func newWithServer(cfg config.Config, logger *slog.Logger, options ...Option) (h
 	mux.HandleFunc("POST /api/v1/admin/accounts/{id}/disable", server.handleDisableAdminAccount)
 	mux.HandleFunc("POST /api/v1/admin/accounts/{id}/enable", server.handleEnableAdminAccount)
 	mux.HandleFunc("POST /api/v1/admin/accounts/{id}/recover", server.handleRecoverAdminAccount)
+	mux.HandleFunc("POST /api/v1/admin/accounts/{id}/manual-pause", server.handleApplyAdminAccountManualPause)
+	mux.HandleFunc("DELETE /api/v1/admin/accounts/{id}/manual-pause", server.handleClearAdminAccountManualPause)
 	mux.HandleFunc("POST /api/v1/admin/accounts/{id}/clear-error", server.handleClearAdminAccountError)
 	mux.HandleFunc("POST /api/v1/admin/accounts/{id}/refresh", server.handleRefreshAdminAccount)
 	mux.HandleFunc("GET /api/v1/admin/accounts/health-summary", server.handleAdminAccountsHealthSummary)

@@ -28,9 +28,9 @@ func mustGeneratePKCS8(t *testing.T) ([]byte, []byte) {
 func TestNormalize_AcceptsPKCS8AndRewritesToPKCS1(t *testing.T) {
 	pkcs8PEM, _ := mustGeneratePKCS8(t)
 	raw, err := json.Marshal(map[string]any{
-		"type":        "service_account",
-		"project_id":  "demo-project",
-		"private_key": string(pkcs8PEM),
+		"type":         "service_account",
+		"project_id":   "demo-project",
+		"private_key":  string(pkcs8PEM),
 		"client_email": "demo@demo-project.iam.gserviceaccount.com",
 	})
 	if err != nil {

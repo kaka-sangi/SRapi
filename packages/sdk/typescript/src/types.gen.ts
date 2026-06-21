@@ -1566,6 +1566,14 @@ export type AdminTestResult = {
     checked_at: Timestamp;
 };
 
+export type AdminAccountManualPauseRequest = {
+    until: Timestamp;
+    /**
+     * Optional operator-supplied free-form context surfaced to other operators (e.g. "investigating slow upstream", "rotating proxy"). Trimmed and truncated server-side.
+     */
+    reason?: string;
+};
+
 export type AdminAccountTestRequest = {
     /**
      * Use `live` for a real upstream round-trip; default only validates local configuration.
@@ -15242,6 +15250,88 @@ export type EnableAdminAccountResponses = {
 };
 
 export type EnableAdminAccountResponse = EnableAdminAccountResponses[keyof EnableAdminAccountResponses];
+
+export type ClearAdminAccountManualPauseData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/accounts/{id}/manual-pause';
+};
+
+export type ClearAdminAccountManualPauseErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ClearAdminAccountManualPauseError = ClearAdminAccountManualPauseErrors[keyof ClearAdminAccountManualPauseErrors];
+
+export type ClearAdminAccountManualPauseResponses = {
+    /**
+     * Provider account pause cleared (or already absent).
+     */
+    200: ProviderAccountResponse;
+};
+
+export type ClearAdminAccountManualPauseResponse = ClearAdminAccountManualPauseResponses[keyof ClearAdminAccountManualPauseResponses];
+
+export type ApplyAdminAccountManualPauseData = {
+    body: AdminAccountManualPauseRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/accounts/{id}/manual-pause';
+};
+
+export type ApplyAdminAccountManualPauseErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ApplyAdminAccountManualPauseError = ApplyAdminAccountManualPauseErrors[keyof ApplyAdminAccountManualPauseErrors];
+
+export type ApplyAdminAccountManualPauseResponses = {
+    /**
+     * Provider account pause recorded.
+     */
+    200: ProviderAccountResponse;
+};
+
+export type ApplyAdminAccountManualPauseResponse = ApplyAdminAccountManualPauseResponses[keyof ApplyAdminAccountManualPauseResponses];
 
 export type RefreshAdminAccountData = {
     body?: never;

@@ -6383,6 +6383,100 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/accounts/{id}/manual-pause:
+    post:
+      tags:
+        - AdminAccounts
+      operationId: applyAdminAccountManualPause
+      summary: Skip this account during scheduling until a wall-clock instant.
+      description: >
+        Records an operator-initiated scheduling skip on the account. The
+        scheduler treats the window like a health-probe cooldown — the
+        account is invisible to candidate selection — but the row's
+        status field stays unchanged so existing observability does not
+        confuse the temporary skip with a logical disable. The window
+        auto-expires at `until`; clearing earlier requires
+        `DELETE /admin/accounts/{id}/manual-pause`. Probe-driven
+        cooldowns are persisted in different metadata keys, so a probe
+        success cannot silently lift this operator pause.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminAccountManualPauseRequest"
+      responses:
+        "200":
+          description: Provider account pause recorded.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderAccountResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+    delete:
+      tags:
+        - AdminAccounts
+      operationId: clearAdminAccountManualPause
+      summary: Clear the operator-initiated scheduling skip on this account.
+      description: >
+        Idempotent — clearing an unpaused account is a successful no-op.
+        Returns the current account snapshot so callers can refresh
+        their cache from the response.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Provider account pause cleared (or already absent).
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderAccountResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/accounts/{id}/refresh:
     post:
       tags:
@@ -21406,6 +21500,25 @@ components:
           $ref: "#/components/schemas/JsonObject"
         checked_at:
           $ref: "#/components/schemas/Timestamp"
+
+    AdminAccountManualPauseRequest:
+      type: object
+      required:
+        - until
+      properties:
+        until:
+          $ref: "#/components/schemas/Timestamp"
+          description: >-
+            RFC3339 wall-clock instant at which the pause auto-expires. Must
+            be strictly in the future; the server clamps the comparison to
+            its own clock so client-side drift cannot bypass the check.
+        reason:
+          type: string
+          maxLength: 200
+          description: >-
+            Optional operator-supplied free-form context surfaced to other
+            operators (e.g. "investigating slow upstream", "rotating proxy").
+            Trimmed and truncated server-side.
 
     AdminAccountTestRequest:
       type: object

@@ -11,12 +11,12 @@ import (
 )
 
 const (
-	warningPIIRedacted              = "content_safety_pii_redacted"
-	warningPromptInjectionDetected  = "content_safety_prompt_injection_detected"
-	warningModerationFlagged        = "content_safety_moderation_flagged"
-	warningModerationCallFailed     = "content_safety_moderation_failed"
-	moderationDefaultFlaggedScore   = 1.0
-	moderationMaxInputCharacters    = 50_000
+	warningPIIRedacted             = "content_safety_pii_redacted"
+	warningPromptInjectionDetected = "content_safety_prompt_injection_detected"
+	warningModerationFlagged       = "content_safety_moderation_flagged"
+	warningModerationCallFailed    = "content_safety_moderation_failed"
+	moderationDefaultFlaggedScore  = 1.0
+	moderationMaxInputCharacters   = 50_000
 )
 
 var piiPatterns = []redactionPattern{

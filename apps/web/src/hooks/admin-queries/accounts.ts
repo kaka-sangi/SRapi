@@ -231,6 +231,26 @@ export function useResetAccountQuota() {
     },
   });
 }
+// Operator-initiated scheduling skip with auto-expiry. Distinct from disable —
+// the account stays logically active, only Scheduler candidate selection
+// skips it during the pause window. Same invalidation surface as the other
+// non-status mutations: the account list re-renders so the row badge picks
+// up the new cooldown state.
+export function useApplyAccountManualPause() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.applyAccountManualPause> }) =>
+      adminApi.applyAccountManualPause(vars.id, vars.body),
+    ["admin", "accounts"],
+    queryKeys.admin.gatewayResources(),
+  );
+}
+export function useClearAccountManualPause() {
+  return useAdminMutation(
+    (id: string) => adminApi.clearAccountManualPause(id),
+    ["admin", "accounts"],
+    queryKeys.admin.gatewayResources(),
+  );
+}
 export function useDiscoverAccountModels() {
   return useAdminMutation(
     (vars: { id: string; body?: B<typeof adminApi.discoverAccountModels> }) =>

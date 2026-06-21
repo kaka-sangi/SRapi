@@ -26,13 +26,13 @@ import (
 // account as the encrypted credential — this struct is the parsed, runtime
 // view.
 type ServiceAccount struct {
-	Type            string
-	ProjectID       string
-	PrivateKeyID    string
-	PrivateKey      string
-	ClientEmail     string
-	TokenURI        string
-	UniverseDomain  string
+	Type           string
+	ProjectID      string
+	PrivateKeyID   string
+	PrivateKey     string
+	ClientEmail    string
+	TokenURI       string
+	UniverseDomain string
 }
 
 // ParseServiceAccount unmarshals a normalized service-account JSON blob into
@@ -43,13 +43,13 @@ func ParseServiceAccount(raw []byte) (*ServiceAccount, error) {
 		return nil, errors.New("service account payload is empty")
 	}
 	var payload struct {
-		Type            string `json:"type"`
-		ProjectID       string `json:"project_id"`
-		PrivateKeyID    string `json:"private_key_id"`
-		PrivateKey      string `json:"private_key"`
-		ClientEmail     string `json:"client_email"`
-		TokenURI        string `json:"token_uri"`
-		UniverseDomain  string `json:"universe_domain"`
+		Type           string `json:"type"`
+		ProjectID      string `json:"project_id"`
+		PrivateKeyID   string `json:"private_key_id"`
+		PrivateKey     string `json:"private_key"`
+		ClientEmail    string `json:"client_email"`
+		TokenURI       string `json:"token_uri"`
+		UniverseDomain string `json:"universe_domain"`
 	}
 	if err := json.Unmarshal(raw, &payload); err != nil {
 		return nil, fmt.Errorf("parse service account: %w", err)
@@ -94,9 +94,9 @@ func (t AccessToken) Valid() bool {
 type TokenSource struct {
 	httpClient *http.Client
 
-	mu     sync.Mutex
-	cache  map[string]AccessToken
-	nowFn  func() time.Time
+	mu    sync.Mutex
+	cache map[string]AccessToken
+	nowFn func() time.Time
 }
 
 // NewTokenSource builds a TokenSource backed by the provided HTTP client (or
