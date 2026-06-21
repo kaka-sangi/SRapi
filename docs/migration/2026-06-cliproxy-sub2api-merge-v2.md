@@ -13,12 +13,20 @@ is the binding scope: what we adopt, what we reject, and the order of work.
 
 ### IN — port to SRapi
 
-1. **Antigravity reasoning replay.** SRapi already ports `CodexReasoningReplayCache`
-   (Codex CLI → OpenAI Responses). The Antigravity reverse-proxy path has no
-   equivalent, so multi-turn Gemini-via-Antigravity re-generates thought blocks
-   every turn. CLIProxyAPI added a sibling implementation keyed by
-   `(model, sessionKey)`. We port it alongside the Codex cache, wired into
-   `provider_adapters/service/antigravity.go`.
+1. **Antigravity reasoning replay.** Real gap, deferred to a follow-up
+   package. SRapi already ports `CodexReasoningReplayCache` (Codex CLI →
+   OpenAI Responses); the Antigravity reverse-proxy path has no equivalent,
+   so multi-turn Gemini-via-Antigravity re-generates `thoughtSignature`
+   blocks every turn and signature-validation failures silently degrade
+   thinking to plain text via `gemini_signature_retry.go`. The CLIProxyAPI
+   reference is ~607 lines of replay wiring + ~347 lines of cache, and the
+   item shapes (`thought_signature` keyed by `contentIndex`/`partIndex`,
+   `function_call_part` with thoughtSignature) differ enough from the Codex
+   shapes that the cache layer cannot be trivially shared. We hold the
+   implementation until a focused package can deliver the cache port,
+   adapter pre/post hooks, signature-failure cache-clear path, and live
+   Antigravity verification in one cohesive change. Logging the gap here
+   so the next package has the scope already scoped.
 
 2. **Transient-error cooldown for 408 / 5xx.** Current call site at
    `runtime_gateway_failover.go:731-737` only records account cooldown when
@@ -129,11 +137,44 @@ blast radius first; bigger items get their own commit so review stays focused.
    a live OAuth-token harness to verify.
 7. **Scheduler snapshot cleanup worker** (item 6 — new worker package +
    wiring + retention config).
-8. **Antigravity reasoning replay** (item 1 — port cache module + wire into
-   `antigravity.go` translator pre/post hooks).
+8. ~~Antigravity reasoning replay~~ — deferred; rationale in item 1
+   above. Scope is too large to land safely in the same wave; the
+   follow-up package owns the cache port + wiring + signature-failure
+   cache-clear + live verification.
 
 Each commit runs the targeted module tests; `make check` runs at the end of
 the wave.
+
+## Outcomes
+
+Shipped:
+
+- Codex CLI preset declares the full image trio (item 9).
+- Claude thinking-strip is gated by upstream model family (item 4).
+- 5xx / 408 upstream failures cool the candidate down, not just 429 (item 2).
+- Operator-initiated scheduling pause without disabling the account, with
+  matching admin API + admin UI action (item 7 + item 8 collapsed).
+- scheduler_request_snapshots cleanup folded into the existing retention
+  worker with a 30-day default (item 6).
+
+Deferred with rationale:
+
+- Antigravity reasoning replay (item 1) — scope too large for a single wave;
+  needs a focused follow-up with live verification.
+- OpenAI rate-limit reset credit (item 3) — local reset already exists; the
+  upstream `/wham/rate-limit-reset-credits/consume` call needs a real
+  ChatGPT/Codex OAuth token to verify, which this session can't supply.
+
+Closed without code change:
+
+- Images failover per-account remap (item 5) — verified existing
+  `candidate.Mapping.UpstreamModelName` already provides the behavior.
+
+Refused as architectural regression (FINAL_STATE.md invariants):
+
+- Anthropic API-key passthrough.
+- CN cyber compliance session-block stack.
+- sub2api dedicated scheduler_outbox dedup table.
 
 ## Non-goals
 
