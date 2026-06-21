@@ -727,7 +727,10 @@ NextCandidate:
 			// attempt instead of being re-picked into another bad upstream
 			// call. Three signals trigger a cooldown:
 			//
-			//   1. Any upstream-derived Retry-After header (429 / 503).
+			//   1. The adapter-parsed RetryAfter on ProviderError — covers
+			//      Anthropic 5h/7d unified-window resets, Codex quota window
+			//      resets, Gemini retryDelay, and generic `Retry-After`. The
+			//      adapter sees the headers; ClassifyUpstreamError does not.
 			//   2. A raw 429 / 408 status (throttle / read timeout) without
 			//      Retry-After — the rate-limit module clamps to its own
 			//      default minimum, so 0 here means "use module default".
@@ -739,12 +742,16 @@ NextCandidate:
 			// cooled down: the account isn't the cause, and the runtime's
 			// per-candidate retry policy is the right control there.
 			if errorClass, upstreamStatus, _ := providerGatewayError(err); errorClass != "" || upstreamStatus > 0 {
-				decision := ClassifyUpstreamError(upstreamStatus, nil, err)
-				switch {
-				case decision.RetryAfterMs > 0:
-					s.runtime.recordGatewayAccountRateLimitCooldown(result.Candidate.Account, canonical.CanonicalModel, time.Duration(decision.RetryAfterMs)*time.Millisecond)
-				case isAccountTargetedUpstreamCooldownStatus(upstreamStatus):
-					s.runtime.recordGatewayAccountRateLimitCooldown(result.Candidate.Account, canonical.CanonicalModel, 0)
+				if cooldown, ok := providerGatewayRetryAfter(err, time.Now()); ok {
+					s.runtime.recordGatewayAccountRateLimitCooldown(result.Candidate.Account, canonical.CanonicalModel, cooldown)
+				} else {
+					decision := ClassifyUpstreamError(upstreamStatus, nil, err)
+					switch {
+					case decision.RetryAfterMs > 0:
+						s.runtime.recordGatewayAccountRateLimitCooldown(result.Candidate.Account, canonical.CanonicalModel, time.Duration(decision.RetryAfterMs)*time.Millisecond)
+					case isAccountTargetedUpstreamCooldownStatus(upstreamStatus):
+						s.runtime.recordGatewayAccountRateLimitCooldown(result.Candidate.Account, canonical.CanonicalModel, 0)
+					}
 				}
 			}
 

@@ -2081,6 +2081,34 @@ func providerGatewayError(err error) (string, int, apiopenapi.GatewayErrorObject
 	return "upstream_error", http.StatusBadGateway, apiopenapi.UpstreamError
 }
 
+// providerGatewayRetryAfter extracts the upstream-parsed Retry-After timestamp
+// from a provider error. Adapter-level classifiers populate this from the
+// real upstream signal (Anthropic 5h/7d unified-window resets, Codex quota
+// window resets, Gemini retryDelay, generic `Retry-After`). Returning the
+// parsed *time.Time lets the failover handler set a cooldown that matches
+// the upstream's actual reset window instead of falling back to the
+// rate-limit module's minutes-scale default.
+//
+// Returns (0, false) when no provider error is present, when no RetryAfter
+// was parsed, or when the parsed time is not in the future relative to
+// `now`. The bool sentinel lets the caller skip the parsed path entirely
+// without conflating "no signal" with "signal of zero duration".
+func providerGatewayRetryAfter(err error, now time.Time) (time.Duration, bool) {
+	var providerErr provideradaptercontract.ProviderError
+	if !errors.As(err, &providerErr) {
+		return 0, false
+	}
+	if providerErr.RetryAfter == nil {
+		return 0, false
+	}
+	resetAt := providerErr.RetryAfter.UTC()
+	cutoff := now.UTC()
+	if !resetAt.After(cutoff) {
+		return 0, false
+	}
+	return resetAt.Sub(cutoff), true
+}
+
 func gatewayErrorTypeForProviderClass(errorClass string) apiopenapi.GatewayErrorObjectType {
 	switch errorClass {
 	case "invalid_request":
