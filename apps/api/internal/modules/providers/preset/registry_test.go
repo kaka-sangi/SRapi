@@ -416,6 +416,11 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if !codexPreset.Capabilities["chat_completions"] || !codexPreset.Capabilities["responses"] || !codexPreset.Capabilities["messages"] || !codexPreset.Capabilities["responses_compact"] || !codexPreset.Capabilities["responses_input_items"] || !codexPreset.Capabilities["streaming"] {
 		t.Fatalf("unexpected codex-cli capabilities: %+v", codexPreset.Capabilities)
 	}
+	for _, key := range []string{"image_generations", "image_edits", "image_variations"} {
+		if !codexPreset.Capabilities[key] {
+			t.Fatalf("expected codex-cli to declare %s capability (matches reverse-proxy adapter coverage), got %+v", key, codexPreset.Capabilities)
+		}
+	}
 	if codexPreset.MatchesPath("/backend-api/codex/responses") {
 		t.Fatalf("expected Codex backend root alias to be unregistered")
 	}

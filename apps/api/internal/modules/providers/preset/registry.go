@@ -725,9 +725,16 @@ func geminiCapabilities() map[string]bool {
 }
 
 func codexCLICapabilities() map[string]bool {
+	// image_edits/image_variations are advertised because the reverse-proxy
+	// Codex adapter (codex_images.go) already implements both endpoints —
+	// previously omitting them caused the capability-aware Scheduler hard
+	// filter to reject otherwise-routable image edit / variation requests
+	// scheduled to a Codex CLI account.
 	return map[string]bool{
 		capabilitiescontract.KeyChatCompletions:     true,
 		capabilitiescontract.KeyImageGenerations:    true,
+		capabilitiescontract.KeyImageEdits:          true,
+		capabilitiescontract.KeyImageVariations:     true,
 		capabilitiescontract.KeyMessages:            true,
 		capabilitiescontract.KeyResponses:           true,
 		capabilitiescontract.KeyResponsesCompact:    true,
