@@ -65,6 +65,7 @@ import { Label } from "@/components/ui/label";
 import { ADMIN_ROUTES } from "@/lib/routes";
 import { adminAccountHealthInvestigationHref } from "@/lib/admin-account-health-investigation";
 import { adminErrorMessage } from "@/lib/admin-api";
+import { cn } from "@/lib/cn";
 import { formatInteger, formatMoney, formatPercent } from "@/lib/admin-format";
 import {
   ACCOUNT_STATUSES,
@@ -77,6 +78,7 @@ import { BulkAddAccountsDialog } from "./bulk-add-dialog";
 import type { Provider, ProviderAccount, ProviderAccountStatus } from "@/lib/sdk-types";
 import {
   accountCapacityFacts,
+  accountEndpointCapabilityFacts,
   accountIdentitySummary,
   accountModelPolicyLabel,
   accountProfileFacts,
@@ -84,7 +86,10 @@ import {
   type AccountListMode,
 } from "./account-types";
 import { AccountHealthCell, AccountQuotaCell, HealthSummaryStrip } from "./account-health-cells";
-import type { AccountHealthMaintenanceAction, AccountHealthOpsGroup } from "@/lib/admin-account-health-ops";
+import type {
+  AccountHealthMaintenanceAction,
+  AccountHealthOpsGroup,
+} from "@/lib/admin-account-health-ops";
 import { AccountStatusCell } from "./account-status-cell";
 import { TokenExpiryChip } from "./token-expiry-chip";
 import { AutoRefreshButton, ViewModeToggle } from "./accounts-toolbar";
@@ -132,13 +137,14 @@ function AccountsContent() {
   const readOnlyHealthView = searchParams.get("view") === "health";
   const colVis = useColumnVisibility("admin-accounts", ["created_at", "updated_at", "notes"]);
 
-  const autoRefresh = useAutoRefresh(
-    () => void qc.invalidateQueries({ queryKey: ["admin"] }),
-    { storageKey: "admin-accounts", defaultInterval: 30 },
-  );
+  const autoRefresh = useAutoRefresh(() => void qc.invalidateQueries({ queryKey: ["admin"] }), {
+    storageKey: "admin-accounts",
+    defaultInterval: 30,
+  });
 
   const statusFilter =
-    (list.filters.status as ProviderAccount["status"]) || (readOnlyHealthView ? "active" : undefined);
+    (list.filters.status as ProviderAccount["status"]) ||
+    (readOnlyHealthView ? "active" : undefined);
   const providerFilter = list.filters.providerId || undefined;
   const groupFilter = list.filters.groupId || undefined;
   const focusedAccountId = list.filters.accountId || undefined;
@@ -177,9 +183,7 @@ function AccountsContent() {
   const discover = useDiscoverAccountModels();
   const exportMut = useExportAccounts();
   const healthSummary = useAccountsHealthSummary();
-  const healthById = new Map(
-    (healthSummary.data ?? []).map((h) => [h.account_id, h] as const),
-  );
+  const healthById = new Map((healthSummary.data ?? []).map((h) => [h.account_id, h] as const));
   // Group membership lookup: ProviderAccount carries group_ids only — resolve to
   // names for the table cell. Cheap to keep around as a Map; useAdminGroups is
   // already cached across the admin shell.
@@ -191,9 +195,7 @@ function AccountsContent() {
   // when the page shows many accounts. Joined back by account_id below.
   const visibleAccountIds = (accountRows ?? []).map((a) => a.id);
   const usageToday = useAccountsUsageTodayBatch(visibleAccountIds);
-  const todayByAccountId = new Map(
-    (usageToday.data ?? []).map((t) => [t.account_id, t] as const),
-  );
+  const todayByAccountId = new Map((usageToday.data ?? []).map((t) => [t.account_id, t] as const));
 
   const [formTarget, setFormTarget] = useState<ProviderAccount | "new" | null>(null);
   const [proxyTarget, setProxyTarget] = useState<ProviderAccount | null>(null);
@@ -218,8 +220,14 @@ function AccountsContent() {
     function onKey(e: KeyboardEvent) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key === "n" && !readOnlyHealthView) { e.preventDefault(); setFormTarget("new"); }
-      if (e.key === "r") { e.preventDefault(); void qc.invalidateQueries({ queryKey: ["admin"] }); }
+      if (e.key === "n" && !readOnlyHealthView) {
+        e.preventDefault();
+        setFormTarget("new");
+      }
+      if (e.key === "r") {
+        e.preventDefault();
+        void qc.invalidateQueries({ queryKey: ["admin"] });
+      }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -246,11 +254,11 @@ function AccountsContent() {
   );
   const proxyOptions = (proxies.data?.data ?? []).map((p) => ({ value: p.id, label: p.name }));
   const focusedAccountTarget = focusedAccountId
-    ? (accountRows ?? []).find((a) => a.id === focusedAccountId) ?? focusedAccount.data
+    ? ((accountRows ?? []).find((a) => a.id === focusedAccountId) ?? focusedAccount.data)
     : undefined;
   const autoDetailTarget =
     readOnlyHealthView && focusedAccountId !== dismissedFocusedAccountId
-      ? focusedAccountTarget ?? null
+      ? (focusedAccountTarget ?? null)
       : null;
   const detailTarget = manualDetailTarget ?? autoDetailTarget;
   const isFiltered = Boolean(statusFilter || providerFilter || groupFilter);
@@ -297,7 +305,10 @@ function AccountsContent() {
       } else if (failedCount > 0) {
         toast({ title: t("feedback.batchAllFailed", { count: ids.length }), tone: "error" });
       } else {
-        toast({ title: t("feedback.batchAllSucceeded", { count: succeededCount }), tone: "success" });
+        toast({
+          title: t("feedback.batchAllSucceeded", { count: succeededCount }),
+          tone: "success",
+        });
       }
     } catch (err) {
       toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
@@ -324,7 +335,10 @@ function AccountsContent() {
       } else if (failedCount > 0) {
         toast({ title: t("feedback.batchAllFailed", { count: ids.length }), tone: "error" });
       } else {
-        toast({ title: t("feedback.batchAllSucceeded", { count: succeededCount }), tone: "success" });
+        toast({
+          title: t("feedback.batchAllSucceeded", { count: succeededCount }),
+          tone: "success",
+        });
       }
     } catch (err) {
       toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
@@ -352,7 +366,10 @@ function AccountsContent() {
       } else if (failedCount > 0) {
         toast({ title: t("feedback.batchAllFailed", { count: ids.length }), tone: "error" });
       } else {
-        toast({ title: t("feedback.batchAllSucceeded", { count: succeededCount }), tone: "success" });
+        toast({
+          title: t("feedback.batchAllSucceeded", { count: succeededCount }),
+          tone: "success",
+        });
       }
     } catch (err) {
       toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
@@ -382,7 +399,10 @@ function AccountsContent() {
       } else if (failedCount > 0) {
         toast({ title: t("feedback.batchAllFailed", { count: ids.length }), tone: "error" });
       } else {
-        toast({ title: t("feedback.batchAllSucceeded", { count: succeededCount }), tone: "success" });
+        toast({
+          title: t("feedback.batchAllSucceeded", { count: succeededCount }),
+          tone: "success",
+        });
       }
     } catch (err) {
       toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
@@ -411,7 +431,10 @@ function AccountsContent() {
       } else if (failedCount > 0) {
         toast({ title: t("feedback.batchAllFailed", { count: items.length }), tone: "error" });
       } else {
-        toast({ title: t("feedback.batchAllSucceeded", { count: succeededCount }), tone: "success" });
+        toast({
+          title: t("feedback.batchAllSucceeded", { count: succeededCount }),
+          tone: "success",
+        });
       }
     } catch (err) {
       toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
@@ -424,9 +447,7 @@ function AccountsContent() {
    *  Per-row failures come back in result.errors and surface as a
    *  partial-batch toast — mirrors the toast pattern used by every other
    *  bulk action on this page. */
-  async function applyBulkEdit(
-    body: Parameters<typeof bulkUpdate.mutateAsync>[0],
-  ) {
+  async function applyBulkEdit(body: Parameters<typeof bulkUpdate.mutateAsync>[0]) {
     if (!body.account_ids?.length && !body.filters) return;
     try {
       const result = await bulkUpdate.mutateAsync(body);
@@ -442,7 +463,10 @@ function AccountsContent() {
       } else if (failedCount > 0) {
         toast({ title: t("feedback.batchAllFailed", { count: totalCount }), tone: "error" });
       } else {
-        toast({ title: t("feedback.batchAllSucceeded", { count: succeededCount }), tone: "success" });
+        toast({
+          title: t("feedback.batchAllSucceeded", { count: succeededCount }),
+          tone: "success",
+        });
       }
     } catch (err) {
       toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
@@ -480,7 +504,9 @@ function AccountsContent() {
     const ids = normalizeAccountIds(accountIds);
     if (ids.length === 0) return;
     try {
-      const result = await batchAction.mutateAsync(buildBatchAccountActionBody({ accountIds: ids, action }));
+      const result = await batchAction.mutateAsync(
+        buildBatchAccountActionBody({ accountIds: ids, action }),
+      );
       if (options.clearSelection) list.clearSelection();
       toastBatchResult({
         total: ids.length,
@@ -561,9 +587,12 @@ function AccountsContent() {
         const hasIdentity = identity.primary !== a.name || identity.secondary.length > 0;
         return (
           <div className="flex min-w-[12rem] flex-col gap-0.5">
-            <span className="truncate text-srapi-text-primary">{a.name}</span>
+            <span className="text-srapi-text-primary truncate">{a.name}</span>
             {hasIdentity ? (
-              <span className="max-w-[16rem] truncate font-mono text-2xs text-srapi-text-tertiary" title={[identity.primary, ...identity.secondary].join(" · ")}>
+              <span
+                className="text-2xs text-srapi-text-tertiary max-w-[16rem] truncate font-mono"
+                title={[identity.primary, ...identity.secondary].join(" · ")}
+              >
                 {[identity.primary, ...identity.secondary.slice(0, 2)].join(" · ")}
               </span>
             ) : null}
@@ -585,29 +614,55 @@ function AccountsContent() {
       key: "models",
       header: t("adminAccounts.models"),
       hideOnMobile: true,
-      sortValue: (a) => accountModelPolicyLabel(t, a.metadata),
-      render: (a) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary">
-          {accountModelPolicyLabel(t, a.metadata)}
-        </span>
-      ),
+      sortValue: (a) =>
+        [
+          accountModelPolicyLabel(t, a.metadata),
+          ...accountEndpointCapabilityFacts(t, a).map((fact) => fact.value),
+        ].join(" "),
+      render: (a) => {
+        const endpointFacts = accountEndpointCapabilityFacts(t, a);
+        return (
+          <div className="flex max-w-[16rem] flex-wrap gap-1">
+            <span className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded-md border px-1.5 py-0.5 font-mono">
+              {accountModelPolicyLabel(t, a.metadata)}
+            </span>
+            {endpointFacts.map((fact) => (
+              <span
+                key={fact.key}
+                className={cn(
+                  "text-2xs rounded-md border px-1.5 py-0.5 font-mono",
+                  fact.tone === "enabled"
+                    ? "border-srapi-success/30 bg-srapi-success/10 text-srapi-success"
+                    : "border-srapi-error/30 bg-srapi-error/10 text-srapi-error",
+                )}
+                title={`${fact.label}: ${fact.value}`}
+              >
+                {fact.label}: {fact.value}
+              </span>
+            ))}
+          </div>
+        );
+      },
     },
     {
       key: "profile",
       header: t("adminAccounts.profile"),
       hideOnMobile: true,
-      sortValue: (a) => accountProfileFacts(t, a).map((fact) => fact.value).join(" "),
+      sortValue: (a) =>
+        accountProfileFacts(t, a)
+          .map((fact) => fact.value)
+          .join(" "),
       render: (a) => {
         const facts = accountProfileFacts(t, a).slice(0, 4);
         if (facts.length === 0) {
-          return <span className="font-mono text-2xs text-srapi-text-tertiary">—</span>;
+          return <span className="text-2xs text-srapi-text-tertiary font-mono">—</span>;
         }
         return (
           <div className="flex max-w-[18rem] flex-wrap gap-1">
             {facts.map((fact) => (
               <span
                 key={fact.key}
-                className="max-w-[8.5rem] truncate rounded-md border border-srapi-border bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary"
+                className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-tertiary max-w-[8.5rem] truncate rounded-md border px-1.5 py-0.5 font-mono"
                 title={`${fact.label}: ${fact.value}`}
               >
                 {fact.label}: {fact.value}
@@ -621,18 +676,21 @@ function AccountsContent() {
       key: "capacity",
       header: t("adminAccounts.capacity"),
       hideOnMobile: true,
-      sortValue: (a) => accountCapacityFacts(t, a).map((fact) => fact.value).join(" "),
+      sortValue: (a) =>
+        accountCapacityFacts(t, a)
+          .map((fact) => fact.value)
+          .join(" "),
       render: (a) => {
         const facts = accountCapacityFacts(t, a);
         if (facts.length === 0) {
-          return <span className="font-mono text-2xs text-srapi-text-tertiary">—</span>;
+          return <span className="text-2xs text-srapi-text-tertiary font-mono">—</span>;
         }
         return (
           <div className="flex max-w-[16rem] flex-wrap gap-1">
             {facts.map((fact) => (
               <span
                 key={fact.key}
-                className="max-w-[7rem] truncate rounded-md border border-srapi-border bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary"
+                className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-tertiary max-w-[7rem] truncate rounded-md border px-1.5 py-0.5 font-mono"
                 title={`${fact.label}: ${fact.value}`}
               >
                 {fact.label}: {fact.value}
@@ -647,7 +705,9 @@ function AccountsContent() {
       header: t("adminAccounts.type"),
       hideOnMobile: true,
       render: (a) => (
-        <span className="text-2xs text-srapi-text-tertiary">{runtimeClassLabel(t, a.runtime_class)}</span>
+        <span className="text-2xs text-srapi-text-tertiary">
+          {runtimeClassLabel(t, a.runtime_class)}
+        </span>
       ),
     },
     {
@@ -657,7 +717,11 @@ function AccountsContent() {
       render: (a) => {
         const ids = a.group_ids ?? [];
         if (ids.length === 0) {
-          return <span className="text-2xs text-srapi-text-tertiary">{t("adminAccounts.ungrouped")}</span>;
+          return (
+            <span className="text-2xs text-srapi-text-tertiary">
+              {t("adminAccounts.ungrouped")}
+            </span>
+          );
         }
         return (
           <div className="flex flex-wrap gap-1">
@@ -666,7 +730,7 @@ function AccountsContent() {
               return (
                 <span
                   key={String(id)}
-                  className="inline-flex items-center rounded-md border border-srapi-border bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary"
+                  className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-tertiary inline-flex items-center rounded-md border px-1.5 py-0.5 font-mono"
                 >
                   {name}
                 </span>
@@ -682,7 +746,7 @@ function AccountsContent() {
       hideOnMobile: true,
       sortValue: (a) => a.proxy_id ?? "",
       render: (a) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary">
+        <span className="text-2xs text-srapi-text-tertiary font-mono">
           {a.proxy_id ? t("adminAccounts.proxyConfigured") : t("adminAccounts.noProxy")}
         </span>
       ),
@@ -694,14 +758,14 @@ function AccountsContent() {
       sortValue: (a) => `${a.priority}:${a.weight}:${a.risk_level ?? ""}`,
       render: (a) => (
         <div className="flex flex-wrap gap-1">
-          <span className="rounded-md bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary">
+          <span className="bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded-md px-1.5 py-0.5 font-mono">
             P{a.priority ?? 0}
           </span>
-          <span className="rounded-md bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary">
+          <span className="bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded-md px-1.5 py-0.5 font-mono">
             W{a.weight ?? 1}
           </span>
           {a.risk_level ? (
-            <span className="rounded-md bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary">
+            <span className="bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded-md px-1.5 py-0.5 font-mono">
               {a.risk_level}
             </span>
           ) : null}
@@ -752,24 +816,23 @@ function AccountsContent() {
       render: (a) => {
         const today = todayByAccountId.get(a.id);
         if (!today) {
-          return (
-            <span className="font-mono text-2xs text-srapi-text-tertiary">—</span>
-          );
+          return <span className="text-2xs text-srapi-text-tertiary font-mono">—</span>;
         }
         if (today.requests === 0) {
           return (
-            <span className="font-mono text-2xs text-srapi-text-tertiary">
+            <span className="text-2xs text-srapi-text-tertiary font-mono">
               {t("adminAccounts.todayIdle")}
             </span>
           );
         }
         return (
           <div className="flex flex-col gap-0.5">
-            <span className="font-mono text-2xs text-srapi-text-secondary tabular">
+            <span className="text-2xs text-srapi-text-secondary tabular font-mono">
               {formatInteger(today.requests)} · {formatMoney(today.cost, today.currency)}
             </span>
-            <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
-              {formatInteger(today.total_tokens || today.input_tokens + today.output_tokens)} {t("adminAccounts.usageTokens").toLowerCase()} · {formatPercent(today.success_rate)}
+            <span className="text-2xs text-srapi-text-tertiary tabular font-mono">
+              {formatInteger(today.total_tokens || today.input_tokens + today.output_tokens)}{" "}
+              {t("adminAccounts.usageTokens").toLowerCase()} · {formatPercent(today.success_rate)}
             </span>
           </div>
         );
@@ -980,7 +1043,11 @@ function AccountsContent() {
           if (input === null) return;
           const val = parseInt(input, 10);
           if (Number.isNaN(val)) {
-            toast({ title: t("feedback.failed"), description: "Priority must be a valid number", tone: "error" });
+            toast({
+              title: t("feedback.failed"),
+              description: "Priority must be a valid number",
+              tone: "error",
+            });
             return;
           }
           void runAction(
@@ -996,23 +1063,18 @@ function AccountsContent() {
       actions.push({
         label: t("adminAccounts.refreshTokenAction"),
         onSelect: () =>
-          void runAction(
-            () => refreshToken.mutateAsync(a.id),
-            t("adminAccounts.refreshSuccess"),
-          ),
+          void runAction(() => refreshToken.mutateAsync(a.id), t("adminAccounts.refreshSuccess")),
       });
     }
     if (isRecoverable(a.status)) {
       actions.push(
         {
           label: t("adminAccounts.clearError"),
-          onSelect: () =>
-            void runAction(() => clearErr.mutateAsync(a.id), t("feedback.saved")),
+          onSelect: () => void runAction(() => clearErr.mutateAsync(a.id), t("feedback.saved")),
         },
         {
           label: t("adminAccounts.recover"),
-          onSelect: () =>
-            void runAction(() => recover.mutateAsync(a.id), t("feedback.saved")),
+          onSelect: () => void runAction(() => recover.mutateAsync(a.id), t("feedback.saved")),
         },
       );
     }
@@ -1036,14 +1098,16 @@ function AccountsContent() {
       <PageHeader
         eyebrow={t("nav.sectionAdmin")}
         title={t("adminAccounts.title")}
-        description={readOnlyHealthView ? t("adminAccounts.healthViewSubtitle") : t("adminAccounts.subtitle")}
+        description={
+          readOnlyHealthView ? t("adminAccounts.healthViewSubtitle") : t("adminAccounts.subtitle")
+        }
         actions={
           <div className="flex items-center gap-3">
             {accounts.data ? (
               <ListCount total={accounts.data.pagination?.total ?? accounts.data.data.length} />
             ) : null}
             {accounts.isFetching ? (
-              <RefreshCw className="size-3 animate-spin text-srapi-text-tertiary" />
+              <RefreshCw className="text-srapi-text-tertiary size-3 animate-spin" />
             ) : null}
             <AutoRefreshButton autoRefresh={autoRefresh} />
             {readOnlyHealthView ? (
@@ -1079,7 +1143,7 @@ function AccountsContent() {
         actionPending={batchAction.isPending || batchQuotaFetch.isPending}
       />
       {readOnlyHealthView && focusedAccountId ? (
-        <div className="mb-4 rounded-md border border-srapi-border bg-srapi-card-muted px-3 py-2 font-mono text-2xs text-srapi-text-secondary">
+        <div className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-secondary mb-4 rounded-md border px-3 py-2 font-mono">
           {focusedAccountTarget ? (
             <span>
               {t("adminAccounts.healthFocusActive", {
@@ -1365,15 +1429,22 @@ function BulkCredentialRotateDialog({
 }: {
   selectedIds: string[];
   isPending: boolean;
-  onSubmit: (items: { account_id: string; credential: Record<string, unknown> }[]) => void | Promise<void>;
+  onSubmit: (
+    items: { account_id: string; credential: Record<string, unknown> }[],
+  ) => void | Promise<void>;
   onClose: () => void;
 }) {
   const { t } = useLanguage();
   const [raw, setRaw] = useState(() => selectedIds.map((id) => `${id},`).join("\n"));
   const [error, setError] = useState<string | null>(null);
 
-  function parseLine(line: string): { account_id: string; credential: Record<string, unknown> } | null {
-    const parts = line.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+  function parseLine(
+    line: string,
+  ): { account_id: string; credential: Record<string, unknown> } | null {
+    const parts = line
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
     if (parts.length < 2) return null;
     const accountId = parts[0];
     const credential: Record<string, unknown> = {};
@@ -1411,27 +1482,28 @@ function BulkCredentialRotateDialog({
   }
 
   return (
-    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{t("adminAccounts.bulkRotateTitle")}</DialogTitle>
           <DialogDescription>{t("adminAccounts.bulkRotateBody")}</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-3">
-          <Label htmlFor="bulk-rotate-textarea">
-            {t("adminAccounts.bulkRotateInputLabel")}
-          </Label>
+          <Label htmlFor="bulk-rotate-textarea">{t("adminAccounts.bulkRotateInputLabel")}</Label>
           <textarea
             id="bulk-rotate-textarea"
             value={raw}
             onChange={(e) => setRaw(e.target.value)}
             rows={Math.min(12, Math.max(4, selectedIds.length))}
-            className="w-full rounded border border-srapi-border bg-srapi-bg-secondary px-3 py-2 text-sm font-mono"
+            className="border-srapi-border bg-srapi-bg-secondary w-full rounded border px-3 py-2 font-mono text-sm"
             placeholder="123,refresh_token=abc123,api_key=sk-..."
           />
-          {error ? (
-            <p className="text-xs text-srapi-error">{error}</p>
-          ) : null}
+          {error ? <p className="text-srapi-error text-xs">{error}</p> : null}
           <DialogFooter>
             <Button variant="ghost" type="button" onClick={onClose}>
               {t("common.cancel")}
@@ -1479,18 +1551,12 @@ function BulkConcurrencyDialog({
       <DialogContent>
         <form onSubmit={submit}>
           <DialogHeader>
-            <DialogTitle>
-              {t("adminAccounts.bulkSetConcurrencyTitle", { count })}
-            </DialogTitle>
-            <DialogDescription>
-              {t("adminAccounts.bulkSetConcurrencyHint")}
-            </DialogDescription>
+            <DialogTitle>{t("adminAccounts.bulkSetConcurrencyTitle", { count })}</DialogTitle>
+            <DialogDescription>{t("adminAccounts.bulkSetConcurrencyHint")}</DialogDescription>
           </DialogHeader>
           <div className="mt-4 space-y-3">
             <div>
-              <Label htmlFor="bulk-concurrency">
-                {t("adminAccounts.bulkSetConcurrency")}
-              </Label>
+              <Label htmlFor="bulk-concurrency">{t("adminAccounts.bulkSetConcurrency")}</Label>
               <Input
                 id="bulk-concurrency"
                 type="number"
@@ -1548,20 +1614,18 @@ function BulkEditAccountDialog({
   isPending: boolean;
   proxyOptions: { value: string; label: string }[];
   groupOptions: { value: string; label: string }[];
-  onSubmit: (
-    body: {
-      name?: string;
-      status?: ProviderAccountStatus;
-      priority?: number;
-      weight?: number;
-      risk_level?: string;
-      max_concurrency?: number;
-      proxy_id?: string;
-      upstream_client?: string;
-      runtime_class?: string;
-      add_group_id?: string;
-    },
-  ) => void | Promise<void>;
+  onSubmit: (body: {
+    name?: string;
+    status?: ProviderAccountStatus;
+    priority?: number;
+    weight?: number;
+    risk_level?: string;
+    max_concurrency?: number;
+    proxy_id?: string;
+    upstream_client?: string;
+    runtime_class?: string;
+    add_group_id?: string;
+  }) => void | Promise<void>;
   onClose: () => void;
 }) {
   const { t } = useLanguage();
@@ -1669,9 +1733,7 @@ function BulkEditAccountDialog({
   }
 
   const titleKey =
-    mode === "filtered"
-      ? "adminAccounts.bulkEditFilteredTitle"
-      : "adminAccounts.bulkEditTitle";
+    mode === "filtered" ? "adminAccounts.bulkEditFilteredTitle" : "adminAccounts.bulkEditTitle";
   return (
     <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
       <DialogContent>
@@ -1700,7 +1762,7 @@ function BulkEditAccountDialog({
               disabled={isPending}
             >
               <select
-                className="w-full rounded-md border border-srapi-border bg-srapi-card px-2 py-1.5 text-2xs"
+                className="border-srapi-border bg-srapi-card text-2xs w-full rounded-md border px-2 py-1.5"
                 value={statusValue}
                 disabled={!statusEnabled || isPending}
                 onChange={(e) => setStatusValue(e.target.value as ProviderAccountStatus)}
@@ -1778,7 +1840,7 @@ function BulkEditAccountDialog({
               disabled={isPending}
             >
               <select
-                className="w-full rounded-md border border-srapi-border bg-srapi-card px-2 py-1.5 text-2xs"
+                className="border-srapi-border bg-srapi-card text-2xs w-full rounded-md border px-2 py-1.5"
                 value={proxyValue}
                 disabled={!proxyEnabled || isPending}
                 onChange={(e) => setProxyValue(e.target.value)}
@@ -1811,7 +1873,7 @@ function BulkEditAccountDialog({
               disabled={isPending}
             >
               <select
-                className="w-full rounded-md border border-srapi-border bg-srapi-card px-2 py-1.5 text-2xs"
+                className="border-srapi-border bg-srapi-card text-2xs w-full rounded-md border px-2 py-1.5"
                 value={runtimeClassValue}
                 disabled={!runtimeClassEnabled || isPending}
                 onChange={(e) => setRuntimeClassValue(e.target.value)}
@@ -1836,7 +1898,7 @@ function BulkEditAccountDialog({
               disabled={isPending || groupOptions.length === 0}
             >
               <select
-                className="w-full rounded-md border border-srapi-border bg-srapi-card px-2 py-1.5 text-2xs"
+                className="border-srapi-border bg-srapi-card text-2xs w-full rounded-md border px-2 py-1.5"
                 value={groupValue}
                 disabled={!groupEnabled || isPending || groupOptions.length === 0}
                 onChange={(e) => setGroupValue(e.target.value)}
@@ -1889,7 +1951,7 @@ function BulkEditRow({
         checked={enabled}
         disabled={disabled}
         onChange={(e) => onToggle(e.target.checked)}
-        className="size-4 rounded border-srapi-border"
+        className="border-srapi-border size-4 rounded"
         aria-label={label}
       />
       <Label className="text-2xs">{label}</Label>

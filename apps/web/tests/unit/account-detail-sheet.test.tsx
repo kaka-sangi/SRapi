@@ -178,6 +178,9 @@ describe("AccountDetailSheet", () => {
     expect(screen.getByText("Pooled accounts")).toBeInTheDocument();
     expect(screen.getAllByText("已绑定代理").length).toBeGreaterThan(0);
     expect(screen.getByText(/最近使用/)).toBeInTheDocument();
+    expect(screen.getByText("使用期")).toBeInTheDocument();
+    expect(screen.getByText("端点覆盖")).toBeInTheDocument();
+    expect(screen.getByText("Resp: 强关 Msg: 强开")).toBeInTheDocument();
     expect(screen.getAllByText(/2026年6月12日|Jun 12, 2026/).length).toBeGreaterThan(0);
     const usageTable = screen.getByRole("table");
     expect(within(usageTable).queryByText(/2026年5月18日|May 18, 2026/)).not.toBeInTheDocument();
@@ -238,6 +241,8 @@ function renderSheet() {
       organization_id: "org-main",
       max_concurrency: 4,
       supported_models: ["gpt-5"],
+      capability_responses: false,
+      capability_messages: true,
     },
     created_at: "2026-06-10T00:00:00Z",
   };

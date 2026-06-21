@@ -67,6 +67,7 @@ func TestChatGPTWebPoWGenerateUsesSentinelFNVAnswerShape(t *testing.T) {
 }
 
 func TestChatGPTWebPoWRunCheckMatchesSentinelAlgorithm(t *testing.T) {
+	start := time.Now().Add(-123 * time.Millisecond)
 	config := []any{
 		"0",
 		"",
@@ -92,7 +93,7 @@ func TestChatGPTWebPoWRunCheckMatchesSentinelAlgorithm(t *testing.T) {
 		0,
 		0,
 	}
-	answer, err := chatGPTWebPoWRunCheck(time.Now(), "seed", "ffffffff", config, 7)
+	answer, err := chatGPTWebPoWRunCheck(start, "seed", "ffffffff", config, 7)
 	if err != nil {
 		t.Fatalf("run check: %v", err)
 	}
@@ -113,8 +114,14 @@ func TestChatGPTWebPoWRunCheckMatchesSentinelAlgorithm(t *testing.T) {
 	if fp[3] != float64(7) {
 		t.Fatalf("nonce slot = %#v, want 7", fp[3])
 	}
-	if _, ok := fp[9].(float64); !ok {
-		t.Fatalf("elapsed slot = %#v, want numeric", fp[9])
+	if fp[9] != float64(123) {
+		t.Fatalf("elapsed slot = %#v, want 123", fp[9])
+	}
+	if encoded := strings.TrimSuffix(answer, "~S"); encoded != "WyIwIiwiIiwiMCIsNywwLCIiLCIiLCIiLCJlbi1VUyIsMTIzLCJlbi1VUyIsMCwiIiwiIiwwLCIiLCIiLCIiLDAsMCwwLDAsMF0=" {
+		t.Fatalf("encoded fingerprint = %q", encoded)
+	}
+	if got := chatGPTWebPoWFNV1aHex("seed" + strings.TrimSuffix(answer, "~S")); got != "2716110f" {
+		t.Fatalf("hash = %s, want 2716110f", got)
 	}
 }
 

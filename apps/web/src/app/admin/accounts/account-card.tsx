@@ -17,6 +17,7 @@ import { cn } from "@/lib/cn";
 import { AccountHealthCell, AccountQuotaCell } from "./account-health-cells";
 import {
   accountCapacityFacts,
+  accountEndpointCapabilityFacts,
   accountIdentitySummary,
   accountModelPolicyLabel,
   accountProfileFacts,
@@ -119,7 +120,7 @@ export function AccountsCardView({
         }
       </PageQueryState>
       {pagination.total > pagination.pageSize ? (
-        <div className="border-t border-srapi-border">
+        <div className="border-srapi-border border-t">
           <Pagination
             page={pagination.page}
             pageSize={pagination.pageSize}
@@ -165,7 +166,7 @@ function AccountCardGrid({
   return (
     <div>
       {selection ? (
-        <div className="flex items-center gap-2 border-b border-srapi-border px-4 py-2.5">
+        <div className="border-srapi-border flex items-center gap-2 border-b px-4 py-2.5">
           <Checkbox
             aria-label="select all"
             checked={allOnPage}
@@ -225,8 +226,11 @@ function AccountCard({
   const identity = accountIdentitySummary(t, account);
   const modelPolicy = accountModelPolicyLabel(t, account.metadata);
   const capacityFacts = accountCapacityFacts(t, account);
+  const endpointFacts = accountEndpointCapabilityFacts(t, account);
   const profileFacts = accountProfileFacts(t, account).slice(0, 3);
-  const proxyLabel = account.proxy_id ? t("adminAccounts.proxyConfigured") : t("adminAccounts.noProxy");
+  const proxyLabel = account.proxy_id
+    ? t("adminAccounts.proxyConfigured")
+    : t("adminAccounts.noProxy");
   const groups = account.group_ids ?? [];
   const visibleGroups = groups.slice(0, 3).map((id) => groupNameById.get(String(id)) ?? `#${id}`);
   const extraGroupCount = Math.max(0, groups.length - visibleGroups.length);
@@ -235,10 +239,10 @@ function AccountCard({
   return (
     <article
       className={cn(
-        "tactile-card rounded-lg border border-srapi-border bg-srapi-card transition-colors",
+        "tactile-card border-srapi-border bg-srapi-card rounded-lg border transition-colors",
         account.status === "disabled" && "opacity-55",
         selected && "border-srapi-primary/50 bg-srapi-card-muted",
-        onDetail && "cursor-pointer hover:border-srapi-border-strong",
+        onDetail && "hover:border-srapi-border-strong cursor-pointer",
       )}
       onClick={(e) => {
         if (!onDetail) return;
@@ -259,23 +263,28 @@ function AccountCard({
         ) : null}
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="truncate text-sm font-medium text-srapi-text-primary">{account.name}</h3>
+            <h3 className="text-srapi-text-primary truncate text-sm font-medium">{account.name}</h3>
             <div className="shrink-0">{actions}</div>
           </div>
           <div className="mt-1.5 flex min-w-0 items-center gap-1.5">
-            <span className="truncate text-xs text-srapi-text-secondary">{providerName}</span>
-            <span className="shrink-0 text-srapi-border">·</span>
-            <span className="truncate text-2xs text-srapi-text-tertiary">{runtimeClassLabel(t, account.runtime_class)}</span>
+            <span className="text-srapi-text-secondary truncate text-xs">{providerName}</span>
+            <span className="text-srapi-border shrink-0">·</span>
+            <span className="text-2xs text-srapi-text-tertiary truncate">
+              {runtimeClassLabel(t, account.runtime_class)}
+            </span>
           </div>
           {hasIdentity ? (
-            <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 font-mono text-2xs">
-              <span className="min-w-0 max-w-[13rem] truncate text-srapi-text-secondary" title={identity.primary}>
+            <div className="text-2xs mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 font-mono">
+              <span
+                className="text-srapi-text-secondary max-w-[13rem] min-w-0 truncate"
+                title={identity.primary}
+              >
                 {identity.primary}
               </span>
               {identity.secondary.slice(0, 2).map((item) => (
                 <span
                   key={item}
-                  className="max-w-[8rem] truncate text-srapi-text-tertiary"
+                  className="text-srapi-text-tertiary max-w-[8rem] truncate"
                   title={item}
                 >
                   {item}
@@ -284,36 +293,50 @@ function AccountCard({
             </div>
           ) : null}
           <div className="mt-2 flex flex-wrap gap-1">
-            <span className="rounded-md bg-srapi-bg-muted px-1.5 py-0.5 font-mono text-[10px] text-srapi-text-tertiary">
+            <span className="bg-srapi-bg-muted text-srapi-text-tertiary rounded-md px-1.5 py-0.5 font-mono text-[10px]">
               {modelPolicy}
             </span>
-            <span className="rounded-md bg-srapi-bg-muted px-1.5 py-0.5 font-mono text-[10px] text-srapi-text-tertiary">
+            {endpointFacts.map((fact) => (
+              <span
+                key={fact.key}
+                className={cn(
+                  "rounded-md px-1.5 py-0.5 font-mono text-[10px]",
+                  fact.tone === "enabled"
+                    ? "bg-srapi-success/10 text-srapi-success"
+                    : "bg-srapi-error/10 text-srapi-error",
+                )}
+                title={`${fact.label}: ${fact.value}`}
+              >
+                {fact.label}: {fact.value}
+              </span>
+            ))}
+            <span className="bg-srapi-bg-muted text-srapi-text-tertiary rounded-md px-1.5 py-0.5 font-mono text-[10px]">
               {proxyLabel}
             </span>
             {visibleGroups.length > 0 ? (
               visibleGroups.map((name) => (
                 <span
                   key={name}
-                  className="max-w-[7rem] truncate rounded-md bg-srapi-bg-muted px-1.5 py-0.5 font-mono text-[10px] text-srapi-text-tertiary"
+                  className="bg-srapi-bg-muted text-srapi-text-tertiary max-w-[7rem] truncate rounded-md px-1.5 py-0.5 font-mono text-[10px]"
                   title={name}
                 >
                   {name}
                 </span>
               ))
             ) : (
-              <span className="rounded-md bg-srapi-bg-muted px-1.5 py-0.5 font-mono text-[10px] text-srapi-text-tertiary">
+              <span className="bg-srapi-bg-muted text-srapi-text-tertiary rounded-md px-1.5 py-0.5 font-mono text-[10px]">
                 {t("adminAccounts.ungrouped")}
               </span>
             )}
             {extraGroupCount > 0 ? (
-              <span className="rounded-md bg-srapi-bg-muted px-1.5 py-0.5 font-mono text-[10px] text-srapi-text-tertiary">
+              <span className="bg-srapi-bg-muted text-srapi-text-tertiary rounded-md px-1.5 py-0.5 font-mono text-[10px]">
                 +{extraGroupCount}
               </span>
             ) : null}
             {[...capacityFacts, ...profileFacts].slice(0, 5).map((fact) => (
               <span
                 key={fact.key}
-                className="max-w-[10rem] truncate rounded-md bg-srapi-bg-muted px-1.5 py-0.5 font-mono text-[10px] text-srapi-text-tertiary"
+                className="bg-srapi-bg-muted text-srapi-text-tertiary max-w-[10rem] truncate rounded-md px-1.5 py-0.5 font-mono text-[10px]"
                 title={`${fact.label}: ${fact.value}`}
               >
                 {fact.label}: {fact.value}
@@ -324,48 +347,57 @@ function AccountCard({
       </div>
 
       {/* Status row */}
-      <div className="flex items-center gap-2 border-t border-srapi-border/50 px-4 py-2.5">
+      <div className="border-srapi-border/50 flex items-center gap-2 border-t px-4 py-2.5">
         {status}
         {account.priority != null && account.priority !== 0 ? (
-          <span className="font-mono text-2xs text-srapi-text-tertiary">P{account.priority}</span>
+          <span className="text-2xs text-srapi-text-tertiary font-mono">P{account.priority}</span>
         ) : null}
         {account.weight != null && account.weight !== 1 ? (
-          <span className="font-mono text-2xs text-srapi-text-tertiary">W{account.weight}</span>
+          <span className="text-2xs text-srapi-text-tertiary font-mono">W{account.weight}</span>
         ) : null}
         {account.risk_level ? (
-          <span className="font-mono text-2xs text-srapi-text-tertiary">{account.risk_level}</span>
+          <span className="text-2xs text-srapi-text-tertiary font-mono">{account.risk_level}</span>
         ) : null}
         <TokenExpiryInline account={account} />
       </div>
 
       {/* Metrics */}
-      <div className="grid grid-cols-2 gap-px border-t border-srapi-border/50 bg-srapi-border/30">
+      <div className="border-srapi-border/50 bg-srapi-border/30 grid grid-cols-2 gap-px border-t">
         <div className="bg-srapi-card px-4 py-2.5">
-          <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-srapi-text-tertiary">{t("adminAccounts.healthTitle")}</div>
+          <div className="text-srapi-text-tertiary mb-1 font-mono text-[10px] tracking-wide uppercase">
+            {t("adminAccounts.healthTitle")}
+          </div>
           <AccountHealthCell health={health} investigationHref={investigationHref} />
         </div>
         <div className="bg-srapi-card px-4 py-2.5">
-          <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-srapi-text-tertiary">{t("adminAccounts.quotaTitle")}</div>
+          <div className="text-srapi-text-tertiary mb-1 font-mono text-[10px] tracking-wide uppercase">
+            {t("adminAccounts.quotaTitle")}
+          </div>
           <AccountQuotaCell health={health} />
         </div>
       </div>
-      <div className="border-t border-srapi-border/50 px-4 py-2.5">
-        <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-srapi-text-tertiary">
+      <div className="border-srapi-border/50 border-t px-4 py-2.5">
+        <div className="text-srapi-text-tertiary mb-1 font-mono text-[10px] tracking-wide uppercase">
           {t("adminAccounts.today")}
         </div>
         {hasTodayUsage && today ? (
-          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-mono text-2xs tabular">
+          <div className="text-2xs tabular flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-mono">
             <span className="text-srapi-text-primary">
               {formatCompactNumber(today.requests)} {t("adminAccounts.usageRequests").toLowerCase()}
             </span>
             <span className="text-srapi-text-secondary">
-              {formatCompactNumber(today.total_tokens || today.input_tokens + today.output_tokens)} {t("adminAccounts.usageTokens").toLowerCase()}
+              {formatCompactNumber(today.total_tokens || today.input_tokens + today.output_tokens)}{" "}
+              {t("adminAccounts.usageTokens").toLowerCase()}
             </span>
-            <span className="text-srapi-text-secondary">{formatMoney(today.cost, today.currency)}</span>
+            <span className="text-srapi-text-secondary">
+              {formatMoney(today.cost, today.currency)}
+            </span>
             <span className="text-srapi-text-tertiary">{formatPercent(today.success_rate)}</span>
           </div>
         ) : (
-          <span className="font-mono text-2xs text-srapi-text-tertiary">{t("adminAccounts.todayIdle")}</span>
+          <span className="text-2xs text-srapi-text-tertiary font-mono">
+            {t("adminAccounts.todayIdle")}
+          </span>
         )}
       </div>
     </article>
@@ -391,14 +423,14 @@ function AccountBulkBar({
 }) {
   const { t } = useLanguage();
   return (
-    <div className="anim-rise-sm flex flex-wrap items-center gap-3 border-b border-srapi-border bg-srapi-card-muted px-4 py-2.5">
-      <span className="font-mono text-2xs text-srapi-text-secondary">
+    <div className="anim-rise-sm border-srapi-border bg-srapi-card-muted flex flex-wrap items-center gap-3 border-b px-4 py-2.5">
+      <span className="text-2xs text-srapi-text-secondary font-mono">
         {t("adminCommon.selectedCount", { count })}
       </span>
       <button
         type="button"
         onClick={onClear}
-        className="text-2xs text-srapi-text-tertiary underline-offset-2 hover:text-srapi-text-primary hover:underline"
+        className="text-2xs text-srapi-text-tertiary hover:text-srapi-text-primary underline-offset-2 hover:underline"
       >
         {t("adminCommon.clearSelection")}
       </button>
@@ -412,7 +444,7 @@ function AccountCardSkeleton() {
     <div className="min-h-[55vh] p-3">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="rounded-lg border border-srapi-border bg-srapi-card">
+          <div key={i} className="border-srapi-border bg-srapi-card rounded-lg border">
             <div className="px-4 pt-4 pb-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="space-y-2">
@@ -422,12 +454,16 @@ function AccountCardSkeleton() {
                 <Skeleton className="size-7 rounded-md" />
               </div>
             </div>
-            <div className="border-t border-srapi-border/50 px-4 py-2.5">
+            <div className="border-srapi-border/50 border-t px-4 py-2.5">
               <Skeleton className="h-5 w-20" />
             </div>
-            <div className="grid grid-cols-2 gap-px border-t border-srapi-border/50">
-              <div className="px-4 py-2.5"><Skeleton className="h-6 w-full" /></div>
-              <div className="px-4 py-2.5"><Skeleton className="h-6 w-full" /></div>
+            <div className="border-srapi-border/50 grid grid-cols-2 gap-px border-t">
+              <div className="px-4 py-2.5">
+                <Skeleton className="h-6 w-full" />
+              </div>
+              <div className="px-4 py-2.5">
+                <Skeleton className="h-6 w-full" />
+              </div>
             </div>
           </div>
         ))}

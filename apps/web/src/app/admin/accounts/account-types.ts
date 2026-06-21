@@ -37,9 +37,7 @@ type Translate = (key: string, vars?: Record<string, string | number>) => string
 export function metadataStringList(metadata: ProviderAccount["metadata"], key: string): string[] {
   const value = metadata?.[key];
   if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => (typeof item === "string" ? item.trim() : ""))
-    .filter(Boolean);
+  return value.map((item) => (typeof item === "string" ? item.trim() : "")).filter(Boolean);
 }
 
 function metadataObjectKeyCount(metadata: ProviderAccount["metadata"], key: string): number {
@@ -71,10 +69,16 @@ function truncateMetadataValue(value: string, max = 28): string {
   return `${value.slice(0, Math.max(0, max - 1))}…`;
 }
 
+function metadataBoolean(metadata: ProviderAccount["metadata"], key: string): boolean | null {
+  const value = metadata?.[key];
+  return typeof value === "boolean" ? value : null;
+}
+
 export interface AccountMetadataFact {
   key: string;
   label: string;
   value: string;
+  tone?: "default" | "enabled" | "disabled";
 }
 
 export function accountMetadataFacts(
@@ -130,7 +134,8 @@ export function accountMetadataFacts(
   }
 
   const org =
-    metadataString(metadata, "organization_id") || metadataString(metadata, "codex_organization_id");
+    metadataString(metadata, "organization_id") ||
+    metadataString(metadata, "codex_organization_id");
   if (org) {
     facts.push({
       key: "org",
@@ -162,18 +167,9 @@ export function accountMetadataFacts(
   return facts;
 }
 
-export function accountProfileFacts(
-  t: Translate,
-  account: ProviderAccount,
-): AccountMetadataFact[] {
+export function accountProfileFacts(t: Translate, account: ProviderAccount): AccountMetadataFact[] {
   return accountMetadataFacts(t, account).filter(
-    (fact) =>
-      ![
-        "email",
-        "max-concurrency",
-        "max-sessions",
-        "rpm",
-      ].includes(fact.key),
+    (fact) => !["email", "max-concurrency", "max-sessions", "rpm"].includes(fact.key),
   );
 }
 
@@ -218,6 +214,30 @@ export function accountCapacityFacts(
     });
   }
 
+  return facts;
+}
+
+const accountEndpointOverrides = [
+  { key: "chat_completions", metadataKey: "capability_chat_completions" },
+  { key: "responses", metadataKey: "capability_responses" },
+  { key: "messages", metadataKey: "capability_messages" },
+] as const;
+
+export function accountEndpointCapabilityFacts(
+  t: Translate,
+  account: ProviderAccount,
+): AccountMetadataFact[] {
+  const facts: AccountMetadataFact[] = [];
+  for (const item of accountEndpointOverrides) {
+    const value = metadataBoolean(account.metadata, item.metadataKey);
+    if (value === null) continue;
+    facts.push({
+      key: item.key,
+      label: t(`adminGatewayResources.endpointShort.${item.key}`),
+      value: value ? t("adminAccounts.capabilityForcedOn") : t("adminAccounts.capabilityForcedOff"),
+      tone: value ? "enabled" : "disabled",
+    });
+  }
   return facts;
 }
 

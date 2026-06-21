@@ -82,13 +82,14 @@ const account = providerAccount({
     max_concurrency: 4,
     max_sessions: 2,
     supported_models: ["gpt-5", "gpt-5-mini"],
+    capability_responses: false,
+    capability_messages: true,
   },
 });
 
 vi.mock("@/hooks/admin-queries", async () => {
-  const actual = await vi.importActual<typeof import("@/hooks/admin-queries")>(
-    "@/hooks/admin-queries",
-  );
+  const actual =
+    await vi.importActual<typeof import("@/hooks/admin-queries")>("@/hooks/admin-queries");
   return {
     ...actual,
     useAdminAccounts: () => ({
@@ -222,6 +223,8 @@ describe("AdminAccountsPage", () => {
     renderPage();
 
     expect(screen.getByText("允许 2 个")).toBeInTheDocument();
+    expect(screen.getByText("Resp: 强关")).toBeInTheDocument();
+    expect(screen.getByText("Msg: 强开")).toBeInTheDocument();
     expect(screen.getByText(/ada@example.com/)).toBeInTheDocument();
     expect(screen.getByText("套餐: pro")).toBeInTheDocument();
     expect(screen.getByText("组织: org-main")).toBeInTheDocument();
@@ -239,6 +242,8 @@ describe("AdminAccountsPage", () => {
     expect(screen.getByRole("columnheader", { name: "代理" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "路由" })).toBeInTheDocument();
     expect(screen.getAllByText("允许 2 个").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Resp: 强关").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Msg: 强开").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/ada@example.com/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/套餐: pro/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/组织: org-main/).length).toBeGreaterThan(0);

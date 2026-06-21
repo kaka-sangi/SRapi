@@ -37,6 +37,7 @@ import { Sparkline } from "@/components/charts/sparkline";
 import {
   accountIdentitySummary,
   accountCapacityFacts,
+  accountEndpointCapabilityFacts,
   accountModelPolicyLabel,
   accountProfileFacts,
 } from "@/app/admin/accounts/account-types";
@@ -73,20 +74,20 @@ function pct(ratio: number): string {
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-4 py-1.5">
-      <span className="text-2xs uppercase tracking-wide text-srapi-text-tertiary">{label}</span>
-      <span className="font-mono text-xs text-srapi-text-primary tabular">{value}</span>
+      <span className="text-2xs text-srapi-text-tertiary tracking-wide uppercase">{label}</span>
+      <span className="text-srapi-text-primary tabular font-mono text-xs">{value}</span>
     </div>
   );
 }
 
 function DetailMetric({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="min-w-0 rounded-md border border-srapi-border bg-srapi-bg-muted px-3 py-2">
-      <div className="font-mono text-[10px] uppercase tracking-wide text-srapi-text-tertiary">
+    <div className="border-srapi-border bg-srapi-bg-muted min-w-0 rounded-md border px-3 py-2">
+      <div className="text-srapi-text-tertiary font-mono text-[10px] tracking-wide uppercase">
         {label}
       </div>
       <div
-        className="mt-1 truncate font-mono text-2xs text-srapi-text-secondary"
+        className="text-2xs text-srapi-text-secondary mt-1 truncate font-mono"
         title={typeof value === "string" ? value : undefined}
       >
         {value}
@@ -120,6 +121,18 @@ function activeDailyUsagePoints(points: AccountUsageDailyPoint[]): AccountUsageD
   return points.filter(hasDailyTraffic);
 }
 
+function usageDateRangeLabel(
+  points: AccountUsageDailyPoint[],
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): string {
+  const activePoints = activeDailyUsagePoints(points);
+  if (activePoints.length === 0) return t("adminAccounts.neverUsed");
+  const first = activePoints[0]?.date ?? "";
+  const last = activePoints[activePoints.length - 1]?.date ?? "";
+  if (!first || !last || first === last) return formatDate(last || first);
+  return `${formatDate(first)} - ${formatDate(last)}`;
+}
+
 function AccountHealthEvidenceLinks({ links }: { links: AccountHealthInvestigationLinks }) {
   const { t } = useLanguage();
   const items = [
@@ -150,12 +163,12 @@ function QuotaWindowRow({ window }: { window: QuotaDisplayWindow }) {
   return (
     <div className="space-y-1.5 py-2">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="font-mono text-2xs uppercase tracking-wide text-srapi-text-secondary">
+        <span className="text-2xs text-srapi-text-secondary font-mono tracking-wide uppercase">
           {quotaWindowDisplayLabel(window, t)}
         </span>
         <span
           className={cn(
-            "font-mono text-xs tabular",
+            "tabular font-mono text-xs",
             level === "crit"
               ? "text-srapi-error"
               : level === "warn"
@@ -166,7 +179,7 @@ function QuotaWindowRow({ window }: { window: QuotaDisplayWindow }) {
           {Math.round(window.remainingPercent)}%
         </span>
       </div>
-      <div className="relative h-1.5 overflow-hidden rounded-full bg-srapi-border">
+      <div className="bg-srapi-border relative h-1.5 overflow-hidden rounded-full">
         <div
           className={cn(
             "h-full rounded-full transition-all",
@@ -179,7 +192,7 @@ function QuotaWindowRow({ window }: { window: QuotaDisplayWindow }) {
           style={{ width: `${Math.max(window.remainingPercent, 2)}%` }}
         />
       </div>
-      <div className="flex items-center justify-between gap-3 font-mono text-2xs text-srapi-text-tertiary">
+      <div className="text-2xs text-srapi-text-tertiary flex items-center justify-between gap-3 font-mono">
         <span>{quotaWindowValue(window)}</span>
         <span>{quotaWindowTiming(window, t)}</span>
       </div>
@@ -210,20 +223,20 @@ function UsageWindowCard({
   return (
     <div className="space-y-1.5 py-2">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="font-mono text-2xs uppercase tracking-wide text-srapi-text-secondary">
+        <span className="text-2xs text-srapi-text-secondary font-mono tracking-wide uppercase">
           {usageWindowLabel(window.window, t)}
         </span>
-        <span className="font-mono text-xs text-srapi-text-primary tabular">
+        <span className="text-srapi-text-primary tabular font-mono text-xs">
           {formatCompactNumber(window.requests)} {t("adminAccounts.usageRequests").toLowerCase()}
         </span>
       </div>
-      <div className="relative h-1.5 overflow-hidden rounded-full bg-srapi-border">
+      <div className="bg-srapi-border relative h-1.5 overflow-hidden rounded-full">
         <div
-          className="h-full rounded-full bg-srapi-success transition-all"
+          className="bg-srapi-success h-full rounded-full transition-all"
           style={{ width: `${Math.max(ratio * 100, window.requests > 0 ? 2 : 0)}%` }}
         />
       </div>
-      <div className="flex items-center justify-between gap-3 font-mono text-2xs text-srapi-text-tertiary">
+      <div className="text-2xs text-srapi-text-tertiary flex items-center justify-between gap-3 font-mono">
         <span>
           {t("adminAccounts.usageTokens")} {formatCompactNumber(window.total_tokens)}
         </span>
@@ -313,16 +326,16 @@ function UsageDailyBody({ points }: { points: AccountUsageDailyPoint[] }) {
           <TableBody>
             {rows.map((p) => (
               <TableRow key={p.date}>
-                <TableCell className="py-1.5 font-mono text-srapi-text-secondary">
+                <TableCell className="text-srapi-text-secondary py-1.5 font-mono">
                   {formatDate(p.date)}
                 </TableCell>
-                <TableCell className="py-1.5 text-right font-mono tabular text-srapi-text-primary">
+                <TableCell className="tabular text-srapi-text-primary py-1.5 text-right font-mono">
                   {formatCompactNumber(p.requests)}
                 </TableCell>
-                <TableCell className="py-1.5 text-right font-mono tabular text-srapi-text-secondary">
+                <TableCell className="tabular text-srapi-text-secondary py-1.5 text-right font-mono">
                   {formatCompactNumber(p.input_tokens + p.output_tokens)}
                 </TableCell>
-                <TableCell className="py-1.5 text-right font-mono tabular text-srapi-text-secondary">
+                <TableCell className="tabular text-srapi-text-secondary py-1.5 text-right font-mono">
                   {formatMoney(p.cost, p.currency)}
                 </TableCell>
               </TableRow>
@@ -331,7 +344,7 @@ function UsageDailyBody({ points }: { points: AccountUsageDailyPoint[] }) {
         </Table>
       </TableScroll>
       {activePoints.length > rows.length ? (
-        <p className="font-mono text-2xs text-srapi-text-tertiary">
+        <p className="text-2xs text-srapi-text-tertiary font-mono">
           {t("adminAccounts.usageDailyRowsShown", {
             shown: rows.length,
             total: activePoints.length,
@@ -357,9 +370,9 @@ function Section<T>({
 }) {
   const { t } = useLanguage();
   return (
-    <div className="border-t border-srapi-border pt-4 first:border-t-0 first:pt-0">
+    <div className="border-srapi-border border-t pt-4 first:border-t-0 first:pt-0">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <h3 className="font-mono text-2xs uppercase tracking-widest text-srapi-text-secondary">
+        <h3 className="text-2xs text-srapi-text-secondary font-mono tracking-widest uppercase">
           {title}
         </h3>
         {action}
@@ -402,7 +415,9 @@ export function AccountDetailSheet({
   const usageDaily = useAccountUsageDaily(id, ACCOUNT_USAGE_DAILY_MAX_DAYS);
   const fetchQuota = useFetchAccountQuota();
   const identity = account ? accountIdentitySummary(t, account) : null;
-  const lastUsageDate = [...(usageDaily.data ?? [])].reverse().find(hasDailyTraffic)?.date ?? "";
+  const endpointFacts = account ? accountEndpointCapabilityFacts(t, account) : [];
+  const activeUsagePoints = activeDailyUsagePoints(usageDaily.data ?? []);
+  const lastUsageDate = [...activeUsagePoints].reverse()[0]?.date ?? "";
 
   async function refreshQuota() {
     if (!id) return;
@@ -429,23 +444,30 @@ export function AccountDetailSheet({
     <Sheet open={account !== null} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-[28rem] gap-0 overflow-y-auto p-6">
         <SheetTitle>{t("adminAccounts.detailTitle")}</SheetTitle>
-        {account ? <SheetDescription className="text-sm text-srapi-text-secondary">{account.name}</SheetDescription> : null}
+        {account ? (
+          <SheetDescription
+            className="text-srapi-text-secondary block max-w-full truncate text-sm"
+            title={account.name}
+          >
+            {account.name}
+          </SheetDescription>
+        ) : null}
 
         {account ? (
           <div className="mt-3 flex flex-wrap gap-1.5">
-            <span className="rounded-md bg-srapi-bg-muted px-2 py-0.5 font-mono text-2xs text-srapi-text-secondary">
+            <span className="bg-srapi-bg-muted text-2xs text-srapi-text-secondary rounded-md px-2 py-0.5 font-mono">
               {account.status}
             </span>
-            <span className="rounded-md bg-srapi-bg-muted px-2 py-0.5 text-2xs text-srapi-text-secondary">
+            <span className="bg-srapi-bg-muted text-2xs text-srapi-text-secondary rounded-md px-2 py-0.5">
               {runtimeClassLabel(t, account.runtime_class)}
             </span>
             {account.priority != null && account.priority !== 0 ? (
-              <span className="rounded-md bg-srapi-bg-muted px-2 py-0.5 font-mono text-2xs text-srapi-text-tertiary">
+              <span className="bg-srapi-bg-muted text-2xs text-srapi-text-tertiary rounded-md px-2 py-0.5 font-mono">
                 P{account.priority}
               </span>
             ) : null}
             {account.weight != null && account.weight !== 1 ? (
-              <span className="rounded-md bg-srapi-bg-muted px-2 py-0.5 font-mono text-2xs text-srapi-text-tertiary">
+              <span className="bg-srapi-bg-muted text-2xs text-srapi-text-tertiary rounded-md px-2 py-0.5 font-mono">
                 W{account.weight}
               </span>
             ) : null}
@@ -478,7 +500,9 @@ export function AccountDetailSheet({
             />
             <DetailMetric
               label={t("adminAccounts.proxy")}
-              value={account.proxy_id ? t("adminAccounts.proxyConfigured") : t("adminAccounts.noProxy")}
+              value={
+                account.proxy_id ? t("adminAccounts.proxyConfigured") : t("adminAccounts.noProxy")
+              }
             />
             <DetailMetric
               label={t("adminAccounts.routing")}
@@ -490,7 +514,29 @@ export function AccountDetailSheet({
             />
             <DetailMetric
               label={t("adminAccounts.lastUsedAt")}
-              value={lastUsageDate ? formatDate(lastUsageDate) : t("adminAccounts.neverUsed")}
+              value={
+                usageDaily.isLoading
+                  ? t("adminAccounts.detailLoading")
+                  : lastUsageDate
+                    ? formatDate(lastUsageDate)
+                    : t("adminAccounts.neverUsed")
+              }
+            />
+            <DetailMetric
+              label={t("adminAccounts.usagePeriod")}
+              value={
+                usageDaily.isLoading
+                  ? t("adminAccounts.detailLoading")
+                  : usageDateRangeLabel(usageDaily.data ?? [], t)
+              }
+            />
+            <DetailMetric
+              label={t("adminAccounts.endpointOverrides")}
+              value={
+                endpointFacts.length > 0
+                  ? endpointFacts.map((fact) => `${fact.label}: ${fact.value}`).join(" ")
+                  : t("adminAccounts.inheritProvider")
+              }
             />
             {account.last_refreshed_at ? (
               <DetailMetric
@@ -508,14 +554,7 @@ export function AccountDetailSheet({
               <DetailMetric key={fact.key} label={fact.label} value={fact.value} />
             ))}
             {accountProfileFacts(t, account)
-              .filter(
-                (fact) =>
-                  ![
-                    "max-concurrency",
-                    "max-sessions",
-                    "rpm",
-                  ].includes(fact.key),
-              )
+              .filter((fact) => !["max-concurrency", "max-sessions", "rpm"].includes(fact.key))
               .slice(0, 4)
               .map((fact) => (
                 <DetailMetric key={fact.key} label={fact.label} value={fact.value} />
@@ -531,7 +570,10 @@ export function AccountDetailSheet({
                 <div>
                   <Row label={t("adminCommon.status")} value={h.status} />
                   <Row label={t("adminAccounts.successRate")} value={pct(h.success_rate)} />
-                  <Row label={`${t("adminAccounts.latency")} p50 / p95`} value={`${Math.round(h.latency_p50_ms)} / ${Math.round(h.latency_p95_ms)}ms`} />
+                  <Row
+                    label={`${t("adminAccounts.latency")} p50 / p95`}
+                    value={`${Math.round(h.latency_p50_ms)} / ${Math.round(h.latency_p95_ms)}ms`}
+                  />
                   <Row label={t("adminAccounts.circuitState")} value={h.circuit_state} />
                   {h.error_class ? (
                     <Row
@@ -556,7 +598,12 @@ export function AccountDetailSheet({
                       value={<AccountHealthEvidenceLinks links={investigationLinks} />}
                     />
                   ) : null}
-                  {h.cooldown_until ? <Row label={t("adminAccounts.cooldown")} value={h.cooldown_reason ?? h.cooldown_until} /> : null}
+                  {h.cooldown_until ? (
+                    <Row
+                      label={t("adminAccounts.cooldown")}
+                      value={h.cooldown_reason ?? h.cooldown_until}
+                    />
+                  ) : null}
                 </div>
               );
             }}
@@ -595,7 +642,7 @@ export function AccountDetailSheet({
                   type="button"
                   onClick={() => void refreshQuota()}
                   disabled={fetchQuota.isPending}
-                  className="flex items-center gap-1 font-mono text-2xs uppercase tracking-wide text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary disabled:opacity-50"
+                  className="text-2xs text-srapi-text-tertiary hover:text-srapi-text-secondary flex items-center gap-1 font-mono tracking-wide uppercase transition-colors disabled:opacity-50"
                 >
                   <RefreshCw className={cn("size-3", fetchQuota.isPending && "animate-spin")} />
                   {t("adminAccounts.quotaRefresh")}
@@ -605,7 +652,9 @@ export function AccountDetailSheet({
           >
             {(q) =>
               q.data.length === 0 ? (
-                <p className="text-2xs text-srapi-text-tertiary">{t("adminAccounts.detailNoData")}</p>
+                <p className="text-2xs text-srapi-text-tertiary">
+                  {t("adminAccounts.detailNoData")}
+                </p>
               ) : (
                 <div className="space-y-2">
                   {latestQuotaWindows(q.data).map((window) => (
@@ -619,9 +668,15 @@ export function AccountDetailSheet({
           <Section title={t("adminAccounts.proxyQualityTitle")} query={proxy}>
             {(p) => (
               <div>
-                <Row label={t("adminAccounts.proxy")} value={p.proxy_id ?? t("adminAccounts.noProxy")} />
+                <Row
+                  label={t("adminAccounts.proxy")}
+                  value={p.proxy_id ?? t("adminAccounts.noProxy")}
+                />
                 <Row label={t("adminAccounts.successRate")} value={pct(p.success_rate)} />
-                <Row label={`${t("adminAccounts.latency")} p95`} value={`${Math.round(p.latency_p95_ms)}ms`} />
+                <Row
+                  label={`${t("adminAccounts.latency")} p95`}
+                  value={`${Math.round(p.latency_p95_ms)}ms`}
+                />
                 <Row label="samples" value={p.sample_count} />
               </div>
             )}
