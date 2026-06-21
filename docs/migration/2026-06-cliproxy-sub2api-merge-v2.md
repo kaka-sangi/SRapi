@@ -44,13 +44,14 @@ is the binding scope: what we adopt, what we reject, and the order of work.
    strip for passback-required families. Anthropic-strict family keeps the
    current behavior; unknown family stays conservative (no strip, no cache push).
 
-5. **Images failover — per-account model remap.** Images-edits / images-variations
-   route through the generic failover invoker with a frozen canonical request;
-   when failover swaps accounts, the second account's per-credential model
-   mapping is ignored. We re-resolve the upstream model from the chosen
-   account's mapping at attempt-time, parallel to the existing chat-completions
-   path. (Multipart bodies stay non-cached — only the JSON envelope picks up
-   per-account remapping.)
+5. ~~Images failover — per-account model remap.~~ **False positive on closer
+   inspection.** `schedulercontract.Candidate.Mapping` is the
+   per-(model, provider) row; `candidate.Mapping.UpstreamModelName` is read by
+   the provider adapter at attempt time, not from the canonical request.
+   `TestGatewayImageGenerationPoolModeRetriesThenFailsOver` already verifies the
+   secondary upstream sees the secondary mapping's model name. Images edits /
+   variations route through the same generic `invokeGatewayCandidateWithFailover`
+   machinery, so the inheritance argument holds. No code change needed.
 
 6. **Scheduler request snapshot cleanup worker.** `scheduler_request_snapshots`
    ships under WP-1310 but has no TTL enforcement. sub2api uses a watermark +
@@ -119,8 +120,8 @@ blast radius first; bigger items get their own commit so review stays focused.
 4. **Account temp-unschedulable** (item 7 + item 8 — Ent schema field, store
    helper, scheduler hard-filter, admin API + handler + SDK, web action,
    partial index).
-5. **Images failover per-account model remap** (item 5 — extend the failover
-   invoker hook used by images edits / variations).
+5. ~~Images failover per-account model remap~~ — closed without code change;
+   verified by re-reading `candidate.Mapping.UpstreamModelName` flow.
 6. **OpenAI quota-window reset credit** (item 3 — provider-adapter call,
    admin endpoint, SDK, web button).
 7. **Scheduler snapshot cleanup worker** (item 6 — new worker package +
