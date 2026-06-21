@@ -5,12 +5,25 @@ import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AdminSettingsPage from "@/app/admin/settings/page";
 import { LanguageProvider } from "@/context/LanguageContext";
-import type { AdminSettings } from "../../../../packages/sdk/typescript/src/types.gen";
+import type {
+  AdminSettings,
+  CaptchaSettings,
+  CaptchaSettingsWritable,
+} from "../../../../packages/sdk/typescript/src/types.gen";
 
 const mocks = vi.hoisted(() => ({
   replace: vi.fn(),
   searchParams: new URLSearchParams("tab=gateway"),
   updateSettings: vi.fn(),
+  captchaSettings: {
+    managed: false,
+    enabled: false,
+    provider: "turnstile",
+    site_key: "",
+    secret_key_configured: false,
+    verify_url: "",
+  } as CaptchaSettings,
+  updateCaptchaSettings: vi.fn(),
   toast: vi.fn(),
 }));
 
@@ -45,8 +58,18 @@ vi.mock("@/hooks/admin-queries", () => ({
     isError: false,
     refetch: vi.fn(),
   }),
+  useAdminCaptchaSettings: () => ({
+    data: mocks.captchaSettings,
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
   useUpdateSettings: () => ({
     mutateAsync: mocks.updateSettings,
+    isPending: false,
+  }),
+  useUpdateCaptchaSettings: () => ({
+    mutateAsync: mocks.updateCaptchaSettings,
     isPending: false,
   }),
   useAdminModels: () => ({
@@ -60,8 +83,17 @@ describe("AdminSettingsPage", () => {
   beforeEach(() => {
     mocks.replace.mockReset();
     mocks.updateSettings.mockReset();
+    mocks.updateCaptchaSettings.mockReset();
     mocks.toast.mockReset();
     mocks.searchParams = new URLSearchParams("tab=gateway");
+    mocks.captchaSettings = {
+      managed: false,
+      enabled: false,
+      provider: "turnstile",
+      site_key: "",
+      secret_key_configured: false,
+      verify_url: "",
+    } as CaptchaSettings;
     storage.clear();
     storage.set("srapi_lang", "zh");
     window.history.replaceState(null, "", "/admin/settings?tab=gateway");
@@ -143,6 +175,43 @@ describe("AdminSettingsPage", () => {
       scopes: ["openid", "email"],
     });
     expect(await screen.findByText("已保存")).toBeInTheDocument();
+  });
+
+  it("edits captcha runtime settings through the dedicated security control", async () => {
+    const user = userEvent.setup();
+    mocks.searchParams = new URLSearchParams("tab=security");
+    mocks.updateCaptchaSettings.mockImplementation(async (body: CaptchaSettingsWritable) => ({
+      managed: body.managed,
+      enabled: body.enabled,
+      provider: body.provider,
+      site_key: body.site_key,
+      secret_key_configured: Boolean(body.secret_key),
+      verify_url: body.verify_url,
+    }));
+    renderPage();
+
+    expect(screen.getByText("CAPTCHA")).toBeInTheDocument();
+    await user.click(screen.getByLabelText("由控制台托管"));
+    await user.click(screen.getByLabelText("要求验证"));
+    await user.type(screen.getByLabelText("Site key"), "site-123");
+    await user.type(screen.getByLabelText("Secret key"), "secret-123");
+    await user.type(screen.getByLabelText("Verify URL"), "https://captcha.example/siteverify");
+
+    expect(screen.getByText("CAPTCHA 有未保存更改")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "保存 CAPTCHA" }));
+
+    await waitFor(() => expect(mocks.updateCaptchaSettings).toHaveBeenCalled());
+    expect(mocks.updateCaptchaSettings).toHaveBeenCalledWith({
+      managed: true,
+      enabled: true,
+      provider: "turnstile",
+      site_key: "site-123",
+      secret_key: "secret-123",
+      verify_url: "https://captcha.example/siteverify",
+    });
+    expect(mocks.updateSettings).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByLabelText("Secret key")).toHaveValue(""));
+    expect(screen.getByText("CAPTCHA 已保存")).toBeInTheDocument();
   });
 
   it("uses the normalized settings returned by the server after save", async () => {

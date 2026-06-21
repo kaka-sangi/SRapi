@@ -10,10 +10,12 @@ import {
   batchSetAdminAccountGroupRateMultipliers,
   batchSetAdminAccountGroupRpmOverrides,
   getAdminConfigSnapshot,
+  getAdminCaptchaSettings,
   importAdminConfigSnapshot,
   getAdminSettings,
   getAdminCopilotConfig,
   sendAdminTestEmail,
+  updateAdminCaptchaSettings,
   updateAdminSettings,
 } from "../../../../../packages/sdk/typescript/src/index";
 import type {
@@ -21,6 +23,8 @@ import type {
   AdminSendTestEmailRequest,
   AdminSettings,
   AdminTestResult,
+  CaptchaSettings,
+  CaptchaSettingsWritable,
   ConfigImportRequest,
   ConfigImportResponse,
   ConfigSnapshotResponse,
@@ -54,6 +58,14 @@ export const settingsApi = {
 
   getCopilotConfig(): Promise<AdminCopilotConfig> {
     return unwrapData(() => getAdminCopilotConfig({ throwOnError: true }));
+  },
+
+  getCaptchaSettings(): Promise<CaptchaSettings> {
+    return unwrapData(() => getAdminCaptchaSettings({ throwOnError: true }));
+  },
+
+  updateCaptchaSettings(body: CaptchaSettingsWritable): Promise<CaptchaSettings> {
+    return unwrapData(() => updateAdminCaptchaSettings({ body, throwOnError: true }));
   },
 
   getConfigSnapshot(): Promise<ConfigSnapshotResponse["data"]> {

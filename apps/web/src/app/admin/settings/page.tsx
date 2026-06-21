@@ -33,6 +33,7 @@ import { SpecialFieldRow } from "./special-field-row";
 import { EmailTestPanel } from "./email-test-panel";
 import { CopilotTab } from "./copilot-tab";
 import { BackupTab } from "./backup-tab";
+import { CaptchaSettingsPanel } from "./captcha-settings-panel";
 
 export default function AdminSettingsPage() {
   return (
@@ -184,6 +185,7 @@ function SettingsEditor({ initial }: { initial: Parameters<typeof createSettings
                   />
                 ))}
                 {tab.id === "email" ? <EmailTestPanel /> : null}
+                {tab.id === "security" ? <CaptchaSettingsPanel /> : null}
                 <div className="border-srapi-border flex justify-end border-t pt-4">
                   <Button
                     variant="primary"

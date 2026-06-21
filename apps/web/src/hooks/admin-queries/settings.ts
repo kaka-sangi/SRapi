@@ -110,6 +110,13 @@ export function useAdminSettings() {
   });
 }
 
+export function useAdminCaptchaSettings() {
+  return useQuery({
+    queryKey: queryKeys.admin.captchaSettings(),
+    queryFn: () => adminApi.getCaptchaSettings(),
+  });
+}
+
 // ---- Admin AI copilot ----
 export function useAdminCopilotConfig() {
   return useQuery({
@@ -229,6 +236,13 @@ export function useUpdateSettings() {
     (body: P<typeof adminApi.updateSettings>) => adminApi.updateSettings(body),
     ["admin", "settings"],
     queryKeys.admin.gatewayResources(),
+  );
+}
+
+export function useUpdateCaptchaSettings() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.updateCaptchaSettings>) => adminApi.updateCaptchaSettings(body),
+    queryKeys.admin.captchaSettings(),
   );
 }
 
