@@ -152,4 +152,59 @@ describe("AccountFormDialog", () => {
       }),
     );
   });
+
+  it("stores plain text pasted into the OAuth refresh token field as refresh_token", async () => {
+    const user = userEvent.setup({ delay: null });
+    renderDialog([
+      {
+        value: "codex-oauth-provider",
+        label: "Codex OAuth",
+        authMethods: ["oauth_refresh"],
+        adapterType: "reverse-proxy-codex-cli",
+      },
+    ], "codex-oauth-provider");
+
+    fireEvent.paste(screen.getByLabelText("刷新令牌"), {
+      clipboardData: { getData: () => "plain-refresh-token" },
+    });
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    expect(submit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runtime_class: "oauth_refresh",
+        credential: { refresh_token: "plain-refresh-token" },
+      }),
+    );
+  });
+
+  it("fills refresh_token from nested tokens JSON in the quick paste box", async () => {
+    const user = userEvent.setup({ delay: null });
+    renderDialog([
+      {
+        value: "codex-oauth-provider",
+        label: "Codex OAuth",
+        authMethods: ["oauth_refresh"],
+        adapterType: "reverse-proxy-codex-cli",
+      },
+    ], "codex-oauth-provider");
+
+    fireEvent.paste(screen.getByLabelText("Refresh Token / 授权 JSON"), {
+      clipboardData: {
+        getData: () =>
+          JSON.stringify({
+            tokens: {
+              refreshToken: "nested-refresh-token",
+            },
+          }),
+      },
+    });
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    expect(submit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runtime_class: "oauth_refresh",
+        credential: { refresh_token: "nested-refresh-token" },
+      }),
+    );
+  });
 });

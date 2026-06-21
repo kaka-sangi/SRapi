@@ -201,7 +201,7 @@ export function buildCredentialJson(
   return v ? JSON.stringify({ [spec.credKey as string]: v }) : "";
 }
 
-export function credentialFieldsFromPaste(value: string): {
+export function credentialFieldsFromPaste(value: string, preferredPlainTextField = "access_token"): {
   fields: Record<string, string>;
   metadata: Record<string, unknown>;
   name?: string;
@@ -209,12 +209,12 @@ export function credentialFieldsFromPaste(value: string): {
   const trimmed = value.trim();
   if (!trimmed) return { fields: {}, metadata: {} };
   const parsed = parsePastedJson(trimmed);
-  if (!parsed) return { fields: { access_token: trimmed }, metadata: {} };
+  if (!parsed) return { fields: { [preferredPlainTextField]: trimmed }, metadata: {} };
   const object = accountCredentialObject(parsed);
   if (!object) return { fields: {}, metadata: {} };
   const fields: Record<string, string> = {};
   for (const key of ["access_token", "refresh_token", "id_token", "session_token", "api_key", "cookie"]) {
-    const value = stringField(object, key);
+    const value = credentialStringField(object, key);
     if (value) fields[key] = value;
   }
   const metadata: Record<string, unknown> = {};
@@ -223,10 +223,10 @@ export function credentialFieldsFromPaste(value: string): {
     Object.assign(metadata, extra);
   }
   for (const key of ["email", "chatgpt_account_id", "chatgpt_user_id", "organization_id", "plan_type"]) {
-    const value = stringField(object, key);
+    const value = credentialStringField(object, key);
     if (value && metadata[key] == null) metadata[key] = value;
   }
-  const name = stringField(parsed, "name") || stringField(object, "email");
+  const name = credentialStringField(parsed, "name") || credentialStringField(object, "email");
   return { fields, metadata, name: name || undefined };
 }
 
@@ -275,6 +275,50 @@ function accountCredentialObject(value: Record<string, unknown>): Record<string,
   if (isPlainObject(value.credentials)) return value.credentials;
   if (isPlainObject(value.credential)) return value.credential;
   return value;
+}
+
+function credentialStringField(value: Record<string, unknown>, key: string): string {
+  return (
+    stringField(value, key) ||
+    credentialAliasStringField(value, key) ||
+    nestedCredentialStringField(value, "tokens", key) ||
+    nestedCredentialAliasStringField(value, "tokens", key)
+  );
+}
+
+function nestedCredentialStringField(value: Record<string, unknown>, objectKey: string, fieldKey: string): string {
+  const nested = value[objectKey];
+  return isPlainObject(nested) ? stringField(nested, fieldKey) : "";
+}
+
+function nestedCredentialAliasStringField(value: Record<string, unknown>, objectKey: string, fieldKey: string): string {
+  const nested = value[objectKey];
+  return isPlainObject(nested) ? credentialAliasStringField(nested, fieldKey) : "";
+}
+
+function credentialAliasStringField(value: Record<string, unknown>, key: string): string {
+  for (const alias of credentialFieldAliases(key)) {
+    const raw = stringField(value, alias);
+    if (raw) return raw;
+  }
+  return "";
+}
+
+function credentialFieldAliases(key: string): string[] {
+  switch (key) {
+    case "access_token":
+      return ["accessToken", "token"];
+    case "refresh_token":
+      return ["refreshToken", "rt"];
+    case "id_token":
+      return ["idToken"];
+    case "session_token":
+      return ["sessionToken"];
+    case "api_key":
+      return ["apiKey"];
+    default:
+      return [];
+  }
 }
 
 function stringField(value: Record<string, unknown>, key: string): string {

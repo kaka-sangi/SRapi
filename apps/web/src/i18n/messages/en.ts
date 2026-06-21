@@ -1083,11 +1083,22 @@ export const en = {
   accountOAuth: {
     title: "Authorize account",
     authorizeAccount: "Authorize account",
-    authorizeAccountHint: "Mint tokens by signing in with the provider instead of pasting them.",
+    authorizeAccountHint: "Paste a refresh token below, or sign in with the provider to exchange an authorization/setup code.",
+    quickPasteLabel: "Refresh token / auth JSON",
+    quickPastePlaceholder: "Paste a refresh_token, or a JSON object that contains tokens.refresh_token…",
+    quickPasteApply: "Fill token",
+    quickPasteHint:
+      "For Codex CLI and Claude Code CLI accounts, a refresh_token is enough; SRapi refreshes the access token when the account is used.",
     authCodeIntro:
-      "Sign in with the provider in a new tab, then paste the returned code to mint tokens.",
+      "Generate an authorization URL, sign in with the provider, then paste the returned authorization/setup code.",
     deviceIntro:
       "Enter the code at the provider's device page; tokens are minted once you approve.",
+    advancedConfig: "OAuth configuration",
+    advancedConfigHint: "Preset providers fill this automatically. Open only if you need to override client or endpoint details.",
+    stepBuildTitle: "Generate authorization URL",
+    stepOpenTitle: "Open the URL and finish authorization",
+    stepOpenHint: "Sign in on the provider page, approve access, and copy the returned code.",
+    stepCodeTitle: "Paste authorization/setup code",
     clientId: "Client ID",
     clientSecret: "Client secret",
     clientSecretHint: "Leave blank for public / PKCE clients.",

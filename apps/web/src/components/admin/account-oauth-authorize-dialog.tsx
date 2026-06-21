@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ExternalLink, Loader2 } from "lucide-react";
+import { ChevronDown, ExternalLink, Link2, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/cn";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { adminApi, adminErrorMessage } from "@/lib/admin-api";
@@ -87,6 +88,7 @@ export function AccountOAuthAuthorizeDialog({
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollCount = useRef(0);
   const prefillKey = useRef("");
@@ -278,119 +280,189 @@ export function AccountOAuthAuthorizeDialog({
         </DialogHeader>
 
         <div className="mt-4 max-h-[60vh] space-y-4 overflow-y-auto pr-1">
-          <div>
-            <Label htmlFor="oauth-client-id">{t("accountOAuth.clientId")}</Label>
-            <Input
-              id="oauth-client-id"
-              autoComplete="off"
-              className="mt-1.5 font-mono"
-              value={clientId}
-              disabled={busy || polling}
-              onChange={(e) => setClientId(e.target.value)}
-            />
-          </div>
-          <div>
-            <Label htmlFor="oauth-client-secret">{t("accountOAuth.clientSecret")}</Label>
-            <Input
-              id="oauth-client-secret"
-              type="password"
-              autoComplete="off"
-              className="mt-1.5 font-mono"
-              value={clientSecret}
-              disabled={busy || polling}
-              onChange={(e) => setClientSecret(e.target.value)}
-            />
-            <p className="mt-1 text-2xs text-srapi-text-tertiary">
-              {t("accountOAuth.clientSecretHint")}
-            </p>
-          </div>
-          {isAuthCode ? (
-            <>
-              <div>
-                <Label htmlFor="oauth-authorize-url">{t("accountOAuth.authorizeUrl")}</Label>
-                <Input
-                  id="oauth-authorize-url"
-                  autoComplete="off"
-                  className="mt-1.5 font-mono"
-                  value={authorizeUrl}
-                  disabled={busy}
-                  onChange={(e) => setAuthorizeUrl(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="oauth-redirect-uri">{t("accountOAuth.redirectUri")}</Label>
-                <Input
-                  id="oauth-redirect-uri"
-                  autoComplete="off"
-                  className="mt-1.5 font-mono"
-                  value={redirectUri}
-                  disabled={busy}
-                  onChange={(e) => setRedirectUri(e.target.value)}
-                />
-              </div>
-            </>
-          ) : (
-            <div>
-              <Label htmlFor="oauth-device-url">{t("accountOAuth.deviceAuthorizeUrl")}</Label>
-              <Input
-                id="oauth-device-url"
-                autoComplete="off"
-                className="mt-1.5 font-mono"
-                value={deviceAuthorizeUrl}
-                disabled={busy || polling}
-                onChange={(e) => setDeviceAuthorizeUrl(e.target.value)}
+          <div className="rounded-lg border border-srapi-border bg-srapi-card-muted/60 p-3.5">
+            <button
+              type="button"
+              onClick={() => setAdvancedOpen((v) => !v)}
+              className="flex w-full items-center justify-between text-left"
+              aria-expanded={advancedOpen}
+            >
+              <span className="text-sm font-medium text-srapi-text-primary">
+                {t("accountOAuth.advancedConfig")}
+              </span>
+              <ChevronDown
+                className={cn(
+                  "size-4 text-srapi-text-tertiary transition-transform",
+                  advancedOpen && "rotate-180",
+                )}
               />
-            </div>
-          )}
-          <div>
-            <Label htmlFor="oauth-token-url">{t("accountOAuth.tokenUrl")}</Label>
-            <Input
-              id="oauth-token-url"
-              autoComplete="off"
-              className="mt-1.5 font-mono"
-              value={tokenUrl}
-              disabled={busy || polling}
-              onChange={(e) => setTokenUrl(e.target.value)}
-            />
-          </div>
-          <div>
-            <Label htmlFor="oauth-scopes">{t("accountOAuth.scopes")}</Label>
-            <Input
-              id="oauth-scopes"
-              autoComplete="off"
-              className="mt-1.5 font-mono"
-              placeholder={t("accountOAuth.scopesPlaceholder")}
-              value={scopes}
-              disabled={busy || polling}
-              onChange={(e) => setScopes(e.target.value)}
-            />
+            </button>
+            <p className="mt-1 text-2xs text-srapi-text-tertiary">
+              {t("accountOAuth.advancedConfigHint")}
+            </p>
+            {advancedOpen ? (
+              <div className="mt-3 space-y-3 border-t border-srapi-border pt-3">
+                <div>
+                  <Label htmlFor="oauth-client-id">{t("accountOAuth.clientId")}</Label>
+                  <Input
+                    id="oauth-client-id"
+                    autoComplete="off"
+                    className="mt-1.5 font-mono"
+                    value={clientId}
+                    disabled={busy || polling}
+                    onChange={(e) => setClientId(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="oauth-client-secret">{t("accountOAuth.clientSecret")}</Label>
+                  <Input
+                    id="oauth-client-secret"
+                    type="password"
+                    autoComplete="off"
+                    className="mt-1.5 font-mono"
+                    value={clientSecret}
+                    disabled={busy || polling}
+                    onChange={(e) => setClientSecret(e.target.value)}
+                  />
+                  <p className="mt-1 text-2xs text-srapi-text-tertiary">
+                    {t("accountOAuth.clientSecretHint")}
+                  </p>
+                </div>
+                {isAuthCode ? (
+                  <>
+                    <div>
+                      <Label htmlFor="oauth-authorize-url">{t("accountOAuth.authorizeUrl")}</Label>
+                      <Input
+                        id="oauth-authorize-url"
+                        autoComplete="off"
+                        className="mt-1.5 font-mono"
+                        value={authorizeUrl}
+                        disabled={busy}
+                        onChange={(e) => setAuthorizeUrl(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="oauth-redirect-uri">{t("accountOAuth.redirectUri")}</Label>
+                      <Input
+                        id="oauth-redirect-uri"
+                        autoComplete="off"
+                        className="mt-1.5 font-mono"
+                        value={redirectUri}
+                        disabled={busy}
+                        onChange={(e) => setRedirectUri(e.target.value)}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div>
+                    <Label htmlFor="oauth-device-url">{t("accountOAuth.deviceAuthorizeUrl")}</Label>
+                    <Input
+                      id="oauth-device-url"
+                      autoComplete="off"
+                      className="mt-1.5 font-mono"
+                      value={deviceAuthorizeUrl}
+                      disabled={busy || polling}
+                      onChange={(e) => setDeviceAuthorizeUrl(e.target.value)}
+                    />
+                  </div>
+                )}
+                <div>
+                  <Label htmlFor="oauth-token-url">{t("accountOAuth.tokenUrl")}</Label>
+                  <Input
+                    id="oauth-token-url"
+                    autoComplete="off"
+                    className="mt-1.5 font-mono"
+                    value={tokenUrl}
+                    disabled={busy || polling}
+                    onChange={(e) => setTokenUrl(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="oauth-scopes">{t("accountOAuth.scopes")}</Label>
+                  <Input
+                    id="oauth-scopes"
+                    autoComplete="off"
+                    className="mt-1.5 font-mono"
+                    placeholder={t("accountOAuth.scopesPlaceholder")}
+                    value={scopes}
+                    disabled={busy || polling}
+                    onChange={(e) => setScopes(e.target.value)}
+                  />
+                </div>
+              </div>
+            ) : null}
           </div>
 
-          {/* Authorization-code: show the generated URL + a code paste box. */}
-          {isAuthCode && authUrl ? (
-            <div className="space-y-2 rounded-lg border border-srapi-border bg-srapi-card-muted px-3.5 py-3">
-              <a
-                href={authUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm text-srapi-primary hover:underline"
-              >
-                <ExternalLink className="size-3.5" />
-                {t("accountOAuth.openAuthorizeUrl")}
-              </a>
-              <p className="text-2xs text-srapi-text-tertiary">{t("accountOAuth.pasteCodeHint")}</p>
-              <div>
-                <Label htmlFor="oauth-callback-code" className="text-2xs">
-                  {t("accountOAuth.callbackCode")}
-                </Label>
-                <Input
-                  id="oauth-callback-code"
-                  autoComplete="off"
-                  className="mt-1 font-mono"
-                  value={callbackCode}
-                  disabled={busy}
-                  onChange={(e) => setCallbackCode(e.target.value)}
-                />
+          {isAuthCode ? (
+            <div className="space-y-3">
+              <div className="rounded-lg border border-srapi-border bg-srapi-card-muted/60 p-3.5">
+                <div className="flex gap-3">
+                  <StepBadge value="1" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium text-srapi-text-primary">
+                      {t("accountOAuth.stepBuildTitle")}
+                    </div>
+                    <Button
+                      type="button"
+                      className="mt-2"
+                      onClick={() => void startAuthorizeUrl()}
+                      disabled={busy || !configReady}
+                    >
+                      {busy && !authUrl ? <Loader2 className="size-4 animate-spin" /> : <Link2 className="size-4" />}
+                      {t("accountOAuth.buildAuthorizeUrl")}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-lg border border-srapi-border bg-srapi-card-muted/60 p-3.5">
+                <div className="flex gap-3">
+                  <StepBadge value="2" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium text-srapi-text-primary">
+                      {t("accountOAuth.stepOpenTitle")}
+                    </div>
+                    <p className="mt-1 text-2xs text-srapi-text-tertiary">
+                      {t("accountOAuth.stepOpenHint")}
+                    </p>
+                    {authUrl ? (
+                      <a
+                        href={authUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 inline-flex items-center gap-1.5 text-sm text-srapi-primary hover:underline"
+                      >
+                        <ExternalLink className="size-3.5" />
+                        {t("accountOAuth.openAuthorizeUrl")}
+                      </a>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-lg border border-srapi-border bg-srapi-card-muted/60 p-3.5">
+                <div className="flex gap-3">
+                  <StepBadge value="3" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium text-srapi-text-primary">
+                      {t("accountOAuth.stepCodeTitle")}
+                    </div>
+                    <p className="mt-1 text-2xs text-srapi-text-tertiary">
+                      {t("accountOAuth.pasteCodeHint")}
+                    </p>
+                    <div className="mt-2">
+                      <Label htmlFor="oauth-callback-code" className="text-2xs">
+                        {t("accountOAuth.callbackCode")}
+                      </Label>
+                      <Input
+                        id="oauth-callback-code"
+                        autoComplete="off"
+                        className="mt-1 font-mono"
+                        value={callbackCode}
+                        disabled={busy || !authUrl}
+                        onChange={(e) => setCallbackCode(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           ) : null}
@@ -430,17 +502,14 @@ export function AccountOAuthAuthorizeDialog({
             {t("common.cancel")}
           </Button>
           {isAuthCode ? (
-            authUrl ? (
-              <Button type="button" onClick={() => void exchangeCode()} disabled={busy || !callbackCode.trim()}>
-                {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-                {t("accountOAuth.completeAuthorization")}
-              </Button>
-            ) : (
-              <Button type="button" onClick={() => void startAuthorizeUrl()} disabled={busy || !configReady}>
-                {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-                {t("accountOAuth.buildAuthorizeUrl")}
-              </Button>
-            )
+            <Button
+              type="button"
+              onClick={() => void exchangeCode()}
+              disabled={busy || !authUrl || !callbackCode.trim()}
+            >
+              {busy ? <Loader2 className="size-4 animate-spin" /> : null}
+              {t("accountOAuth.completeAuthorization")}
+            </Button>
           ) : (
             <Button
               type="button"
@@ -454,5 +523,13 @@ export function AccountOAuthAuthorizeDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function StepBadge({ value }: { value: string }) {
+  return (
+    <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-srapi-primary text-sm font-semibold text-white">
+      {value}
+    </span>
   );
 }

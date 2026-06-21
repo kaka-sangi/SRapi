@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { ChevronDown, Eye, EyeOff, KeyRound, Zap } from "lucide-react";
+import { ChevronDown, Eye, EyeOff, KeyRound, Sparkles, Zap } from "lucide-react";
 import {
   AccountOAuthAuthorizeDialog,
   type AccountOAuthFlowMode,
@@ -151,6 +151,7 @@ export function AccountFormDialog({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [oauthWizardOpen, setOauthWizardOpen] = useState(false);
+  const [quickOAuthToken, setQuickOAuthToken] = useState("");
 
   const template = useMemo(
     () => getProviderTemplate(providerOptions, providerId),
@@ -272,6 +273,7 @@ export function AccountFormDialog({
     // Reset the credential inputs so they always match the selected auth type.
     setCredInput(defaultCredInput(rc));
     setCredFields({});
+    setQuickOAuthToken("");
   }
 
   function changeProvider(id: string) {
@@ -314,8 +316,8 @@ export function AccountFormDialog({
     setCredFields((prev) => ({ ...prev, [key]: value }));
   }
 
-  function applyPastedCredential(value: string) {
-    const parsed = credentialFieldsFromPaste(value);
+  function applyPastedCredential(value: string, preferredPlainTextField = "access_token") {
+    const parsed = credentialFieldsFromPaste(value, preferredPlainTextField);
     if (Object.keys(parsed.fields).length === 0 && Object.keys(parsed.metadata).length === 0) {
       return false;
     }
@@ -326,6 +328,14 @@ export function AccountFormDialog({
     if (mode === "create" && parsed.name && !name.trim()) {
       setName(parsed.name);
     }
+    return true;
+  }
+
+  function applyQuickOAuthToken(value: string) {
+    if (!applyPastedCredential(value, "refresh_token")) {
+      return false;
+    }
+    setQuickOAuthToken("");
     return true;
   }
 
@@ -362,6 +372,7 @@ export function AccountFormDialog({
     setName("");
     setCredInput(defaultCredInput(runtimeClass));
     setCredFields({});
+    setQuickOAuthToken("");
     setCredVisible(false);
     setError(null);
   }
@@ -556,6 +567,46 @@ export function AccountFormDialog({
                       {t("accountOAuth.authorizeAccountHint")}
                     </p>
                   ) : null}
+                  {runtimeClass === "oauth_refresh" ? (
+                    <div className="mt-3 rounded-lg border border-srapi-border bg-srapi-card-muted/60 p-3">
+                      <Label htmlFor="oauth-token-quick-paste" className="text-xs">
+                        {t("accountOAuth.quickPasteLabel")}
+                      </Label>
+                      <div className="mt-1.5 flex flex-col gap-2 sm:flex-row">
+                        <Textarea
+                          id="oauth-token-quick-paste"
+                          spellCheck={false}
+                          className="min-h-20 flex-1 font-mono text-xs"
+                          value={quickOAuthToken}
+                          disabled={busy}
+                          autoComplete="off"
+                          data-lpignore="true"
+                          data-1p-ignore="true"
+                          placeholder={t("accountOAuth.quickPastePlaceholder")}
+                          onPaste={(e) => {
+                            const text = e.clipboardData.getData("text");
+                            if (applyQuickOAuthToken(text)) {
+                              e.preventDefault();
+                            }
+                          }}
+                          onChange={(e) => setQuickOAuthToken(e.target.value)}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={busy || !quickOAuthToken.trim()}
+                          onClick={() => applyQuickOAuthToken(quickOAuthToken)}
+                          className="sm:self-end"
+                        >
+                          <Sparkles className="size-3.5" />
+                          {t("accountOAuth.quickPasteApply")}
+                        </Button>
+                      </div>
+                      <p className="mt-1.5 text-2xs text-srapi-text-tertiary">
+                        {t("accountOAuth.quickPasteHint")}
+                      </p>
+                    </div>
+                  ) : null}
                   <div className="mt-1.5 space-y-3">
                     {(spec.fields ?? []).map((f) => (
                       <div key={f.key}>
@@ -577,7 +628,7 @@ export function AccountFormDialog({
                             disabled={busy}
                             onPaste={(e) => {
                               const text = e.clipboardData.getData("text");
-                              if (applyPastedCredential(text)) {
+                              if (applyPastedCredential(text, f.key)) {
                                 e.preventDefault();
                               }
                             }}
