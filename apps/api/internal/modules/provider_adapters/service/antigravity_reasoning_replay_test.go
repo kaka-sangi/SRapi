@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
+	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 )
 
 func TestAntigravityUsesReasoningReplayCacheGate(t *testing.T) {
