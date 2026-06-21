@@ -154,6 +154,10 @@ describe("AdminGatewayResourcesPage", () => {
     expect(screen.getAllByText("12 请求").length).toBeGreaterThan(0);
     expect(screen.getAllByText("2 错误").length).toBeGreaterThan(0);
     expect(screen.getAllByText("最近 502 upstream_timeout").length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: "最近 502 upstream_timeout" })[0]).toHaveAttribute(
+      "href",
+      "/admin/logs?tab=error&q=req-latest-error",
+    );
     expect(screen.getByText("路由明细")).toBeInTheDocument();
     expect(screen.getByText("gpt-4.1-upstream")).toBeInTheDocument();
     expect(screen.getAllByText("就绪").length).toBeGreaterThan(0);

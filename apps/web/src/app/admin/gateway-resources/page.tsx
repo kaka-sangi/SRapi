@@ -42,7 +42,11 @@ import {
 import { useToast } from "@/context/ToastContext";
 import { adminErrorMessage } from "@/lib/admin-api";
 import { formatCompactNumber, formatDateTime, formatPercent } from "@/lib/admin-format";
-import { adminRequestEvidenceHref, adminSchedulerDecisionsHref } from "@/lib/admin-log-links";
+import {
+  adminErrorLogsHref,
+  adminRequestEvidenceHref,
+  adminSchedulerDecisionsHref,
+} from "@/lib/admin-log-links";
 import {
   PROTOCOL_CONVERSION_ROUTES,
   type ProtocolConversionRoute,
@@ -1581,19 +1585,34 @@ function GatewayTrafficSummary({
           </span>
         ) : null}
       </span>
-      {lastError ? (
-        <span className="border-srapi-error/20 bg-srapi-error/10 text-srapi-error inline-flex max-w-[180px] rounded-md border px-1.5 py-0.5 font-mono text-[10px]">
-          <span className="truncate">
-            {t("adminGatewayResources.trafficLastErrorShort", {
-              error: gatewayTrafficLastErrorLabel(lastError),
-            })}
-          </span>
-        </span>
-      ) : null}
+      {lastError ? <GatewayTrafficLastErrorBadge error={lastError} /> : null}
       <span className="text-2xs text-srapi-text-tertiary truncate font-mono">
         {hasRequests ? lastRequest : t("adminGatewayResources.noRecentTraffic")}
       </span>
     </div>
+  );
+}
+
+function GatewayTrafficLastErrorBadge({
+  error,
+}: {
+  error: NonNullable<GatewayResourceTraffic["last_error"]>;
+}) {
+  const { t } = useLanguage();
+  const label = t("adminGatewayResources.trafficLastErrorShort", {
+    error: gatewayTrafficLastErrorLabel(error),
+  });
+  const className =
+    "border-srapi-error/20 bg-srapi-error/10 text-srapi-error hover:border-srapi-error/40 inline-flex max-w-[180px] rounded-md border px-1.5 py-0.5 font-mono text-[10px] transition-colors";
+  const content = <span className="truncate">{label}</span>;
+  const href = adminErrorLogsHref({ request_id: error.request_id });
+  if (!href) {
+    return <span className={className}>{content}</span>;
+  }
+  return (
+    <Link href={href} className={className} aria-label={label}>
+      {content}
+    </Link>
   );
 }
 
