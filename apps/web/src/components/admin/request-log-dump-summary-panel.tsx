@@ -41,7 +41,7 @@ export function RequestDumpSummaryGrid({ summary }: { summary: RequestDumpSummar
   ];
 
   return (
-    <div className="rounded-md border border-srapi-border-subtle bg-srapi-bg-card-elevated px-3 py-2">
+    <div className="rounded-md border border-srapi-border bg-srapi-card-muted px-3 py-2">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">
           {t("adminRequestLogFiles.diagnosticSummary")}

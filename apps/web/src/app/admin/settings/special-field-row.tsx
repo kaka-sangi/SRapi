@@ -88,7 +88,7 @@ export function SpecialFieldRow({
             return (
               <label
                 key={route.value}
-                className="flex min-h-10 cursor-pointer items-center gap-3 rounded-md border border-srapi-border bg-srapi-surface/40 px-3 py-2 text-sm"
+                className="flex min-h-10 cursor-pointer items-center gap-3 rounded-md border border-srapi-border bg-srapi-card/40 px-3 py-2 text-sm"
               >
                 <Checkbox
                   checked={checked}

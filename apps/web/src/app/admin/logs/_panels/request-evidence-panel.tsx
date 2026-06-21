@@ -486,7 +486,7 @@ function ScopeChip({
 }) {
   return (
     <span
-      className="border-srapi-border-subtle bg-srapi-card-muted inline-flex max-w-full items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-2xs text-srapi-text-secondary sm:max-w-80"
+      className="border-srapi-border bg-srapi-card-muted inline-flex max-w-full items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-2xs text-srapi-text-secondary sm:max-w-80"
       title={`${label}:${value}`}
     >
       <span className="text-srapi-text-tertiary">{label}</span>
@@ -620,11 +620,11 @@ function RequestEvidenceDetailContent({ detail }: { detail: RequestEvidenceDetai
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_18rem]">
-        <div className="border-srapi-border-subtle overflow-hidden rounded border">
-          <div className="border-srapi-border-subtle bg-srapi-bg-card-elevated border-b px-3 py-2 text-xs font-semibold">
+        <div className="border-srapi-border overflow-hidden rounded border">
+          <div className="border-srapi-border bg-srapi-card-muted border-b px-3 py-2 text-xs font-semibold">
             {t("adminRequestEvidence.detailAttempts")}
           </div>
-          <div className="divide-srapi-border-subtle divide-y">
+          <div className="divide-srapi-border divide-y">
             {detail.attempts.map((row, index) => (
               <div key={`${row.request_id}-${row.attempt_no ?? index}`} className="grid gap-3 px-3 py-2 text-xs md:grid-cols-[4rem_1fr_6rem_6rem]">
                 <div className="font-mono text-srapi-text-tertiary">#{row.attempt_no ?? index + 1}</div>
@@ -662,13 +662,13 @@ function RequestEvidenceDetailContent({ detail }: { detail: RequestEvidenceDetai
         </div>
 
         <div className="space-y-3">
-          <div className="border-srapi-border-subtle rounded border p-3">
+          <div className="border-srapi-border rounded border p-3">
             <div className="text-srapi-text-tertiary mb-2 text-xs font-semibold">
               {t("adminRequestEvidence.detailLinks")}
             </div>
             <EvidenceLinks row={linksRow} />
           </div>
-          <div className="border-srapi-border-subtle rounded border p-3">
+          <div className="border-srapi-border rounded border p-3">
             <div className="text-srapi-text-tertiary mb-2 text-xs font-semibold">
               {t("adminRequestEvidence.detailSystemLogs")}
             </div>
@@ -702,7 +702,7 @@ function RequestEvidenceDetailContent({ detail }: { detail: RequestEvidenceDetai
               </div>
             )}
           </div>
-          <div className="border-srapi-border-subtle rounded border p-3">
+          <div className="border-srapi-border rounded border p-3">
             <div className="text-srapi-text-tertiary mb-2 text-xs font-semibold">
               {t("adminRequestEvidence.detailDumps")}
             </div>
@@ -749,7 +749,7 @@ function DetailMetric({
           ? "text-srapi-text-tertiary"
           : "text-srapi-text-primary";
   return (
-    <div className="border-srapi-border-subtle rounded border p-3">
+    <div className="border-srapi-border rounded border p-3">
       <div className="text-srapi-text-tertiary text-2xs uppercase">{label}</div>
       <div className={`mt-1 text-sm font-semibold ${valueClass}`}>{value}</div>
     </div>
@@ -788,7 +788,7 @@ function TokenEvidenceValue({
     <span className="inline-flex items-baseline justify-end gap-1 font-mono tabular">
       <span className="text-srapi-text-primary">{formatInteger(total)}</span>
       {label ? (
-        <span className={`${compact ? "text-[10px]" : "text-2xs"} ${tone}`}>{label}</span>
+        <span className={`${compact ? "text-2xs" : "text-2xs"} ${tone}`}>{label}</span>
       ) : null}
     </span>
   );
@@ -804,7 +804,7 @@ function StreamCompletionBadge({ state }: { state?: RequestEvidenceRow["stream_c
         ? "border-red-500/30 bg-red-500/10 text-red-300"
         : state === "interrupted"
           ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
-          : "border-srapi-border-subtle bg-srapi-bg-card-elevated text-srapi-text-tertiary";
+          : "border-srapi-border bg-srapi-card-muted text-srapi-text-tertiary";
   return (
     <span className={`inline-flex rounded border px-1.5 py-0.5 font-mono text-2xs ${className}`}>
       {t(`adminRequestEvidence.streamState.${state}`)}
@@ -865,7 +865,7 @@ function EvidenceLink({
   return (
     <Link
       href={href}
-      className="border-srapi-border-subtle text-2xs text-srapi-text-secondary hover:bg-srapi-bg-card-elevated hover:text-srapi-text-primary inline-flex items-center gap-1 rounded border px-1.5 py-0.5"
+      className="border-srapi-border text-2xs text-srapi-text-secondary hover:bg-srapi-card-muted hover:text-srapi-text-primary inline-flex items-center gap-1 rounded border px-1.5 py-0.5"
     >
       {icon}
       {label}
@@ -885,7 +885,7 @@ function SourceChip({
       ? "border-red-500/30 bg-red-500/10 text-red-300"
       : tone === "info"
         ? "border-sky-500/30 bg-sky-500/10 text-sky-300"
-        : "border-srapi-border-subtle bg-srapi-bg-card-elevated text-srapi-text-secondary";
+        : "border-srapi-border bg-srapi-card-muted text-srapi-text-secondary";
   return <span className={`text-2xs rounded border px-1.5 py-0.5 ${className}`}>{label}</span>;
 }
 

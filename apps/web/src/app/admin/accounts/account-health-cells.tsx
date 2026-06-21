@@ -241,7 +241,7 @@ export function AccountQuotaCell({ health }: { health?: AccountHealthSnapshot })
               key={window.snapshot.quota_type}
               className="grid grid-cols-[2.5rem_minmax(2rem,1fr)_2.5rem] items-center gap-1.5"
             >
-              <span className="text-srapi-text-tertiary truncate font-mono text-[10px] leading-none uppercase">
+              <span className="text-srapi-text-tertiary truncate font-mono text-2xs leading-none uppercase">
                 {quotaWindowDisplayLabel(window, t)}
               </span>
               <span className="bg-srapi-border relative h-1.5 overflow-hidden rounded-full">
@@ -259,7 +259,7 @@ export function AccountQuotaCell({ health }: { health?: AccountHealthSnapshot })
               </span>
               <span
                 className={cn(
-                  "tabular text-srapi-text-tertiary text-right font-mono text-[10px] leading-none",
+                  "tabular text-srapi-text-tertiary text-right font-mono text-2xs leading-none",
                   exhausted
                     ? "text-srapi-error"
                     : window.remainingPercent <= 20

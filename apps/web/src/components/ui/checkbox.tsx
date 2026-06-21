@@ -34,11 +34,11 @@ export const Checkbox = React.forwardRef<
         )}
         {...props}
       />
-      <span className="pointer-events-none absolute scale-50 text-srapi-primary-foreground opacity-0 transition-[opacity,transform] duration-200 ease-[var(--ease-spring-bounce)] peer-checked:scale-100 peer-checked:opacity-100 peer-indeterminate:opacity-0">
+      <span className="pointer-events-none absolute scale-50 text-srapi-invert-fg opacity-0 transition-[opacity,transform] duration-200 ease-[var(--ease-spring-bounce)] peer-checked:scale-100 peer-checked:opacity-100 peer-indeterminate:opacity-0">
         <Check className="size-3" strokeWidth={3} />
       </span>
       {indeterminate ? (
-        <span className="pointer-events-none absolute text-srapi-primary-foreground">
+        <span className="pointer-events-none absolute text-srapi-invert-fg">
           <Minus className="size-3" strokeWidth={3} />
         </span>
       ) : null}

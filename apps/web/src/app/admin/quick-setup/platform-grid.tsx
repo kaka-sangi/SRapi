@@ -49,7 +49,7 @@ export function PlatformGrid({
               "flex size-11 shrink-0 items-center justify-center rounded-lg font-mono text-xs font-bold tracking-tight transition-colors",
               p.custom
                 ? "bg-srapi-primary/10 text-srapi-primary group-hover:bg-srapi-primary/20"
-                : PLATFORM_ICON_COLORS[p.key] ?? "bg-srapi-bg-muted text-srapi-text-secondary",
+                : PLATFORM_ICON_COLORS[p.key] ?? "bg-srapi-card-muted text-srapi-text-secondary",
             )}
           >
             {PLATFORM_ICONS[p.key] ?? p.key.slice(0, 2).toUpperCase()}
@@ -65,13 +65,13 @@ export function PlatformGrid({
               {p.authTypes.map((a) => (
                 <span
                   key={a}
-                  className="rounded-md bg-srapi-bg-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary"
+                  className="rounded-md bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary"
                 >
                   {a}
                 </span>
               ))}
               {p.defaultModels.length > 0 && (
-                <span className="rounded-md bg-srapi-bg-muted px-1.5 py-0.5 text-2xs text-srapi-text-tertiary">
+                <span className="rounded-md bg-srapi-card-muted px-1.5 py-0.5 text-2xs text-srapi-text-tertiary">
                   {p.defaultModels.length} {t("adminAccounts.models")}
                 </span>
               )}

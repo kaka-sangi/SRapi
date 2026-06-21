@@ -41,7 +41,7 @@ export function StepIndicator({
                   active &&
                     "bg-srapi-text-primary text-srapi-bg",
                   !done && !active &&
-                    "bg-srapi-bg-muted text-srapi-text-tertiary",
+                    "bg-srapi-card-muted text-srapi-text-tertiary",
                 )}
               >
                 {done ? (

@@ -265,7 +265,7 @@ function BackupRow({
   }
 
   return (
-    <tr className="border-b border-srapi-border-faint hover:bg-srapi-surface-soft">
+    <tr className="border-b border-srapi-border hover:bg-srapi-card-muted">
       <td className="py-2 pr-3 font-mono text-xs text-srapi-text-secondary">
         {startedAt ? startedAt.toLocaleString() : "—"}
       </td>

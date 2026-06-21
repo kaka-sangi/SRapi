@@ -398,6 +398,12 @@ export const en = {
     platformQuotas: "Platform quotas",
     quotaPlatforms: "platforms",
     noPlatformQuotas: "No active platform quota",
+    quotaMore: "more",
+    quotaPeriod: {
+      daily: "Daily",
+      weekly: "Weekly",
+      monthly: "Monthly",
+    },
     accountHealth: "Provider account health",
     online: "{count} online",
     quotaLeft: "Quota left",

@@ -296,14 +296,14 @@ function AccountCard({
             </div>
           ) : null}
           <div className="mt-2 flex flex-wrap gap-1.5">
-            <span className="bg-srapi-bg-muted text-srapi-text-tertiary rounded-md px-1.5 py-0.5 font-mono text-[10px]">
+            <span className="bg-srapi-card-muted text-srapi-text-tertiary rounded-md px-1.5 py-0.5 font-mono text-2xs">
               {modelPolicy}
             </span>
             {endpointFacts.map((fact) => (
               <span
                 key={fact.key}
                 className={cn(
-                  "rounded-md px-1.5 py-0.5 font-mono text-[10px]",
+                  "rounded-md px-1.5 py-0.5 font-mono text-2xs",
                   fact.tone === "enabled"
                     ? "bg-srapi-success/10 text-srapi-success"
                     : "bg-srapi-error/10 text-srapi-error",
@@ -313,36 +313,36 @@ function AccountCard({
                 {fact.label}: {fact.value}
               </span>
             ))}
-            <span className="bg-srapi-bg-muted text-srapi-text-tertiary rounded-md px-1.5 py-0.5 font-mono text-[10px]">
+            <span className="bg-srapi-card-muted text-srapi-text-tertiary rounded-md px-1.5 py-0.5 font-mono text-2xs">
               {proxyLabel}
             </span>
-            <span className="bg-srapi-bg-muted text-srapi-text-tertiary rounded-md px-1.5 py-0.5 font-mono text-[10px]">
+            <span className="bg-srapi-card-muted text-srapi-text-tertiary rounded-md px-1.5 py-0.5 font-mono text-2xs">
               {routeLabel}
             </span>
             {visibleGroups.length > 0 ? (
               visibleGroups.map((name) => (
                 <span
                   key={name}
-                  className="bg-srapi-bg-muted text-srapi-text-tertiary max-w-[7rem] truncate rounded-md px-1.5 py-0.5 font-mono text-[10px]"
+                  className="bg-srapi-card-muted text-srapi-text-tertiary max-w-[7rem] truncate rounded-md px-1.5 py-0.5 font-mono text-2xs"
                   title={name}
                 >
                   {name}
                 </span>
               ))
             ) : (
-              <span className="bg-srapi-bg-muted text-srapi-text-tertiary rounded-md px-1.5 py-0.5 font-mono text-[10px]">
+              <span className="bg-srapi-card-muted text-srapi-text-tertiary rounded-md px-1.5 py-0.5 font-mono text-2xs">
                 {t("adminAccounts.ungrouped")}
               </span>
             )}
             {extraGroupCount > 0 ? (
-              <span className="bg-srapi-bg-muted text-srapi-text-tertiary rounded-md px-1.5 py-0.5 font-mono text-[10px]">
+              <span className="bg-srapi-card-muted text-srapi-text-tertiary rounded-md px-1.5 py-0.5 font-mono text-2xs">
                 +{extraGroupCount}
               </span>
             ) : null}
             {[...capacityFacts, ...profileFacts].slice(0, 4).map((fact) => (
               <span
                 key={fact.key}
-                className="bg-srapi-bg-muted text-srapi-text-tertiary max-w-[10rem] truncate rounded-md px-1.5 py-0.5 font-mono text-[10px]"
+                className="bg-srapi-card-muted text-srapi-text-tertiary max-w-[10rem] truncate rounded-md px-1.5 py-0.5 font-mono text-2xs"
                 title={`${fact.label}: ${fact.value}`}
               >
                 {fact.label}: {fact.value}
@@ -366,19 +366,19 @@ function AccountCard({
       {/* Metrics */}
       <div className="border-srapi-border/50 bg-srapi-border/30 grid gap-px border-t sm:grid-cols-3">
         <div className="bg-srapi-card px-4 py-2.5">
-          <div className="text-srapi-text-tertiary mb-1 font-mono text-[10px] tracking-wide uppercase">
+          <div className="text-srapi-text-tertiary mb-1 font-mono text-2xs tracking-wide uppercase">
             {t("adminAccounts.healthTitle")}
           </div>
           <AccountHealthCell health={health} investigationHref={investigationHref} />
         </div>
         <div className="bg-srapi-card px-4 py-2.5">
-          <div className="text-srapi-text-tertiary mb-1 font-mono text-[10px] tracking-wide uppercase">
+          <div className="text-srapi-text-tertiary mb-1 font-mono text-2xs tracking-wide uppercase">
             {t("adminAccounts.quotaTitle")}
           </div>
           <AccountQuotaCell health={health} />
         </div>
         <div className="bg-srapi-card px-4 py-2.5">
-          <div className="text-srapi-text-tertiary mb-1 font-mono text-[10px] tracking-wide uppercase">
+          <div className="text-srapi-text-tertiary mb-1 font-mono text-2xs tracking-wide uppercase">
             {t("adminAccounts.today")}
           </div>
           {hasTodayUsage && today ? (

@@ -1091,7 +1091,7 @@ function GatewayEndpointSummaryItem({ row }: { row: GatewayEndpointResourceSumma
       {row.unsupported_account_routes > 0 || row.unavailable_model_account_routes > 0 ? (
         <div className="flex flex-wrap gap-1">
           {row.unsupported_account_routes > 0 ? (
-            <span className="border-srapi-border text-srapi-text-tertiary rounded-md border px-1.5 py-0.5 font-mono text-[10px]">
+            <span className="border-srapi-border text-srapi-text-tertiary rounded-md border px-1.5 py-0.5 font-mono text-2xs">
               {t("adminGatewayResources.endpointUnsupported")}:{" "}
               <span className="text-srapi-text-primary tabular">
                 {row.unsupported_account_routes}
@@ -1099,7 +1099,7 @@ function GatewayEndpointSummaryItem({ row }: { row: GatewayEndpointResourceSumma
             </span>
           ) : null}
           {row.unavailable_model_account_routes > 0 ? (
-            <span className="border-srapi-border text-srapi-text-tertiary rounded-md border px-1.5 py-0.5 font-mono text-[10px]">
+            <span className="border-srapi-border text-srapi-text-tertiary rounded-md border px-1.5 py-0.5 font-mono text-2xs">
               {t("adminGatewayResources.endpointModelBlocked")}:{" "}
               <span className="text-srapi-text-primary tabular">
                 {row.unavailable_model_account_routes}
@@ -1134,7 +1134,7 @@ function GatewayEndpointActionLink({ href, label }: { href: string; label: strin
   return (
     <Link
       href={href}
-      className="border-srapi-border bg-srapi-panel hover:border-srapi-border-strong text-2xs text-srapi-text-secondary rounded-md border px-2 py-1 font-mono transition-colors"
+      className="border-srapi-border bg-srapi-card-muted hover:border-srapi-border-strong text-2xs text-srapi-text-secondary rounded-md border px-2 py-1 font-mono transition-colors"
     >
       {label}
     </Link>
@@ -1152,7 +1152,7 @@ function EndpointSummaryMetric({
 }) {
   return (
     <div className="min-w-0">
-      <div className="text-srapi-text-tertiary truncate font-mono text-[10px] uppercase">
+      <div className="text-srapi-text-tertiary truncate font-mono text-2xs uppercase">
         {label}
       </div>
       <div
@@ -1397,8 +1397,8 @@ function EndpointMatrix({
         const title = endpointTitle(endpoint, t);
         const href = endpointDiagnosticsHref(row, endpoint);
         const className = available
-          ? "border-srapi-success/30 bg-srapi-success/10 text-srapi-success inline-flex items-center justify-between gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[10px]"
-          : "border-srapi-border bg-srapi-card-muted text-srapi-text-tertiary hover:border-srapi-border-strong hover:text-srapi-text-primary inline-flex items-center justify-between gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[10px] transition-colors";
+          ? "border-srapi-success/30 bg-srapi-success/10 text-srapi-success inline-flex items-center justify-between gap-1 rounded-md border px-1.5 py-0.5 font-mono text-2xs"
+          : "border-srapi-border bg-srapi-card-muted text-srapi-text-tertiary hover:border-srapi-border-strong hover:text-srapi-text-primary inline-flex items-center justify-between gap-1 rounded-md border px-1.5 py-0.5 font-mono text-2xs transition-colors";
         const content = (
           <>
             <span>{t(`adminGatewayResources.endpointShort.${endpoint.key}`)}</span>
@@ -1738,8 +1738,8 @@ function GatewayTrafficSummary({
       <span
         className={
           errorCount > 0
-            ? "border-srapi-error/20 bg-srapi-error/10 text-srapi-error inline-flex w-fit items-center rounded-md border px-1.5 py-0.5 font-mono text-[10px]"
-            : "border-srapi-border bg-srapi-card-muted text-srapi-text-secondary inline-flex w-fit items-center rounded-md border px-1.5 py-0.5 font-mono text-[10px]"
+            ? "border-srapi-error/20 bg-srapi-error/10 text-srapi-error inline-flex w-fit items-center rounded-md border px-1.5 py-0.5 font-mono text-2xs"
+            : "border-srapi-border bg-srapi-card-muted text-srapi-text-secondary inline-flex w-fit items-center rounded-md border px-1.5 py-0.5 font-mono text-2xs"
         }
       >
         {t("adminGatewayResources.trafficRequests", {
@@ -1771,7 +1771,7 @@ function GatewayTrafficLastErrorBadge({
     error: gatewayTrafficLastErrorLabel(error),
   });
   const className =
-    "border-srapi-error/20 bg-srapi-error/10 text-srapi-error hover:border-srapi-error/40 inline-flex max-w-[180px] rounded-md border px-1.5 py-0.5 font-mono text-[10px] transition-colors";
+    "border-srapi-error/20 bg-srapi-error/10 text-srapi-error hover:border-srapi-error/40 inline-flex max-w-[180px] rounded-md border px-1.5 py-0.5 font-mono text-2xs transition-colors";
   const content = <span className="truncate">{label}</span>;
   const href = adminErrorLogsHref({ request_id: error.request_id });
   if (!href) {
@@ -1973,7 +1973,7 @@ function EndpointCapabilitySwitchStrip({
           <Link
             key={key}
             href={`${ADMIN_ROUTES.providers}?q=${encodeURIComponent(provider.name)}`}
-            className="border-srapi-border bg-srapi-card-muted hover:border-srapi-border-strong inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[10px] transition-colors"
+            className="border-srapi-border bg-srapi-card-muted hover:border-srapi-border-strong inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono text-2xs transition-colors"
             title={t("adminGatewayResources.endpointSwitchHint", {
               endpoint: t(`adminGatewayResources.endpoint.${key}`),
               mode: t(`adminGatewayResources.capabilityMode.${mode}`),
@@ -2025,7 +2025,7 @@ function AccountBlockersStrip({ blockers }: { blockers: GatewayAccountBlockers }
       {items.map((item) => (
         <span
           key={item.key}
-          className="border-srapi-error/20 bg-srapi-error/10 text-srapi-error rounded px-1 py-0.5 text-[10px] leading-none"
+          className="border-srapi-error/20 bg-srapi-error/10 text-srapi-error rounded px-1 py-0.5 text-2xs leading-none"
         >
           {t(`adminGatewayResources.accountBlockersShort.${item.key}`)}
           <span className="tabular ml-0.5">{item.value}</span>

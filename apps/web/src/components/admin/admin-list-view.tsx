@@ -268,13 +268,20 @@ function ListTable<T>({
           </tr>
         </TableHeader>
         <TableBody>
-          {rows.map((row) => {
+          {rows.map((row, idx) => {
             const id = getRowId(row);
             const isSelected = selection?.selected.has(id) ?? false;
+            // Cap stagger at 12 so a 100-row page doesn't waterfall for seconds.
+            const stagger = Math.min(idx, 12);
             return (
               <TableRow
                 key={id}
-                className={cn(dimRow?.(row) && "opacity-50", isSelected && "bg-srapi-card-muted")}
+                className={cn(
+                  "anim-rise-sm",
+                  dimRow?.(row) && "opacity-50",
+                  isSelected && "bg-srapi-card-muted",
+                )}
+                style={{ "--stagger-index": stagger } as React.CSSProperties}
               >
                 {selection ? (
                   <TableCell className="w-10">

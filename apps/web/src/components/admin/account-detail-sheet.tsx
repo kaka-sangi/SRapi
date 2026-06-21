@@ -82,8 +82,8 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 
 function DetailMetric({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="border-srapi-border bg-srapi-bg-muted min-w-0 rounded-md border px-3 py-2">
-      <div className="text-srapi-text-tertiary font-mono text-[10px] tracking-wide uppercase">
+    <div className="border-srapi-border bg-srapi-card-muted min-w-0 rounded-md border px-3 py-2">
+      <div className="text-srapi-text-tertiary font-mono text-2xs tracking-wide uppercase">
         {label}
       </div>
       <div
@@ -500,19 +500,19 @@ export function AccountDetailSheet({
 
         {account ? (
           <div className="mt-3 flex flex-wrap gap-1.5">
-            <span className="bg-srapi-bg-muted text-2xs text-srapi-text-secondary rounded-md px-2 py-0.5 font-mono">
+            <span className="bg-srapi-card-muted text-2xs text-srapi-text-secondary rounded-md px-2 py-0.5 font-mono">
               {account.status}
             </span>
-            <span className="bg-srapi-bg-muted text-2xs text-srapi-text-secondary rounded-md px-2 py-0.5">
+            <span className="bg-srapi-card-muted text-2xs text-srapi-text-secondary rounded-md px-2 py-0.5">
               {runtimeClassLabel(t, account.runtime_class)}
             </span>
             {account.priority != null && account.priority !== 0 ? (
-              <span className="bg-srapi-bg-muted text-2xs text-srapi-text-tertiary rounded-md px-2 py-0.5 font-mono">
+              <span className="bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded-md px-2 py-0.5 font-mono">
                 P{account.priority}
               </span>
             ) : null}
             {account.weight != null && account.weight !== 1 ? (
-              <span className="bg-srapi-bg-muted text-2xs text-srapi-text-tertiary rounded-md px-2 py-0.5 font-mono">
+              <span className="bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded-md px-2 py-0.5 font-mono">
                 W{account.weight}
               </span>
             ) : null}

@@ -295,7 +295,7 @@ function AlertFingerprintItem({ item }: { item: OpsErrorFingerprint }) {
   const exampleHref = adminErrorLogDetailHref({ id: item.example_error_log_id });
   const requestEvidenceHref = adminRequestEvidenceHref({ request_id: item.example_request_id });
   return (
-    <div className="rounded border border-srapi-border-subtle p-3">
+    <div className="rounded border border-srapi-border p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <div className="truncate font-mono text-xs text-srapi-text-primary">
@@ -367,7 +367,7 @@ function AlertSignalSummary({ details }: { details?: JsonObject }) {
   return (
     <div className="grid gap-3 lg:grid-cols-2">
       {sections.map((section) => (
-        <div key={section.title} className="rounded border border-srapi-border-subtle p-3">
+        <div key={section.title} className="rounded border border-srapi-border p-3">
           <div className="mb-2 font-mono text-2xs uppercase text-srapi-text-tertiary">
             {section.title}
           </div>

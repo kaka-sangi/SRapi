@@ -19,6 +19,9 @@
   --color-srapi-border-strong: #d8ccb4;
   --color-srapi-primary: #bf5638;
   --color-srapi-primary-hover: #a2452b;
+  /* accent — 与 primary 同源的语义别名，用于「强调链接 / 选中态 / 数据高亮」。
+     保留独立 token 以便日后差异化（例如改为深墨蓝形成冷暖对比）。 */
+  --color-srapi-accent: #bf5638;
   --color-srapi-success: #3f6f3a;
   --color-srapi-warning: #b07a28;
   --color-srapi-error: #b3432f;
@@ -104,6 +107,7 @@
   --color-srapi-border-strong: #3a372e;
   --color-srapi-primary: #e07a5f;
   --color-srapi-primary-hover: #c96243;
+  --color-srapi-accent: #e07a5f;
   --color-srapi-success: #5fa564;
   --color-srapi-warning: #d6a45a;
   --color-srapi-error: #e2705a;

@@ -280,7 +280,7 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
               return (
                 <li
                   key={`${ev.attempt_no ?? idx}-${idx}`}
-                  className="rounded-md border border-srapi-border bg-srapi-surface p-3"
+                  className="rounded-md border border-srapi-border bg-srapi-card p-3"
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-mono text-2xs font-semibold text-srapi-text-primary">
@@ -463,7 +463,7 @@ function SystemLogEvidence({
           {logs.map((log) => (
             <li
               key={log.id}
-              className="rounded-md border border-srapi-border bg-srapi-surface px-3 py-2"
+              className="rounded-md border border-srapi-border bg-srapi-card px-3 py-2"
             >
               <div className="flex flex-wrap items-center gap-2">
                 <QuietBadge status={systemLogTone(log.level)} label={log.level} />
@@ -611,7 +611,7 @@ function RequestLogEvidence({
       ) : null}
 
       {selected ? (
-        <div className="mt-3 rounded-md border border-srapi-border bg-srapi-surface p-3">
+        <div className="mt-3 rounded-md border border-srapi-border bg-srapi-card p-3">
           <div className="mb-2 flex items-center justify-between gap-3">
             <p className="min-w-0 break-all font-mono text-2xs text-srapi-text-tertiary">
               {selected.name}
@@ -627,7 +627,7 @@ function RequestLogEvidence({
           ) : (
             <div className="space-y-3">
               {dumpSummary ? <RequestDumpSummaryGrid summary={dumpSummary} /> : null}
-              <pre className="max-h-[60vh] overflow-auto rounded bg-srapi-bg-input p-3 text-xs">
+              <pre className="max-h-[60vh] overflow-auto rounded bg-srapi-card p-3 text-xs">
                 {downloadQuery.data ?? ""}
               </pre>
             </div>
@@ -698,7 +698,7 @@ function ResolutionEditor({
                   "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors " +
                   (value === option.value
                     ? "border-srapi-accent bg-srapi-accent/10 text-srapi-text-primary"
-                    : "border-srapi-border bg-srapi-surface text-srapi-text-secondary hover:bg-srapi-card-muted")
+                    : "border-srapi-border bg-srapi-card text-srapi-text-secondary hover:bg-srapi-card-muted")
                 }
               >
                 {option.label}
@@ -826,7 +826,7 @@ function SchedulerDiagnosticSummary({
           {topReasons.map((item) => (
             <span
               key={item.reason}
-              className="rounded bg-srapi-surface px-2 py-1 font-mono text-2xs text-srapi-text-secondary"
+              className="rounded bg-srapi-card px-2 py-1 font-mono text-2xs text-srapi-text-secondary"
             >
               {item.reason}({formatInteger(item.count)})
             </span>
@@ -875,7 +875,7 @@ function UpstreamDiagnosticPills({ diagnostic }: { diagnostic: UpstreamErrorDiag
       {parts.map((part) => (
         <span
           key={part}
-          className="rounded bg-srapi-surface px-2 py-1 font-mono text-2xs text-srapi-text-secondary"
+          className="rounded bg-srapi-card px-2 py-1 font-mono text-2xs text-srapi-text-secondary"
         >
           {part}
         </span>

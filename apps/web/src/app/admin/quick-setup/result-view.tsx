@@ -149,7 +149,7 @@ export function ResultView({
               {result.model_names.map((m) => (
                 <span
                   key={m}
-                  className="rounded-md bg-srapi-bg-muted px-2 py-0.5 font-mono text-2xs text-srapi-text-secondary"
+                  className="rounded-md bg-srapi-card-muted px-2 py-0.5 font-mono text-2xs text-srapi-text-secondary"
                 >
                   {m}
                 </span>

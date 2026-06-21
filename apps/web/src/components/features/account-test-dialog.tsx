@@ -240,7 +240,7 @@ export function AccountTestDialog({
           ) : null}
 
           {!loading && result?.checked_at ? (
-            <p className="mt-2.5 text-[10px] text-srapi-text-tertiary">
+            <p className="mt-2.5 text-2xs text-srapi-text-tertiary">
               {formatDateTime(result.checked_at)}
             </p>
           ) : null}

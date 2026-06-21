@@ -176,7 +176,7 @@ export function CredentialsForm({
           <div className="flex items-center gap-3">
             <div className={cn(
               "flex size-10 shrink-0 items-center justify-center rounded-lg font-mono text-xs font-bold tracking-tight",
-              PLATFORM_ICON_COLORS[platform.key] ?? "bg-srapi-bg-muted text-srapi-text-secondary",
+              PLATFORM_ICON_COLORS[platform.key] ?? "bg-srapi-card-muted text-srapi-text-secondary",
             )}>
               {PLATFORM_ICONS[platform.key] ?? platform.key.slice(0, 2).toUpperCase()}
             </div>
@@ -199,7 +199,7 @@ export function CredentialsForm({
                     className={cn(
                       "rounded-lg border px-3 py-1.5 font-mono text-xs transition-colors",
                       a === authType
-                        ? "border-srapi-text-secondary bg-srapi-bg-muted text-srapi-text-primary"
+                        ? "border-srapi-text-secondary bg-srapi-card-muted text-srapi-text-primary"
                         : "border-srapi-border bg-srapi-card text-srapi-text-tertiary hover:border-srapi-text-tertiary",
                     )}
                   >
@@ -404,7 +404,7 @@ export function CredentialsForm({
                       className={cn(
                         "rounded-lg border px-2.5 py-1 font-mono text-xs transition-colors",
                         selected
-                          ? "border-srapi-text-secondary bg-srapi-bg-muted text-srapi-text-primary"
+                          ? "border-srapi-text-secondary bg-srapi-card-muted text-srapi-text-primary"
                           : "border-srapi-border bg-srapi-card text-srapi-text-tertiary hover:border-srapi-text-tertiary",
                       )}
                     >

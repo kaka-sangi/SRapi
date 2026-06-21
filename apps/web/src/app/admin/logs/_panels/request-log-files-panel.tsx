@@ -122,12 +122,12 @@ export function RequestLogFilesPanel() {
         description={t("adminRequestLogFiles.subtitle")}
       />
 
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-srapi-border-subtle bg-srapi-bg-card p-3">
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-srapi-border bg-srapi-card p-3">
         <input
           value={prefix}
           onChange={(e) => setPrefix(e.target.value)}
           placeholder={t("adminRequestLogFiles.searchPlaceholder")}
-          className="h-8 flex-1 min-w-[180px] rounded border border-srapi-border-subtle bg-srapi-bg-input px-2 text-sm"
+          className="h-8 flex-1 min-w-[180px] rounded border border-srapi-border bg-srapi-card px-2 text-sm"
         />
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -148,16 +148,16 @@ export function RequestLogFilesPanel() {
       </div>
 
       {formattedRows.length === 0 ? (
-        <div className="rounded-lg border border-srapi-border-subtle bg-srapi-bg-card p-6 text-center text-sm text-srapi-text-tertiary">
+        <div className="rounded-lg border border-srapi-border bg-srapi-card p-6 text-center text-sm text-srapi-text-tertiary">
           <p className="font-medium text-srapi-text-secondary">
             {t("adminRequestLogFiles.emptyTitle")}
           </p>
           <p>{t("adminRequestLogFiles.emptyBody")}</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-srapi-border-subtle bg-srapi-bg-card">
+        <div className="overflow-x-auto rounded-lg border border-srapi-border bg-srapi-card">
           <table className="w-full table-fixed text-left text-sm">
-            <thead className="border-b border-srapi-border-subtle bg-srapi-bg-card-elevated">
+            <thead className="border-b border-srapi-border bg-srapi-card-muted">
               <tr>
                 <th className="px-3 py-2 font-medium">{t("adminRequestLogFiles.name")}</th>
                 <th className="w-44 px-3 py-2 font-medium">
@@ -178,7 +178,7 @@ export function RequestLogFilesPanel() {
             </thead>
             <tbody>
               {formattedRows.map((row) => (
-                <tr key={row.name} className="border-t border-srapi-border-subtle">
+                <tr key={row.name} className="border-t border-srapi-border">
                   <td className="px-3 py-2 font-mono text-xs">
                     <div className="flex min-w-0 items-center gap-2">
                       <button
@@ -190,7 +190,7 @@ export function RequestLogFilesPanel() {
                         {row.name}
                       </button>
                       {row.is_error_only ? (
-                        <span className="shrink-0 rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-red-300">
+                        <span className="shrink-0 rounded bg-red-500/15 px-1.5 py-0.5 text-2xs uppercase tracking-wide text-red-300">
                           error
                         </span>
                       ) : null}
@@ -218,14 +218,14 @@ export function RequestLogFilesPanel() {
                       <button
                         type="button"
                         onClick={() => openPreview(row)}
-                        className="rounded border border-srapi-border-subtle px-2 py-1 text-xs hover:bg-srapi-bg-card-elevated"
+                        className="rounded border border-srapi-border px-2 py-1 text-xs hover:bg-srapi-card-muted"
                       >
                         {t("adminRequestLogFiles.preview")}
                       </button>
                       <button
                         type="button"
                         onClick={() => downloadFile(row)}
-                        className="rounded border border-srapi-border-subtle px-2 py-1 text-xs hover:bg-srapi-bg-card-elevated"
+                        className="rounded border border-srapi-border px-2 py-1 text-xs hover:bg-srapi-card-muted"
                       >
                         {t("adminRequestLogFiles.download")}
                       </button>
@@ -265,7 +265,7 @@ export function RequestLogFilesPanel() {
             <div className="space-y-3">
               {selected ? <RequestDumpEvidenceLinks file={selected} /> : null}
               {dumpSummary ? <RequestDumpSummaryGrid summary={dumpSummary} /> : null}
-              <pre className="max-h-[60vh] overflow-auto rounded bg-srapi-bg-input p-3 text-xs">
+              <pre className="max-h-[60vh] overflow-auto rounded bg-srapi-card p-3 text-xs">
                 {downloadQuery.data ?? ""}
               </pre>
             </div>
@@ -275,7 +275,7 @@ export function RequestLogFilesPanel() {
               <button
                 type="button"
                 onClick={() => selected && downloadFile(selected)}
-                className="rounded border border-srapi-border-subtle px-3 py-1 text-sm hover:bg-srapi-bg-card-elevated"
+                className="rounded border border-srapi-border px-3 py-1 text-sm hover:bg-srapi-card-muted"
               >
                 {t("adminRequestLogFiles.download")}
               </button>
@@ -409,7 +409,7 @@ function RequestDumpEvidenceLinks({ file }: { file: RequestLogFileDescriptor }) 
   if (!requestEvidenceHref && !errorHref && !systemHref) return null;
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-srapi-border-subtle bg-srapi-bg-card-elevated px-3 py-2">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-srapi-border bg-srapi-card-muted px-3 py-2">
       <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">
         {t("adminRequestLogFiles.relatedEvidence")}
       </span>

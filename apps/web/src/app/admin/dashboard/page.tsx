@@ -586,7 +586,7 @@ function HealthMiniStat({
         <div className={cn("font-mono text-sm font-semibold tabular", count === 0 && "text-srapi-text-tertiary")}>
           {count}
         </div>
-        <div className="text-[10px] leading-tight text-srapi-text-tertiary">{label}</div>
+        <div className="text-2xs leading-tight text-srapi-text-tertiary">{label}</div>
       </div>
     </div>
   );

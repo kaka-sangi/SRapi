@@ -126,7 +126,7 @@ export function AutoRefreshControl({
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-[8rem]">
-          <div className="px-2 pb-1 pt-1 font-mono text-[10px] uppercase tracking-wide text-srapi-text-tertiary">
+          <div className="px-2 pb-1 pt-1 font-mono text-2xs uppercase tracking-wide text-srapi-text-tertiary">
             {t("common.autoRefresh")}
           </div>
           {OPTIONS.map((sec) => (

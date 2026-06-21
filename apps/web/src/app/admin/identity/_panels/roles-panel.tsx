@@ -97,7 +97,7 @@ export function RolesPanel() {
         <div className="flex items-center gap-2">
           <span className="font-mono text-xs text-srapi-text-primary">{r.name}</span>
           {isBuiltInRole(r.name) ? (
-            <span className="rounded border border-srapi-border px-1 py-px text-[10px] uppercase tracking-wide text-srapi-text-tertiary">
+            <span className="rounded border border-srapi-border px-1 py-px text-2xs uppercase tracking-wide text-srapi-text-tertiary">
               {t("adminRoles.builtIn")}
             </span>
           ) : null}

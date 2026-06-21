@@ -159,30 +159,30 @@ export function LiveErrorsPanel() {
         description={t("adminLiveErrors.subtitle")}
       />
 
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-srapi-border-subtle bg-srapi-bg-card p-3">
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-srapi-border bg-srapi-card p-3">
         <input
           value={accountId}
           onChange={(e) => setAccountId(e.target.value)}
           placeholder={t("adminLiveErrors.accountIdPlaceholder")}
-          className="h-8 w-32 rounded border border-srapi-border-subtle bg-srapi-bg-input px-2 text-sm"
+          className="h-8 w-32 rounded border border-srapi-border bg-srapi-card px-2 text-sm"
         />
         <input
           value={errorClass}
           onChange={(e) => setErrorClass(e.target.value)}
           placeholder={t("adminLiveErrors.errorClassPlaceholder")}
-          className="h-8 w-48 rounded border border-srapi-border-subtle bg-srapi-bg-input px-2 text-sm"
+          className="h-8 w-48 rounded border border-srapi-border bg-srapi-card px-2 text-sm"
         />
         <button
           type="button"
           onClick={applyFilters}
-          className="rounded border border-srapi-border-subtle px-3 py-1 text-xs hover:bg-srapi-bg-card-elevated"
+          className="rounded border border-srapi-border px-3 py-1 text-xs hover:bg-srapi-card-muted"
         >
           {t("adminLiveErrors.applyFilters")}
         </button>
         <button
           type="button"
           onClick={clearFilters}
-          className="rounded border border-srapi-border-subtle px-3 py-1 text-xs hover:bg-srapi-bg-card-elevated"
+          className="rounded border border-srapi-border px-3 py-1 text-xs hover:bg-srapi-card-muted"
         >
           {t("adminLiveErrors.clearFilters")}
         </button>
@@ -190,20 +190,20 @@ export function LiveErrorsPanel() {
         <button
           type="button"
           onClick={() => setPaused((p) => !p)}
-          className="rounded border border-srapi-border-subtle px-3 py-1 text-xs hover:bg-srapi-bg-card-elevated"
+          className="rounded border border-srapi-border px-3 py-1 text-xs hover:bg-srapi-card-muted"
         >
           {paused ? t("adminLiveErrors.resume") : t("adminLiveErrors.pause")}
         </button>
         <button
           type="button"
           onClick={() => setEvents([])}
-          className="rounded border border-srapi-border-subtle px-3 py-1 text-xs hover:bg-srapi-bg-card-elevated"
+          className="rounded border border-srapi-border px-3 py-1 text-xs hover:bg-srapi-card-muted"
         >
           {t("adminLiveErrors.clear")}
         </button>
         <span
           className={
-            "inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] " +
+            "inline-flex items-center gap-1 rounded px-2 py-0.5 text-2xs " +
             (connected
               ? "bg-emerald-500/15 text-emerald-300"
               : "bg-amber-500/15 text-amber-300")
@@ -222,16 +222,16 @@ export function LiveErrorsPanel() {
       </div>
 
       {formatted.length === 0 ? (
-        <div className="rounded-lg border border-srapi-border-subtle bg-srapi-bg-card p-6 text-center text-sm text-srapi-text-tertiary">
+        <div className="rounded-lg border border-srapi-border bg-srapi-card p-6 text-center text-sm text-srapi-text-tertiary">
           <p className="font-medium text-srapi-text-secondary">
             {t("adminLiveErrors.emptyTitle")}
           </p>
           <p>{t("adminLiveErrors.emptyBody")}</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-srapi-border-subtle bg-srapi-bg-card">
+        <div className="overflow-x-auto rounded-lg border border-srapi-border bg-srapi-card">
           <table className="w-full table-fixed text-left text-sm">
-            <thead className="border-b border-srapi-border-subtle bg-srapi-bg-card-elevated">
+            <thead className="border-b border-srapi-border bg-srapi-card-muted">
               <tr>
                 <th className="w-44 px-3 py-2 font-medium">{t("adminLiveErrors.time")}</th>
                 <th className="w-24 px-3 py-2 font-medium">{t("adminLiveErrors.status")}</th>
@@ -247,7 +247,7 @@ export function LiveErrorsPanel() {
               {formatted.map((row, idx) => (
                 <tr
                   key={`${row.request_id}-${row.at_unix_ms}-${idx}`}
-                  className="border-t border-srapi-border-subtle"
+                  className="border-t border-srapi-border"
                 >
                   <td className="px-3 py-2 text-xs text-srapi-text-tertiary">{row.atLabel}</td>
                   <td className="px-3 py-2 text-xs">
@@ -258,7 +258,7 @@ export function LiveErrorsPanel() {
                           ? "bg-red-500/15 text-red-300"
                           : row.status_code >= 400
                           ? "bg-amber-500/15 text-amber-300"
-                          : "bg-srapi-bg-input text-srapi-text-secondary")
+                          : "bg-srapi-card text-srapi-text-secondary")
                       }
                     >
                       {row.status_code || "-"}
@@ -266,7 +266,7 @@ export function LiveErrorsPanel() {
                   </td>
                   <td className="px-3 py-2 text-xs">
                     <div className="font-mono text-srapi-error">{row.error_class ?? "-"}</div>
-                    <div className="mt-0.5 font-mono text-[11px] text-srapi-text-tertiary">
+                    <div className="mt-0.5 font-mono text-2xs text-srapi-text-tertiary">
                       {[row.error_phase, row.error_owner].filter(Boolean).join(" / ") || "-"}
                     </div>
                   </td>
@@ -275,7 +275,7 @@ export function LiveErrorsPanel() {
                       {row.source_endpoint ?? "-"}
                     </div>
                     <div
-                      className="mt-0.5 truncate font-mono text-[11px]"
+                      className="mt-0.5 truncate font-mono text-2xs"
                       title={protocolLabel(row.source_protocol, row.target_protocol)}
                     >
                       {protocolLabel(row.source_protocol, row.target_protocol)}
@@ -289,7 +289,7 @@ export function LiveErrorsPanel() {
                       {identityLabel(row.provider_name, row.provider_id)}
                     </div>
                     <div
-                      className="mt-0.5 truncate text-[11px]"
+                      className="mt-0.5 truncate text-2xs"
                       title={identityLabel(row.account_name, row.account_id)}
                     >
                       {identityLabel(row.account_name, row.account_id)}
@@ -300,7 +300,7 @@ export function LiveErrorsPanel() {
                       {row.model ?? "-"}
                     </div>
                     <div
-                      className="mt-0.5 truncate font-mono text-[11px]"
+                      className="mt-0.5 truncate font-mono text-2xs"
                       title={row.upstream_model ?? row.requested_model ?? ""}
                     >
                       {row.upstream_model || row.requested_model || "-"}
@@ -311,7 +311,7 @@ export function LiveErrorsPanel() {
                       {row.message ?? "-"}
                     </div>
                   </td>
-                  <td className="px-3 py-2 font-mono text-[11px] text-srapi-text-tertiary">
+                  <td className="px-3 py-2 font-mono text-2xs text-srapi-text-tertiary">
                     <div className="truncate" title={row.request_id}>
                       {row.request_id}
                     </div>
@@ -350,7 +350,7 @@ function LiveEventEvidenceLinks({ requestID, traceID }: { requestID?: string; tr
         <Link
           key={link.href}
           href={link.href}
-          className="inline-flex items-center gap-1 rounded border border-srapi-border-subtle px-1.5 py-0.5 text-[10px] text-srapi-text-secondary hover:bg-srapi-bg-card-elevated hover:text-srapi-text-primary"
+          className="inline-flex items-center gap-1 rounded border border-srapi-border px-1.5 py-0.5 text-2xs text-srapi-text-secondary hover:bg-srapi-card-muted hover:text-srapi-text-primary"
         >
           {link.label}
           <ExternalLink className="size-2.5" aria-hidden />

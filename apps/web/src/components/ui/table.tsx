@@ -64,18 +64,37 @@ export const TableRow = React.forwardRef<
 ));
 TableRow.displayName = "TableRow";
 
+/** numeric: 等宽 + tabular-nums + 右对齐。给数字列防止位数跳动 / 视觉抖。 */
+type NumericProp = { numeric?: boolean };
+
 export const TableHead = React.forwardRef<
   HTMLTableCellElement,
-  React.ThHTMLAttributes<HTMLTableCellElement>
->(({ className, ...props }, ref) => (
-  <th ref={ref} className={cn("h-10 px-3 align-middle first:pl-5 last:pr-5", className)} {...props} />
+  React.ThHTMLAttributes<HTMLTableCellElement> & NumericProp
+>(({ className, numeric, ...props }, ref) => (
+  <th
+    ref={ref}
+    className={cn(
+      "h-10 px-3 align-middle first:pl-5 last:pr-5",
+      numeric && "text-right font-mono tabular",
+      className,
+    )}
+    {...props}
+  />
 ));
 TableHead.displayName = "TableHead";
 
 export const TableCell = React.forwardRef<
   HTMLTableCellElement,
-  React.TdHTMLAttributes<HTMLTableCellElement>
->(({ className, ...props }, ref) => (
-  <td ref={ref} className={cn("px-3 py-3 align-middle first:pl-5 last:pr-5", className)} {...props} />
+  React.TdHTMLAttributes<HTMLTableCellElement> & NumericProp
+>(({ className, numeric, ...props }, ref) => (
+  <td
+    ref={ref}
+    className={cn(
+      "px-3 py-3 align-middle first:pl-5 last:pr-5",
+      numeric && "text-right font-mono tabular",
+      className,
+    )}
+    {...props}
+  />
 ));
 TableCell.displayName = "TableCell";

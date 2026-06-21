@@ -60,7 +60,7 @@ export function AnnouncementBell() {
         >
           <Bell className="size-4" />
           {hasUnread ? (
-            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-srapi-primary px-1 font-mono text-[10px] font-medium leading-none text-srapi-invert-foreground">
+            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-srapi-primary px-1 font-mono text-2xs font-medium leading-none text-srapi-invert-fg">
               {unread > 9 ? "9+" : unread}
             </span>
           ) : null}
@@ -132,7 +132,7 @@ export function AnnouncementBell() {
                           >
                             {a.title}
                           </span>
-                          <span className="shrink-0 font-mono text-[10px] text-srapi-text-tertiary tabular">
+                          <span className="shrink-0 font-mono text-2xs text-srapi-text-tertiary tabular">
                             {relativeTime(a.created_at, t("announcements.justNow"))}
                           </span>
                         </span>

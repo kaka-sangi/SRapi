@@ -933,7 +933,7 @@ function RealtimeMetric({
 
 function CompactMetric({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
-    <div className="rounded border border-srapi-border/80 bg-srapi-bg-card-elevated/50 px-3 py-2">
+    <div className="rounded border border-srapi-border/80 bg-srapi-card-muted/50 px-3 py-2">
       <div className="text-2xs text-srapi-text-tertiary font-mono uppercase">{label}</div>
       <div className="text-srapi-text-primary mt-1 font-mono text-lg tabular-nums">{value}</div>
       <div className="text-2xs text-srapi-text-tertiary mt-1 truncate">{hint}</div>
@@ -957,7 +957,7 @@ function AlertRuleBaselinePostureSummary({
         : "active";
 
   return (
-    <div className="border-srapi-border bg-srapi-surface-muted/50 space-y-2 rounded-md border p-3">
+    <div className="border-srapi-border bg-srapi-card-muted/50 space-y-2 rounded-md border p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <div className="text-srapi-text-primary text-sm font-medium">

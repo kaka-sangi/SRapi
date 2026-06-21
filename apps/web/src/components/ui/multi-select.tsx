@@ -28,6 +28,7 @@ export function MultiSelect({
   addCustomLabel,
   allowCustom = false,
   disabled,
+  ariaLabel,
 }: {
   id?: string;
   value: string[];
@@ -40,6 +41,8 @@ export function MultiSelect({
   addCustomLabel?: (query: string) => string;
   allowCustom?: boolean;
   disabled?: boolean;
+  /** Accessible label for the trigger when no external <label> targets `id`. */
+  ariaLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -142,14 +145,14 @@ export function MultiSelect({
               role="combobox"
               aria-expanded={open}
               aria-controls={listId}
+              aria-label={ariaLabel}
               className="flex min-w-[5rem] flex-1 items-center justify-between gap-2 bg-transparent px-1 py-1 text-left text-sm text-srapi-text-primary outline-none"
             >
               {value.length === 0 ? (
                 <span className="text-srapi-text-tertiary">{placeholder}</span>
               ) : (
-                <span aria-hidden className="sr-only">
-                  {value.length}
-                </span>
+                /* Sub-visual count for screen readers; visible chip pills above carry the values themselves. */
+                <span className="sr-only">{`${value.length} selected`}</span>
               )}
               <ChevronDown className="size-4 shrink-0 text-srapi-text-tertiary opacity-70" />
             </button>

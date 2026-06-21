@@ -481,7 +481,7 @@ function PaymentPresetPicker({
               onClick={() => onSelect(preset)}
               className="flex w-full items-center gap-4 rounded-lg border border-srapi-border bg-srapi-card px-4 py-3.5 text-left transition-colors hover:border-srapi-border-strong hover:bg-srapi-card-muted active:scale-[0.995]"
             >
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-srapi-bg-muted font-mono text-xs font-bold text-srapi-text-secondary">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-srapi-card-muted font-mono text-xs font-bold text-srapi-text-secondary">
                 {preset.key.slice(0, 2).toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">

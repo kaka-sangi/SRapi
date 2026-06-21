@@ -259,7 +259,7 @@ function PricingContent() {
             {pricingRuleModelLabel(r, modelMap, t)}
           </div>
           {String(r.model_id) === "0" ? (
-            <div className="text-srapi-text-tertiary truncate text-[10px] tracking-wide uppercase">
+            <div className="text-srapi-text-tertiary truncate text-2xs tracking-wide uppercase">
               {t("adminPricing.modelFamily")}
             </div>
           ) : null}
@@ -619,7 +619,7 @@ function PricingPresetPanel({
 function PresetMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="border-srapi-border bg-srapi-card-muted rounded-md border px-3 py-2">
-      <div className="text-srapi-text-tertiary text-[10px] tracking-wide uppercase">{label}</div>
+      <div className="text-srapi-text-tertiary text-2xs tracking-wide uppercase">{label}</div>
       <div className="text-srapi-text-primary mt-1 font-mono text-sm">{value}</div>
     </div>
   );

@@ -391,6 +391,12 @@ export const zh: Messages = {
     platformQuotas: "平台配额",
     quotaPlatforms: "个平台",
     noPlatformQuotas: "暂无启用的平台配额",
+    quotaMore: "项另见",
+    quotaPeriod: {
+      daily: "日",
+      weekly: "周",
+      monthly: "月",
+    },
     accountHealth: "上游账号健康",
     online: "{count} 在线",
     quotaLeft: "剩余配额",

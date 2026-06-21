@@ -227,7 +227,7 @@ function ToggleRow({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex min-h-16 cursor-pointer items-start gap-3 rounded-md border border-srapi-border bg-srapi-surface/40 px-3 py-3 text-sm has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
+    <label className="flex min-h-16 cursor-pointer items-start gap-3 rounded-md border border-srapi-border bg-srapi-card/40 px-3 py-3 text-sm has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
       <Checkbox
         id={id}
         aria-label={label}

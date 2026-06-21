@@ -82,7 +82,7 @@ export function FileDropZone({
           "flex cursor-pointer flex-col items-center gap-1.5 rounded-xl border-2 border-dashed px-4 py-5 text-center transition-colors",
           dragging
             ? "border-srapi-text-tertiary bg-srapi-bg-sunken"
-            : "border-srapi-border bg-srapi-bg-muted hover:border-srapi-text-tertiary",
+            : "border-srapi-border bg-srapi-card-muted hover:border-srapi-text-tertiary",
           disabled && "pointer-events-none opacity-50",
         )}
       >
@@ -109,7 +109,7 @@ export function FileDropZone({
           {fileNames.map((name) => (
             <span
               key={name}
-              className="inline-flex items-center gap-1 rounded-md bg-srapi-bg-muted px-2 py-0.5 text-2xs text-srapi-text-secondary"
+              className="inline-flex items-center gap-1 rounded-md bg-srapi-card-muted px-2 py-0.5 text-2xs text-srapi-text-secondary"
             >
               {name}
             </span>

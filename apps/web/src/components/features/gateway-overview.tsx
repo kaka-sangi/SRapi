@@ -55,6 +55,14 @@ function quotaLimit(quota: UserPlatformQuota): string | null {
   return quota.daily_limit ?? quota.weekly_limit ?? quota.monthly_limit ?? null;
 }
 
+/** "daily" / "weekly" / "monthly" — derived from whichever cap is set. */
+function quotaPeriod(quota: UserPlatformQuota): "daily" | "weekly" | "monthly" | null {
+  if (quota.daily_limit) return "daily";
+  if (quota.weekly_limit) return "weekly";
+  if (quota.monthly_limit) return "monthly";
+  return null;
+}
+
 /** Time-bucket request counts for a sparkline. Empty (no shape) when too sparse to be honest. */
 function bucketRequests(logs: UsageLogSummary[], buckets = 14): number[] {
   const times = logs.map((l) => new Date(l.created_at).getTime()).filter((t) => !Number.isNaN(t));
@@ -117,76 +125,107 @@ export function GatewayOverview() {
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="anim-rise-sm h-full" style={rise(1)}>
-          <CardContent className="flex h-full items-center justify-between gap-4">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 font-mono text-2xs uppercase text-srapi-text-tertiary">
-                <Wallet className="size-3.5" />
-                {t("dashboard.balance")}
+      <div className="grid gap-4 lg:grid-cols-2 lg:gap-5">
+        {/* Balance — entire card is the billing link (tactile hover via card-interactive). */}
+        <Link
+          href="/billing"
+          className="anim-rise-sm group block focus-visible:outline-none"
+          style={rise(1)}
+        >
+          <Card className="card-interactive h-full">
+            <CardContent className="flex h-full items-center justify-between gap-4">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 font-mono text-2xs uppercase text-srapi-text-tertiary">
+                  <Wallet className="size-3.5" />
+                  {t("dashboard.balance")}
+                </div>
+                <PageQueryState
+                  query={balance}
+                  skeleton={<Skeleton className="mt-3 h-9 w-36" />}
+                >
+                  {(data) => (
+                    <div className="mt-2 truncate font-serif text-3xl text-srapi-text-primary tabular">
+                      {formatMoney(data.balance, data.currency)}
+                    </div>
+                  )}
+                </PageQueryState>
               </div>
-              <PageQueryState
-                query={balance}
-                skeleton={<Skeleton className="mt-3 h-9 w-36" />}
-              >
-                {(data) => (
-                  <div className="mt-2 truncate font-serif text-3xl text-srapi-text-primary tabular">
-                    {formatMoney(data.balance, data.currency)}
-                  </div>
-                )}
-              </PageQueryState>
-            </div>
-            <Button asChild variant="outline" size="sm" className="shrink-0">
-              <Link href="/billing">
+              <div className="flex shrink-0 items-center gap-1.5 font-mono text-2xs uppercase text-srapi-text-tertiary transition-colors group-hover:text-srapi-primary">
                 {t("nav.billing")}
-                <ArrowUpRight className="size-3.5" />
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
+                <ArrowUpRight className="size-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
 
         <Card className="anim-rise-sm h-full" style={rise(2)}>
-          <CardContent className="flex h-full items-center justify-between gap-4">
-            <div className="min-w-0">
+          <CardContent className="flex h-full min-w-0 flex-col gap-3.5">
+            <div className="flex items-baseline justify-between gap-3">
               <div className="flex items-center gap-2 font-mono text-2xs uppercase text-srapi-text-tertiary">
                 <Gauge className="size-3.5" />
                 {t("dashboard.platformQuotas")}
               </div>
               <PageQueryState
                 query={platformQuotas}
-                skeleton={<Skeleton className="mt-3 h-9 w-40" />}
+                skeleton={<Skeleton className="h-6 w-16" />}
               >
                 {() => (
-                  <>
-                    <div className="mt-2 font-serif text-3xl text-srapi-text-primary tabular">
-                      {enabledQuotas.length}
-                      <span className="ml-1.5 text-sm font-sans text-srapi-text-tertiary">
-                        {t("dashboard.quotaPlatforms")}
-                      </span>
-                    </div>
-                    <div className="mt-2 flex min-w-0 flex-wrap gap-1.5">
-                      {enabledQuotas.slice(0, 3).map((quota) => {
-                        const limit = quotaLimit(quota);
-                        return (
-                          <span
-                            key={quota.platform}
-                            className="max-w-full truncate rounded-md border border-srapi-border bg-srapi-card-muted px-2 py-1 font-mono text-2xs text-srapi-text-secondary"
-                          >
-                            {quota.platform}
-                            {limit ? ` · ${formatMoney(limit, quota.currency)}` : ""}
-                          </span>
-                        );
-                      })}
-                      {enabledQuotas.length === 0 ? (
-                        <span className="text-sm text-srapi-text-tertiary">
-                          {t("dashboard.noPlatformQuotas")}
-                        </span>
-                      ) : null}
-                    </div>
-                  </>
+                  <div className="font-serif text-3xl leading-none text-srapi-text-primary tabular">
+                    {enabledQuotas.length}
+                    <span className="ml-1.5 align-baseline font-sans text-sm text-srapi-text-tertiary">
+                      {t("dashboard.quotaPlatforms")}
+                    </span>
+                  </div>
                 )}
               </PageQueryState>
             </div>
+            <PageQueryState
+              query={platformQuotas}
+              skeleton={
+                <div className="space-y-2 pt-1">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-2/3" />
+                </div>
+              }
+            >
+              {() =>
+                enabledQuotas.length === 0 ? (
+                  <p className="text-sm text-srapi-text-tertiary">
+                    {t("dashboard.noPlatformQuotas")}
+                  </p>
+                ) : (
+                  <ul className="min-w-0 divide-y divide-srapi-border border-t border-srapi-border">
+                    {enabledQuotas.slice(0, 3).map((quota) => {
+                      const limit = quotaLimit(quota);
+                      const period = quotaPeriod(quota);
+                      return (
+                        <li
+                          key={quota.platform}
+                          className="flex min-w-0 items-baseline justify-between gap-3 py-2"
+                        >
+                          <span className="min-w-0 truncate text-sm text-srapi-text-primary">
+                            {quota.platform}
+                          </span>
+                          <span className="shrink-0 font-mono text-2xs text-srapi-text-secondary tabular">
+                            {period ? (
+                              <span className="mr-1.5 uppercase text-srapi-text-tertiary">
+                                {t(`dashboard.quotaPeriod.${period}`)}
+                              </span>
+                            ) : null}
+                            {limit ? formatMoney(limit, quota.currency) : "—"}
+                          </span>
+                        </li>
+                      );
+                    })}
+                    {enabledQuotas.length > 3 ? (
+                      <li className="pt-2 font-mono text-2xs uppercase text-srapi-text-tertiary">
+                        + {enabledQuotas.length - 3} {t("dashboard.quotaMore")}
+                      </li>
+                    ) : null}
+                  </ul>
+                )
+              }
+            </PageQueryState>
           </CardContent>
         </Card>
       </div>
@@ -195,7 +234,7 @@ export function GatewayOverview() {
       <ThroughputKpis throughput={throughput} cacheMetrics={cacheMetrics} />
 
       {/* Usage trend over the last window + model distribution by tokens. */}
-      <div className="grid gap-4 lg:grid-cols-5">
+      <div className="grid gap-4 lg:grid-cols-5 lg:gap-5">
         <div className="anim-rise-sm lg:col-span-3" style={rise(1)}>
           <UsageTrendCard query={trend} />
         </div>
@@ -208,7 +247,7 @@ export function GatewayOverview() {
       <PageQueryState
         query={usage}
         skeleton={
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-5">
             {Array.from({ length: 4 }).map((_, i) => (
               <StatCardSkeleton key={i} />
             ))}
@@ -216,7 +255,7 @@ export function GatewayOverview() {
         }
       >
         {() => (
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-5">
             <div className="anim-rise-sm" style={rise(1)}>
               <StatCard
                 className="h-full"
@@ -288,10 +327,11 @@ export function GatewayOverview() {
               />
             ) : (
               <div className="divide-y divide-srapi-border">
-                {rows.slice(0, 8).map((log) => (
+                {rows.slice(0, 8).map((log, idx) => (
                   <div
                     key={log.request_id}
-                    className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-srapi-card-muted/40"
+                    className="anim-rise-sm flex items-center gap-3 px-5 py-3 transition-colors hover:bg-srapi-card-muted/40"
+                    style={{ "--stagger-index": 6 + idx } as CSSProperties}
                   >
                     <div className="w-24 shrink-0 font-mono text-2xs tabular text-srapi-text-tertiary">
                       {fmtTime(log.created_at)}
@@ -342,7 +382,7 @@ function ThroughputKpis({
   const cacheLoading = cacheMetrics.isLoading;
 
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+    <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 lg:gap-5">
       <div className="anim-rise-sm" style={rise(1)}>
         {tpLoading ? (
           <StatCardSkeleton className="h-full" />
