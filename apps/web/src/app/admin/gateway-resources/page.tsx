@@ -871,10 +871,12 @@ function GatewayEndpointSummaryItem({ row }: { row: GatewayEndpointResourceSumma
   const modelCoverage = `${row.ready_models}/${row.models}`;
   const routeCoverage = `${row.ready_routes}/${row.routes}`;
   const accountCoverage = `${row.routable_account_routes}/${row.candidate_account_routes}`;
+  const routeHref = `${ADMIN_ROUTES.gatewayResources}?f_scope=routes&q=${encodeURIComponent(row.source_endpoint)}`;
+  const evidenceHref = adminRequestEvidenceHref({ source_endpoint: row.source_endpoint });
+  const decisionsHref = adminSchedulerDecisionsHref({ source_endpoint: row.source_endpoint });
   return (
-    <Link
-      href={`${ADMIN_ROUTES.gatewayResources}?f_scope=routes&q=${encodeURIComponent(row.source_endpoint)}`}
-      className="border-srapi-border bg-srapi-card-muted hover:border-srapi-border-strong grid gap-3 rounded-md border p-3 transition-colors"
+    <div
+      className="border-srapi-border bg-srapi-card-muted grid gap-3 rounded-md border p-3"
       title={endpointSummaryTitle(row, t)}
     >
       <div className="flex min-w-0 items-start justify-between gap-3">
@@ -928,6 +930,35 @@ function GatewayEndpointSummaryItem({ row }: { row: GatewayEndpointResourceSumma
           ) : null}
         </div>
       ) : null}
+      <div className="flex flex-wrap gap-1">
+        <GatewayEndpointActionLink
+          href={routeHref}
+          label={t("adminGatewayResources.fixAction.routes")}
+        />
+        {evidenceHref ? (
+          <GatewayEndpointActionLink
+            href={evidenceHref}
+            label={t("adminGatewayResources.fixAction.requestEvidence")}
+          />
+        ) : null}
+        {decisionsHref ? (
+          <GatewayEndpointActionLink
+            href={decisionsHref}
+            label={t("adminGatewayResources.fixAction.schedulerDecisions")}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function GatewayEndpointActionLink({ href, label }: { href: string; label: string }) {
+  return (
+    <Link
+      href={href}
+      className="border-srapi-border bg-srapi-panel hover:border-srapi-border-strong text-2xs text-srapi-text-secondary rounded-md border px-2 py-1 font-mono transition-colors"
+    >
+      {label}
     </Link>
   );
 }

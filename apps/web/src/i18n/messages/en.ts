@@ -1330,6 +1330,7 @@ export const en = {
       apiKeys: "API key",
       modelMappings: "Mappings",
       models: "Models",
+      routes: "Routes",
       pricing: "Pricing",
       endpointSwitches: "Endpoints",
       accountModels: "Account models",

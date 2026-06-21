@@ -80,16 +80,51 @@ describe("AdminGatewayResourcesPage", () => {
       "/admin/accounts?f_providerId=p1",
     );
     expect(screen.getByRole("link", { name: "代理" })).toHaveAttribute("href", "/admin/proxies");
-    expect(screen.getAllByRole("link", { name: "证据" })[0]).toHaveAttribute(
-      "href",
-      "/admin/logs?tab=request-evidence&f_provider_id=p1",
-    );
-    expect(screen.getAllByRole("link", { name: "决策" })[0]).toHaveAttribute(
-      "href",
-      "/admin/ops?tab=scheduler-decisions&f_provider_id=p1",
-    );
+    expect(
+      screen
+        .getAllByRole("link", { name: "证据" })
+        .some(
+          (link) =>
+            link.getAttribute("href") === "/admin/logs?tab=request-evidence&f_provider_id=p1",
+        ),
+    ).toBe(true);
+    expect(
+      screen
+        .getAllByRole("link", { name: "决策" })
+        .some(
+          (link) =>
+            link.getAttribute("href") === "/admin/ops?tab=scheduler-decisions&f_provider_id=p1",
+        ),
+    ).toBe(true);
     expect(screen.getByRole("heading", { name: /端点总览/ })).toBeInTheDocument();
     expect(screen.getAllByText("路由").length).toBeGreaterThan(0);
+    expect(
+      screen
+        .getAllByRole("link", { name: "路由" })
+        .some(
+          (link) =>
+            link.getAttribute("href") ===
+            "/admin/gateway-resources?f_scope=routes&q=%2Fv1%2Fresponses%2Fcompact",
+        ),
+    ).toBe(true);
+    expect(
+      screen
+        .getAllByRole("link", { name: "证据" })
+        .some(
+          (link) =>
+            link.getAttribute("href") ===
+            "/admin/logs?tab=request-evidence&f_source_endpoint=%2Fv1%2Fresponses%2Fcompact",
+        ),
+    ).toBe(true);
+    expect(
+      screen
+        .getAllByRole("link", { name: "决策" })
+        .some(
+          (link) =>
+            link.getAttribute("href") ===
+            "/admin/ops?tab=scheduler-decisions&f_source_endpoint=%2Fv1%2Fresponses%2Fcompact",
+        ),
+    ).toBe(true);
     expect(screen.getByText("模型可服务性")).toBeInTheDocument();
     expect(screen.getAllByText("gpt-4.1").length).toBeGreaterThan(0);
     expect(screen.getAllByText("端点").length).toBeGreaterThan(0);
@@ -130,12 +165,6 @@ describe("AdminGatewayResourcesPage", () => {
     expect(screen.getByTitle("有 1 个账号的代理绑定需要处理。")).toHaveAttribute(
       "href",
       "/admin/gateway-resources?f_reason=proxy_attention&f_scope=providers",
-    );
-    expect(
-      screen.getAllByTitle(new RegExp("Responses Compact · /v1/responses/compact"))[0],
-    ).toHaveAttribute(
-      "href",
-      "/admin/gateway-resources?f_scope=routes&q=%2Fv1%2Fresponses%2Fcompact",
     );
   });
 

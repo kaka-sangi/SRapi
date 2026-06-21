@@ -1296,6 +1296,7 @@ export const zh: Messages = {
       apiKeys: "API Key",
       modelMappings: "映射",
       models: "模型",
+      routes: "路由",
       pricing: "定价",
       endpointSwitches: "端点",
       accountModels: "账号模型",
