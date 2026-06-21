@@ -71,6 +71,10 @@ describe("AdminGatewayResourcesPage", () => {
     expect(screen.getAllByText("Compact").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Image").length).toBeGreaterThan(0);
     expect(screen.getAllByText("RT WS").length).toBeGreaterThan(0);
+    expect(screen.getByText("端点开关")).toBeInTheDocument();
+    expect(screen.getAllByTitle(/Chat Completions 当前为 自动/).length).toBeGreaterThan(0);
+    expect(screen.getAllByTitle(/Responses 当前为 强制开启/).length).toBeGreaterThan(0);
+    expect(screen.getAllByTitle(/Messages 当前为 强制关闭/).length).toBeGreaterThan(0);
     expect(screen.getAllByText("计费").length).toBeGreaterThan(0);
     expect(screen.getAllByText("规则定价").length).toBeGreaterThan(0);
     expect(screen.getAllByText("3/3").length).toBeGreaterThan(0);
@@ -89,6 +93,12 @@ describe("AdminGatewayResourcesPage", () => {
     expect(screen.getByTitle("有 1 个账号的代理绑定需要处理。")).toHaveAttribute(
       "href",
       "/admin/gateway-resources?f_reason=proxy_attention&f_scope=providers",
+    );
+    expect(
+      screen.getAllByTitle(new RegExp("Responses Compact · /v1/responses/compact"))[0],
+    ).toHaveAttribute(
+      "href",
+      "/admin/gateway-resources?f_scope=routes&q=%2Fv1%2Fresponses%2Fcompact",
     );
   });
 
@@ -272,7 +282,15 @@ function summary(): GatewayResourceSummary {
     ],
     rows: [
       {
-        provider: provider({ id: "p1", display_name: "OpenAI" }),
+        provider: provider({
+          id: "p1",
+          name: "openai",
+          display_name: "OpenAI",
+          capabilities: {
+            responses: true,
+            messages: false,
+          },
+        }),
         total_accounts: 1,
         routable_accounts: 1,
         attention_accounts: 0,
@@ -360,7 +378,15 @@ function summary(): GatewayResourceSummary {
           display_name: "GPT 4.1",
           family: "gpt-4.1",
         }),
-        provider: provider({ id: "p1", display_name: "OpenAI" }),
+        provider: provider({
+          id: "p1",
+          name: "openai",
+          display_name: "OpenAI",
+          capabilities: {
+            responses: true,
+            messages: false,
+          },
+        }),
         mapping_id: "mapping-1",
         upstream_model: "gpt-4.1-upstream",
         routable_accounts: 1,
@@ -420,7 +446,15 @@ function summary(): GatewayResourceSummary {
           display_name: "GPT 4.1 Free",
           family: "gpt-4.1",
         }),
-        provider: provider({ id: "p1", display_name: "OpenAI" }),
+        provider: provider({
+          id: "p1",
+          name: "openai",
+          display_name: "OpenAI",
+          capabilities: {
+            responses: true,
+            messages: false,
+          },
+        }),
         mapping_id: "mapping-2",
         upstream_model: "gpt-4.1-free-upstream",
         routable_accounts: 1,

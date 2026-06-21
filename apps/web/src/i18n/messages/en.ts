@@ -1244,6 +1244,7 @@ export const en = {
     accounts: "Accounts",
     routableAccountsShort: "Routable",
     endpoints: "Endpoints",
+    endpointSwitches: "Endpoint switches",
     pricing: "Pricing",
     pricingRule: "Pricing rule",
     modelMappings: "Model mappings",
@@ -1262,6 +1263,8 @@ export const en = {
     installPricingPresets: "Install {count} price presets",
     pricingPresetsInstalled: "Installed {count} default price rules",
     pricingPresetsInstalledHint: "Matched model families: {families}",
+    endpointSwitchHint:
+      "{endpoint} is currently {mode}. Click through to adjust Auto / On / Off on the provider.",
     fixSeverity: {
       critical: "Critical",
       warning: "Warning",
@@ -1362,6 +1365,16 @@ export const en = {
       candidate: "candidate",
       unsupported: "capability missing",
       unavailableModel: "model blocked",
+    },
+    capabilityMode: {
+      auto: "auto",
+      on: "forced on",
+      off: "forced off",
+    },
+    capabilityModeShort: {
+      auto: "A",
+      on: "On",
+      off: "Off",
     },
     pricingSource: {
       mapping_override: "Mapping price",

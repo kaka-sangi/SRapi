@@ -1211,6 +1211,7 @@ export const zh: Messages = {
     accounts: "账号",
     routableAccountsShort: "可路由",
     endpoints: "端点",
+    endpointSwitches: "端点开关",
     pricing: "计费",
     pricingRule: "定价规则",
     modelMappings: "模型映射",
@@ -1229,6 +1230,7 @@ export const zh: Messages = {
     installPricingPresets: "安装 {count} 个价格预设",
     pricingPresetsInstalled: "已安装 {count} 条默认价格规则",
     pricingPresetsInstalledHint: "命中模型系列：{families}",
+    endpointSwitchHint: "{endpoint} 当前为 {mode}。点击到供应商配置里调整 Auto / 开启 / 关闭。",
     fixSeverity: {
       critical: "严重",
       warning: "注意",
@@ -1329,6 +1331,16 @@ export const zh: Messages = {
       candidate: "候选",
       unsupported: "缺少能力",
       unavailableModel: "模型被屏蔽",
+    },
+    capabilityMode: {
+      auto: "自动",
+      on: "强制开启",
+      off: "强制关闭",
+    },
+    capabilityModeShort: {
+      auto: "A",
+      on: "On",
+      off: "Off",
     },
     pricingSource: {
       mapping_override: "映射定价",

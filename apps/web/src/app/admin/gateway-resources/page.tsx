@@ -57,6 +57,7 @@ import type {
 type GatewayResourceScope = "endpoints" | "providers" | "models" | "routes";
 
 const GATEWAY_STATUSES: GatewayProviderResourceStatus[] = ["ready", "limited", "blocked"];
+const CONVERSATION_ENDPOINT_KEYS = ["chat_completions", "responses", "messages"] as const;
 const GATEWAY_REASONS: GatewayProviderResourceReason[] = [
   "provider_disabled",
   "no_active_models",
@@ -227,12 +228,13 @@ function GatewayResourcesContent() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                <TableScroll minWidth={760}>
+                <TableScroll minWidth={900}>
                   <Table>
                     <TableHeader>
                       <tr>
                         <TableHead>{t("adminProviders.name")}</TableHead>
                         <TableHead>{t("adminProviders.adapterType")}</TableHead>
+                        <TableHead>{t("adminGatewayResources.endpointSwitches")}</TableHead>
                         <TableHead className="text-right">
                           {t("adminGatewayResources.modelMappings")}
                         </TableHead>
@@ -1065,7 +1067,9 @@ function PricingCoverageBadge({ pricing }: { pricing: GatewayPricingCoverage }) 
 function EndpointMatrix({
   row,
 }: {
-  row: Pick<GatewayModelResourceRow, "endpoints"> | Pick<GatewayRouteResourceRow, "endpoints">;
+  row:
+    | Pick<GatewayModelResourceRow, "endpoints" | "model">
+    | Pick<GatewayRouteResourceRow, "endpoints" | "model" | "provider">;
 }) {
   const { t } = useLanguage();
   return (
@@ -1073,25 +1077,52 @@ function EndpointMatrix({
       {row.endpoints.map((endpoint) => {
         const available = endpoint.routable_accounts > 0 && endpoint.status !== "blocked";
         const title = endpointTitle(endpoint, t);
-        return (
-          <span
-            key={endpoint.key}
-            title={title}
-            className={
-              available
-                ? "border-srapi-success/30 bg-srapi-success/10 text-srapi-success inline-flex items-center justify-between gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[10px]"
-                : "border-srapi-border bg-srapi-card-muted text-srapi-text-tertiary inline-flex items-center justify-between gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[10px]"
-            }
-          >
+        const href = endpointDiagnosticsHref(row, endpoint);
+        const className = available
+          ? "border-srapi-success/30 bg-srapi-success/10 text-srapi-success inline-flex items-center justify-between gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[10px]"
+          : "border-srapi-border bg-srapi-card-muted text-srapi-text-tertiary hover:border-srapi-border-strong hover:text-srapi-text-primary inline-flex items-center justify-between gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[10px] transition-colors";
+        const content = (
+          <>
             <span>{t(`adminGatewayResources.endpointShort.${endpoint.key}`)}</span>
             <span className="tabular">
               {endpoint.routable_accounts}/{endpoint.candidate_accounts}
             </span>
+          </>
+        );
+        if (href) {
+          return (
+            <Link key={endpoint.key} href={href} title={title} className={className}>
+              {content}
+            </Link>
+          );
+        }
+        return (
+          <span key={endpoint.key} title={title} className={className}>
+            {content}
           </span>
         );
       })}
     </div>
   );
+}
+
+function endpointDiagnosticsHref(
+  row:
+    | Pick<GatewayModelResourceRow, "model" | "endpoints">
+    | Pick<GatewayRouteResourceRow, "model" | "provider" | "endpoints">,
+  endpoint: GatewayEndpointResourceRow,
+) {
+  if (endpoint.status !== "blocked") return undefined;
+  if (!("provider" in row)) {
+    return `${ADMIN_ROUTES.gatewayResources}?f_scope=routes&q=${encodeURIComponent(endpoint.source_endpoint)}`;
+  }
+  if (endpoint.unsupported_accounts > 0) {
+    return `${ADMIN_ROUTES.providers}?q=${encodeURIComponent(row.provider.name)}`;
+  }
+  if (endpoint.unavailable_model_accounts > 0) {
+    return `${ADMIN_ROUTES.accounts}?f_providerId=${encodeURIComponent(row.provider.id)}`;
+  }
+  return `${ADMIN_ROUTES.models}?q=${encodeURIComponent(row.model.canonical_name)}`;
 }
 
 function endpointTitle(
@@ -1154,6 +1185,9 @@ function ProviderResourceRow({ row }: { row: GatewayProviderResourceRow }) {
       <TableCell className="text-2xs text-srapi-text-secondary font-mono">
         {row.provider.adapter_type}
       </TableCell>
+      <TableCell>
+        <EndpointCapabilitySwitchStrip provider={row.provider} />
+      </TableCell>
       <TableCell className="text-2xs tabular text-right font-mono">
         <span
           className={row.active_model_mappings > 0 ? "text-srapi-text-primary" : "text-srapi-error"}
@@ -1212,6 +1246,54 @@ function ProviderResourceRow({ row }: { row: GatewayProviderResourceRow }) {
       </TableCell>
     </TableRow>
   );
+}
+
+function EndpointCapabilitySwitchStrip({
+  provider,
+}: {
+  provider: GatewayProviderResourceRow["provider"];
+}) {
+  const { t } = useLanguage();
+  return (
+    <div className="flex min-w-[190px] flex-wrap gap-1">
+      {CONVERSATION_ENDPOINT_KEYS.map((key) => {
+        const mode = providerEndpointCapabilityMode(provider.capabilities, key);
+        const label = `${t(`adminGatewayResources.endpointShort.${key}`)}:${t(
+          `adminGatewayResources.capabilityModeShort.${mode}`,
+        )}`;
+        return (
+          <Link
+            key={key}
+            href={`${ADMIN_ROUTES.providers}?q=${encodeURIComponent(provider.name)}`}
+            className="border-srapi-border bg-srapi-card-muted hover:border-srapi-border-strong inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[10px] transition-colors"
+            title={t("adminGatewayResources.endpointSwitchHint", {
+              endpoint: t(`adminGatewayResources.endpoint.${key}`),
+              mode: t(`adminGatewayResources.capabilityMode.${mode}`),
+            })}
+          >
+            <span className={endpointCapabilityModeTone(mode)}>■</span>
+            <span className="text-srapi-text-tertiary">{label}</span>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
+function providerEndpointCapabilityMode(
+  capabilities: Record<string, unknown> | undefined,
+  key: (typeof CONVERSATION_ENDPOINT_KEYS)[number],
+) {
+  const value = capabilities?.[key];
+  if (value === true) return "on";
+  if (value === false) return "off";
+  return "auto";
+}
+
+function endpointCapabilityModeTone(mode: "auto" | "on" | "off") {
+  if (mode === "on") return "text-srapi-success";
+  if (mode === "off") return "text-srapi-error";
+  return "text-srapi-text-tertiary";
 }
 
 function AccountBlockersStrip({ blockers }: { blockers: GatewayAccountBlockers }) {
