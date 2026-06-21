@@ -56,10 +56,17 @@ export function CodexSessionImportDialog({
   const [result, setResult] = useState<CodexSessionImportResult | null>(null);
   const [fileNames, setFileNames] = useState<string[]>([]);
 
+  // Each drop replaces the staged content. Appending (the original
+  // behaviour) silently merged a mis-dropped file with the correct one
+  // and shipped the bogus session through to import — a real data
+  // corruption path observed in ROOTCAUSE-SWEEP. Multi-file imports are
+  // still supported in a single drag (the FileDropZone passes the
+  // whole File[] in one callback); explicit accumulation can be added
+  // back with a UI affordance once it is actually needed.
   const handleFiles = useCallback(async (files: File[]) => {
     const texts = await Promise.all(files.map((f) => f.text()));
-    setContent((prev) => (prev ? prev + "\n" : "") + texts.join("\n"));
-    setFileNames((prev) => [...prev, ...files.map((f) => f.name)]);
+    setContent(texts.join("\n"));
+    setFileNames(files.map((f) => f.name));
   }, []);
 
   function reset() {
