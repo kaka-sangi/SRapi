@@ -69,6 +69,10 @@ function truncateMetadataValue(value: string, max = 28): string {
   return `${value.slice(0, Math.max(0, max - 1))}…`;
 }
 
+function isLikelyURL(value: string): boolean {
+  return /^https?:\/\//i.test(value.trim());
+}
+
 function metadataBoolean(metadata: ProviderAccount["metadata"], key: string): boolean | null {
   const value = metadata?.[key];
   return typeof value === "boolean" ? value : null;
@@ -156,7 +160,7 @@ export function accountMetadataFacts(
     });
   }
 
-  if (account.upstream_client) {
+  if (account.upstream_client && !isLikelyURL(account.upstream_client)) {
     facts.push({
       key: "client",
       label: t("adminAccounts.factClient"),

@@ -648,7 +648,9 @@ function AccountsContent() {
         const hasIdentity = identity.primary !== a.name || identity.secondary.length > 0;
         const endpointFacts = accountEndpointCapabilityFacts(t, a);
         const capacityFacts = accountCapacityFacts(t, a);
-        const profileFacts = accountProfileFacts(t, a).slice(0, 2);
+        const profileFacts = accountProfileFacts(t, a).filter((fact) =>
+          ["plan", "org"].includes(fact.key),
+        );
         const today = todayByAccountId.get(a.id);
         const groups = a.group_ids ?? [];
         const groupLabel =
@@ -660,7 +662,7 @@ function AccountsContent() {
             ? `${formatInteger(today.requests)} ${t("adminAccounts.usageRequests").toLowerCase()} · ${formatMoney(today.cost, today.currency)}`
             : t("adminAccounts.todayIdle");
         return (
-          <div className="flex max-w-[25rem] min-w-[16rem] flex-col gap-1.5">
+          <div className="flex max-w-[28rem] min-w-[18rem] flex-col gap-1.5">
             {hasIdentity ? (
               <span
                 className="text-2xs text-srapi-text-secondary max-w-[22rem] truncate font-mono"
@@ -687,7 +689,7 @@ function AccountsContent() {
                   {fact.label}: {fact.value}
                 </span>
               ))}
-              {capacityFacts.slice(0, 2).map((fact) => (
+              {capacityFacts.slice(0, 3).map((fact) => (
                 <span
                   key={fact.key}
                   className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded-md border px-1.5 py-0.5 font-mono"

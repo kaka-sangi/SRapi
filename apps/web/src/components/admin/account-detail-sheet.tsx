@@ -121,7 +121,7 @@ function activeDailyUsagePoints(points: AccountUsageDailyPoint[]): AccountUsageD
   return points.filter(hasDailyTraffic);
 }
 
-function usageDateRangeLabel(
+function activeUsageDateSummary(
   points: AccountUsageDailyPoint[],
   t: (key: string, vars?: Record<string, string | number>) => string,
 ): string {
@@ -131,6 +131,26 @@ function usageDateRangeLabel(
   const last = activePoints[activePoints.length - 1]?.date ?? "";
   if (!first || !last || first === last) return formatDate(last || first);
   return `${formatDate(first)} - ${formatDate(last)}`;
+}
+
+function usageWindowActiveRangeLabel(
+  result: AccountUsageWindowsResult | undefined,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): string {
+  if (!result) return t("adminAccounts.neverUsed");
+  const dates = result.windows
+    .filter((window) => window.requests > 0)
+    .flatMap((window) =>
+      [window.first_request_at, window.last_request_at].filter((value): value is string =>
+        Boolean(value),
+      ),
+    );
+  if (dates.length === 0) return t("adminAccounts.neverUsed");
+  dates.sort((a, b) => Date.parse(a) - Date.parse(b));
+  const first = dates[0];
+  const last = dates[dates.length - 1];
+  if (!first || !last || first === last) return formatDateTime(last || first);
+  return `${formatDateTime(first)} - ${formatDateTime(last)}`;
 }
 
 function latestUsageWindowRequestAt(result: AccountUsageWindowsResult | undefined): string {
@@ -143,22 +163,13 @@ function latestUsageWindowRequestAt(result: AccountUsageWindowsResult | undefine
   );
 }
 
-function usageWindowDateRangeLabel(
-  result: AccountUsageWindowsResult | undefined,
+function activeUsageDayCountLabel(
+  points: AccountUsageDailyPoint[],
   t: (key: string, vars?: Record<string, string | number>) => string,
 ): string {
-  if (!result) return t("adminAccounts.neverUsed");
-  const dates = result.windows.flatMap((window) =>
-    [window.first_request_at, window.last_request_at].filter((value): value is string =>
-      Boolean(value),
-    ),
-  );
-  if (dates.length === 0) return t("adminAccounts.neverUsed");
-  dates.sort((a, b) => Date.parse(a) - Date.parse(b));
-  const first = dates[0];
-  const last = dates[dates.length - 1];
-  if (!first || !last || first === last) return formatDateTime(last || first);
-  return `${formatDateTime(first)} - ${formatDateTime(last)}`;
+  const count = activeDailyUsagePoints(points).length;
+  if (count === 0) return t("adminAccounts.neverUsed");
+  return t("adminAccounts.activeUsageDays", { count });
 }
 
 function AccountHealthEvidenceLinks({ links }: { links: AccountHealthInvestigationLinks }) {
@@ -555,13 +566,21 @@ export function AccountDetailSheet({
               }
             />
             <DetailMetric
-              label={t("adminAccounts.usagePeriod")}
+              label={t("adminAccounts.activeUsageRange")}
               value={
                 usageWindows.isLoading || usageDaily.isLoading
                   ? t("adminAccounts.detailLoading")
-                  : latestRequestAt
-                    ? usageWindowDateRangeLabel(usageWindows.data, t)
-                    : usageDateRangeLabel(usageDaily.data ?? [], t)
+                  : activeUsagePoints.length > 0
+                    ? activeUsageDateSummary(usageDaily.data ?? [], t)
+                    : usageWindowActiveRangeLabel(usageWindows.data, t)
+              }
+            />
+            <DetailMetric
+              label={t("adminAccounts.activeUsageDaysLabel")}
+              value={
+                usageDaily.isLoading
+                  ? t("adminAccounts.detailLoading")
+                  : activeUsageDayCountLabel(usageDaily.data ?? [], t)
               }
             />
             <DetailMetric

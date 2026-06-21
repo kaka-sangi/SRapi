@@ -205,7 +205,9 @@ describe("AccountDetailSheet", () => {
     expect(screen.getByText("Pooled accounts")).toBeInTheDocument();
     expect(screen.getAllByText("已绑定代理").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/最近使用/).length).toBeGreaterThan(0);
-    expect(screen.getByText("使用期")).toBeInTheDocument();
+    expect(screen.getByText("活跃区间")).toBeInTheDocument();
+    expect(screen.getByText("活跃天数")).toBeInTheDocument();
+    expect(screen.getByText("1 天")).toBeInTheDocument();
     expect(screen.getAllByText(/08:03|8:03|16:03|4:03/).length).toBeGreaterThan(0);
     expect(screen.getByText("端点覆盖")).toBeInTheDocument();
     expect(screen.getByText("Resp: 强关 Msg: 强开")).toBeInTheDocument();
@@ -241,7 +243,6 @@ describe("AccountDetailSheet", () => {
 
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(screen.getAllByText("暂无数据。").length).toBeGreaterThan(0);
-    expect(screen.queryByText(/2026年5月18日|May 18, 2026/)).not.toBeInTheDocument();
   });
 });
 

@@ -749,8 +749,9 @@ func chatGPTWebPoWGenerate(seed string, difficulty string, config []any, limit i
 		return "", false
 	}
 	start := time.Now()
+	config = append([]any(nil), config...)
 	for nonce := 0; nonce < limit; nonce++ {
-		answer, err := chatGPTWebPoWRunCheck(start, seed, difficulty, config, nonce)
+		answer, err := chatGPTWebPoWRunCheckInPlace(start, seed, difficulty, config, nonce)
 		if err != nil {
 			return "", false
 		}
@@ -766,6 +767,16 @@ func chatGPTWebPoWRunCheck(start time.Time, seed string, difficulty string, conf
 		return "", nil
 	}
 	config = append([]any(nil), config...)
+	return chatGPTWebPoWRunCheckInPlace(start, seed, strings.ToLower(strings.TrimSpace(difficulty)), config, nonce)
+}
+
+// chatGPTWebPoWRunCheckInPlace updates nonce/elapsed slots on the working
+// fingerprint. Generate clones once and reuses that slice to avoid allocating
+// a 23-item copy on every nonce attempt.
+func chatGPTWebPoWRunCheckInPlace(start time.Time, seed string, difficulty string, config []any, nonce int) (string, error) {
+	if len(config) < 10 {
+		return "", nil
+	}
 	config[3] = nonce
 	config[9] = int64(math.Round(float64(time.Since(start)) / float64(time.Millisecond)))
 	encoded, err := chatGPTWebPoWEncodeFingerprint(config)

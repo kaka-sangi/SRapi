@@ -227,7 +227,9 @@ function AccountCard({
   const modelPolicy = accountModelPolicyLabel(t, account.metadata);
   const capacityFacts = accountCapacityFacts(t, account);
   const endpointFacts = accountEndpointCapabilityFacts(t, account);
-  const profileFacts = accountProfileFacts(t, account).slice(0, 3);
+  const profileFacts = accountProfileFacts(t, account).filter((fact) =>
+    ["plan", "org"].includes(fact.key),
+  );
   const proxyLabel = account.proxy_id
     ? t("adminAccounts.proxyConfigured")
     : t("adminAccounts.noProxy");
@@ -236,6 +238,7 @@ function AccountCard({
   const extraGroupCount = Math.max(0, groups.length - visibleGroups.length);
   const hasTodayUsage = Boolean(today && today.requests > 0);
   const hasIdentity = identity.primary !== account.name || identity.secondary.length > 0;
+  const routeLabel = `P${account.priority ?? 0} / W${account.weight ?? 1}`;
   return (
     <article
       className={cn(
@@ -292,7 +295,7 @@ function AccountCard({
               ))}
             </div>
           ) : null}
-          <div className="mt-2 flex flex-wrap gap-1">
+          <div className="mt-2 flex flex-wrap gap-1.5">
             <span className="bg-srapi-bg-muted text-srapi-text-tertiary rounded-md px-1.5 py-0.5 font-mono text-[10px]">
               {modelPolicy}
             </span>
@@ -312,6 +315,9 @@ function AccountCard({
             ))}
             <span className="bg-srapi-bg-muted text-srapi-text-tertiary rounded-md px-1.5 py-0.5 font-mono text-[10px]">
               {proxyLabel}
+            </span>
+            <span className="bg-srapi-bg-muted text-srapi-text-tertiary rounded-md px-1.5 py-0.5 font-mono text-[10px]">
+              {routeLabel}
             </span>
             {visibleGroups.length > 0 ? (
               visibleGroups.map((name) => (
@@ -333,7 +339,7 @@ function AccountCard({
                 +{extraGroupCount}
               </span>
             ) : null}
-            {[...capacityFacts, ...profileFacts].slice(0, 5).map((fact) => (
+            {[...capacityFacts, ...profileFacts].slice(0, 4).map((fact) => (
               <span
                 key={fact.key}
                 className="bg-srapi-bg-muted text-srapi-text-tertiary max-w-[10rem] truncate rounded-md px-1.5 py-0.5 font-mono text-[10px]"
@@ -347,14 +353,10 @@ function AccountCard({
       </div>
 
       {/* Status row */}
-      <div className="border-srapi-border/50 flex items-center gap-2 border-t px-4 py-2.5">
+      <div className="border-srapi-border/50 flex min-w-0 flex-wrap items-center gap-2 border-t px-4 py-2.5">
         {status}
-        {account.priority != null && account.priority !== 0 ? (
-          <span className="text-2xs text-srapi-text-tertiary font-mono">P{account.priority}</span>
-        ) : null}
-        {account.weight != null && account.weight !== 1 ? (
-          <span className="text-2xs text-srapi-text-tertiary font-mono">W{account.weight}</span>
-        ) : null}
+        <AccountHealthCell health={health} investigationHref={investigationHref} />
+        <AccountQuotaCell health={health} />
         {account.risk_level ? (
           <span className="text-2xs text-srapi-text-tertiary font-mono">{account.risk_level}</span>
         ) : null}

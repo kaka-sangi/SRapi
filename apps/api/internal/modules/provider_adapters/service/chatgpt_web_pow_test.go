@@ -167,6 +167,49 @@ func TestChatGPTWebPoWRunCheckDoesNotMutateInputFingerprint(t *testing.T) {
 	}
 }
 
+func TestChatGPTWebPoWGenerateDoesNotMutateInputFingerprint(t *testing.T) {
+	config := []any{
+		"0",
+		"",
+		"0",
+		99,
+		0.0,
+		"",
+		"",
+		"",
+		"en-US",
+		321,
+		"en-US",
+		0.0,
+		"",
+		"",
+		0.0,
+		"",
+		"",
+		"",
+		0,
+		0,
+		0,
+		0,
+		0,
+	}
+	before, err := json.Marshal(config)
+	if err != nil {
+		t.Fatalf("marshal fingerprint: %v", err)
+	}
+	answer, ok := chatGPTWebPoWGenerate("seed", "ffffffff", config, 3)
+	if !ok || answer == "" {
+		t.Fatal("expected trivial difficulty to solve")
+	}
+	after, err := json.Marshal(config)
+	if err != nil {
+		t.Fatalf("marshal fingerprint after generate: %v", err)
+	}
+	if string(after) != string(before) {
+		t.Fatalf("fingerprint mutated: before=%s after=%s", before, after)
+	}
+}
+
 func TestChatGPTWebPoWGenerateReportsUnsolvedWithoutFallback(t *testing.T) {
 	config := chatGPTWebPoWConfig(contractConversationRequestForPoWTest(), nil, "")
 

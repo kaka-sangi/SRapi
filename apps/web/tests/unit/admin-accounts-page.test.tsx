@@ -244,6 +244,8 @@ describe("AdminAccountsPage", () => {
     expect(screen.getByText("并发: 4")).toBeInTheDocument();
     expect(screen.getByText("已绑定代理")).toBeInTheDocument();
     expect(screen.getByText("Pooled accounts")).toBeInTheDocument();
+    expect(screen.getAllByText("50%").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("900ms").length).toBeGreaterThan(0);
     expect(screen.getByText(/12.*请求/i)).toBeInTheDocument();
     expect(screen.queryByText("https://internal-upstream.example/v1")).not.toBeInTheDocument();
 
