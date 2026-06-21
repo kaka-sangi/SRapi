@@ -526,21 +526,23 @@ func gatewayResourceFixes(
 		for _, reason := range row.Reasons {
 			acc.add(reason, gatewayFixAreaForReason(reason), gatewayFixSeverityForReason(reason), 1)
 		}
-		if row.Pricing.Status == apiopenapi.GatewayPricingCoverageStatusError {
-			acc.add(apiopenapi.PricingUncovered, apiopenapi.Pricing, apiopenapi.GatewayResourceFixSeverityWarning, 1)
-		}
 		acc.addEndpointFixes(row.Endpoints)
 	}
 	for _, row := range routeRows {
 		for _, reason := range row.Reasons {
 			acc.add(reason, gatewayFixAreaForReason(reason), gatewayFixSeverityForReason(reason), 1)
 		}
-		if row.Pricing.Status == apiopenapi.GatewayPricingCoverageStatusError {
+		if gatewayPricingNeedsAttention(row.Pricing) {
 			acc.add(apiopenapi.PricingUncovered, apiopenapi.Pricing, apiopenapi.GatewayResourceFixSeverityWarning, 1)
 		}
 		acc.addEndpointFixes(row.Endpoints)
 	}
 	return acc.rows()
+}
+
+func gatewayPricingNeedsAttention(pricing apiopenapi.GatewayPricingCoverage) bool {
+	return pricing.Status == apiopenapi.GatewayPricingCoverageStatusError ||
+		pricing.Source == apiopenapi.GatewayPricingCoverageSourceDefaultZero
 }
 
 type gatewayResourceFixAccumulator struct {

@@ -26,6 +26,21 @@ vi.mock("@/hooks/admin-queries", () => ({
     data: summary(),
     isLoading: false,
     isError: false,
+    refetch: vi.fn(),
+  }),
+  useAdminPricingRulePresets: () => ({
+    data: [{ model_family: "gpt-4.1" }],
+    isLoading: false,
+  }),
+  useInstallPricingRulePresets: () => ({
+    isPending: false,
+    mutateAsync: vi.fn(),
+  }),
+}));
+
+vi.mock("@/context/ToastContext", () => ({
+  useToast: () => ({
+    toast: vi.fn(),
   }),
 }));
 
@@ -110,6 +125,22 @@ describe("AdminGatewayResourcesPage", () => {
     expect(screen.queryByText("路由明细")).not.toBeInTheDocument();
     expect(screen.queryByText("没有匹配的网关资源")).not.toBeInTheDocument();
   });
+
+  it("filters default-zero routes from pricing uncovered fix links", () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/admin/gateway-resources?f_scope=routes&f_reason=pricing_uncovered",
+    );
+
+    renderPage();
+
+    expect(screen.getByText("路由明细")).toBeInTheDocument();
+    expect(screen.getByText("gpt-4.1-free-upstream")).toBeInTheDocument();
+    expect(screen.getAllByText("默认零价").length).toBeGreaterThan(0);
+    expect(screen.queryByText("gpt-4.1-upstream")).not.toBeInTheDocument();
+    expect(screen.queryByText("没有匹配的网关资源")).not.toBeInTheDocument();
+  });
 });
 
 function renderPage() {
@@ -154,6 +185,13 @@ function summary(): GatewayResourceSummary {
         reason: "proxy_attention",
         count: 1,
         href: "/admin/gateway-resources?f_reason=proxy_attention&f_scope=providers",
+      },
+      {
+        severity: "warning",
+        area: "pricing",
+        reason: "pricing_uncovered",
+        count: 1,
+        href: "/admin/gateway-resources?f_reason=pricing_uncovered&f_scope=routes",
       },
     ],
     endpoint_rows: [
@@ -255,7 +293,12 @@ function summary(): GatewayResourceSummary {
     ],
     model_rows: [
       {
-        model: model({ id: "m1", canonical_name: "gpt-4.1", display_name: "GPT 4.1" }),
+        model: model({
+          id: "m1",
+          canonical_name: "gpt-4.1",
+          display_name: "GPT 4.1",
+          family: "gpt-4.1",
+        }),
         active_providers: 1,
         active_model_mappings: 1,
         routable_accounts: 1,
@@ -311,7 +354,12 @@ function summary(): GatewayResourceSummary {
     ],
     route_rows: [
       {
-        model: model({ id: "m1", canonical_name: "gpt-4.1", display_name: "GPT 4.1" }),
+        model: model({
+          id: "m1",
+          canonical_name: "gpt-4.1",
+          display_name: "GPT 4.1",
+          family: "gpt-4.1",
+        }),
         provider: provider({ id: "p1", display_name: "OpenAI" }),
         mapping_id: "mapping-1",
         upstream_model: "gpt-4.1-upstream",
@@ -356,6 +404,35 @@ function summary(): GatewayResourceSummary {
           source: "pricing_rule",
           pricing_rule_id: 1,
           priced_routes: 3,
+          total_routes: 3,
+          currency: "USD",
+          billing_mode: "token",
+        },
+        api_key_count: 1,
+        scoped_key_count: 1,
+        status: "ready",
+        reasons: [],
+      },
+      {
+        model: model({
+          id: "m2",
+          canonical_name: "gpt-4.1-free",
+          display_name: "GPT 4.1 Free",
+          family: "gpt-4.1",
+        }),
+        provider: provider({ id: "p1", display_name: "OpenAI" }),
+        mapping_id: "mapping-2",
+        upstream_model: "gpt-4.1-free-upstream",
+        routable_accounts: 1,
+        endpoints: [
+          endpoint("chat_completions", "/v1/chat/completions", 1, 1, "ready"),
+          endpoint("responses", "/v1/responses", 1, 1, "ready"),
+          endpoint("messages", "/v1/messages", 1, 1, "ready"),
+        ],
+        pricing: {
+          status: "estimated_zero",
+          source: "default_zero",
+          priced_routes: 0,
           total_routes: 3,
           currency: "USD",
           billing_mode: "token",

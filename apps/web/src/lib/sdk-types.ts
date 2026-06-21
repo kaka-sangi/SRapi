@@ -171,6 +171,7 @@ export type {
   GatewayProviderResourceStatus,
   GatewayRouteResourceRow,
   GatewayResourceSummary,
+  PricingRulePreset,
   UsageThroughput,
   UsageModelShare,
   UsageTrendPoint,

@@ -1226,6 +1226,9 @@ export const zh: Messages = {
     endpointUnsupported: "缺能力",
     endpointModelBlocked: "模型屏蔽",
     fixQueue: "优先修复",
+    installPricingPresets: "安装 {count} 个价格预设",
+    pricingPresetsInstalled: "已安装 {count} 条默认价格规则",
+    pricingPresetsInstalledHint: "命中模型系列：{families}",
     fixSeverity: {
       critical: "严重",
       warning: "注意",

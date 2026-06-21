@@ -1259,6 +1259,9 @@ export const en = {
     endpointUnsupported: "Unsupported",
     endpointModelBlocked: "Model blocked",
     fixQueue: "Fix first",
+    installPricingPresets: "Install {count} price presets",
+    pricingPresetsInstalled: "Installed {count} default price rules",
+    pricingPresetsInstalledHint: "Matched model families: {families}",
     fixSeverity: {
       critical: "Critical",
       warning: "Warning",

@@ -366,6 +366,30 @@ func TestBuildGatewayResourceSummaryReportsPricingCoverage(t *testing.T) {
 	}
 }
 
+func TestGatewayResourceFixesIncludesDefaultZeroRoutePricing(t *testing.T) {
+	routeRows := []apiopenapi.GatewayRouteResourceRow{
+		{
+			Pricing: apiopenapi.GatewayPricingCoverage{
+				Source:       apiopenapi.GatewayPricingCoverageSourceDefaultZero,
+				Status:       apiopenapi.GatewayPricingCoverageStatusEstimatedZero,
+				PricedRoutes: 0,
+				TotalRoutes:  3,
+			},
+		},
+		{
+			Pricing: apiopenapi.GatewayPricingCoverage{
+				Source:       apiopenapi.GatewayPricingCoverageSourcePricingRule,
+				Status:       apiopenapi.GatewayPricingCoverageStatusPriced,
+				PricedRoutes: 3,
+				TotalRoutes:  3,
+			},
+		},
+	}
+
+	fixes := apiopenapi.GatewayResourceSummary{Fixes: gatewayResourceFixes(nil, nil, routeRows)}
+	assertGatewayResourceFix(t, fixes, apiopenapi.Pricing, apiopenapi.PricingUncovered, apiopenapi.GatewayResourceFixSeverityWarning, 1, "/admin/gateway-resources?f_reason=pricing_uncovered&f_scope=routes")
+}
+
 func TestBuildGatewayResourceSummaryScopesRouteApiKeysByProviderGroups(t *testing.T) {
 	now := time.Date(2026, 6, 20, 12, 0, 0, 0, time.UTC)
 	summary := buildGatewayResourceSummary(gatewayResourceSummaryInput{

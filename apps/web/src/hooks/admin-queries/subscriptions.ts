@@ -84,6 +84,7 @@ export function useCreatePricingRule() {
   return useAdminMutation(
     (body: P<typeof adminApi.createPricingRule>) => adminApi.createPricingRule(body),
     ["admin", "pricing-rules"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 export function useUpdatePricingRule() {
@@ -91,12 +92,14 @@ export function useUpdatePricingRule() {
     (vars: { id: string; body: B<typeof adminApi.updatePricingRule> }) =>
       adminApi.updatePricingRule(vars.id, vars.body),
     ["admin", "pricing-rules"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 export function useBulkImportPricingRules() {
   return useAdminMutation(
     (body: P<typeof adminApi.bulkImportPricingRules>) => adminApi.bulkImportPricingRules(body),
     ["admin", "pricing-rules"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 export function useInstallPricingRulePresets() {
@@ -104,11 +107,13 @@ export function useInstallPricingRulePresets() {
     (body: P<typeof adminApi.installPricingRulePresets> | undefined) =>
       adminApi.installPricingRulePresets(body),
     ["admin", "pricing-rules"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 export function useDeletePricingRule() {
   return useAdminMutation(
     (id: string) => adminApi.deletePricingRule(id),
     ["admin", "pricing-rules"],
+    queryKeys.admin.gatewayResources(),
   );
 }

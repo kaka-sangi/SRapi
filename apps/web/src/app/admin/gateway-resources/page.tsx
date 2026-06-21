@@ -10,6 +10,7 @@ import {
   KeyRound,
   Route,
   SearchX,
+  Tag,
 } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
@@ -31,7 +32,13 @@ import {
 import { ADMIN_ROUTES } from "@/lib/routes";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useLanguage } from "@/context/LanguageContext";
-import { useAdminGatewayResources } from "@/hooks/admin-queries";
+import {
+  useAdminGatewayResources,
+  useAdminPricingRulePresets,
+  useInstallPricingRulePresets,
+} from "@/hooks/admin-queries";
+import { useToast } from "@/context/ToastContext";
+import { adminErrorMessage } from "@/lib/admin-api";
 import type {
   GatewayAccountBlockers,
   GatewayEndpointResourceRow,
@@ -44,6 +51,7 @@ import type {
   GatewayProviderResourceRow,
   GatewayRouteResourceRow,
   GatewayResourceSummary,
+  PricingRulePreset,
 } from "@/lib/sdk-types";
 
 type GatewayResourceScope = "endpoints" | "providers" | "models" | "routes";
@@ -71,15 +79,41 @@ export default function AdminGatewayResourcesPage() {
 
 function GatewayResourcesContent() {
   const { t } = useLanguage();
+  const { toast } = useToast();
   const list = useAdminList({ pageSize: 1000 });
   const gatewayResources = useAdminGatewayResources();
+  const pricingPresets = useAdminPricingRulePresets();
+  const installPricingPresets = useInstallPricingRulePresets();
   const loading = gatewayResources.isLoading;
   const error = gatewayResources.isError;
   const summary = gatewayResources.data;
   const filters = gatewayResourceFilters(summary, list.search, list.filters);
+  const missingPricingPresetFamilies = gatewayMissingPricingPresetFamilies(
+    summary,
+    pricingPresets.data ?? [],
+  );
   const isFiltered = Boolean(
     list.search || list.filters.status || list.filters.reason || list.filters.scope,
   );
+
+  async function installMissingPricingPresets() {
+    if (missingPricingPresetFamilies.length === 0) return;
+    try {
+      const result = await installPricingPresets.mutateAsync({
+        families: missingPricingPresetFamilies,
+      });
+      toast({
+        title: t("adminGatewayResources.pricingPresetsInstalled", { count: result.created }),
+        description: t("adminGatewayResources.pricingPresetsInstalledHint", {
+          families: missingPricingPresetFamilies.join(", "),
+        }),
+        tone: result.errors.length > 0 ? "warning" : "success",
+      });
+      await gatewayResources.refetch();
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+    }
+  }
 
   return (
     <>
@@ -142,7 +176,12 @@ function GatewayResourcesContent() {
             />
           </div>
 
-          <GatewayFixQueue fixes={summary?.fixes ?? []} />
+          <GatewayFixQueue
+            fixes={summary?.fixes ?? []}
+            pricingPresetFamilies={missingPricingPresetFamilies}
+            installingPricingPresets={installPricingPresets.isPending}
+            onInstallPricingPresets={installMissingPricingPresets}
+          />
 
           <GatewayResourceToolbar
             search={list.searchInput}
@@ -500,7 +539,13 @@ function modelResourceRowMatches(
   reason: GatewayProviderResourceReason | undefined,
 ) {
   if (status && row.status !== status) return false;
-  if (reason && !rowMatchesReason(row.reasons, reason)) return false;
+  if (
+    reason &&
+    !rowMatchesReason(row.reasons, reason) &&
+    !rowMatchesPricingReason(row.pricing, reason)
+  ) {
+    return false;
+  }
   if (!search) return true;
   return rowText([
     row.model.canonical_name,
@@ -523,7 +568,13 @@ function routeResourceRowMatches(
   reason: GatewayProviderResourceReason | undefined,
 ) {
   if (status && row.status !== status) return false;
-  if (reason && !rowMatchesReason(row.reasons, reason)) return false;
+  if (
+    reason &&
+    !rowMatchesReason(row.reasons, reason) &&
+    !rowMatchesPricingReason(row.pricing, reason)
+  ) {
+    return false;
+  }
   if (!search) return true;
   return rowText([
     row.model.canonical_name,
@@ -547,6 +598,45 @@ function rowMatchesReason(
   reason: GatewayProviderResourceReason,
 ) {
   return reasons.includes(reason);
+}
+
+function rowMatchesPricingReason(
+  pricing: GatewayPricingCoverage,
+  reason: GatewayProviderResourceReason,
+) {
+  return reason === "pricing_uncovered" && gatewayPricingNeedsAttention(pricing);
+}
+
+function gatewayPricingNeedsAttention(pricing: GatewayPricingCoverage) {
+  return pricing.status === "error" || pricing.source === "default_zero";
+}
+
+function gatewayMissingPricingPresetFamilies(
+  summary: GatewayResourceSummary | undefined,
+  presets: PricingRulePreset[],
+) {
+  const presetByFamily = new Map<string, string>();
+  for (const preset of presets) {
+    const family = normalizePricingFamily(preset.model_family);
+    if (family && !presetByFamily.has(family)) {
+      presetByFamily.set(family, preset.model_family);
+    }
+  }
+  const families = new Set<string>();
+  for (const row of summary?.route_rows ?? []) {
+    if (!gatewayPricingNeedsAttention(row.pricing)) continue;
+    const family = normalizePricingFamily(row.model.family);
+    if (!family) continue;
+    const presetFamily = presetByFamily.get(family);
+    if (presetFamily) {
+      families.add(presetFamily);
+    }
+  }
+  return Array.from(families).sort((left, right) => left.localeCompare(right));
+}
+
+function normalizePricingFamily(value: string | null | undefined) {
+  return (value ?? "").trim().toLowerCase();
 }
 
 function rowText(values: Array<string | number | null | undefined>) {
@@ -574,9 +664,19 @@ function validScopeFilter(value: string | undefined): GatewayResourceScope | und
     : undefined;
 }
 
-function GatewayFixQueue({ fixes }: { fixes: GatewayResourceFix[] }) {
+function GatewayFixQueue({
+  fixes,
+  pricingPresetFamilies,
+  installingPricingPresets,
+  onInstallPricingPresets,
+}: {
+  fixes: GatewayResourceFix[];
+  pricingPresetFamilies: string[];
+  installingPricingPresets: boolean;
+  onInstallPricingPresets: () => void;
+}) {
   const { t } = useLanguage();
-  if (fixes.length === 0) {
+  if (fixes.length === 0 && pricingPresetFamilies.length === 0) {
     return null;
   }
   const visible = fixes.slice(0, 5);
@@ -616,6 +716,21 @@ function GatewayFixQueue({ fixes }: { fixes: GatewayResourceFix[] }) {
           <span className="text-2xs text-srapi-text-tertiary font-mono">
             +{fixes.length - visible.length}
           </span>
+        ) : null}
+        {pricingPresetFamilies.length > 0 ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            loading={installingPricingPresets}
+            onClick={onInstallPricingPresets}
+            title={pricingPresetFamilies.join(", ")}
+          >
+            <Tag className="size-3.5" />
+            {t("adminGatewayResources.installPricingPresets", {
+              count: pricingPresetFamilies.length,
+            })}
+          </Button>
         ) : null}
       </div>
     </Card>
