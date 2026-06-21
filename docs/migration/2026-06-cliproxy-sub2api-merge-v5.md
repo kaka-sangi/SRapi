@@ -128,4 +128,15 @@ F. **CLIProxyAPI homekv, pluginhost, pluginstore, wsrelay,
 
 ## Outcomes
 
-(Filled in after the commit lands.)
+Shipped:
+
+- Antigravity privacy enforcement runs after every successful OAuth
+  refresh. Telemetry stays off for managed accounts; failure persists
+  `privacy_mode=privacy_set_failed` so the next refresh pass retries.
+- Existing antigravity refresh + chat integration tests extended to
+  exercise the new endpoints alongside the refresh flow.
+
+Refused as out of scope for this wave (see Decisions section): the
+audit's four remaining candidates (Airwallex, WeChat/DingTalk OAuth,
+web search emulation, OAuth signup promo) remain documented for
+future product-driven scope decisions.

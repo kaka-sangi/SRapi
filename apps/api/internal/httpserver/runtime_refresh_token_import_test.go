@@ -290,6 +290,12 @@ func TestGatewayAntigravityRefreshTokenOnlyCreateCanRequestChat(t *testing.T) {
 			}
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = io.WriteString(w, `{"response":{"candidates":[{"content":{"parts":[{"text":"antigravity refresh ok"}]}}],"usageMetadata":{"promptTokenCount":6,"candidatesTokenCount":7}}}`)
+		case "/v1internal/users/me:setUserSettings", "/v1internal:fetchUserInfo":
+			// Privacy enforcement runs after every successful OAuth
+			// refresh — return the documented "telemetry off" response
+			// so the credential lands with privacy_mode=privacy_set.
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `{"userSettings":{}}`)
 		default:
 			t.Fatalf("unexpected upstream path %s", r.URL.Path)
 		}
@@ -366,6 +372,9 @@ func TestGatewayAntigravityRefreshTokenOnlyUpdateCanRequestChat(t *testing.T) {
 			generateAuthorization = r.Header.Get("Authorization")
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = io.WriteString(w, `{"response":{"candidates":[{"content":{"parts":[{"text":"antigravity update ok"}]}}],"usageMetadata":{"promptTokenCount":7,"candidatesTokenCount":8}}}`)
+		case "/v1internal/users/me:setUserSettings", "/v1internal:fetchUserInfo":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `{"userSettings":{}}`)
 		default:
 			t.Fatalf("unexpected upstream path %s", r.URL.Path)
 		}

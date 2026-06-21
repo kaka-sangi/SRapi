@@ -438,6 +438,7 @@ func (s *Service) refreshOAuthCredential(ctx context.Context, req contract.Refre
 		return contract.RefreshResponse{}, err
 	}
 	refreshed = s.enrichOpenAIOAuthCredential(ctx, req.Account, refreshed)
+	refreshed = s.enrichAntigravityOAuthCredential(ctx, req.Account, refreshed)
 	s.recordRefresh("success")
 	return contract.RefreshResponse{AccountID: req.Account.AccountID, Credential: refreshed, RefreshedAt: refreshedAt}, nil
 }
