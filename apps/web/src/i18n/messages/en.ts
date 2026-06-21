@@ -3421,7 +3421,9 @@ export const en = {
   },
   adminPricing: {
     title: "Channel pricing",
-    subtitle: "Per-model upstream pricing rules.",
+    subtitle:
+      "Per-model upstream pricing rules. A rule applies only when its (model, provider, effective_at) matches the dispatched request — if traffic falls through to default-zero, check Gateway resources for the unmatched routes.",
+    coverageDiagnosticLink: "Open coverage diagnostics →",
     model: "Model",
     provider: "Provider",
     billingMode: "Billing mode",

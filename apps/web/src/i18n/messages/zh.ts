@@ -3348,7 +3348,9 @@ export const zh: Messages = {
   },
   adminPricing: {
     title: "渠道定价",
-    subtitle: "按模型的上游定价规则。",
+    subtitle:
+      "按模型的上游定价规则。只有当规则的（模型、服务商、生效时间）与实际分派的请求一致时才会计费；若流量落到 default-zero（未计费），请到“网关资源”页面查看哪些路由没有匹配上。",
+    coverageDiagnosticLink: "查看覆盖诊断 →",
     model: "模型",
     provider: "服务商",
     billingMode: "计费模式",

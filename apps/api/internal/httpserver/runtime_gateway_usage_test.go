@@ -54,9 +54,13 @@ func TestWarnDefaultZeroGatewayPricing(t *testing.T) {
 		logger: slog.New(slog.NewTextHandler(&logs, nil)),
 	}
 
+	providerID := 42
 	rt.warnDefaultZeroGatewayPricing(gatewayUsageRecord{
 		RequestID:      "req_default_zero",
 		SourceEndpoint: "/v1/chat/completions",
+		RequestedModel: "claude-opus-4-1",
+		UpstreamModel:  "gpt-5-preview",
+		ProviderID:     &providerID,
 	}, "zero-priced-model", gatewayPricingEvidence{PricingSource: "default_zero"})
 
 	got := logs.String()
@@ -65,6 +69,13 @@ func TestWarnDefaultZeroGatewayPricing(t *testing.T) {
 	}
 	if !strings.Contains(got, "req_default_zero") || !strings.Contains(got, "zero-priced-model") {
 		t.Fatalf("expected request and model fields in warning, got %q", got)
+	}
+	// Diagnostic context the operator needs to debug why their PricingRule
+	// did not match: requested vs upstream model, provider id.
+	for _, want := range []string{"claude-opus-4-1", "gpt-5-preview", "provider_id=42"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected diagnostic %q in warning, got %q", want, got)
+		}
 	}
 }
 

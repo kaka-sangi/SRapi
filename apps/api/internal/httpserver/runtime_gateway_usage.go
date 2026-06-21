@@ -481,7 +481,24 @@ func (rt *runtimeState) warnDefaultZeroGatewayPricing(rec gatewayUsageRecord, mo
 	if pricing.PricingSource != "default_zero" {
 		return
 	}
-	rt.logger.Warn("gateway usage recorded with default zero pricing", "request_id", rec.RequestID, "model", model, "source_endpoint", rec.SourceEndpoint)
+	// Include enough context for an operator to diagnose why the rule
+	// they set isn't being matched: the canonical model id, the requested
+	// model the caller sent, the upstream model the candidate is dispatching
+	// to, the model family, the provider id, and the billing-model-source
+	// the resolver used. Without these fields the operator only saw
+	// "default_zero" with no signal pointing at the per-(model, provider)
+	// dimension that didn't line up with their PricingRule.
+	args := []any{
+		"request_id", rec.RequestID,
+		"model", model,
+		"requested_model", strings.TrimSpace(rec.RequestedModel),
+		"upstream_model", strings.TrimSpace(rec.UpstreamModel),
+		"source_endpoint", rec.SourceEndpoint,
+	}
+	if rec.ProviderID != nil && *rec.ProviderID > 0 {
+		args = append(args, "provider_id", *rec.ProviderID)
+	}
+	rt.logger.Warn("gateway usage recorded with default zero pricing — no PricingRule matched this (model, provider). Verify the rule's model_id, provider_id, and effective_at window.", args...)
 }
 
 // networkErrorCooldownWindow is the SHORT account cooldown applied after a
