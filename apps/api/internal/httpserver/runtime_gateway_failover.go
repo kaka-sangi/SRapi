@@ -741,19 +741,7 @@ NextCandidate:
 			// Network-only failures (statusCode == 0) are deliberately NOT
 			// cooled down: the account isn't the cause, and the runtime's
 			// per-candidate retry policy is the right control there.
-			if errorClass, upstreamStatus, _ := providerGatewayError(err); errorClass != "" || upstreamStatus > 0 {
-				if cooldown, ok := providerGatewayRetryAfter(err, time.Now()); ok {
-					s.runtime.recordGatewayAccountRateLimitCooldown(result.Candidate.Account, canonical.CanonicalModel, cooldown)
-				} else {
-					decision := ClassifyUpstreamError(upstreamStatus, nil, err)
-					switch {
-					case decision.RetryAfterMs > 0:
-						s.runtime.recordGatewayAccountRateLimitCooldown(result.Candidate.Account, canonical.CanonicalModel, time.Duration(decision.RetryAfterMs)*time.Millisecond)
-					case isAccountTargetedUpstreamCooldownStatus(upstreamStatus):
-						s.runtime.recordGatewayAccountRateLimitCooldown(result.Candidate.Account, canonical.CanonicalModel, 0)
-					}
-				}
-			}
+			s.recordGatewayCooldownForUpstreamFailure(result.Candidate.Account, canonical.CanonicalModel, err)
 
 			errorClass, upstreamStatus, _ := providerGatewayError(err)
 			if gatewayShouldRetrySameCandidate(retryPolicy, errorClass, upstreamStatus, sameCandidateRetries) {
