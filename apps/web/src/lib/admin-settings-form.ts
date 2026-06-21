@@ -32,7 +32,8 @@ export type SettingsTab =
   | "payment"
   | "email"
   | "copilot"
-  | "backup";
+  | "backup"
+  | "maintenance";
 
 export const SETTINGS_TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: "general", label: "General" },
@@ -45,6 +46,7 @@ export const SETTINGS_TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: "email", label: "Email" },
   { id: "copilot", label: "Copilot" },
   { id: "backup", label: "Backup" },
+  { id: "maintenance", label: "Maintenance" },
 ];
 
 export interface AdminSettingsDraft {
@@ -137,6 +139,7 @@ const HIGH_RISK_SETTINGS_TABS = new Set<SettingsTab>([
   "payment",
   "email",
   "backup",
+  "maintenance",
 ]);
 
 export function settingsTabRequiresConfirmation(tab: SettingsTab): boolean {

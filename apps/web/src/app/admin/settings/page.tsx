@@ -34,6 +34,8 @@ import { EmailTestPanel } from "./email-test-panel";
 import { CopilotTab } from "./copilot-tab";
 import { BackupTab } from "./backup-tab";
 import { CaptchaSettingsPanel } from "./captcha-settings-panel";
+import { MaintenanceTab } from "./maintenance-tab";
+import type { AdminSettingsMaintenance } from "../../../../../../packages/sdk/typescript/src/types.gen";
 
 export default function AdminSettingsPage() {
   return (
@@ -166,6 +168,13 @@ function SettingsEditor({ initial }: { initial: Parameters<typeof createSettings
               onSave={() => requestSave("copilot")}
               pending={updateMut.isPending}
               modelOptions={modelOptions}
+            />
+          ) : tab.id === "maintenance" ? (
+            <MaintenanceTab
+              value={draft.value.maintenance as AdminSettingsMaintenance}
+              onField={(key, v) => setSectionField("maintenance", key, v)}
+              onSave={() => requestSave("maintenance")}
+              pending={updateMut.isPending}
             />
           ) : (
             <Card>

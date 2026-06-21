@@ -3034,6 +3034,18 @@ export const zh: Messages = {
       email: "邮件",
       copilot: "副驾驶",
       backup: "备份",
+      maintenance: "维护",
+    },
+    maintenance: {
+      enabledLabel: "维护模式",
+      enabledHelp: "开启后 /v1/* 与 /v1beta/* 一律返回 503，管理控制台、登录与回调仍可访问。",
+      messageLabel: "运维公告",
+      messagePlaceholder: "例如：数据库迁移期间网关暂停，迁移完成后自动恢复。",
+      recoveryLabel: "预计恢复时间（本地时区）",
+      recoveryHelp: "会作为 Retry-After 返回给 API 客户端，并在前台横幅中提示。已过时间将被自动清除。",
+      activeBanner: "维护模式已开启：所有网关请求将返回 503，公共站点会显示上方公告。",
+      bannerTitle: "服务维护中",
+      bannerRecoveryHint: "预计 {time} 恢复。",
     },
     fields: {
       // general

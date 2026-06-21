@@ -388,5 +388,9 @@ function settings(): AdminSettings {
       web_search_base_url: "",
       web_search_api_key_configured: false,
     },
+    maintenance: {
+      enabled: false,
+      message: "",
+    },
   };
 }

@@ -517,6 +517,16 @@ export type SiteConfig = {
     custom_menus: Array<CustomMenuItem>;
     user_agreement: string;
     privacy_policy: string;
+    maintenance: SiteMaintenanceSummary;
+};
+
+/**
+ * Compact summary of the maintenance flag suitable for unauthenticated consumption. When disabled only `enabled` is present; when enabled the message and an optional expected recovery timestamp are surfaced so callers can render banners and Retry-After hints.
+ */
+export type SiteMaintenanceSummary = {
+    enabled: boolean;
+    message?: string;
+    expected_recovery_at?: Timestamp;
 };
 
 export type SiteConfigResponse = {
@@ -4051,6 +4061,22 @@ export type AdminSettings = {
     email: AdminSettingsEmail;
     backup: AdminSettingsBackup;
     copilot: AdminSettingsCopilot;
+    maintenance: AdminSettingsMaintenance;
+};
+
+/**
+ * Maintenance gate for the public gateway. When enabled, /v1* and /v1beta* respond 503 with a structured payload while the admin console and authentication surfaces remain reachable so operators can disable the gate.
+ */
+export type AdminSettingsMaintenance = {
+    /**
+     * Master switch for the maintenance gate.
+     */
+    enabled: boolean;
+    /**
+     * Operator-supplied message surfaced in 503 responses and the public banner.
+     */
+    message: string;
+    expected_recovery_at?: Timestamp;
 };
 
 /**
@@ -8339,6 +8365,7 @@ export type AdminSettingsWritable = {
     email: AdminSettingsEmail;
     backup: AdminSettingsBackup;
     copilot: AdminSettingsCopilotWritable;
+    maintenance: AdminSettingsMaintenance;
 };
 
 /**

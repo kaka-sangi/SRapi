@@ -5172,9 +5172,12 @@ type AdminSettings struct {
 	Features AdminSettingsFeatures `json:"features"`
 	Gateway  AdminSettingsGateway  `json:"gateway"`
 	General  AdminSettingsGeneral  `json:"general"`
-	Payment  AdminSettingsPayment  `json:"payment"`
-	Security AdminSettingsSecurity `json:"security"`
-	Users    AdminSettingsUsers    `json:"users"`
+
+	// Maintenance Maintenance gate for the public gateway. When enabled, /v1/* and /v1beta/* respond 503 with a structured payload while the admin console and authentication surfaces remain reachable so operators can disable the gate.
+	Maintenance AdminSettingsMaintenance `json:"maintenance"`
+	Payment     AdminSettingsPayment     `json:"payment"`
+	Security    AdminSettingsSecurity    `json:"security"`
+	Users       AdminSettingsUsers       `json:"users"`
 }
 
 // AdminSettingsAgreement defines model for AdminSettingsAgreement.
@@ -5337,6 +5340,16 @@ type AdminSettingsGeneral struct {
 	SiteName     string           `json:"site_name"`
 	SiteSubtitle string           `json:"site_subtitle"`
 	VersionLabel string           `json:"version_label"`
+}
+
+// AdminSettingsMaintenance Maintenance gate for the public gateway. When enabled, /v1/* and /v1beta/* respond 503 with a structured payload while the admin console and authentication surfaces remain reachable so operators can disable the gate.
+type AdminSettingsMaintenance struct {
+	// Enabled Master switch for the maintenance gate.
+	Enabled            bool       `json:"enabled"`
+	ExpectedRecoveryAt *Timestamp `json:"expected_recovery_at,omitempty"`
+
+	// Message Operator-supplied message surfaced in 503 responses and the public banner.
+	Message string `json:"message"`
 }
 
 // AdminSettingsPayment defines model for AdminSettingsPayment.
@@ -11995,21 +12008,31 @@ type SetupStatusResponse struct {
 
 // SiteConfig defines model for SiteConfig.
 type SiteConfig struct {
-	ContactInfo   string           `json:"contact_info"`
-	CustomMenus   []CustomMenuItem `json:"custom_menus"`
-	DocUrl        string           `json:"doc_url"`
-	LogoUrl       string           `json:"logo_url"`
-	PrivacyPolicy string           `json:"privacy_policy"`
-	SiteName      string           `json:"site_name"`
-	SiteSubtitle  string           `json:"site_subtitle"`
-	UserAgreement string           `json:"user_agreement"`
-	VersionLabel  string           `json:"version_label"`
+	ContactInfo string           `json:"contact_info"`
+	CustomMenus []CustomMenuItem `json:"custom_menus"`
+	DocUrl      string           `json:"doc_url"`
+	LogoUrl     string           `json:"logo_url"`
+
+	// Maintenance Compact summary of the maintenance flag suitable for unauthenticated consumption. When disabled only `enabled` is present; when enabled the message and an optional expected recovery timestamp are surfaced so callers can render banners and Retry-After hints.
+	Maintenance   SiteMaintenanceSummary `json:"maintenance"`
+	PrivacyPolicy string                 `json:"privacy_policy"`
+	SiteName      string                 `json:"site_name"`
+	SiteSubtitle  string                 `json:"site_subtitle"`
+	UserAgreement string                 `json:"user_agreement"`
+	VersionLabel  string                 `json:"version_label"`
 }
 
 // SiteConfigResponse defines model for SiteConfigResponse.
 type SiteConfigResponse struct {
 	Data      SiteConfig `json:"data"`
 	RequestId RequestId  `json:"request_id"`
+}
+
+// SiteMaintenanceSummary Compact summary of the maintenance flag suitable for unauthenticated consumption. When disabled only `enabled` is present; when enabled the message and an optional expected recovery timestamp are surfaced so callers can render banners and Retry-After hints.
+type SiteMaintenanceSummary struct {
+	Enabled            bool       `json:"enabled"`
+	ExpectedRecoveryAt *Timestamp `json:"expected_recovery_at,omitempty"`
+	Message            *string    `json:"message,omitempty"`
 }
 
 // SnapshotGroupRateLimit defines model for SnapshotGroupRateLimit.

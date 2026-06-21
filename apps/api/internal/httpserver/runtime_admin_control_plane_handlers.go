@@ -822,6 +822,11 @@ func toAPIAdminSettings(in admincontrol.AdminSettings) apiopenapi.AdminSettings 
 			WebSearchBaseUrl:          in.Copilot.WebSearchBaseURL,
 			WebSearchApiKeyConfigured: strings.TrimSpace(in.Copilot.WebSearchAPIKeyCiphertext) != "",
 		},
+		Maintenance: apiopenapi.AdminSettingsMaintenance{
+			Enabled:            in.Maintenance.Enabled,
+			Message:            in.Maintenance.Message,
+			ExpectedRecoveryAt: in.Maintenance.ExpectedRecoveryAt,
+		},
 	}
 }
 
@@ -925,6 +930,11 @@ func adminSettingsFromAPI(in apiopenapi.AdminSettings) admincontrol.AdminSetting
 			WebSearchBaseURL:  in.Copilot.WebSearchBaseUrl,
 			// DedicatedAPIKeyCiphertext and WebSearchAPIKeyCiphertext are set by the
 			// handler (encrypt-new or preserve-existing); never from the body here.
+		},
+		Maintenance: admincontrol.AdminSettingsMaintenance{
+			Enabled:            in.Maintenance.Enabled,
+			Message:            in.Maintenance.Message,
+			ExpectedRecoveryAt: in.Maintenance.ExpectedRecoveryAt,
 		},
 	}
 }

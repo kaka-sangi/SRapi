@@ -189,7 +189,29 @@ func defaultAdminSettings(now time.Time) admincontrol.AdminSettings {
 			OwnerOnly:         false,
 			AutoRunReads:      true,
 		},
+		Maintenance: admincontrol.AdminSettingsMaintenance{
+			Enabled: false,
+			Message: "",
+		},
 	}
+}
+
+// maintenanceMessageMaxLen caps how long an operator-supplied maintenance
+// message can be. 1KiB is enough for a sentence + a status-page link without
+// risking gateway 503 payloads ballooning.
+const maintenanceMessageMaxLen = 1024
+
+func normalizeMaintenance(settings admincontrol.AdminSettingsMaintenance) admincontrol.AdminSettingsMaintenance {
+	settings.Message = strings.TrimSpace(settings.Message)
+	if len(settings.Message) > maintenanceMessageMaxLen {
+		settings.Message = settings.Message[:maintenanceMessageMaxLen]
+	}
+	// A past recovery time is meaningless to surface — drop it rather than
+	// persisting stale promises that confuse the banner.
+	if settings.ExpectedRecoveryAt != nil && !settings.ExpectedRecoveryAt.After(time.Now()) {
+		settings.ExpectedRecoveryAt = nil
+	}
+	return settings
 }
 
 func normalizeAdminSettings(settings admincontrol.AdminSettings) (admincontrol.AdminSettings, error) {
@@ -326,6 +348,7 @@ func normalizeAdminSettings(settings admincontrol.AdminSettings) (admincontrol.A
 	if settings.Copilot.ProviderAccountID < 0 {
 		settings.Copilot.ProviderAccountID = 0
 	}
+	settings.Maintenance = normalizeMaintenance(settings.Maintenance)
 	return settings, nil
 }
 
@@ -734,6 +757,7 @@ func cloneAdminSettings(settings admincontrol.AdminSettings) admincontrol.AdminS
 	settings.Email.AccountQuotaNotifyEnabled = cloneBoolPtr(settings.Email.AccountQuotaNotifyEnabled)
 	settings.Backup.LastBackupAt = cloneTimePtr(settings.Backup.LastBackupAt)
 	settings.Copilot.Models = cloneStringSlice(settings.Copilot.Models)
+	settings.Maintenance.ExpectedRecoveryAt = cloneTimePtr(settings.Maintenance.ExpectedRecoveryAt)
 	return settings
 }
 

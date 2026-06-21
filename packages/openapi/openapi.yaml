@@ -18907,6 +18907,7 @@ components:
         - custom_menus
         - user_agreement
         - privacy_policy
+        - maintenance
       properties:
         site_name:
           type: string
@@ -18928,6 +18929,26 @@ components:
           type: string
         privacy_policy:
           type: string
+        maintenance:
+          $ref: "#/components/schemas/SiteMaintenanceSummary"
+
+    SiteMaintenanceSummary:
+      type: object
+      description: >-
+        Compact summary of the maintenance flag suitable for unauthenticated
+        consumption. When disabled only `enabled` is present; when enabled
+        the message and an optional expected recovery timestamp are surfaced
+        so callers can render banners and Retry-After hints.
+      required:
+        - enabled
+      properties:
+        enabled:
+          type: boolean
+        message:
+          type: string
+        expected_recovery_at:
+          $ref: "#/components/schemas/Timestamp"
+          nullable: true
 
     SiteConfigResponse:
       type: object
@@ -26820,6 +26841,7 @@ components:
         - email
         - backup
         - copilot
+        - maintenance
       properties:
         general:
           $ref: "#/components/schemas/AdminSettingsGeneral"
@@ -26841,6 +26863,31 @@ components:
           $ref: "#/components/schemas/AdminSettingsBackup"
         copilot:
           $ref: "#/components/schemas/AdminSettingsCopilot"
+        maintenance:
+          $ref: "#/components/schemas/AdminSettingsMaintenance"
+
+    AdminSettingsMaintenance:
+      type: object
+      description: >-
+        Maintenance gate for the public gateway. When enabled, /v1/* and
+        /v1beta/* respond 503 with a structured payload while the admin
+        console and authentication surfaces remain reachable so operators
+        can disable the gate.
+      required:
+        - enabled
+        - message
+      properties:
+        enabled:
+          type: boolean
+          description: Master switch for the maintenance gate.
+        message:
+          type: string
+          maxLength: 1024
+          description: Operator-supplied message surfaced in 503 responses and the public banner.
+        expected_recovery_at:
+          $ref: "#/components/schemas/Timestamp"
+          nullable: true
+          description: Optional ETA; rendered as Retry-After and as a banner hint until elapsed.
 
     AdminSettingsCopilot:
       type: object

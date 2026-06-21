@@ -672,7 +672,11 @@ func newWithServer(cfg config.Config, logger *slog.Logger, options ...Option) (h
 	// Admin copilot dispatches approved admin calls in-process through the same
 	// RBAC gate used by external admin requests.
 	runtime.internalRouter = handler
-	return securityHeadersMiddleware(requestIDMiddleware(server.tracingMiddleware(server.gatewayConcurrencyMiddleware(handler)))), server
+	// The maintenance gate sits outside the RBAC layer so toggling it does not
+	// require operator-only routes to be re-resolved; it only intercepts the
+	// public gateway namespaces, leaving the admin console reachable.
+	gated := server.maintenanceGateMiddleware(handler)
+	return securityHeadersMiddleware(requestIDMiddleware(server.tracingMiddleware(server.gatewayConcurrencyMiddleware(gated)))), server
 }
 
 func (s *Server) registerAdminBillingRoutes(mux *http.ServeMux) {

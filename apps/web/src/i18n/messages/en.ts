@@ -3104,6 +3104,22 @@ export const en = {
       email: "Email",
       copilot: "Copilot",
       backup: "Backup",
+      maintenance: "Maintenance",
+    },
+    maintenance: {
+      enabledLabel: "Maintenance mode",
+      enabledHelp:
+        "Returns 503 from /v1/* and /v1beta/* until disabled. Admin console, auth, and webhooks remain reachable.",
+      messageLabel: "Operator message",
+      messagePlaceholder:
+        "e.g. Scheduled upgrade — gateway resumes after the database migration completes.",
+      recoveryLabel: "Expected recovery (local time)",
+      recoveryHelp:
+        "Surfaced as Retry-After to API clients and as a hint in the public banner. Past timestamps are cleared automatically.",
+      activeBanner:
+        "Maintenance mode is ENABLED. All gateway requests return 503; the public site shows the operator message above.",
+      bannerTitle: "Service in maintenance",
+      bannerRecoveryHint: "Expected back online at {time}.",
     },
     fields: {
       site_name: "Site name",

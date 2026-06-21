@@ -60,9 +60,28 @@ func (s *Server) handleSiteConfig(w http.ResponseWriter, r *http.Request) {
 			"custom_menus":   publicCustomMenus(settings.General.CustomMenus),
 			"user_agreement": settings.Agreement.UserAgreement,
 			"privacy_policy": settings.Agreement.PrivacyPolicy,
+			"maintenance":    publicMaintenanceSummary(settings.Maintenance),
 		},
 		"request_id": requestID,
 	})
+}
+
+// publicMaintenanceSummary trims the admin-only knobs out of the maintenance
+// settings before exposing them on the unauthenticated site-config endpoint.
+// Disabled maintenance returns a zero summary so the frontend banner can
+// reliably check the `enabled` flag without inspecting nested fields.
+func publicMaintenanceSummary(m admincontrolcontract.AdminSettingsMaintenance) map[string]any {
+	if !m.Enabled {
+		return map[string]any{"enabled": false}
+	}
+	out := map[string]any{
+		"enabled": true,
+		"message": m.Message,
+	}
+	if m.ExpectedRecoveryAt != nil {
+		out["expected_recovery_at"] = m.ExpectedRecoveryAt
+	}
+	return out
 }
 
 func publicCustomMenus(values []admincontrolcontract.CustomMenuItem) []admincontrolcontract.CustomMenuItem {

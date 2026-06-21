@@ -78,16 +78,17 @@ type SecretConfigured struct {
 	Configured bool `json:"configured"`
 }
 type AdminSettings struct {
-	General   AdminSettingsGeneral   `json:"general"`
-	Agreement AdminSettingsAgreement `json:"agreement"`
-	Features  AdminSettingsFeatures  `json:"features"`
-	Security  AdminSettingsSecurity  `json:"security"`
-	Users     AdminSettingsUsers     `json:"users"`
-	Gateway   AdminSettingsGateway   `json:"gateway"`
-	Payment   AdminSettingsPayment   `json:"payment"`
-	Email     AdminSettingsEmail     `json:"email"`
-	Backup    AdminSettingsBackup    `json:"backup"`
-	Copilot   AdminSettingsCopilot   `json:"copilot"`
+	General     AdminSettingsGeneral     `json:"general"`
+	Agreement   AdminSettingsAgreement   `json:"agreement"`
+	Features    AdminSettingsFeatures    `json:"features"`
+	Security    AdminSettingsSecurity    `json:"security"`
+	Users       AdminSettingsUsers       `json:"users"`
+	Gateway     AdminSettingsGateway     `json:"gateway"`
+	Payment     AdminSettingsPayment     `json:"payment"`
+	Email       AdminSettingsEmail       `json:"email"`
+	Backup      AdminSettingsBackup      `json:"backup"`
+	Copilot     AdminSettingsCopilot     `json:"copilot"`
+	Maintenance AdminSettingsMaintenance `json:"maintenance"`
 }
 
 // AdminSettingsCopilot configures the admin AI copilot: which LLM powers it and
@@ -246,6 +247,22 @@ type AdminSettingsBackup struct {
 	Enabled       bool       `json:"enabled"`
 	LastBackupAt  *time.Time `json:"last_backup_at,omitempty"`
 	RetentionDays int        `json:"retention_days"`
+}
+
+// AdminSettingsMaintenance toggles a process-wide maintenance gate. While
+// enabled, the public gateway routes (/v1/*) respond 503 with a structured
+// payload that explains why and (optionally) when service is expected back.
+// The admin console and authentication endpoints remain available so operators
+// can react and flip the gate off.
+//
+// The gate is intentionally narrow — only the gateway returns 503. Console
+// browsing still works so users can read announcements and pre-stage tickets.
+// Tight lockdowns (block all console writes, etc.) are intentionally not
+// in scope here; ops should run a network-level cordon for that.
+type AdminSettingsMaintenance struct {
+	Enabled            bool       `json:"enabled"`
+	Message            string     `json:"message"`
+	ExpectedRecoveryAt *time.Time `json:"expected_recovery_at,omitempty"`
 }
 
 type CaptchaSettings struct {

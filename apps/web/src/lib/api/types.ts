@@ -161,6 +161,13 @@ export type SiteConfig = {
   custom_menus: CustomMenuItem[];
   user_agreement: string;
   privacy_policy: string;
+  maintenance: SiteMaintenanceSummary;
+};
+
+export type SiteMaintenanceSummary = {
+  enabled: boolean;
+  message?: string;
+  expected_recovery_at?: string;
 };
 
 export type CurrentUserAttribute = {
