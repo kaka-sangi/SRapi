@@ -849,7 +849,9 @@ export const zh: Messages = {
     lastError: "最近错误",
     evidence: "证据",
     investigateErrors: "查看错误日志",
+    viewEvidence: "请求证据",
     healthNeedsAttention: "需处理",
+    healthGroupCount: "{count} 个账号",
     selectHealthGroup: "选择 {count} 个账号",
     healthIssue: {
       circuit: "熔断",

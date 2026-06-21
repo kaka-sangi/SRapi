@@ -127,16 +127,17 @@ vi.mock("@/hooks/admin-queries", async () => {
           account_id: "acct-1",
           provider_id: "provider-1",
           runtime_class: "oauth_refresh",
-          status: "healthy",
-          success_rate: 1,
-          error_rate: 0,
-          latency_p50_ms: 0,
-          latency_p95_ms: 0,
+          status: "degraded",
+          error_class: "upstream_401",
+          success_rate: 0.5,
+          error_rate: 0.5,
+          latency_p50_ms: 900,
+          latency_p95_ms: 1200,
           quota_remaining_ratio: 0.72,
           quota_exhausted: false,
           rate_limit_count: 0,
           timeout_count: 0,
-          circuit_state: "closed",
+          circuit_state: "open",
           snapshot_at: "2026-06-11T00:00:00Z",
         },
       ],
@@ -222,6 +223,20 @@ describe("AdminAccountsPage", () => {
     const user = userEvent.setup();
     renderPage();
 
+    expect(screen.getByText("熔断")).toBeInTheDocument();
+    expect(screen.getAllByText("upstream_401").length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: "查看错误日志" }).length).toBeGreaterThan(0);
+    expect(
+      screen
+        .getAllByRole("link", { name: "查看错误日志" })
+        .some((link) =>
+          link.getAttribute("href")?.includes("f_error_class=upstream_401"),
+        ),
+    ).toBe(true);
+    expect(screen.getByRole("link", { name: "请求证据" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "选择 1 个账号" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "恢复该组账号" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "清除该组错误" })).toBeInTheDocument();
     expect(screen.getByText("允许 2 个")).toBeInTheDocument();
     expect(screen.getByText("Resp: 强关")).toBeInTheDocument();
     expect(screen.getByText("Msg: 强开")).toBeInTheDocument();

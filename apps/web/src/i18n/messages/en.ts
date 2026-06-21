@@ -863,7 +863,9 @@ export const en = {
     lastError: "Last error",
     evidence: "Evidence",
     investigateErrors: "View error logs",
+    viewEvidence: "Request evidence",
     healthNeedsAttention: "need attention",
+    healthGroupCount: "{count} accounts",
     selectHealthGroup: "Select {count} accounts",
     healthIssue: {
       circuit: "Circuit",

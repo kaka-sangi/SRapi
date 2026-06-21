@@ -10,7 +10,11 @@ import {
   type AccountHealthMaintenanceAction,
   type AccountHealthOpsGroup,
 } from "@/lib/admin-account-health-ops";
-import { latestQuotaWindows, quotaWindowDisplayLabel, quotaWindowTiming } from "@/lib/quota-display";
+import {
+  latestQuotaWindows,
+  quotaWindowDisplayLabel,
+  quotaWindowTiming,
+} from "@/lib/quota-display";
 
 export function HealthSummaryStrip({
   healthById,
@@ -29,17 +33,23 @@ export function HealthSummaryStrip({
   const summary = buildAccountHealthOpsSummary(entries);
   return (
     <div className="mb-4 space-y-2">
-      <div className="flex items-center gap-4 font-mono text-2xs text-srapi-text-tertiary">
-        <span>{summary.healthy} {t("dashboard.healthyAccounts")}</span>
+      <div className="text-srapi-text-tertiary text-2xs flex items-center gap-4 font-mono">
+        <span>
+          {summary.healthy} {t("dashboard.healthyAccounts")}
+        </span>
         {summary.attention > 0 ? (
-          <span className="text-srapi-warning">{summary.attention} {t("adminAccounts.healthNeedsAttention")}</span>
+          <span className="text-srapi-warning">
+            {summary.attention} {t("adminAccounts.healthNeedsAttention")}
+          </span>
         ) : null}
-        <span className="ml-auto">{t("dashboard.total")} {summary.total}</span>
+        <span className="ml-auto">
+          {t("dashboard.total")} {summary.total}
+        </span>
       </div>
       {summary.groups.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="grid gap-2 lg:grid-cols-2">
           {summary.groups.map((group) => (
-            <HealthOpsGroupPill
+            <HealthOpsGroupCard
               key={group.key}
               group={group}
               onSelectAccounts={onSelectAccounts}
@@ -53,7 +63,7 @@ export function HealthSummaryStrip({
   );
 }
 
-function HealthOpsGroupPill({
+function HealthOpsGroupCard({
   group,
   onSelectAccounts,
   onRunGroupAction,
@@ -67,62 +77,72 @@ function HealthOpsGroupPill({
   const { t } = useLanguage();
   const actions = onRunGroupAction ? accountHealthGroupMaintenanceActions(group) : [];
   return (
-    <span className="inline-flex min-w-0 items-center gap-1.5 rounded-md border border-srapi-border bg-srapi-card-muted px-2 py-1 font-mono text-2xs text-srapi-text-secondary">
-      <span className="truncate">{t(`adminAccounts.healthIssue.${group.key}`)}</span>
-      <span className="text-srapi-text-tertiary tabular">{group.count}</span>
-      {group.errorClass ? (
-        <span className="max-w-[7rem] truncate text-srapi-error" title={group.errorClass}>
-          {group.errorClass}
-        </span>
-      ) : null}
-      {group.investigationHref ? (
-        <Link
-          href={group.investigationHref}
-          className="text-srapi-text-tertiary transition-colors hover:text-srapi-text-primary"
-          aria-label={t("adminAccounts.investigateErrors")}
-          title={t("adminAccounts.investigateErrors")}
-        >
-          <ExternalLink className="size-3" aria-hidden />
-        </Link>
-      ) : null}
-      {group.requestEvidenceHref ? (
-        <Link
-          href={group.requestEvidenceHref}
-          className="text-srapi-text-tertiary transition-colors hover:text-srapi-accent"
-          aria-label={t("adminRequestEvidence.title")}
-          title={t("adminRequestEvidence.title")}
-        >
-          <FileSearch className="size-3" aria-hidden />
-        </Link>
-      ) : null}
-      {onSelectAccounts ? (
-        <button
-          type="button"
-          onClick={() => onSelectAccounts(group.accountIds)}
-          className="text-srapi-text-tertiary transition-colors hover:text-srapi-text-primary"
-          aria-label={t("adminAccounts.selectHealthGroup", { count: group.count })}
-          title={t("adminAccounts.selectHealthGroup", { count: group.count })}
-        >
-          <CheckSquare className="size-3" aria-hidden />
-        </button>
-      ) : null}
-      {actions.map((action) => {
-        const Icon = healthActionIcon(action);
-        return (
-          <button
-            key={action}
-            type="button"
-            onClick={() => onRunGroupAction?.(group, action)}
-            disabled={actionPending}
-            className="text-srapi-text-tertiary transition-colors hover:text-srapi-text-primary disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label={t(`adminAccounts.healthAction.${action}`)}
-            title={t(`adminAccounts.healthAction.${action}`)}
+    <div className="border-srapi-border bg-srapi-card-muted flex min-w-0 flex-wrap items-center gap-2 rounded-md border px-3 py-2">
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="text-srapi-text-primary truncate text-xs font-medium">
+            {t(`adminAccounts.healthIssue.${group.key}`)}
+          </span>
+          <span className="text-srapi-text-tertiary text-2xs tabular font-mono">
+            {t("adminAccounts.healthGroupCount", { count: group.count })}
+          </span>
+        </div>
+        {group.errorClass ? (
+          <div
+            className="text-srapi-error text-2xs mt-1 truncate font-mono"
+            title={group.errorClass}
           >
-            <Icon className="size-3" aria-hidden />
+            {group.errorClass}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        {group.investigationHref ? (
+          <Link
+            href={group.investigationHref}
+            className="border-srapi-border bg-srapi-card text-srapi-text-secondary hover:text-srapi-text-primary text-2xs inline-flex h-7 items-center gap-1 rounded-md border px-2 transition-colors"
+          >
+            <ExternalLink className="size-3" aria-hidden />
+            {t("adminAccounts.investigateErrors")}
+          </Link>
+        ) : null}
+        {group.requestEvidenceHref ? (
+          <Link
+            href={group.requestEvidenceHref}
+            className="border-srapi-border bg-srapi-card text-srapi-text-secondary hover:text-srapi-text-primary text-2xs inline-flex h-7 items-center gap-1 rounded-md border px-2 transition-colors"
+          >
+            <FileSearch className="size-3" aria-hidden />
+            {t("adminAccounts.viewEvidence")}
+          </Link>
+        ) : null}
+        {onSelectAccounts ? (
+          <button
+            type="button"
+            onClick={() => onSelectAccounts(group.accountIds)}
+            className="border-srapi-border bg-srapi-card text-srapi-text-secondary hover:text-srapi-text-primary text-2xs inline-flex h-7 items-center gap-1 rounded-md border px-2 transition-colors"
+          >
+            <CheckSquare className="size-3" aria-hidden />
+            {t("adminAccounts.selectHealthGroup", { count: group.count })}
           </button>
-        );
-      })}
-    </span>
+        ) : null}
+        {actions.map((action) => {
+          const Icon = healthActionIcon(action);
+          return (
+            <button
+              key={action}
+              type="button"
+              onClick={() => onRunGroupAction?.(group, action)}
+              disabled={actionPending}
+              className="border-srapi-border bg-srapi-card text-srapi-text-secondary hover:text-srapi-text-primary text-2xs inline-flex h-7 items-center gap-1 rounded-md border px-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Icon className="size-3" aria-hidden />
+              {t(`adminAccounts.healthAction.${action}`)}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -164,15 +184,23 @@ export function AccountHealthCell({
         title={circuitTitle}
         className={cn(
           "inline-block size-1.5 shrink-0 rounded-full",
-          isOpen ? "bg-srapi-error" : isHalfOpen ? "bg-srapi-warning" : rate >= 0.95 ? "bg-srapi-success" : rate >= 0.8 ? "bg-srapi-warning" : "bg-srapi-error",
+          isOpen
+            ? "bg-srapi-error"
+            : isHalfOpen
+              ? "bg-srapi-warning"
+              : rate >= 0.95
+                ? "bg-srapi-success"
+                : rate >= 0.8
+                  ? "bg-srapi-warning"
+                  : "bg-srapi-error",
         )}
       />
       <span className="text-srapi-text-secondary">{Math.round(rate * 100)}%</span>
-      {p50 > 0 ? (
-        <span className="text-srapi-text-tertiary">{p50}ms</span>
-      ) : null}
+      {p50 > 0 ? <span className="text-srapi-text-tertiary">{p50}ms</span> : null}
       {health.error_class ? (
-        <span className="max-w-[5rem] truncate text-srapi-text-tertiary" title={health.error_class}>{health.error_class}</span>
+        <span className="text-srapi-text-tertiary max-w-[5rem] truncate" title={health.error_class}>
+          {health.error_class}
+        </span>
       ) : null}
     </>
   );
@@ -181,18 +209,14 @@ export function AccountHealthCell({
     return (
       <Link
         href={investigationHref}
-        className={`${className} rounded-sm underline-offset-2 hover:text-srapi-text-primary hover:underline`}
+        className={`${className} hover:text-srapi-text-primary rounded-sm underline-offset-2 hover:underline`}
         aria-label={t("adminAccounts.investigateErrors")}
       >
         {content}
       </Link>
     );
   }
-  return (
-    <div className={className}>
-      {content}
-    </div>
-  );
+  return <div className={className}>{content}</div>;
 }
 
 export function AccountQuotaCell({ health }: { health?: AccountHealthSnapshot }) {
@@ -217,10 +241,10 @@ export function AccountQuotaCell({ health }: { health?: AccountHealthSnapshot })
               key={window.snapshot.quota_type}
               className="grid grid-cols-[2.5rem_minmax(2rem,1fr)_2.5rem] items-center gap-1.5"
             >
-              <span className="truncate font-mono text-[10px] uppercase leading-none text-srapi-text-tertiary">
+              <span className="text-srapi-text-tertiary truncate font-mono text-[10px] leading-none uppercase">
                 {quotaWindowDisplayLabel(window, t)}
               </span>
-              <span className="relative h-1.5 overflow-hidden rounded-full bg-srapi-border">
+              <span className="bg-srapi-border relative h-1.5 overflow-hidden rounded-full">
                 <span
                   className={cn(
                     "absolute inset-y-0 left-0 rounded-full transition-all",
@@ -235,7 +259,7 @@ export function AccountQuotaCell({ health }: { health?: AccountHealthSnapshot })
               </span>
               <span
                 className={cn(
-                  "text-right font-mono text-[10px] leading-none tabular text-srapi-text-tertiary",
+                  "tabular text-srapi-text-tertiary text-right font-mono text-[10px] leading-none",
                   exhausted
                     ? "text-srapi-error"
                     : window.remainingPercent <= 20
@@ -256,7 +280,7 @@ export function AccountQuotaCell({ health }: { health?: AccountHealthSnapshot })
   const pct = Math.round(ratio * 100);
   return (
     <span className="flex items-center gap-1.5">
-      <span className="relative h-1.5 w-12 overflow-hidden rounded-full bg-srapi-border">
+      <span className="bg-srapi-border relative h-1.5 w-12 overflow-hidden rounded-full">
         <span
           className={cn(
             "absolute inset-y-0 left-0 rounded-full transition-all",
@@ -265,10 +289,16 @@ export function AccountQuotaCell({ health }: { health?: AccountHealthSnapshot })
           style={{ width: `${Math.max(pct, 2)}%` }}
         />
       </span>
-      <span className={cn(
-        "font-mono text-2xs tabular",
-        exhausted ? "text-srapi-error" : ratio <= 0.2 ? "text-srapi-warning" : "text-srapi-text-secondary",
-      )}>
+      <span
+        className={cn(
+          "text-2xs tabular font-mono",
+          exhausted
+            ? "text-srapi-error"
+            : ratio <= 0.2
+              ? "text-srapi-warning"
+              : "text-srapi-text-secondary",
+        )}
+      >
         {pct}%
       </span>
     </span>
