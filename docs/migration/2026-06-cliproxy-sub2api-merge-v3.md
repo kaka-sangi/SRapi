@@ -123,6 +123,32 @@ This document is the binding scope for the work done in this wave.
 
 `make check` at the end of the wave gates the push of the final commit.
 
+## Outcomes
+
+Shipped:
+
+- Antigravity reasoning replay cache (in-memory LRU + sliding TTL,
+  CLIProxyAPI defaults verbatim).
+- Antigravity reasoning replay wiring: pre-request splice into
+  `request.contents`, post-response capture on streaming and
+  non-streaming, signature-failure cache-clear on 400.
+- `reasoning_effort: "max"` clamps down to `"xhigh"` at the
+  OpenAI-compatible adapter boundary so DeepSeek / Kimi / GLM /
+  MiniMax-M / Qwen-thinking upstreams stop dropping it. Codex
+  Responses path keeps `"max"` intact.
+
+Refused as architecturally redundant (rationale above):
+
+- Chinese-LLM fallback pricing.
+- MiniMax M-series thinking adaptive rewrite.
+- Anthropic-compatible protocol-aware thinking filter.
+- Account-ID admin column.
+- IP-ACL denial message client-IP echo.
+
+Deferred (same blocker as wave 2):
+
+- OpenAI rate-limit reset credit.
+
 ## Non-goals
 
 - No new architectural layers. Cache and wiring live next to the

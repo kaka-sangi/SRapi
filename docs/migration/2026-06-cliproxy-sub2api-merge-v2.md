@@ -159,8 +159,8 @@ Shipped:
 
 Deferred with rationale:
 
-- Antigravity reasoning replay (item 1) — scope too large for a single wave;
-  needs a focused follow-up with live verification.
+- Antigravity reasoning replay (item 1) — shipped in
+  `2026-06-cliproxy-sub2api-merge-v3.md`.
 - OpenAI rate-limit reset credit (item 3) — local reset already exists; the
   upstream `/wham/rate-limit-reset-credits/consume` call needs a real
   ChatGPT/Codex OAuth token to verify, which this session can't supply.
