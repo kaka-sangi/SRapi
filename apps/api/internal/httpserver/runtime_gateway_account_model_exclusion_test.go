@@ -8,8 +8,18 @@ import (
 	"testing"
 
 	"github.com/srapi/srapi/apps/api/internal/config"
+	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
+	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
+
+func mustProviderContractForExclusionTest(id int, configSchema map[string]any) providercontract.Provider {
+	return providercontract.Provider{ID: id, ConfigSchema: configSchema}
+}
+
+func mustAccountContractForExclusionTest(id int, metadata map[string]any) accountcontract.ProviderAccount {
+	return accountcontract.ProviderAccount{ID: id, ProviderID: id, Metadata: metadata}
+}
 
 // TestAccountExcludesModel covers the per-account excluded_models wildcard
 // resolver: exact, prefix, suffix, and substring patterns, plus the guards that
@@ -50,6 +60,27 @@ func TestAccountExcludesModel(t *testing.T) {
 	}
 }
 
+func TestProviderAccountExcludesModel(t *testing.T) {
+	provider := mustProviderContractForExclusionTest(1, map[string]any{
+		"excluded_models": []any{"provider-secret", "provider-upstream-*"},
+	})
+	account := mustAccountContractForExclusionTest(1, map[string]any{
+		"excluded_models": []any{"account-secret"},
+	})
+	if !providerAccountExcludesModel(provider, account, "provider-secret") {
+		t.Fatal("expected provider-level canonical exclusion to apply")
+	}
+	if !providerAccountExcludesModel(provider, account, "catalog-name", "provider-upstream-1") {
+		t.Fatal("expected provider-level upstream exclusion to apply")
+	}
+	if !providerAccountExcludesModel(provider, account, "account-secret") {
+		t.Fatal("expected account-level exclusion to remain active")
+	}
+	if providerAccountExcludesModel(provider, account, "visible-model", "visible-upstream") {
+		t.Fatal("did not expect unrelated model to be excluded")
+	}
+}
+
 // TestGatewayExcludedModelDeniesScheduling proves the wire effect: the only
 // account serving a catalog model excludes it via a wildcard, so the gateway
 // returns 503 no_available_account rather than routing upstream.
@@ -78,6 +109,32 @@ func TestGatewayExcludedModelDeniesScheduling(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503 (no available account) for excluded model, got %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestGatewayProviderExcludedModelDeniesScheduling(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"x","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	csrf := loginResp.Data.CsrfToken
+	providerResp := mustCreateProvider(t, handler, sessionCookie, csrf, `{"name":"provider-excl","display_name":"Provider Excl","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","config_schema":{"excluded_models":["provider-excl-*"]}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, csrf, `{"canonical_name":"provider-excl-model","display_name":"Provider Excl Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, csrf, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"provider-excl-model","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, csrf, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"provider-excl-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, csrf)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"provider-excl-model","messages":[{"role":"user","content":"hi"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503 (no available account) for provider-excluded model, got %d body=%s", rec.Code, rec.Body.String())
 	}
 }
 
@@ -132,6 +189,44 @@ func TestGatewayExcludedModelHiddenFromListing(t *testing.T) {
 	}
 	if !ids["hide-visible"] {
 		t.Fatalf("expected non-excluded sibling model visible in /v1/models, got list=%s", rec.Body.String())
+	}
+}
+
+func TestGatewayProviderExcludedModelHiddenFromListing(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	csrf := loginResp.Data.CsrfToken
+	providerResp := mustCreateProvider(t, handler, sessionCookie, csrf, `{"name":"provider-hide","display_name":"Provider Hide","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","config_schema":{"excluded_models":["provider-hidden"]}}`)
+	hiddenModel := mustCreateModel(t, handler, sessionCookie, csrf, `{"canonical_name":"provider-hidden","display_name":"Provider Hidden","status":"active"}`)
+	visibleModel := mustCreateModel(t, handler, sessionCookie, csrf, `{"canonical_name":"provider-visible","display_name":"Provider Visible","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, csrf, string(hiddenModel.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"provider-hidden","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, csrf, string(visibleModel.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"provider-visible","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, csrf, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"provider-hide-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, csrf)
+
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodGet, "/v1/models", "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 from /v1/models, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var list apiopenapi.OpenAIModelList
+	if err := json.Unmarshal(rec.Body.Bytes(), &list); err != nil {
+		t.Fatalf("decode model list: %v body=%s", err, rec.Body.String())
+	}
+	ids := map[string]bool{}
+	for _, m := range list.Data {
+		ids[m.Id] = true
+	}
+	if ids["provider-hidden"] {
+		t.Fatalf("expected provider-excluded model hidden from /v1/models, got list=%s", rec.Body.String())
+	}
+	if !ids["provider-visible"] {
+		t.Fatalf("expected visible sibling model in /v1/models, got list=%s", rec.Body.String())
 	}
 }
 

@@ -101,6 +101,32 @@ func TestAdminAccountLiveTestRequiresRegisteredMapping(t *testing.T) {
 	}
 }
 
+func TestAdminAccountLiveTestHonorsProviderExcludedModels(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"admin-live-provider-excluded","display_name":"Admin Live Provider Excluded","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","config_schema":{"excluded_models":["live-blocked"]}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"live-blocked","display_name":"Live Blocked","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"live-blocked","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"admin-live-provider-excluded-account","runtime_class":"api_key","credential":{"api_key":"secret"},"metadata":{"base_url":"https://upstream.invalid/v1"},"status":"active"}`)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/"+string(accountResp.Data.Id)+"/test", strings.NewReader(`{"mode":"live"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(sessionCookie)
+	req.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected account live test 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var resp apiopenapi.AdminTestResultResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode account test response: %v", err)
+	}
+	if resp.Data.Ok || resp.Data.Checks == nil || (*resp.Data.Checks)["live_probe"] != "skipped_no_model" {
+		t.Fatalf("expected provider-excluded model to be skipped, got %+v", resp.Data)
+	}
+}
+
 func TestAdminAccountTestRejectsUnknownMode(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)

@@ -350,7 +350,7 @@ func activeProviderMappingForModel(ctx context.Context, models interface {
 		}
 		effectiveMapping := accountEffectiveModelMapping(mapping, account, canonicalName, sourceEndpoint)
 		effectiveMapping = providerEffectiveModelMapping(provider, effectiveMapping)
-		if accountExcludesModel(account.Metadata, canonicalName, effectiveMapping.UpstreamModelName) {
+		if providerAccountExcludesModel(provider, account, canonicalName, effectiveMapping.UpstreamModelName) {
 			continue
 		}
 		if !accountRoutableForModel(provider, account.Metadata, effectiveMapping.UpstreamModelName) {

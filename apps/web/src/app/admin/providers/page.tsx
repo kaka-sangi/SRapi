@@ -196,6 +196,13 @@ function ProvidersContent() {
       hint: t("adminProviders.endpointCapabilityHint"),
     },
     {
+      name: "excludedModels",
+      label: t("adminProviders.excludedModels"),
+      type: "tags",
+      placeholder: "gpt-4.1, o1-*",
+      hint: t("adminProviders.excludedModelsHint"),
+    },
+    {
       name: "capabilities",
       label: t("adminProviders.capabilities"),
       help: t("adminProviders.capabilitiesHelp"),

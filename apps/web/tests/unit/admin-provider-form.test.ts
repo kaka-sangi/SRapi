@@ -78,6 +78,7 @@ describe("admin provider form endpoint capability switches", () => {
       responsesCompactCapability: "auto",
       responsesInputItemsCapability: "auto",
       messagesCapability: "off",
+      excludedModels: [],
       capabilities: {
         responses: true,
         custom_flag: true,
@@ -88,6 +89,28 @@ describe("admin provider form endpoint capability switches", () => {
     expect(body.capabilities).toEqual({
       messages: false,
       custom_flag: true,
+    });
+  });
+
+  it("round-trips provider-level excluded model patterns through config_schema", () => {
+    const form = providerFormFromProvider({
+      ...baseProvider,
+      config_schema: {
+        excluded_models: [" gpt-4.1 ", "GPT-4.1", "", "o1-*"],
+        oauth_config: { client_id: "client-1" },
+      },
+    });
+
+    expect(form.excludedModels).toEqual(["gpt-4.1", "o1-*"]);
+
+    const body = buildUpdateProviderBody({
+      ...form,
+      excludedModels: ["claude-*", "CLAUDE-*", "", "o3"],
+    });
+
+    expect(body.config_schema).toEqual({
+      excluded_models: ["claude-*", "o3"],
+      oauth_config: { client_id: "client-1" },
     });
   });
 });

@@ -797,7 +797,7 @@ func (rt *runtimeState) gatewayCandidates(ctx context.Context, modelID int, forc
 			}
 			effectiveMapping := accountEffectiveModelMapping(mapping, account, model.CanonicalName, sourceEndpoint)
 			effectiveMapping = providerEffectiveModelMapping(provider, effectiveMapping)
-			if accountExcludesModel(account.Metadata, model.CanonicalName, effectiveMapping.UpstreamModelName) {
+			if providerAccountExcludesModel(provider, account, model.CanonicalName, effectiveMapping.UpstreamModelName) {
 				continue
 			}
 			if !accountRoutableForModel(provider, account.Metadata, effectiveMapping.UpstreamModelName) {

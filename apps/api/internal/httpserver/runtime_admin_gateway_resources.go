@@ -1145,7 +1145,7 @@ func gatewayResourceEffectiveModelMapping(model modelcontract.Model, mapping mod
 }
 
 func gatewayResourceAccountCanServeMapping(model modelcontract.Model, provider providercontract.Provider, account accountcontract.ProviderAccount, mapping modelcontract.ModelProviderMapping) bool {
-	if accountExcludesModel(account.Metadata, model.CanonicalName, mapping.UpstreamModelName) {
+	if providerAccountExcludesModel(provider, account, model.CanonicalName, mapping.UpstreamModelName) {
 		return false
 	}
 	return accountRoutableForModel(provider, account.Metadata, mapping.UpstreamModelName)

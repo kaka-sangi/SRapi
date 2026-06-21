@@ -59,6 +59,7 @@ export interface ProviderFormState {
   responsesCompactCapability: ProviderEndpointCapabilityMode;
   responsesInputItemsCapability: ProviderEndpointCapabilityMode;
   messagesCapability: ProviderEndpointCapabilityMode;
+  excludedModels: string[];
   capabilities: Record<string, unknown>;
   configSchema: Record<string, unknown>;
 }
@@ -78,6 +79,7 @@ export function emptyProviderForm(): ProviderFormState {
     responsesCompactCapability: "auto",
     responsesInputItemsCapability: "auto",
     messagesCapability: "auto",
+    excludedModels: [],
     capabilities: {},
     configSchema: {},
   };
@@ -85,6 +87,7 @@ export function emptyProviderForm(): ProviderFormState {
 
 export function providerFormFromProvider(provider: Provider): ProviderFormState {
   const capabilities = (provider.capabilities ?? {}) as Record<string, unknown>;
+  const configSchema = (provider.config_schema ?? {}) as Record<string, unknown>;
   return {
     name: provider.name,
     displayName: provider.display_name,
@@ -96,8 +99,9 @@ export function providerFormFromProvider(provider: Provider): ProviderFormState 
     responsesCompactCapability: capabilityMode(capabilities.responses_compact),
     responsesInputItemsCapability: capabilityMode(capabilities.responses_input_items),
     messagesCapability: capabilityMode(capabilities.messages),
+    excludedModels: stringListFromValue(configSchema.excluded_models ?? configSchema["excluded-models"]),
     capabilities,
-    configSchema: (provider.config_schema ?? {}) as Record<string, unknown>,
+    configSchema,
   };
 }
 
@@ -109,7 +113,7 @@ export function buildCreateProviderBody(form: ProviderFormState): CreateAdminPro
     protocol: form.protocol,
     status: form.status,
     capabilities: composeProviderCapabilities(form),
-    config_schema: form.configSchema,
+    config_schema: composeProviderConfigSchema(form),
   };
 }
 
@@ -120,7 +124,7 @@ export function buildUpdateProviderBody(form: ProviderFormState): UpdateAdminPro
     protocol: form.protocol,
     status: form.status,
     capabilities: composeProviderCapabilities(form),
-    config_schema: form.configSchema,
+    config_schema: composeProviderConfigSchema(form),
   };
 }
 
@@ -138,6 +142,18 @@ function composeProviderCapabilities(form: ProviderFormState): Record<string, un
   return next;
 }
 
+function composeProviderConfigSchema(form: ProviderFormState): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...form.configSchema };
+  delete next["excluded-models"];
+  const excludedModels = cleanStringList(form.excludedModels);
+  if (excludedModels.length > 0) {
+    next.excluded_models = excludedModels;
+  } else {
+    delete next.excluded_models;
+  }
+  return next;
+}
+
 function capabilityMode(value: unknown): ProviderEndpointCapabilityMode {
   if (value === true) return "on";
   if (value === false) return "off";
@@ -150,6 +166,27 @@ function parseProviderName(value: string): string {
     throw new Error("Provider name must be 2-63 chars: lowercase letters, numbers, '_' or '-'.");
   }
   return normalized;
+}
+
+function cleanStringList(values: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of values) {
+    const trimmed = value.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(trimmed);
+  }
+  return out;
+}
+
+function stringListFromValue(value: unknown): string[] {
+  if (Array.isArray(value)) return cleanStringList(value.map((item) => String(item)));
+  if (typeof value === "string") return cleanStringList(value.split(","));
+  if (value == null) return [];
+  return cleanStringList([String(value)]);
 }
 
 function requiredText(value: string, fieldName: string): string {
