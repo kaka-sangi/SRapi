@@ -16,6 +16,7 @@ import { TokenBreakdown } from "@/components/charts/token-breakdown";
 import { ChartEmpty } from "@/components/charts/chart-empty";
 import { TrendChartSkeleton, BarChartSkeleton } from "@/components/charts/chart-skeleton";
 import { AutoRefreshControl } from "@/components/ui/auto-refresh";
+import { Badge } from "@/components/ui/badge";
 import { useAdminDashboard, useAccountsHealthSummary } from "@/hooks/admin-queries";
 import {
   useListOpsRealtimeSlots,
@@ -30,6 +31,7 @@ import {
   formatCompactNumber,
   formatMoney,
   formatPercent,
+  formatDateTime,
 } from "@/lib/admin-format";
 import type { AdminDashboardSnapshot } from "@/lib/sdk-types";
 
@@ -157,6 +159,8 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
   const c = tokens.costs;
   const successRate =
     traffic.total_requests > 0 ? traffic.success_requests / traffic.total_requests : null;
+  const errorRate =
+    traffic.total_requests > 0 ? traffic.error_requests / traffic.total_requests : null;
 
   const modelData = snapshot.model_distribution.map((m) => ({
     label: m.model,
@@ -173,6 +177,8 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
 
   return (
     <div className="space-y-5">
+      <SnapshotSummary snapshot={snapshot} errorRate={errorRate} />
+
       {/* KPI grid — surfaces traffic, tokens, cost tiers, throughput, latency, users */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
         <div className="anim-rise-sm" style={rise(0)}>
@@ -185,7 +191,9 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
             spark={requestSpark}
             hint={`${t("dashboard.today")} ${formatCompactNumber(traffic.today_requests)} · ${t(
               "dashboard.successRate",
-            )} ${successRate != null ? formatPercent(successRate) : "—"}`}
+            )} ${successRate != null ? formatPercent(successRate) : "-"} · ${t(
+              "dashboard.errors",
+            )} ${formatCompactNumber(traffic.error_requests)}`}
           />
         </div>
         <div className="anim-rise-sm" style={rise(1)}>
@@ -337,6 +345,102 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
           </CardContent>
         </Card>
       </div>
+    </div>
+  );
+}
+
+function SnapshotSummary({
+  snapshot,
+  errorRate,
+}: {
+  snapshot: AdminDashboardSnapshot;
+  errorRate: number | null;
+}) {
+  const { t } = useLanguage();
+  const { inventory, traffic, window, generated_at } = snapshot;
+  const activeKeyRatio =
+    inventory.total_api_keys > 0 ? inventory.active_api_keys / inventory.total_api_keys : null;
+  const windowText = `${formatDateTime(window.start)} - ${formatDateTime(window.end)}`;
+
+  return (
+    <Card className="anim-rise-sm" style={rise(0)}>
+      <CardContent className="py-4">
+        <div className="grid gap-4 md:grid-cols-5">
+          <SummaryMetric
+            label={t("dashboard.window")}
+            value={windowText}
+            mono
+            className="md:col-span-2"
+          />
+          <SummaryMetric
+            label={t("dashboard.apiKeys")}
+            value={`${formatInteger(inventory.active_api_keys)} / ${formatInteger(
+              inventory.total_api_keys,
+            )}`}
+            hint={activeKeyRatio != null ? formatPercent(activeKeyRatio) : "-"}
+          />
+          <SummaryMetric
+            label={t("dashboard.accounts")}
+            value={`${formatInteger(inventory.healthy_accounts)} / ${formatInteger(
+              inventory.total_accounts,
+            )}`}
+            hint={`${formatInteger(inventory.abnormal_accounts)} ${t("dashboard.abnormal")}`}
+          />
+          <SummaryMetric
+            label={t("dashboard.errors")}
+            value={formatInteger(traffic.error_requests)}
+            hint={errorRate != null ? formatPercent(errorRate) : "-"}
+            tone={traffic.error_requests > 0 ? "danger" : "success"}
+          />
+        </div>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-srapi-border pt-3">
+          <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+            {t("dashboard.generatedAt")}
+          </span>
+          <span className="font-mono text-2xs text-srapi-text-secondary">
+            {formatDateTime(generated_at)}
+          </span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SummaryMetric({
+  label,
+  value,
+  hint,
+  tone = "neutral",
+  mono,
+  className,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  tone?: "neutral" | "success" | "danger";
+  mono?: boolean;
+  className?: string;
+}) {
+  return (
+    <div className={cn("min-w-0", className)}>
+      <div className="font-mono text-2xs uppercase text-srapi-text-tertiary">{label}</div>
+      <div
+        className={cn(
+          "mt-1 truncate text-sm font-medium text-srapi-text-primary",
+          mono && "font-mono text-xs",
+        )}
+        title={value}
+      >
+        {value}
+      </div>
+      {hint ? (
+        <Badge
+          variant={tone === "danger" ? "danger" : tone === "success" ? "success" : "neutral"}
+          className="mt-2"
+        >
+          {hint}
+        </Badge>
+      ) : null}
     </div>
   );
 }

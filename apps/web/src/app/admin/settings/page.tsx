@@ -1,7 +1,8 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { CheckCircle2, CircleAlert, Loader2 } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
@@ -78,8 +79,24 @@ function SettingsEditor({ initial }: { initial: Parameters<typeof createSettings
     value: m.canonical_name ?? m.id,
     label: m.canonical_name ?? m.id,
   }));
+  const initialSignature = JSON.stringify(initial);
+  const initialSignatureRef = useRef(initialSignature);
   const [draft, setDraft] = useState<AdminSettingsDraft>(() => createSettingsDraft(initial));
+  const [savedDraft, setSavedDraft] = useState<AdminSettingsDraft>(() => createSettingsDraft(initial));
   const [confirmTab, setConfirmTab] = useState<SettingsTab | null>(null);
+
+  useEffect(() => {
+    if (initialSignatureRef.current === initialSignature) return;
+    initialSignatureRef.current = initialSignature;
+    const next = createSettingsDraft(initial);
+    setDraft(next);
+    setSavedDraft(next);
+  }, [initial, initialSignature]);
+
+  const isDirty = useMemo(
+    () => JSON.stringify(draft) !== JSON.stringify(savedDraft),
+    [draft, savedDraft],
+  );
 
   function setSectionField(section: SettingsTab, key: string, value: unknown) {
     setDraft((d) => ({
@@ -98,7 +115,10 @@ function SettingsEditor({ initial }: { initial: Parameters<typeof createSettings
   async function save() {
     try {
       const body = materializeSettingsDraft(draft);
-      await updateMut.mutateAsync(body);
+      const saved = await updateMut.mutateAsync(body);
+      const normalizedDraft = createSettingsDraft(saved);
+      setDraft(normalizedDraft);
+      setSavedDraft(normalizedDraft);
       toast({ title: t("feedback.saved"), tone: "success" });
     } catch (err) {
       toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
@@ -132,6 +152,7 @@ function SettingsEditor({ initial }: { initial: Parameters<typeof createSettings
           </TabsTrigger>
         ))}
       </TabsList>
+      <SettingsSaveState dirty={isDirty} pending={updateMut.isPending} />
 
       {SETTINGS_TABS.map((tab) => (
         <TabsContent key={tab.id} value={tab.id}>
@@ -167,6 +188,7 @@ function SettingsEditor({ initial }: { initial: Parameters<typeof createSettings
                   <Button
                     variant="primary"
                     loading={updateMut.isPending}
+                    disabled={!isDirty}
                     onClick={() => requestSave(tab.id)}
                   >
                     {t("adminSettings.saveSection")}
@@ -189,10 +211,34 @@ function SettingsEditor({ initial }: { initial: Parameters<typeof createSettings
           confirmLabel={t("common.save")}
           confirmPhrase={settingsSaveConfirmationPhrase(confirmTab)}
           onConfirm={save}
-          successMessage={t("feedback.saved")}
           isPending={updateMut.isPending}
         />
       ) : null}
     </Tabs>
+  );
+}
+
+function SettingsSaveState({ dirty, pending }: { dirty: boolean; pending: boolean }) {
+  const { t } = useLanguage();
+  const icon = pending ? (
+    <Loader2 className="size-3.5 animate-spin" aria-hidden />
+  ) : dirty ? (
+    <CircleAlert className="size-3.5 text-srapi-warning" aria-hidden />
+  ) : (
+    <CheckCircle2 className="size-3.5 text-srapi-success" aria-hidden />
+  );
+  const label = pending
+    ? t("adminSettings.saveState.saving")
+    : dirty
+      ? t("adminSettings.saveState.unsaved")
+      : t("adminSettings.saveState.saved");
+
+  return (
+    <div className="mt-3 flex items-center justify-end font-mono text-2xs text-srapi-text-tertiary">
+      <span className="inline-flex items-center gap-1.5 rounded-md border border-srapi-border px-2 py-1">
+        {icon}
+        {label}
+      </span>
+    </div>
   );
 }

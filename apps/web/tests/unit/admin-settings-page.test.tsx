@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -84,6 +84,31 @@ describe("AdminSettingsPage", () => {
     expect(mocks.replace).toHaveBeenCalledWith("/admin/settings?tab=security", {
       scroll: false,
     });
+  });
+
+  it("uses the normalized settings returned by the server after save", async () => {
+    const user = userEvent.setup();
+    mocks.updateSettings.mockImplementation(async (body: AdminSettings) => ({
+      ...body,
+      gateway: {
+        ...body.gateway,
+        overload_cooldown_seconds: 75,
+      },
+    }));
+    renderPage();
+
+    const cooldown = screen.getByLabelText("过载冷却（秒）");
+    await user.clear(cooldown);
+    await user.type(cooldown, "61");
+    expect(screen.getByText("有未保存更改")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "保存更改" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByRole("textbox"), "SAVE GATEWAY SETTINGS");
+    await user.click(within(dialog).getByRole("button", { name: "保存" }));
+
+    await waitFor(() => expect(cooldown).toHaveValue(75));
+    expect(screen.getByText("已保存")).toBeInTheDocument();
   });
 });
 
