@@ -723,16 +723,27 @@ NextCandidate:
 			}
 
 			// On failure we feed the structured ClassifyUpstreamError into
-			// the in-process cooldown — captures the Retry-After window so
-			// subsequent attempts (across this request and the next) skip
-			// the account immediately. Gated by per-account metadata flag.
+			// the in-process cooldown so the account is skipped on the next
+			// attempt instead of being re-picked into another bad upstream
+			// call. Three signals trigger a cooldown:
+			//
+			//   1. Any upstream-derived Retry-After header (429 / 503).
+			//   2. A raw 429 / 408 status (throttle / read timeout) without
+			//      Retry-After — the rate-limit module clamps to its own
+			//      default minimum, so 0 here means "use module default".
+			//   3. server_bad (5xx) without Retry-After — without this, a
+			//      flapping 5xx upstream would keep being re-picked on
+			//      every request until cross-candidate failover bailed.
+			//
+			// Network-only failures (statusCode == 0) are deliberately NOT
+			// cooled down: the account isn't the cause, and the runtime's
+			// per-candidate retry policy is the right control there.
 			if errorClass, upstreamStatus, _ := providerGatewayError(err); errorClass != "" || upstreamStatus > 0 {
 				decision := ClassifyUpstreamError(upstreamStatus, nil, err)
-				if decision.Class == "transient" && decision.RetryAfterMs > 0 {
+				switch {
+				case decision.RetryAfterMs > 0:
 					s.runtime.recordGatewayAccountRateLimitCooldown(result.Candidate.Account, canonical.CanonicalModel, time.Duration(decision.RetryAfterMs)*time.Millisecond)
-				} else if upstreamStatus == http.StatusTooManyRequests {
-					// 429 without a Retry-After header still counts toward
-					// the consecutive-disable threshold.
+				case isAccountTargetedUpstreamCooldownStatus(upstreamStatus):
 					s.runtime.recordGatewayAccountRateLimitCooldown(result.Candidate.Account, canonical.CanonicalModel, 0)
 				}
 			}

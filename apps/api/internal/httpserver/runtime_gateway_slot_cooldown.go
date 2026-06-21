@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"context"
+	"net/http"
 	"strings"
 	"time"
 
@@ -130,6 +131,33 @@ func accountConcurrencySlotCapacity(metadata map[string]any) int {
 		}
 	}
 	return defaultConcurrencySlotCapacity
+}
+
+// isAccountTargetedUpstreamCooldownStatus reports whether an HTTP status
+// from the upstream is, on its own (no Retry-After header needed), a
+// signal that the account just used should be cooled down before being
+// re-picked. The set is:
+//
+//   - 408 Request Timeout         — upstream read timeout
+//   - 429 Too Many Requests       — explicit throttle
+//   - 500..504 server-side errors — overload / dependency outage on that
+//     credential; without this, a flapping 5xx upstream gets re-picked
+//     on every request until cross-candidate failover gives up.
+//
+// 5xx codes outside 500-504 (505 HTTP Version Not Supported,
+// 511 Network Authentication Required, etc.) are deliberately not in
+// the set: they're rare and don't carry "try again later" semantics.
+func isAccountTargetedUpstreamCooldownStatus(status int) bool {
+	switch status {
+	case http.StatusRequestTimeout, http.StatusTooManyRequests:
+		return true
+	case http.StatusInternalServerError,
+		http.StatusBadGateway,
+		http.StatusServiceUnavailable,
+		http.StatusGatewayTimeout:
+		return true
+	}
+	return false
 }
 
 // errIsConcurrencySlotTransient reports whether the AcquireSlot error came
