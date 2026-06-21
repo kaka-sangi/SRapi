@@ -175,7 +175,11 @@ function AccountCardGrid({
           />
         </div>
       ) : null}
-      <div className="grid gap-3 p-3 sm:grid-cols-2 xl:grid-cols-3">
+      {/* Card grid: 2-up on sm, 3-up on xl, 4-up on 2xl. With a fleet of 20+
+          accounts the 4-up density on wide displays keeps the operator out of
+          scroll-and-search hell. The skeleton below mirrors the same breakpoints
+          to avoid layout shift. */}
+      <div className="grid gap-3 p-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {accounts.map((account) => (
           <AccountCard
             key={account.id}
@@ -446,7 +450,7 @@ function AccountBulkBar({
 function AccountCardSkeleton() {
   return (
     <div className="min-h-[55vh] p-3">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className="border-srapi-border bg-srapi-card rounded-lg border">
             <div className="px-4 pt-4 pb-3">
