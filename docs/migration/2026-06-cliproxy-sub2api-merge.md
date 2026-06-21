@@ -144,3 +144,34 @@
 
 - 这次会话不保证全部完成；超出能力的阶段会在 task list 留 in-progress，下次会话续。
 - 不会引入 backward-compat 的兼容层——直接调整 API/Schema；同一次 commit 内修齐全链路。
+
+## 6. 本会话实际落地
+
+| 阶段 | 状态 | commit | 备注 |
+|------|------|--------|------|
+| 0 | ✅ | `Plan sub2api/CLIProxyAPI migration scope` | 计划文档 |
+| 2 维护模式 | ✅ | `Add maintenance mode gate for public gateway` | 后端中间件 + 测试 + 前端 Tab + 全局 Banner + i18n |
+| 3 OpenAI Moderation | ✅ | `Add OpenAI moderation pass to content safety` | LRU 缓存 + 配额计数 + fail-open + 前端字段 + 测试 |
+| 4 双键冷却 | ✅ | `Scope rate-limit cooldown to (account, model) keys` | 服务改造 + 调用方更新 + 测试 |
+| 9 ROOTCAUSE 收口 | 🟡 | `Replace, not append, on Codex import drop` | Codex 拖拽 bug 修复；其余 7 项核查后确认已修 |
+| Codex reasoning 缓存 | ✅（已具备） | — | `provider_adapters/service/codex_reasoning_replay_cache.go` + wiring 已在历史 commit 落地 |
+| channel_monitors 模板 | ✅（已具备） | — | `channel_monitors/contract/contract.go` 已实现 Template/CreateTemplate/Update 路径 |
+
+## 7. 留给下个会话
+
+| 阶段 | 状态 | 说明 |
+|------|------|------|
+| 2 Vertex AI provider | ⏳ | 需要：Provider preset + RuntimeClassServiceAccountJSON + service-account JWT→access-token 交换 + Vertex 端点 URL 模板（region/project 注入）+ 凭据加密落库 + 前端表单。预估 2–3 小时工程量。 |
+| 4 GCP 项目切换 | ⏳ | 依赖 2 完成；accounts metadata 增加 `project_ids: []string` + 游标推进 + 网关 `RESOURCE_EXHAUSTED` 拦截 + 短冷却。 |
+| 10 前端密度整理 | ⏳ | 初判的"稀疏页"实际多已迭代过；下次需要先用 `wc -l` 与人工挑选真稀疏的，再决定收紧策略。/admin/logs 已是聚合 tab，/admin/announcements 已是 ListView。 |
+
+## 8. 调研中订正的旧假设
+
+| 旧判断 | 实际情况 |
+|--------|----------|
+| sub2api 是 Clash/V2Ray 订阅转换器 | 实际也是 AI 网关，与 SRapi 大面积重合 |
+| 应升级冷却为指数退避 | 现实现尊重 upstream Retry-After + 5次/10min 升级，比单纯指数退避更优；改为做 per-model 粒度细化 |
+| channel_monitors 缺模板能力 | 已实现 |
+| Codex reasoning replay 缓存缺 | 已实现并接入 |
+| ROOTCAUSE-SWEEP 高严重项全部待修 | 核查 audio 端点 fallback / channel filter fail-open / invalid_response 分类 / codex provider 重置 等均已在过去几次提交中修复，仅 Codex 拖拽 append 真需修 |
+
