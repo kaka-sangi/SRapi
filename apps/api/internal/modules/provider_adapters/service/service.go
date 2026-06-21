@@ -83,6 +83,21 @@ func (s *Service) InvokeConversation(ctx context.Context, req contract.Conversat
 	if accountInterceptWarmupEnabled(req.Account.Metadata) && isWarmupRequest(req) {
 		return warmupMockResponse(req), nil
 	}
+	// Vertex accounts carry a service-account JSON credential rather than an
+	// API key; rewrite the request so the downstream Gemini-compatible
+	// pipeline sees a Bearer token + the region/project-templated URL,
+	// then dispatch through the same code path as native Gemini.
+	if isVertexAccount(req) {
+		prepared, baseURL, err := prepareVertexRequest(ctx, req)
+		if err != nil {
+			return contract.ConversationResponse{}, err
+		}
+		resp, err := s.invokeGeminiCompatible(ctx, prepared, baseURL)
+		if err != nil {
+			vertexHandleDispatchError(prepared, err)
+		}
+		return resp, err
+	}
 	if baseURL := upstreamBaseURL(req); baseURL != "" {
 		if isBedrockCompatible(req) {
 			return s.invokeBedrockAnthropic(ctx, req)
