@@ -97,14 +97,33 @@ func TestCleanupDeletesExpiredOperationalRows(t *testing.T) {
 		SetCircuitState("closed").
 		SetSnapshotAt(old).
 		SaveX(ctx)
+	// One stale scheduler_request_snapshots row sharing the decision_id
+	// from above plus a fresh row that must survive the sweep.
+	client.SchedulerRequestSnapshot.Create().
+		SetRequestID("req_old_snapshot").
+		SetAttemptNo(1).
+		SetDecisionID(2).
+		SetStrategy("balanced").
+		SetCreatedAt(old).
+		SetUpdatedAt(old).
+		SaveX(ctx)
+	client.SchedulerRequestSnapshot.Create().
+		SetRequestID("req_fresh_snapshot").
+		SetAttemptNo(1).
+		SetDecisionID(3).
+		SetStrategy("balanced").
+		SetCreatedAt(fresh).
+		SetUpdatedAt(fresh).
+		SaveX(ctx)
 
 	result, err := store.Cleanup(ctx, contract.RetentionCutoffs{
-		UsageLogs:              &cutoff,
-		SchedulerDecisions:     &cutoff,
-		SchedulerFeedbacks:     &cutoff,
-		AuditLogs:              &cutoff,
-		AccountHealthSnapshots: &cutoff,
-		BatchLimit:             1000,
+		UsageLogs:                 &cutoff,
+		SchedulerDecisions:        &cutoff,
+		SchedulerFeedbacks:        &cutoff,
+		SchedulerRequestSnapshots: &cutoff,
+		AuditLogs:                 &cutoff,
+		AccountHealthSnapshots:    &cutoff,
+		BatchLimit:                1000,
 	})
 	if err != nil {
 		t.Fatalf("cleanup: %v", err)
@@ -112,6 +131,7 @@ func TestCleanupDeletesExpiredOperationalRows(t *testing.T) {
 	if result.UsageLogs != 1 ||
 		result.SchedulerDecisions != 1 ||
 		result.SchedulerFeedbacks != 1 ||
+		result.SchedulerRequestSnapshots != 1 ||
 		result.AuditLogs != 1 ||
 		result.AccountHealthSnapshots != 1 {
 		t.Fatalf("unexpected cleanup result: %+v", result)

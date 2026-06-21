@@ -19,11 +19,12 @@ func TestCleanupRetentionBuildsConfiguredCutoffs(t *testing.T) {
 	}
 
 	result, err := svc.CleanupRetention(t.Context(), contract.RetentionPolicy{
-		UsageLogs:              90 * 24 * time.Hour,
-		SchedulerDecisions:     30 * 24 * time.Hour,
-		SchedulerFeedbacks:     45 * 24 * time.Hour,
-		AuditLogs:              365 * 24 * time.Hour,
-		AccountHealthSnapshots: 15 * 24 * time.Hour,
+		UsageLogs:                 90 * 24 * time.Hour,
+		SchedulerDecisions:        30 * 24 * time.Hour,
+		SchedulerFeedbacks:        45 * 24 * time.Hour,
+		SchedulerRequestSnapshots: 20 * 24 * time.Hour,
+		AuditLogs:                 365 * 24 * time.Hour,
+		AccountHealthSnapshots:    15 * 24 * time.Hour,
 	})
 	if err != nil {
 		t.Fatalf("cleanup retention: %v", err)
@@ -35,6 +36,7 @@ func TestCleanupRetentionBuildsConfiguredCutoffs(t *testing.T) {
 	assertCutoff(t, store.cutoffs.UsageLogs, now.Add(-90*24*time.Hour))
 	assertCutoff(t, store.cutoffs.SchedulerDecisions, now.Add(-30*24*time.Hour))
 	assertCutoff(t, store.cutoffs.SchedulerFeedbacks, now.Add(-45*24*time.Hour))
+	assertCutoff(t, store.cutoffs.SchedulerRequestSnapshots, now.Add(-20*24*time.Hour))
 	assertCutoff(t, store.cutoffs.AuditLogs, now.Add(-365*24*time.Hour))
 	assertCutoff(t, store.cutoffs.AccountHealthSnapshots, now.Add(-15*24*time.Hour))
 }
@@ -52,6 +54,7 @@ func TestCleanupRetentionSkipsDisabledPolicies(t *testing.T) {
 	if store.cutoffs.UsageLogs != nil ||
 		store.cutoffs.SchedulerDecisions != nil ||
 		store.cutoffs.SchedulerFeedbacks != nil ||
+		store.cutoffs.SchedulerRequestSnapshots != nil ||
 		store.cutoffs.AuditLogs != nil ||
 		store.cutoffs.AccountHealthSnapshots != nil {
 		t.Fatalf("expected nil cutoffs for disabled retention, got %+v", store.cutoffs)

@@ -63,12 +63,13 @@ func (s *Service) CleanupRetention(ctx context.Context, policy contract.Retentio
 	}
 	now := s.clock.Now()
 	return s.retentionStore.Cleanup(ctx, contract.RetentionCutoffs{
-		UsageLogs:              cutoff(now, policy.UsageLogs),
-		SchedulerDecisions:     cutoff(now, policy.SchedulerDecisions),
-		SchedulerFeedbacks:     cutoff(now, policy.SchedulerFeedbacks),
-		AuditLogs:              cutoff(now, policy.AuditLogs),
-		AccountHealthSnapshots: cutoff(now, policy.AccountHealthSnapshots),
-		BatchLimit:             normalizeRetentionBatchLimit(policy.BatchLimit),
+		UsageLogs:                 cutoff(now, policy.UsageLogs),
+		SchedulerDecisions:        cutoff(now, policy.SchedulerDecisions),
+		SchedulerFeedbacks:        cutoff(now, policy.SchedulerFeedbacks),
+		SchedulerRequestSnapshots: cutoff(now, policy.SchedulerRequestSnapshots),
+		AuditLogs:                 cutoff(now, policy.AuditLogs),
+		AccountHealthSnapshots:    cutoff(now, policy.AccountHealthSnapshots),
+		BatchLimit:                normalizeRetentionBatchLimit(policy.BatchLimit),
 	})
 }
 

@@ -122,21 +122,23 @@ type SystemLogStore interface {
 }
 
 type RetentionPolicy struct {
-	UsageLogs              time.Duration
-	SchedulerDecisions     time.Duration
-	SchedulerFeedbacks     time.Duration
-	AuditLogs              time.Duration
-	AccountHealthSnapshots time.Duration
-	BatchLimit             int
+	UsageLogs                 time.Duration
+	SchedulerDecisions        time.Duration
+	SchedulerFeedbacks        time.Duration
+	SchedulerRequestSnapshots time.Duration
+	AuditLogs                 time.Duration
+	AccountHealthSnapshots    time.Duration
+	BatchLimit                int
 }
 
 type CleanupResult struct {
-	UsageLogs              int
-	SchedulerDecisions     int
-	SchedulerFeedbacks     int
-	AuditLogs              int
-	AccountHealthSnapshots int
-	Limited                bool
+	UsageLogs                 int
+	SchedulerDecisions        int
+	SchedulerFeedbacks        int
+	SchedulerRequestSnapshots int
+	AuditLogs                 int
+	AccountHealthSnapshots    int
+	Limited                   bool
 }
 
 type RetentionStore interface {
@@ -144,12 +146,13 @@ type RetentionStore interface {
 }
 
 type RetentionCutoffs struct {
-	UsageLogs              *time.Time
-	SchedulerDecisions     *time.Time
-	SchedulerFeedbacks     *time.Time
-	AuditLogs              *time.Time
-	AccountHealthSnapshots *time.Time
-	BatchLimit             int
+	UsageLogs                 *time.Time
+	SchedulerDecisions        *time.Time
+	SchedulerFeedbacks        *time.Time
+	SchedulerRequestSnapshots *time.Time
+	AuditLogs                 *time.Time
+	AccountHealthSnapshots    *time.Time
+	BatchLimit                int
 }
 
 type SLOStatus string

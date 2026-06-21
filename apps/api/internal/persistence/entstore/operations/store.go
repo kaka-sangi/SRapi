@@ -18,6 +18,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/predicate"
 	entschedulerdecision "github.com/srapi/srapi/apps/api/ent/schedulerdecision"
 	entschedulerfeedback "github.com/srapi/srapi/apps/api/ent/schedulerfeedback"
+	entschedulerrequestsnapshot "github.com/srapi/srapi/apps/api/ent/schedulerrequestsnapshot"
 	entusagelog "github.com/srapi/srapi/apps/api/ent/usagelog"
 	"github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
@@ -64,6 +65,14 @@ func (s *Store) Cleanup(ctx context.Context, cutoffs contract.RetentionCutoffs) 
 			return contract.CleanupResult{}, err
 		}
 		result.SchedulerDecisions = deleted
+		result.Limited = result.Limited || limited
+	}
+	if cutoffs.SchedulerRequestSnapshots != nil {
+		deleted, limited, err := cleanupSchedulerRequestSnapshots(ctx, s.client, *cutoffs.SchedulerRequestSnapshots, batchLimit)
+		if err != nil {
+			return contract.CleanupResult{}, err
+		}
+		result.SchedulerRequestSnapshots = deleted
 		result.Limited = result.Limited || limited
 	}
 	if cutoffs.AuditLogs != nil {
@@ -280,6 +289,32 @@ func cleanupSchedulerDecisions(ctx context.Context, client *ent.Client, cutoff t
 	}
 	deleted, err := client.SchedulerDecision.Delete().
 		Where(entschedulerdecision.IDIn(ids...)).
+		Exec(ctx)
+	return deleted, limited, err
+}
+
+// cleanupSchedulerRequestSnapshots prunes scheduler_request_snapshots older
+// than `cutoff`. These rows back the strategy-replay tooling (see
+// `historical replay` in plans/STATUS.md) and grow at one row per Scheduler
+// attempt; without a TTL the table eventually outpaces the on-disk budget.
+// The (request_id, attempt_no) uniqueness rules out duplicate inserts, so the
+// only growth driver is real traffic — bounded by the retention window.
+func cleanupSchedulerRequestSnapshots(ctx context.Context, client *ent.Client, cutoff time.Time, batchLimit int) (int, bool, error) {
+	ids, err := client.SchedulerRequestSnapshot.Query().
+		Where(entschedulerrequestsnapshot.CreatedAtLT(cutoff)).
+		Order(entschedulerrequestsnapshot.ByID()).
+		Limit(batchLimit + 1).
+		IDs(ctx)
+	if err != nil {
+		return 0, false, err
+	}
+	limited := len(ids) > batchLimit
+	ids = capIDs(ids, batchLimit)
+	if len(ids) == 0 {
+		return 0, false, nil
+	}
+	deleted, err := client.SchedulerRequestSnapshot.Delete().
+		Where(entschedulerrequestsnapshot.IDIn(ids...)).
 		Exec(ctx)
 	return deleted, limited, err
 }

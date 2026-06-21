@@ -28,13 +28,15 @@ is the binding scope: what we adopt, what we reject, and the order of work.
    to also fire on `server_bad` (5xx) and on transient class without Retry-After,
    using the bounded default cooldown the rate-limit service already enforces.
 
-3. **OpenAI rate-limit reset credit.** sub2api added a `POST /admin/.../reset`
-   path that consumes one OpenAI `/wham/rate-limit-reset-credits/consume`
-   ticket against a ChatGPT/Codex OAuth account, freeing a stuck 5h window
-   mid-cycle. SRapi has no equivalent. Implement as a new admin action
-   `POST /api/v1/admin/accounts/{id}/openai/reset-quota-window` wired through
-   `provider_adapters.ResetOpenAIQuotaWindow(...)`. Surface in the admin
-   account drawer; only render when account is OAuth + OpenAI/Codex.
+3. **OpenAI rate-limit reset credit.** Deferred. SRapi already has
+   `POST /admin/accounts/{id}/reset-quota` (`runtime_admin_quota_fetch_handlers.go`)
+   that clears the local quota / cooldown metadata; that covers the
+   majority case (operator wants the account pickable again). The
+   sub2api delta is the upstream-side `/wham/rate-limit-reset-credits/consume`
+   call that frees the real 5h window on OpenAI's side mid-cycle —
+   genuinely useful but requires a real ChatGPT/Codex OAuth token to
+   verify, which this offline session can't supply. Leaving it to a
+   future package once a live token harness exists.
 
 4. **Thinking signature strip — gate by model family.** Today
    `claudeThinkingSanitizeRawPayload` strips invalid Claude signatures on every
@@ -122,8 +124,9 @@ blast radius first; bigger items get their own commit so review stays focused.
    partial index).
 5. ~~Images failover per-account model remap~~ — closed without code change;
    verified by re-reading `candidate.Mapping.UpstreamModelName` flow.
-6. **OpenAI quota-window reset credit** (item 3 — provider-adapter call,
-   admin endpoint, SDK, web button).
+6. ~~OpenAI quota-window reset credit~~ — deferred; rationale in item 3
+   above. Local reset path already exists; upstream consume call needs
+   a live OAuth-token harness to verify.
 7. **Scheduler snapshot cleanup worker** (item 6 — new worker package +
    wiring + retention config).
 8. **Antigravity reasoning replay** (item 1 — port cache module + wire into

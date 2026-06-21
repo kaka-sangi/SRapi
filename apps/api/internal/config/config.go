@@ -234,12 +234,13 @@ type OAuthConfig struct {
 }
 
 type RetentionConfig struct {
-	UsageLogsDays              int
-	SchedulerDecisionsDays     int
-	SchedulerFeedbacksDays     int
-	AuditLogsDays              int
-	AccountHealthSnapshotsDays int
-	BatchLimit                 int
+	UsageLogsDays                 int
+	SchedulerDecisionsDays        int
+	SchedulerFeedbacksDays        int
+	SchedulerRequestSnapshotsDays int
+	AuditLogsDays                 int
+	AccountHealthSnapshotsDays    int
+	BatchLimit                    int
 }
 
 // AuthCleanupConfig controls expired console session cleanup.
@@ -369,12 +370,13 @@ func Load() Config {
 			AdminName:     getEnv("BOOTSTRAP_ADMIN_NAME", "Admin"),
 		},
 		Retention: RetentionConfig{
-			UsageLogsDays:              getIntEnv("DATA_RETENTION_USAGE_LOGS_DAYS", 90),
-			SchedulerDecisionsDays:     getIntEnv("DATA_RETENTION_SCHEDULER_DECISIONS_DAYS", 90),
-			SchedulerFeedbacksDays:     getIntEnv("DATA_RETENTION_SCHEDULER_FEEDBACKS_DAYS", 90),
-			AuditLogsDays:              getIntEnv("DATA_RETENTION_AUDIT_LOGS_DAYS", 365),
-			AccountHealthSnapshotsDays: getIntEnv("DATA_RETENTION_ACCOUNT_HEALTH_SNAPSHOTS_DAYS", 90),
-			BatchLimit:                 getIntEnv("DATA_RETENTION_BATCH_LIMIT", 1000),
+			UsageLogsDays:                 getIntEnv("DATA_RETENTION_USAGE_LOGS_DAYS", 90),
+			SchedulerDecisionsDays:        getIntEnv("DATA_RETENTION_SCHEDULER_DECISIONS_DAYS", 90),
+			SchedulerFeedbacksDays:        getIntEnv("DATA_RETENTION_SCHEDULER_FEEDBACKS_DAYS", 90),
+			SchedulerRequestSnapshotsDays: getIntEnv("DATA_RETENTION_SCHEDULER_REQUEST_SNAPSHOTS_DAYS", 30),
+			AuditLogsDays:                 getIntEnv("DATA_RETENTION_AUDIT_LOGS_DAYS", 365),
+			AccountHealthSnapshotsDays:    getIntEnv("DATA_RETENTION_ACCOUNT_HEALTH_SNAPSHOTS_DAYS", 90),
+			BatchLimit:                    getIntEnv("DATA_RETENTION_BATCH_LIMIT", 1000),
 		},
 		AuthCleanup: AuthCleanupConfig{
 			Interval: time.Duration(getIntEnv("AUTH_SESSION_CLEANUP_INTERVAL_SECONDS", 86400)) * time.Second,
@@ -617,6 +619,9 @@ func (c Config) Validate() error {
 	}
 	if c.Retention.AccountHealthSnapshotsDays < 0 {
 		return fmt.Errorf("DATA_RETENTION_ACCOUNT_HEALTH_SNAPSHOTS_DAYS must be zero or positive")
+	}
+	if c.Retention.SchedulerRequestSnapshotsDays < 0 {
+		return fmt.Errorf("DATA_RETENTION_SCHEDULER_REQUEST_SNAPSHOTS_DAYS must be zero or positive")
 	}
 	if c.Retention.BatchLimit <= 0 || c.Retention.BatchLimit > 5000 {
 		return fmt.Errorf("DATA_RETENTION_BATCH_LIMIT must be between 1 and 5000")

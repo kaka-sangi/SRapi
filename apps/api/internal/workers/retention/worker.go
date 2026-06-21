@@ -19,15 +19,16 @@ const (
 )
 
 type Config struct {
-	Interval                   time.Duration
-	UsageLogsDays              int
-	SchedulerDecisionsDays     int
-	SchedulerFeedbacksDays     int
-	AuditLogsDays              int
-	AccountHealthSnapshotsDays int
-	BatchLimit                 int
-	Clock                      service.Clock
-	RunGuard                   runonceguard.Guard
+	Interval                      time.Duration
+	UsageLogsDays                 int
+	SchedulerDecisionsDays        int
+	SchedulerFeedbacksDays        int
+	SchedulerRequestSnapshotsDays int
+	AuditLogsDays                 int
+	AccountHealthSnapshotsDays    int
+	BatchLimit                    int
+	Clock                         service.Clock
+	RunGuard                      runonceguard.Guard
 }
 
 type Worker struct {
@@ -169,6 +170,7 @@ func (w *Worker) cleanupAndLog(ctx context.Context) {
 			"usage_logs", result.UsageLogs,
 			"scheduler_decisions", result.SchedulerDecisions,
 			"scheduler_feedbacks", result.SchedulerFeedbacks,
+			"scheduler_request_snapshots", result.SchedulerRequestSnapshots,
 			"audit_logs", result.AuditLogs,
 			"account_health_snapshots", result.AccountHealthSnapshots,
 			"limited", result.Limited,
@@ -180,18 +182,20 @@ func totalDeleted(result contract.CleanupResult) int {
 	return result.UsageLogs +
 		result.SchedulerDecisions +
 		result.SchedulerFeedbacks +
+		result.SchedulerRequestSnapshots +
 		result.AuditLogs +
 		result.AccountHealthSnapshots
 }
 
 func policyFromConfig(cfg Config) contract.RetentionPolicy {
 	return contract.RetentionPolicy{
-		UsageLogs:              days(cfg.UsageLogsDays),
-		SchedulerDecisions:     days(cfg.SchedulerDecisionsDays),
-		SchedulerFeedbacks:     days(cfg.SchedulerFeedbacksDays),
-		AuditLogs:              days(cfg.AuditLogsDays),
-		AccountHealthSnapshots: days(cfg.AccountHealthSnapshotsDays),
-		BatchLimit:             cfg.BatchLimit,
+		UsageLogs:                 days(cfg.UsageLogsDays),
+		SchedulerDecisions:        days(cfg.SchedulerDecisionsDays),
+		SchedulerFeedbacks:        days(cfg.SchedulerFeedbacksDays),
+		SchedulerRequestSnapshots: days(cfg.SchedulerRequestSnapshotsDays),
+		AuditLogs:                 days(cfg.AuditLogsDays),
+		AccountHealthSnapshots:    days(cfg.AccountHealthSnapshotsDays),
+		BatchLimit:                cfg.BatchLimit,
 	}
 }
 

@@ -674,13 +674,14 @@ func retentionCleanupWorker(cfg config.Config, stores *entstore.Stores, logger *
 		return nil, nil
 	}
 	return retentionworker.New(stores.Operations, logger, retentionworker.Config{
-		UsageLogsDays:              cfg.Retention.UsageLogsDays,
-		SchedulerDecisionsDays:     cfg.Retention.SchedulerDecisionsDays,
-		SchedulerFeedbacksDays:     cfg.Retention.SchedulerFeedbacksDays,
-		AuditLogsDays:              cfg.Retention.AuditLogsDays,
-		AccountHealthSnapshotsDays: cfg.Retention.AccountHealthSnapshotsDays,
-		BatchLimit:                 cfg.Retention.BatchLimit,
-		RunGuard:                   optionalWorkerGuard(guards...),
+		UsageLogsDays:                 cfg.Retention.UsageLogsDays,
+		SchedulerDecisionsDays:        cfg.Retention.SchedulerDecisionsDays,
+		SchedulerFeedbacksDays:        cfg.Retention.SchedulerFeedbacksDays,
+		SchedulerRequestSnapshotsDays: cfg.Retention.SchedulerRequestSnapshotsDays,
+		AuditLogsDays:                 cfg.Retention.AuditLogsDays,
+		AccountHealthSnapshotsDays:    cfg.Retention.AccountHealthSnapshotsDays,
+		BatchLimit:                    cfg.Retention.BatchLimit,
+		RunGuard:                      optionalWorkerGuard(guards...),
 	})
 }
 
