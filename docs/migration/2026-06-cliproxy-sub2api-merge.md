@@ -158,15 +158,29 @@
 | channel_monitors 模板 | ✅（已具备） | — | `channel_monitors/contract/contract.go` 已实现 Template/CreateTemplate/Update 路径 |
 | 2 Vertex AI 基础底座 | 🟡 部分 | `Lay groundwork for Vertex AI provider` | RuntimeClass + preset + key util；adapter 暂未接入 |
 
-## 7. 留给下个会话
+## 7. 后续追加完成项
 
-| 阶段 | 状态 | 说明 |
-|------|------|------|
-| 2 Vertex AI provider | 🟡 部分 | 已落：Provider preset `vertex`、`RuntimeClassServiceAccountJSON`、`internal/platform/vertex` 服务账号密钥规整 + 测试（PKCS#1/PKCS#8 互转、CRLF/ANSI 噪声恢复）。**剩余**：JWT→access-token 交换器、`{region}-aiplatform.googleapis.com` URL 模板解析、provider_adapter 注册（Gemini 翻译器复用 + Bearer 注入）、前端 account 表单的 service-account JSON 上传 + 加密落库。 |
-| 4 GCP 项目切换 | ⏳ | 依赖 2 完成；accounts metadata 增加 `project_ids: []string` + 游标推进 + 网关 `RESOURCE_EXHAUSTED` 拦截 + 短冷却。 |
-| 10 前端密度整理 | ⏳ | 初判的"稀疏页"实际多已迭代过；下次需要先用 `wc -l` 与人工挑选真稀疏的，再决定收紧策略。/admin/logs 已是聚合 tab，/admin/announcements 已是 ListView。 |
+| 阶段 | 状态 | commit | 备注 |
+|------|------|--------|------|
+| 2 Vertex AI provider | ✅ | `Wire Vertex AI request dispatch end-to-end` | JWT-bearer 流（RS256 签名 + token cache + 60s pre-expiry 守护）、`{region}-aiplatform.googleapis.com` URL 模板化、复用 invokeGeminiCompatible 流水线、401/403 自动失效缓存、deep-copy Credential 避免并发竞争、tests 覆盖 JWT/缓存/URL/缺 project_id/无副作用。 |
+| 4 GCP 项目切换 | ✅ | `Rotate Vertex project on quota exhaustion` | accounts metadata 新增 `project_ids: []string`、per-account cursor rotator、429/quota_exhausted 时推进游标、stale-bump 防护、单 project 账号 no-op。 |
+| Vertex 前端凭据输入 | ✅ | `Wire Vertex service-account credentials in account-form dialog` | OpenAPI RuntimeClass enum 加 service_account_json、TS SDK 重新生成、CREDENTIAL_SPECS 加 service_account_json kind="json" + GCP 服务账号模板、i18n（en + zh）。 |
+| 10 前端密度整理 | ✅ | — | 复查后多数初判稀疏页（announcements / logs / account / available-channels）实际已是 ListView/聚合 Tab 形态，无需"为了密度而密度"加按钮；唯一缺的是 Vertex SA JSON 输入框（上行已加）。 |
 
-## 8. 调研中订正的旧假设
+## 8. 本会话最终提交一览（10 commits → origin/main）
+
+1. `Plan sub2api/CLIProxyAPI migration scope`
+2. `Add maintenance mode gate for public gateway`
+3. `Add OpenAI moderation pass to content safety`
+4. `Scope rate-limit cooldown to (account, model) keys`
+5. `Replace, not append, on Codex import drop`
+6. `Record migration outcomes in plan doc`
+7. `Lay groundwork for Vertex AI provider`
+8. `Wire Vertex AI request dispatch end-to-end`
+9. `Rotate Vertex project on quota exhaustion`
+10. `Wire Vertex service-account credentials in account-form dialog`
+
+## 9. 调研中订正的旧假设
 
 | 旧判断 | 实际情况 |
 |--------|----------|
