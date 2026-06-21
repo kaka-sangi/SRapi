@@ -137,3 +137,27 @@ commit.
 - No deprecation of the existing fallback paths — items keep the
   generic `Retry-After` / generic 429 behavior as the default when
   no upstream signal is available.
+
+## Outcomes
+
+Shipped:
+
+- `providerGatewayRetryAfter` accessor + failover plumbing. Anthropic
+  5h/7d unified-window resets, Codex quota windows, Gemini
+  `retryDelay`, and generic `Retry-After` all drive the cooldown
+  duration via the adapter-parsed timestamp. Account no longer gets
+  re-picked into the same 429 within minutes when the real reset is
+  hours away.
+- Antigravity credit-balance exhaustion classifier. The structured
+  `google.rpc.ErrorInfo.reason` (`INSUFFICIENT_G1_CREDITS_BALANCE`,
+  `QUOTA_EXHAUSTED`) is recognized directly instead of falling back to
+  keyword scanning of the human message text. Credit-exhausted
+  accounts now classify as `quota_exhausted` and combine with item 1
+  to land in the right cooldown bucket.
+
+Refused as not real gaps (see Decisions section above): OAuth signup
+auto-apply promo code (product decision), SSE error event body
+capture (already covered by ProviderErrorBodyExcerpt), CLIProxyAPI
+plugin host system, CLIProxyAPI WebSocket relay system, CLIProxyAPI
+file watcher + auth sync, CLIProxyAPI redisqueue usage tracking,
+grok-composer session-isolation fallback.
