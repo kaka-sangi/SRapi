@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/table";
 import { ADMIN_ROUTES } from "@/lib/routes";
 import { useAdminList } from "@/hooks/use-admin-list";
+import type { SortState } from "@/hooks/use-admin-list";
 import { useLanguage } from "@/context/LanguageContext";
 import {
   useAdminGatewayResources,
@@ -68,6 +69,7 @@ import type {
 } from "@/lib/sdk-types";
 
 type GatewayResourceScope = "endpoints" | "providers" | "models" | "routes";
+type GatewayResourceSortKey = "risk" | "errors" | "traffic" | "name";
 
 const GATEWAY_STATUSES: GatewayProviderResourceStatus[] = ["ready", "limited", "blocked"];
 const CONVERSATION_ENDPOINT_KEYS = ["chat_completions", "responses", "messages"] as const;
@@ -82,6 +84,16 @@ const GATEWAY_REASONS: GatewayProviderResourceReason[] = [
   "pricing_uncovered",
 ];
 const GATEWAY_SCOPES: GatewayResourceScope[] = ["endpoints", "providers", "models", "routes"];
+const GATEWAY_SORTS: GatewayResourceSortKey[] = ["risk", "errors", "traffic", "name"];
+const GATEWAY_SORT_OPTIONS = [
+  "risk:asc",
+  "errors:desc",
+  "errors:asc",
+  "traffic:desc",
+  "traffic:asc",
+  "name:asc",
+  "name:desc",
+] as const;
 
 export default function AdminGatewayResourcesPage() {
   return (
@@ -102,7 +114,7 @@ function GatewayResourcesContent() {
   const loading = gatewayResources.isLoading;
   const error = gatewayResources.isError;
   const summary = gatewayResources.data;
-  const filters = gatewayResourceFilters(summary, list.search, list.filters);
+  const filters = gatewayResourceFilters(summary, list.search, list.filters, list.sort);
   const missingPricingPresetFamilies = gatewayMissingPricingPresetFamilies(
     summary,
     pricingPresets.data ?? [],
@@ -211,6 +223,8 @@ function GatewayResourcesContent() {
             onReason={(value) => list.setFilter("reason", value)}
             scope={list.filters.scope}
             onScope={(value) => list.setFilter("scope", value)}
+            sort={list.sort}
+            onSort={list.toggleSort}
             isFiltered={isFiltered}
             onClearFilters={list.clearFilters}
           />
@@ -386,6 +400,8 @@ function GatewayResourceToolbar({
   onReason,
   scope,
   onScope,
+  sort,
+  onSort,
   isFiltered,
   onClearFilters,
 }: {
@@ -397,10 +413,14 @@ function GatewayResourceToolbar({
   onReason: (value: string | undefined) => void;
   scope: string | undefined;
   onScope: (value: string | undefined) => void;
+  sort: SortState | undefined;
+  onSort: (key: string) => void;
   isFiltered: boolean;
   onClearFilters: () => void;
 }) {
   const { t } = useLanguage();
+  const sortKey = validGatewaySortKey(sort?.key);
+  const sortValue = sortKey ? `${sortKey}:${sort?.dir ?? "desc"}` : undefined;
   return (
     <Card className="overflow-hidden">
       <ListToolbar>
@@ -436,6 +456,15 @@ function GatewayResourceToolbar({
             label: t(`adminGatewayResources.scope.${value}`),
           }))}
           allLabel={t("adminGatewayResources.allScopes")}
+        />
+        <FilterSelect
+          value={sortValue}
+          onChange={(value) => setGatewayResourceSort(value, onSort, sort)}
+          options={GATEWAY_SORT_OPTIONS.map((value) => ({
+            value,
+            label: t(gatewaySortLabelKey(value)),
+          }))}
+          allLabel={t("adminGatewayResources.defaultSort")}
         />
         {isFiltered ? (
           <Button variant="ghost" size="sm" onClick={onClearFilters}>
@@ -473,6 +502,7 @@ function gatewayResourceFilters(
   summary: GatewayResourceSummary | undefined,
   rawSearch: string,
   filters: Record<string, string>,
+  sort: SortState | undefined,
 ): {
   endpointRows: GatewayEndpointResourceSummaryRow[] | null;
   providerRows: GatewayProviderResourceRow[] | null;
@@ -489,21 +519,39 @@ function gatewayResourceFilters(
   const includeModels = !scope || scope === "models";
   const includeRoutes = !scope || scope === "routes";
   const endpointRows = includeEndpoints
-    ? (summary?.endpoint_rows ?? []).filter((row) =>
-        endpointSummaryRowMatches(row, search, status, reason),
+    ? sortGatewayResourceRows(
+        (summary?.endpoint_rows ?? []).filter((row) =>
+          endpointSummaryRowMatches(row, search, status, reason),
+        ),
+        sort,
+        endpointGatewayResourceName,
       )
     : null;
   const providerRows = includeProviders
-    ? (summary?.rows ?? []).filter((row) => providerResourceRowMatches(row, search, status, reason))
+    ? sortGatewayResourceRows(
+        (summary?.rows ?? []).filter((row) =>
+          providerResourceRowMatches(row, search, status, reason),
+        ),
+        sort,
+        providerGatewayResourceName,
+      )
     : null;
   const modelRows = includeModels
-    ? (summary?.model_rows ?? []).filter((row) =>
-        modelResourceRowMatches(row, search, status, reason),
+    ? sortGatewayResourceRows(
+        (summary?.model_rows ?? []).filter((row) =>
+          modelResourceRowMatches(row, search, status, reason),
+        ),
+        sort,
+        modelGatewayResourceName,
       )
     : null;
   const routeRows = includeRoutes
-    ? (summary?.route_rows ?? []).filter((row) =>
-        routeResourceRowMatches(row, search, status, reason),
+    ? sortGatewayResourceRows(
+        (summary?.route_rows ?? []).filter((row) =>
+          routeResourceRowMatches(row, search, status, reason),
+        ),
+        sort,
+        routeGatewayResourceName,
       )
     : null;
   return {
@@ -619,6 +667,85 @@ function routeResourceRowMatches(
   ]).includes(search);
 }
 
+function sortGatewayResourceRows<T extends GatewayResourceSortableRow>(
+  rows: T[],
+  sort: SortState | undefined,
+  nameOf: (row: T) => string,
+) {
+  const key = validGatewaySortKey(sort?.key) ?? "risk";
+  const dir = sort?.key && sort.dir === "asc" ? "asc" : "desc";
+  return [...rows].sort((left, right) => {
+    if (key === "name") {
+      const byName = nameOf(left).localeCompare(nameOf(right));
+      return dir === "desc" ? -byName : byName;
+    }
+    const numeric = gatewayResourceSortValue(right, key) - gatewayResourceSortValue(left, key);
+    const ordered = dir === "desc" ? numeric : -numeric;
+    if (ordered !== 0) return ordered;
+    return nameOf(left).localeCompare(nameOf(right));
+  });
+}
+
+type GatewayResourceSortableRow =
+  | GatewayEndpointResourceSummaryRow
+  | GatewayProviderResourceRow
+  | GatewayModelResourceRow
+  | GatewayRouteResourceRow;
+
+function gatewayResourceSortValue(row: GatewayResourceSortableRow, key: GatewayResourceSortKey) {
+  switch (key) {
+    case "errors":
+      return row.traffic.error_count;
+    case "traffic":
+      return row.traffic.request_count;
+    case "name":
+      return 0;
+    default:
+      return gatewayResourceRiskScore(row);
+  }
+}
+
+function gatewayResourceRiskScore(row: GatewayResourceSortableRow) {
+  let score = gatewayStatusRisk(row.status);
+  score += row.traffic.error_count * 10;
+  if (row.traffic.last_error) score += 20;
+  if ("reasons" in row) score += row.reasons.length * 8;
+  if ("pricing" in row && gatewayPricingNeedsAttention(row.pricing)) score += 12;
+  if ("account_blockers" in row) {
+    score +=
+      row.account_blockers.health * 8 +
+      row.account_blockers.quota * 8 +
+      row.account_blockers.proxy * 6 +
+      row.account_blockers.inactive * 3;
+  }
+  if ("unsupported_account_routes" in row) {
+    score += row.unsupported_account_routes * 4 + row.unavailable_model_account_routes * 4;
+  }
+  return score;
+}
+
+function gatewayStatusRisk(status: GatewayProviderResourceStatus) {
+  if (status === "blocked") return 100;
+  if (status === "limited") return 50;
+  return 0;
+}
+
+function endpointGatewayResourceName(row: GatewayEndpointResourceSummaryRow) {
+  return row.source_endpoint || row.key;
+}
+
+function providerGatewayResourceName(row: GatewayProviderResourceRow) {
+  return row.provider.display_name || row.provider.name;
+}
+
+function modelGatewayResourceName(row: GatewayModelResourceRow) {
+  return row.model.display_name || row.model.canonical_name;
+}
+
+function routeGatewayResourceName(row: GatewayRouteResourceRow) {
+  return `${row.model.canonical_name}:${row.provider.name}`;
+}
+
 function rowMatchesReason(
   reasons: GatewayProviderResourceReason[],
   reason: GatewayProviderResourceReason,
@@ -698,6 +825,47 @@ function validScopeFilter(value: string | undefined): GatewayResourceScope | und
   return GATEWAY_SCOPES.includes(value as GatewayResourceScope)
     ? (value as GatewayResourceScope)
     : undefined;
+}
+
+function validGatewaySortKey(value: string | undefined): GatewayResourceSortKey | undefined {
+  return GATEWAY_SORTS.includes(value as GatewayResourceSortKey)
+    ? (value as GatewayResourceSortKey)
+    : undefined;
+}
+
+function gatewaySortLabelKey(value: (typeof GATEWAY_SORT_OPTIONS)[number]) {
+  const [key, dir] = value.split(":");
+  return `adminGatewayResources.sort.${key}${dir === "asc" ? "Asc" : "Desc"}` as const;
+}
+
+function setGatewayResourceSort(
+  value: string | undefined,
+  toggleSort: (key: string) => void,
+  current: SortState | undefined,
+) {
+  if (!value) {
+    if (current) {
+      toggleSort(current.key);
+      if (current.dir === "asc") toggleSort(current.key);
+    }
+    return;
+  }
+  const [key, dirRaw] = value.split(":");
+  const nextKey = validGatewaySortKey(key);
+  const nextDir = dirRaw === "asc" ? "asc" : "desc";
+  if (!nextKey) return;
+  if (current?.key === nextKey && current.dir === nextDir) return;
+  if (current?.key === nextKey) {
+    toggleSort(nextKey);
+    if (current.dir === "desc" && nextDir === "asc") toggleSort(nextKey);
+    return;
+  }
+  if (current?.key && current.key !== nextKey) {
+    toggleSort(current.key);
+    if (current.dir === "asc") toggleSort(current.key);
+  }
+  toggleSort(nextKey);
+  if (nextDir === "desc") toggleSort(nextKey);
 }
 
 function GatewayFixQueue({

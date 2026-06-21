@@ -237,6 +237,20 @@ describe("AdminGatewayResourcesPage", () => {
     expect(screen.queryByText("gpt-4.1-upstream")).not.toBeInTheDocument();
     expect(screen.queryByText("没有匹配的网关资源")).not.toBeInTheDocument();
   });
+
+  it("orders gateway resources by troubleshooting risk and URL sort", () => {
+    const view = renderPage();
+
+    expect(screen.getByText("排障优先")).toBeInTheDocument();
+    expect(textAppearsBefore("Responses Compact", "Chat Completions")).toBe(true);
+
+    view.unmount();
+    window.history.replaceState(null, "", "/admin/gateway-resources?sort=name:asc");
+    renderPage();
+
+    expect(screen.getByText("名称 A-Z")).toBeInTheDocument();
+    expect(textAppearsBefore("Chat Completions", "Responses Compact")).toBe(true);
+  });
 });
 
 function renderPage() {
@@ -249,6 +263,14 @@ function renderPage() {
         <AdminGatewayResourcesPage />
       </LanguageProvider>
     </QueryClientProvider>,
+  );
+}
+
+function textAppearsBefore(first: string, second: string) {
+  const firstElement = screen.getByText(first);
+  const secondElement = screen.getByText(second);
+  return Boolean(
+    firstElement.compareDocumentPosition(secondElement) & Node.DOCUMENT_POSITION_FOLLOWING,
   );
 }
 
