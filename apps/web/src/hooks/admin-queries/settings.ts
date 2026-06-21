@@ -228,6 +228,7 @@ export function useUpdateSettings() {
   return useAdminMutation(
     (body: P<typeof adminApi.updateSettings>) => adminApi.updateSettings(body),
     ["admin", "settings"],
+    queryKeys.admin.gatewayResources(),
   );
 }
 

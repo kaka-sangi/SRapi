@@ -1,0 +1,189 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import type { PropsWithChildren } from "react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import AdminSettingsPage from "@/app/admin/settings/page";
+import { LanguageProvider } from "@/context/LanguageContext";
+import type { AdminSettings } from "../../../../packages/sdk/typescript/src/types.gen";
+
+const mocks = vi.hoisted(() => ({
+  replace: vi.fn(),
+  searchParams: new URLSearchParams("tab=gateway"),
+  updateSettings: vi.fn(),
+  toast: vi.fn(),
+}));
+
+const storage = new Map<string, string>([["srapi_lang", "zh"]]);
+Object.defineProperty(window, "localStorage", {
+  configurable: true,
+  value: {
+    getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, value: string) => storage.set(key, value),
+    removeItem: (key: string) => storage.delete(key),
+    clear: () => storage.clear(),
+  },
+});
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: mocks.replace }),
+  useSearchParams: () => mocks.searchParams,
+}));
+
+vi.mock("@/components/layout/admin-shell", () => ({
+  AdminShell: ({ children }: PropsWithChildren) => <>{children}</>,
+}));
+
+vi.mock("@/context/ToastContext", () => ({
+  useToast: () => ({ toast: mocks.toast }),
+}));
+
+vi.mock("@/hooks/admin-queries", () => ({
+  useAdminSettings: () => ({
+    data: settings(),
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+  useUpdateSettings: () => ({
+    mutateAsync: mocks.updateSettings,
+    isPending: false,
+  }),
+  useAdminModels: () => ({
+    data: { data: [] },
+    isLoading: false,
+    isError: false,
+  }),
+}));
+
+describe("AdminSettingsPage", () => {
+  beforeEach(() => {
+    mocks.replace.mockReset();
+    mocks.updateSettings.mockReset();
+    mocks.toast.mockReset();
+    mocks.searchParams = new URLSearchParams("tab=gateway");
+    storage.clear();
+    storage.set("srapi_lang", "zh");
+    window.history.replaceState(null, "", "/admin/settings?tab=gateway");
+  });
+
+  it("opens the gateway settings tab from the tab query parameter", () => {
+    renderPage();
+
+    expect(screen.getByRole("tab", { name: "网关" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("协议转换开关")).toBeInTheDocument();
+    expect(screen.getByText("Responses → Messages")).toBeInTheDocument();
+  });
+
+  it("keeps tab changes in the settings URL", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole("tab", { name: "安全" }));
+
+    expect(mocks.replace).toHaveBeenCalledWith("/admin/settings?tab=security", {
+      scroll: false,
+    });
+  });
+});
+
+function renderPage() {
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+  return render(
+    <QueryClientProvider client={client}>
+      <LanguageProvider>
+        <AdminSettingsPage />
+      </LanguageProvider>
+    </QueryClientProvider>,
+  );
+}
+
+function settings(): AdminSettings {
+  return {
+    general: {
+      site_name: "SRapi",
+      logo_url: "",
+      version_label: "",
+      custom_menus: [],
+    },
+    agreement: {
+      user_agreement: "",
+      privacy_policy: "",
+    },
+    features: {
+      enabled_channels: [],
+      channel_monitoring_enabled: true,
+      invitation_rebate_enabled: false,
+      payments_enabled: false,
+    },
+    security: {
+      admin_api_key: { configured: true },
+      registration_enabled: true,
+      registration_email_suffix_allowlist: [],
+      oauth_enabled: false,
+      oauth_providers: [],
+      oauth_provider_configs: [],
+    },
+    users: {
+      default_balance: "0",
+      default_group: "default",
+      user_self_delete_enabled: false,
+      rpm_limit_default: 0,
+    },
+    gateway: {
+      overload_cooldown_seconds: 60,
+      rate_limit_cooldown_seconds: 30,
+      stream_timeout_seconds: 300,
+      request_shaper_enabled: false,
+      scheduler_strategy_rollout_enabled: false,
+      scheduler_strategy_shadow_strategy: "balanced",
+      scheduler_strategy_rollout_percent: 0,
+      scheduler_strategy_rollout_models: [],
+      scheduler_strategy_rollout_api_key_hashes: [],
+      protocol_conversion_routes: [
+        "chat_completions_to_responses",
+        "responses_to_chat_completions",
+        "responses_to_messages",
+      ],
+      retry_count: 3,
+      max_retry_credentials: 0,
+      max_retry_interval_ms: 5000,
+      passthrough_upstream_headers: false,
+      passthrough_header_allowlist: [],
+    },
+    payment: {
+      enabled: false,
+      providers: [],
+      subscription_plans_enabled: false,
+    },
+    email: {
+      smtp_configured: false,
+      templates: {},
+    },
+    backup: {
+      enabled: false,
+      retention_days: 7,
+    },
+    copilot: {
+      enabled: false,
+      source: "account",
+      provider_account_id: 0,
+      model: "",
+      models: [],
+      dedicated_protocol: "openai-compatible",
+      dedicated_base_url: "",
+      dedicated_api_key_configured: false,
+      owner_only: true,
+      auto_run_reads: true,
+      web_search_enabled: false,
+      web_search_provider: "tavily",
+      web_search_base_url: "",
+      web_search_api_key_configured: false,
+    },
+  };
+}

@@ -10,6 +10,7 @@ import {
   KeyRound,
   Route,
   SearchX,
+  Shuffle,
   Tag,
 } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
@@ -34,11 +35,16 @@ import { useAdminList } from "@/hooks/use-admin-list";
 import { useLanguage } from "@/context/LanguageContext";
 import {
   useAdminGatewayResources,
+  useAdminSettings,
   useAdminPricingRulePresets,
   useInstallPricingRulePresets,
 } from "@/hooks/admin-queries";
 import { useToast } from "@/context/ToastContext";
 import { adminErrorMessage } from "@/lib/admin-api";
+import {
+  PROTOCOL_CONVERSION_ROUTES,
+  type ProtocolConversionRoute,
+} from "@/lib/admin-settings-form";
 import type {
   GatewayAccountBlockers,
   GatewayEndpointResourceRow,
@@ -83,6 +89,7 @@ function GatewayResourcesContent() {
   const { toast } = useToast();
   const list = useAdminList({ pageSize: 1000 });
   const gatewayResources = useAdminGatewayResources();
+  const settings = useAdminSettings();
   const pricingPresets = useAdminPricingRulePresets();
   const installPricingPresets = useInstallPricingRulePresets();
   const loading = gatewayResources.isLoading;
@@ -182,6 +189,10 @@ function GatewayResourcesContent() {
             pricingPresetFamilies={missingPricingPresetFamilies}
             installingPricingPresets={installPricingPresets.isPending}
             onInstallPricingPresets={installMissingPricingPresets}
+          />
+
+          <ProtocolConversionRoutePanel
+            routes={settings.data?.gateway.protocol_conversion_routes}
           />
 
           <GatewayResourceToolbar
@@ -641,6 +652,16 @@ function normalizePricingFamily(value: string | null | undefined) {
   return (value ?? "").trim().toLowerCase();
 }
 
+function cleanVisibleProtocolConversionRoutes(
+  routes: readonly string[] | null | undefined,
+): ProtocolConversionRoute[] {
+  if (routes === null || routes === undefined) {
+    return [...PROTOCOL_CONVERSION_ROUTES];
+  }
+  const selected = new Set(routes ?? []);
+  return PROTOCOL_CONVERSION_ROUTES.filter((route) => selected.has(route));
+}
+
 function rowText(values: Array<string | number | null | undefined>) {
   return values
     .filter((value) => value !== null && value !== undefined)
@@ -734,6 +755,77 @@ function GatewayFixQueue({
             })}
           </Button>
         ) : null}
+      </div>
+    </Card>
+  );
+}
+
+function ProtocolConversionRoutePanel({
+  routes,
+}: {
+  routes: readonly string[] | null | undefined;
+}) {
+  const { t } = useLanguage();
+  const enabledRoutes = cleanVisibleProtocolConversionRoutes(routes);
+  const enabled = new Set(enabledRoutes);
+  return (
+    <Card className="p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <Shuffle className="text-srapi-text-tertiary size-4" />
+            <h3 className="text-srapi-text-primary font-medium">
+              {t("adminGatewayResources.protocolConversions")}
+            </h3>
+            <QuietBadge
+              status={
+                enabledRoutes.length === PROTOCOL_CONVERSION_ROUTES.length ? "active" : "limited"
+              }
+              label={t("adminGatewayResources.protocolConversionCount", {
+                enabled: enabledRoutes.length,
+                total: PROTOCOL_CONVERSION_ROUTES.length,
+              })}
+            />
+          </div>
+          <p className="text-2xs text-srapi-text-tertiary mt-1">
+            {t("adminGatewayResources.protocolConversionsHint")}
+          </p>
+        </div>
+        <Button asChild variant="outline" size="sm">
+          <Link href={`${ADMIN_ROUTES.settings}?tab=gateway`}>
+            {t("adminGatewayResources.openConversionSettings")}
+          </Link>
+        </Button>
+      </div>
+      <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+        {PROTOCOL_CONVERSION_ROUTES.map((route) => {
+          const on = enabled.has(route);
+          return (
+            <Link
+              key={route}
+              href={`${ADMIN_ROUTES.settings}?tab=gateway`}
+              className="border-srapi-border bg-srapi-card-muted hover:border-srapi-border-strong flex min-w-0 items-center justify-between gap-3 rounded-md border px-3 py-2 transition-colors"
+              title={t("adminGatewayResources.protocolConversionRouteHint", {
+                route: t(`adminSettings.protocolConversionRoutes.${route}`),
+                mode: on
+                  ? t("adminGatewayResources.protocolConversionEnabled")
+                  : t("adminGatewayResources.protocolConversionDisabled"),
+              })}
+            >
+              <span className="text-2xs text-srapi-text-secondary truncate">
+                {t(`adminSettings.protocolConversionRoutes.${route}`)}
+              </span>
+              <QuietBadge
+                status={on ? "active" : "disabled"}
+                label={
+                  on
+                    ? t("adminGatewayResources.protocolConversionEnabled")
+                    : t("adminGatewayResources.protocolConversionDisabled")
+                }
+              />
+            </Link>
+          );
+        })}
       </div>
     </Card>
   );

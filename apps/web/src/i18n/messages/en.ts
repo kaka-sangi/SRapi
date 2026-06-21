@@ -1271,6 +1271,14 @@ export const en = {
     pricingPresetsInstalledHint: "Matched model families: {families}",
     endpointSwitchHint:
       "{endpoint} is currently {mode}. Click through to adjust Auto / On / Off on the provider.",
+    protocolConversions: "Protocol conversion routes",
+    protocolConversionsHint:
+      "Controls which cross-protocol conversions may be scheduled between Chat Completions, Responses, and Messages text endpoints.",
+    protocolConversionCount: "{enabled}/{total} enabled",
+    openConversionSettings: "Open conversion settings",
+    protocolConversionEnabled: "Enabled",
+    protocolConversionDisabled: "Off",
+    protocolConversionRouteHint: "{route} is currently {mode}. Click through to gateway settings.",
     fixSeverity: {
       critical: "Critical",
       warning: "Warning",

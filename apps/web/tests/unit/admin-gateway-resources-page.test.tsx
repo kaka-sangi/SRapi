@@ -28,6 +28,19 @@ vi.mock("@/hooks/admin-queries", () => ({
     isError: false,
     refetch: vi.fn(),
   }),
+  useAdminSettings: () => ({
+    data: {
+      gateway: {
+        protocol_conversion_routes: [
+          "chat_completions_to_responses",
+          "responses_to_chat_completions",
+          "messages_to_responses",
+        ],
+      },
+    },
+    isLoading: false,
+    isError: false,
+  }),
   useAdminPricingRulePresets: () => ({
     data: [{ model_family: "gpt-4.1" }],
     isLoading: false,
@@ -75,6 +88,17 @@ describe("AdminGatewayResourcesPage", () => {
     expect(screen.getAllByTitle(/Chat Completions 当前为 自动/).length).toBeGreaterThan(0);
     expect(screen.getAllByTitle(/Responses 当前为 强制开启/).length).toBeGreaterThan(0);
     expect(screen.getAllByTitle(/Messages 当前为 强制关闭/).length).toBeGreaterThan(0);
+    expect(screen.getByText("协议转换路由")).toBeInTheDocument();
+    expect(screen.getByText("3/6 已启用")).toBeInTheDocument();
+    expect(screen.getByText("打开转换设置")).toHaveAttribute("href", "/admin/settings?tab=gateway");
+    expect(screen.getByTitle(/Chat Completions → Responses 当前为 已启用/)).toHaveAttribute(
+      "href",
+      "/admin/settings?tab=gateway",
+    );
+    expect(screen.getByTitle(/Chat Completions → Messages 当前为 已关闭/)).toHaveAttribute(
+      "href",
+      "/admin/settings?tab=gateway",
+    );
     expect(screen.getAllByText("计费").length).toBeGreaterThan(0);
     expect(screen.getAllByText("规则定价").length).toBeGreaterThan(0);
     expect(screen.getAllByText("3/3").length).toBeGreaterThan(0);

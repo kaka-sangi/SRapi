@@ -1,15 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
-import {
-  useAdminSettings,
-  useUpdateSettings,
-  useAdminModels,
-} from "@/hooks/admin-queries";
+import { useAdminSettings, useUpdateSettings, useAdminModels } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { FormSkeleton } from "@/components/charts/chart-skeleton";
 import { type MultiSelectOption } from "@/components/ui/multi-select";
 import { adminErrorMessage } from "@/lib/admin-api";
+import { ADMIN_ROUTES } from "@/lib/routes";
 import {
   SETTINGS_TABS,
   type SettingsTab,
@@ -38,7 +36,9 @@ import { BackupTab } from "./backup-tab";
 export default function AdminSettingsPage() {
   return (
     <AdminShell>
-      <SettingsContent />
+      <Suspense>
+        <SettingsContent />
+      </Suspense>
     </AdminShell>
   );
 }
@@ -54,19 +54,24 @@ function SettingsContent() {
         title={t("adminSettings.title")}
         description={t("adminSettings.subtitle")}
       />
-      <PageQueryState
-        query={settings}
-        skeleton={<FormSkeleton rows={6} className="p-5" />}
-      >
+      <PageQueryState query={settings} skeleton={<FormSkeleton rows={6} className="p-5" />}>
         {(data) => <SettingsEditor initial={data} />}
       </PageQueryState>
     </>
   );
 }
 
+function isSettingsTab(value: string | null): value is SettingsTab {
+  return value !== null && SETTINGS_TABS.some((tab) => tab.id === value);
+}
+
 function SettingsEditor({ initial }: { initial: Parameters<typeof createSettingsDraft>[0] }) {
   const { t } = useLanguage();
   const { toast } = useToast();
+  const router = useRouter();
+  const params = useSearchParams();
+  const rawTab = params.get("tab");
+  const activeTab: SettingsTab = isSettingsTab(rawTab) ? rawTab : "general";
   const updateMut = useUpdateSettings();
   const models = useAdminModels();
   const modelOptions: MultiSelectOption[] = (models.data?.data ?? []).map((m) => ({
@@ -111,8 +116,15 @@ function SettingsEditor({ initial }: { initial: Parameters<typeof createSettings
     }
   }
 
+  function setTab(next: string) {
+    const q = new URLSearchParams();
+    if (next !== "general") q.set("tab", next);
+    const qs = q.toString();
+    router.replace(`${ADMIN_ROUTES.settings}${qs ? `?${qs}` : ""}`, { scroll: false });
+  }
+
   return (
-    <Tabs defaultValue="general">
+    <Tabs value={activeTab} onValueChange={setTab}>
       <TabsList className="flex-wrap">
         {SETTINGS_TABS.map((tab) => (
           <TabsTrigger key={tab.id} value={tab.id}>
@@ -151,8 +163,12 @@ function SettingsEditor({ initial }: { initial: Parameters<typeof createSettings
                   />
                 ))}
                 {tab.id === "email" ? <EmailTestPanel /> : null}
-                <div className="flex justify-end border-t border-srapi-border pt-4">
-                  <Button variant="primary" loading={updateMut.isPending} onClick={() => requestSave(tab.id)}>
+                <div className="border-srapi-border flex justify-end border-t pt-4">
+                  <Button
+                    variant="primary"
+                    loading={updateMut.isPending}
+                    onClick={() => requestSave(tab.id)}
+                  >
                     {t("adminSettings.saveSection")}
                   </Button>
                 </div>

@@ -1237,6 +1237,14 @@ export const zh: Messages = {
     pricingPresetsInstalled: "已安装 {count} 条默认价格规则",
     pricingPresetsInstalledHint: "命中模型系列：{families}",
     endpointSwitchHint: "{endpoint} 当前为 {mode}。点击到供应商配置里调整 Auto / 开启 / 关闭。",
+    protocolConversions: "协议转换路由",
+    protocolConversionsHint:
+      "控制 Chat Completions、Responses、Messages 三类文本端点之间哪些跨协议转换允许被调度。",
+    protocolConversionCount: "{enabled}/{total} 已启用",
+    openConversionSettings: "打开转换设置",
+    protocolConversionEnabled: "已启用",
+    protocolConversionDisabled: "已关闭",
+    protocolConversionRouteHint: "{route} 当前为 {mode}。点击到网关设置里调整。",
     fixSeverity: {
       critical: "严重",
       warning: "注意",
