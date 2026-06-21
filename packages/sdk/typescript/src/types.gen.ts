@@ -1976,7 +1976,7 @@ export type AdminQuickMapModelsResponse = {
     request_id: RequestId;
 };
 
-export type RuntimeClass = 'api_key' | 'oauth_refresh' | 'oauth_device_code' | 'web_session_cookie' | 'cli_client_token' | 'custom_reverse_proxy';
+export type RuntimeClass = 'api_key' | 'oauth_refresh' | 'oauth_device_code' | 'web_session_cookie' | 'cli_client_token' | 'custom_reverse_proxy' | 'service_account_json';
 
 /**
  * Upstream protocol/platform family a provider preset belongs to.

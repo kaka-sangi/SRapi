@@ -993,6 +993,9 @@ export const en = {
       cookieHint: "The full session cookie string.",
       oauthLabel: "OAuth tokens",
       oauthHint: "Paste the account's access and refresh tokens.",
+      serviceAccountJsonLabel: "Service account JSON",
+      serviceAccountJsonHint:
+        "Paste the entire GCP service-account JSON. The private_key is normalized + encrypted at rest; the runtime signs JWT bearer tokens on every dispatch.",
       editBlankHint: "Leave blank to keep the existing credential.",
     },
     setPriority: "Set priority",

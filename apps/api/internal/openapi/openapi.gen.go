@@ -3426,6 +3426,7 @@ const (
 	RuntimeClassCustomReverseProxy RuntimeClass = "custom_reverse_proxy"
 	RuntimeClassOauthDeviceCode    RuntimeClass = "oauth_device_code"
 	RuntimeClassOauthRefresh       RuntimeClass = "oauth_refresh"
+	RuntimeClassServiceAccountJson RuntimeClass = "service_account_json"
 	RuntimeClassWebSessionCookie   RuntimeClass = "web_session_cookie"
 )
 
@@ -3441,6 +3442,8 @@ func (e RuntimeClass) Valid() bool {
 	case RuntimeClassOauthDeviceCode:
 		return true
 	case RuntimeClassOauthRefresh:
+		return true
+	case RuntimeClassServiceAccountJson:
 		return true
 	case RuntimeClassWebSessionCookie:
 		return true

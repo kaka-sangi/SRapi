@@ -973,6 +973,9 @@ export const zh: Messages = {
       cookieHint: "完整的会话 Cookie 串。",
       oauthLabel: "OAuth 令牌",
       oauthHint: "填写账号的访问令牌与刷新令牌。",
+      serviceAccountJsonLabel: "服务账号 JSON",
+      serviceAccountJsonHint:
+        "粘贴完整的 GCP 服务账号 JSON。后端会规整 private_key 并加密落库；每次调度时签发 JWT bearer 令牌。",
       editBlankHint: "留空则保持现有凭证不变。",
     },
     setPriority: "设置优先级",

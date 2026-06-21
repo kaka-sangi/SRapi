@@ -121,6 +121,15 @@ const OAUTH_FIELDS: CredFieldSpec[] = [
   { key: "refresh_token", cred: "refreshToken", secret: true },
   { key: "id_token", cred: "idToken", secret: true },
 ];
+const SERVICE_ACCOUNT_JSON_TEMPLATE = `{
+  "type": "service_account",
+  "project_id": "",
+  "private_key_id": "",
+  "private_key": "-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----\\n",
+  "client_email": "",
+  "token_uri": "https://oauth2.googleapis.com/token"
+}`;
+
 const CREDENTIAL_SPECS: Record<RuntimeClass, CredSpec> = {
   api_key: { kind: "password", credKey: "api_key", cred: "apiKey" },
   cli_client_token: { kind: "password", credKey: "access_token", cred: "accessToken" },
@@ -128,6 +137,16 @@ const CREDENTIAL_SPECS: Record<RuntimeClass, CredSpec> = {
   web_session_cookie: { kind: "textarea", credKey: "cookie", cred: "cookie" },
   oauth_refresh: { kind: "fields", cred: "oauth", fields: OAUTH_FIELDS },
   oauth_device_code: { kind: "fields", cred: "oauth", fields: OAUTH_FIELDS },
+  // Vertex AI: the admin pastes the GCP service-account JSON wholesale; the
+  // backend normalizes the private_key (PKCS#1/PKCS#8 conversion, CRLF/ANSI
+  // recovery), encrypts it at rest, and signs JWT bearer tokens at dispatch
+  // time. Stored under the `service_account_json` credential key.
+  service_account_json: {
+    kind: "json",
+    credKey: "service_account_json",
+    cred: "serviceAccountJson",
+    template: SERVICE_ACCOUNT_JSON_TEMPLATE,
+  },
 };
 
 export function specFor(rc: RuntimeClass): CredSpec {

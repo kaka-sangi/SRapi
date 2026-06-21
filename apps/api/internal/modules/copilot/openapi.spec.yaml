@@ -22437,6 +22437,7 @@ components:
         - web_session_cookie
         - cli_client_token
         - custom_reverse_proxy
+        - service_account_json
 
     PlatformFamily:
       type: string
