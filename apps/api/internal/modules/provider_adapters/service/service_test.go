@@ -753,6 +753,75 @@ func TestOpenAICompatibleAdapterKeepsNoneReasoningEffortForGenericProvider(t *te
 	}
 }
 
+func TestOpenAICompatibleAdapterClampsMaxReasoningEffortToXhigh(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		// SRapi accepts "max" as the highest internal reasoning tier but
+		// OpenAI Chat Completions has no "max" enum value — DeepSeek / Kimi
+		// / GLM / MiniMax-M etc reject it. The adapter must clamp to xhigh.
+		if payload["reasoning_effort"] != "xhigh" {
+			t.Fatalf("expected reasoning_effort=xhigh after max clamp, got %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"max clamp ok"}}],"usage":{"prompt_tokens":2,"completion_tokens":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	if _, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_openai_reasoning_max",
+		Model:      "gpt-local",
+		InputParts: textParts("think"),
+		Reasoning:  map[string]any{"effort": "max"},
+		Provider:   providercontract.Provider{AdapterType: "openai-compatible", Protocol: "openai-compatible"},
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential: map[string]any{"api_key": "upstream-secret"},
+	}); err != nil {
+		t.Fatalf("invoke: %v", err)
+	}
+}
+
+func TestKimiCompatibleAdapterClampsMaxReasoningEffortToXhigh(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		// Kimi family runs through normalizeOpenAICompatibleReasoning; the
+		// max clamp must reach it too.
+		if payload["reasoning_effort"] != "xhigh" {
+			t.Fatalf("expected Kimi reasoning_effort=xhigh after max clamp, got %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"kimi max clamp ok"}}],"usage":{"prompt_tokens":2,"completion_tokens":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	if _, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_kimi_reasoning_max",
+		Model:      "kimi-local",
+		InputParts: textParts("think"),
+		Reasoning:  map[string]any{"effort": "max"},
+		Provider:   providercontract.Provider{Name: "kimi", AdapterType: "openai-compatible", Protocol: "openai-compatible"},
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "kimi-upstream"},
+		Credential: map[string]any{"api_key": "upstream-secret"},
+	}); err != nil {
+		t.Fatalf("invoke: %v", err)
+	}
+}
+
 func TestKimiCompatibleResponsesPayloadNormalizesDisabledThinking(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/responses" {

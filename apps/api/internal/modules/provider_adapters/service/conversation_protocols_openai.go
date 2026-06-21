@@ -83,7 +83,7 @@ func openAICompatiblePayload(req contract.ConversationRequest) openAIChatComplet
 		ResponseFormat: cloneMap(req.ResponseFormat),
 	}
 	if effort := strings.TrimSpace(metadataString(req.Reasoning, "effort")); effort != "" {
-		payload.ReasoningEffort = effort
+		payload.ReasoningEffort = clampOpenAICompatibleReasoningEffort(effort)
 	}
 	normalizeOpenAICompatibleReasoning(req, &payload)
 	if req.Stream {
@@ -129,7 +129,7 @@ func normalizeOpenAICompatibleReasoning(req contract.ConversationRequest, payloa
 		return
 	}
 	if effort := kimiReasoningEffort(req.Reasoning); effort != "" {
-		payload.ReasoningEffort = effort
+		payload.ReasoningEffort = clampOpenAICompatibleReasoningEffort(effort)
 		payload.Thinking = nil
 	}
 }
@@ -146,6 +146,29 @@ func normalizeRawOpenAICompatibleReasoning(req contract.ConversationRequest, pay
 	if effort := kimiReasoningEffort(req.Reasoning); effort != "" {
 		payload["reasoning_effort"] = effort
 		delete(payload, "thinking")
+	}
+	// Final pass: callers asking for SRapi's "max" tier (highest reasoning
+	// budget; see reasoningBudgetForEffort) must land in the upstream's
+	// "xhigh" bucket on Chat Completions providers. The public OpenAI
+	// reasoning_effort enum is {minimal, low, medium, high, xhigh} —
+	// "max" is an SRapi-internal alias and is rejected by DeepSeek / Kimi /
+	// GLM / MiniMax-M / Qwen-thinking upstreams (sub2api: dropped 100% of
+	// reasoning_effort after their May-1 traffic switch).
+	if raw, ok := payload["reasoning_effort"].(string); ok && raw != "" {
+		payload["reasoning_effort"] = clampOpenAICompatibleReasoningEffort(raw)
+	}
+}
+
+// clampOpenAICompatibleReasoningEffort maps SRapi's "max" alias down to
+// "xhigh" for OpenAI Chat Completions traffic. "max" survives intact for
+// the Codex Responses path (codex_responses_input.go owns that wire shape
+// and Codex does declare a "max" tier upstream).
+func clampOpenAICompatibleReasoningEffort(effort string) string {
+	switch strings.ToLower(strings.TrimSpace(effort)) {
+	case "max", "extrahigh":
+		return "xhigh"
+	default:
+		return effort
 	}
 }
 
