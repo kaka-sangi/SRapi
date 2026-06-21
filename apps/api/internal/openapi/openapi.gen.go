@@ -8212,6 +8212,7 @@ type GatewayEndpointResourceSummaryRow struct {
 	// SourceEndpoint Gateway route or route template represented by this endpoint readiness row.
 	SourceEndpoint string                        `json:"source_endpoint"`
 	Status         GatewayProviderResourceStatus `json:"status"`
+	Traffic        GatewayResourceTraffic        `json:"traffic"`
 
 	// UnavailableModelAccountRoutes Sum of account-route observations whose effective model mapping is blocked by excluded_models or supported_models metadata.
 	UnavailableModelAccountRoutes int `json:"unavailable_model_account_routes"`
@@ -8251,6 +8252,7 @@ type GatewayModelResourceRow struct {
 	RoutableAccounts    int                             `json:"routable_accounts"`
 	ScopedKeyCount      int                             `json:"scoped_key_count"`
 	Status              GatewayProviderResourceStatus   `json:"status"`
+	Traffic             GatewayResourceTraffic          `json:"traffic"`
 }
 
 // GatewayPricingCoverage defines model for GatewayPricingCoverage.
@@ -8287,6 +8289,7 @@ type GatewayProviderResourceRow struct {
 	ScopedKeyCount         int                             `json:"scoped_key_count"`
 	Status                 GatewayProviderResourceStatus   `json:"status"`
 	TotalAccounts          int                             `json:"total_accounts"`
+	Traffic                GatewayResourceTraffic          `json:"traffic"`
 }
 
 // GatewayProviderResourceStatus defines model for GatewayProviderResourceStatus.
@@ -8339,6 +8342,24 @@ type GatewayResourceSummaryResponse struct {
 	RequestId RequestId              `json:"request_id"`
 }
 
+// GatewayResourceTraffic defines model for GatewayResourceTraffic.
+type GatewayResourceTraffic struct {
+	// ErrorCount Failed gateway requests observed in the rolling window.
+	ErrorCount int `json:"error_count"`
+
+	// LastRequestAt Most recent gateway request observed for this resource.
+	LastRequestAt *time.Time `json:"last_request_at,omitempty"`
+
+	// RequestCount Gateway requests observed in the rolling window.
+	RequestCount int `json:"request_count"`
+
+	// SuccessRate Successful requests divided by request_count. Zero when request_count is zero.
+	SuccessRate float32 `json:"success_rate"`
+
+	// WindowSeconds Rolling runtime usage window used for the traffic counters.
+	WindowSeconds int `json:"window_seconds"`
+}
+
 // GatewayRouteResourceRow defines model for GatewayRouteResourceRow.
 type GatewayRouteResourceRow struct {
 	ApiKeyCount      int                             `json:"api_key_count"`
@@ -8351,6 +8372,7 @@ type GatewayRouteResourceRow struct {
 	RoutableAccounts int                             `json:"routable_accounts"`
 	ScopedKeyCount   int                             `json:"scoped_key_count"`
 	Status           GatewayProviderResourceStatus   `json:"status"`
+	Traffic          GatewayResourceTraffic          `json:"traffic"`
 	UpstreamModel    string                          `json:"upstream_model"`
 }
 

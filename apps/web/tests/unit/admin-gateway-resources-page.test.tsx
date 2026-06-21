@@ -150,6 +150,9 @@ describe("AdminGatewayResourcesPage", () => {
     expect(screen.getAllByText("计费").length).toBeGreaterThan(0);
     expect(screen.getAllByText("规则定价").length).toBeGreaterThan(0);
     expect(screen.getAllByText("3/3").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("流量").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("12 请求").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("2 错误").length).toBeGreaterThan(0);
     expect(screen.getByText("路由明细")).toBeInTheDocument();
     expect(screen.getByText("gpt-4.1-upstream")).toBeInTheDocument();
     expect(screen.getAllByText("就绪").length).toBeGreaterThan(0);
@@ -383,6 +386,7 @@ function summary(): GatewayResourceSummary {
         active_model_mappings: 1,
         api_key_count: 1,
         scoped_key_count: 1,
+        traffic: traffic(12, 2),
         status: "limited",
         reasons: ["proxy_attention"],
       },
@@ -444,6 +448,7 @@ function summary(): GatewayResourceSummary {
         },
         api_key_count: 1,
         scoped_key_count: 1,
+        traffic: traffic(12, 2),
         status: "ready",
         reasons: [],
       },
@@ -514,6 +519,7 @@ function summary(): GatewayResourceSummary {
         },
         api_key_count: 1,
         scoped_key_count: 1,
+        traffic: traffic(12, 2),
         status: "ready",
         reasons: [],
       },
@@ -551,6 +557,7 @@ function summary(): GatewayResourceSummary {
         },
         api_key_count: 1,
         scoped_key_count: 1,
+        traffic: traffic(),
         status: "ready",
         reasons: [],
       },
@@ -601,7 +608,21 @@ function endpointSummary(
     candidate_account_routes: candidateAccountRoutes,
     unsupported_account_routes: unsupportedAccountRoutes,
     unavailable_model_account_routes: unavailableModelAccountRoutes,
+    traffic: traffic(
+      key === "chat_completions" ? 12 : key === "responses_compact" ? 1 : 0,
+      key === "chat_completions" ? 2 : key === "responses_compact" ? 1 : 0,
+    ),
     status,
+  };
+}
+
+function traffic(requestCount = 0, errorCount = 0) {
+  return {
+    window_seconds: 86400,
+    request_count: requestCount,
+    error_count: errorCount,
+    success_rate: requestCount > 0 ? (requestCount - errorCount) / requestCount : 0,
+    last_request_at: requestCount > 0 ? "2026-06-20T11:00:00Z" : null,
   };
 }
 

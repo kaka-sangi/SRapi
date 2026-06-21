@@ -164,6 +164,7 @@ export type {
   GatewayEndpointResourceRow,
   GatewayEndpointResourceSummaryRow,
   GatewayResourceFix,
+  GatewayResourceTraffic,
   GatewayModelResourceRow,
   GatewayPricingCoverage,
   GatewayProviderResourceReason,

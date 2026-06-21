@@ -1739,6 +1739,29 @@ export type GatewayAccountBlockers = {
     proxy: number;
 };
 
+export type GatewayResourceTraffic = {
+    /**
+     * Rolling runtime usage window used for the traffic counters.
+     */
+    window_seconds: number;
+    /**
+     * Gateway requests observed in the rolling window.
+     */
+    request_count: number;
+    /**
+     * Failed gateway requests observed in the rolling window.
+     */
+    error_count: number;
+    /**
+     * Successful requests divided by request_count. Zero when request_count is zero.
+     */
+    success_rate: number;
+    /**
+     * Most recent gateway request observed for this resource.
+     */
+    last_request_at?: string | null;
+};
+
 export type GatewayProviderResourceRow = {
     provider: Provider;
     total_accounts: number;
@@ -1750,6 +1773,7 @@ export type GatewayProviderResourceRow = {
     active_model_mappings: number;
     api_key_count: number;
     scoped_key_count: number;
+    traffic: GatewayResourceTraffic;
     status: GatewayProviderResourceStatus;
     reasons: Array<GatewayProviderResourceReason>;
 };
@@ -1814,6 +1838,7 @@ export type GatewayEndpointResourceSummaryRow = {
      * Sum of account-route observations whose effective model mapping is blocked by excluded_models or supported_models metadata.
      */
     unavailable_model_account_routes: number;
+    traffic: GatewayResourceTraffic;
     status: GatewayProviderResourceStatus;
 };
 
@@ -1840,6 +1865,7 @@ export type GatewayModelResourceRow = {
     pricing: GatewayPricingCoverage;
     api_key_count: number;
     scoped_key_count: number;
+    traffic: GatewayResourceTraffic;
     status: GatewayProviderResourceStatus;
     reasons: Array<GatewayProviderResourceReason>;
 };
@@ -1854,6 +1880,7 @@ export type GatewayRouteResourceRow = {
     pricing: GatewayPricingCoverage;
     api_key_count: number;
     scoped_key_count: number;
+    traffic: GatewayResourceTraffic;
     status: GatewayProviderResourceStatus;
     reasons: Array<GatewayProviderResourceReason>;
 };

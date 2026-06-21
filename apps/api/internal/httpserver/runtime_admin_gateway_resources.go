@@ -15,8 +15,11 @@ import (
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
+	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
+
+const defaultGatewayResourceTrafficWindow = 24 * time.Hour
 
 func (s *Server) handleGetAdminGatewayResources(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
@@ -77,6 +80,11 @@ func (s *Server) gatewayResourceSummaryInput(ctx context.Context) (gatewayResour
 	if err != nil {
 		quotasByAccount = nil
 	}
+	usageLogs, err := s.runtime.usage.List(ctx)
+	if err != nil {
+		s.logger.Warn("failed to list usage logs for gateway resources", "error", err)
+		usageLogs = nil
+	}
 	return gatewayResourceSummaryInput{
 		Context:           ctx,
 		Providers:         providers,
@@ -88,6 +96,8 @@ func (s *Server) gatewayResourceSummaryInput(ctx context.Context) (gatewayResour
 		HealthByAccount:   healthByAccount,
 		QuotasByAccount:   quotasByAccount,
 		GroupIDsByAccount: groupIDsByAccount,
+		UsageLogs:         usageLogs,
+		TrafficWindow:     defaultGatewayResourceTrafficWindow,
 		Billing:           s.runtime.billing,
 		Now:               time.Now().UTC(),
 	}, nil
@@ -104,8 +114,182 @@ type gatewayResourceSummaryInput struct {
 	HealthByAccount   map[int]accountcontract.AccountHealthSnapshot
 	QuotasByAccount   map[int][]accountcontract.AccountQuotaSnapshot
 	GroupIDsByAccount map[int][]int
+	UsageLogs         []usagecontract.UsageLog
+	TrafficWindow     time.Duration
 	Billing           *billingservice.Service
 	Now               time.Time
+}
+
+type gatewayResourceTraffic struct {
+	window     time.Duration
+	byProvider map[int]gatewayResourceTrafficAccumulator
+	byModel    map[string]gatewayResourceTrafficAccumulator
+	byRoute    map[string]gatewayResourceTrafficAccumulator
+	byEndpoint map[string]gatewayResourceTrafficAccumulator
+}
+
+type gatewayResourceTrafficAccumulator struct {
+	Requests      int
+	Errors        int
+	LastRequestAt *time.Time
+}
+
+func buildGatewayResourceTraffic(logs []usagecontract.UsageLog, now time.Time, window time.Duration) gatewayResourceTraffic {
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	if window <= 0 {
+		window = defaultGatewayResourceTrafficWindow
+	}
+	out := gatewayResourceTraffic{
+		window:     window,
+		byProvider: map[int]gatewayResourceTrafficAccumulator{},
+		byModel:    map[string]gatewayResourceTrafficAccumulator{},
+		byRoute:    map[string]gatewayResourceTrafficAccumulator{},
+		byEndpoint: map[string]gatewayResourceTrafficAccumulator{},
+	}
+	start := now.Add(-window)
+	for _, log := range logs {
+		created := log.CreatedAt.UTC()
+		if created.IsZero() || created.Before(start) || created.After(now) {
+			continue
+		}
+		if log.ProviderID != nil {
+			out.addProvider(*log.ProviderID, log)
+		}
+		model := gatewayUsageModelKey(log)
+		if model != "" {
+			out.addModel(model, log)
+			if log.ProviderID != nil {
+				out.addRoute(model, *log.ProviderID, log)
+			}
+		}
+		endpointKey := gatewayEndpointTrafficKey(log.SourceEndpoint)
+		if endpointKey != "" {
+			out.addEndpoint(endpointKey, log)
+		}
+	}
+	return out
+}
+
+func (t gatewayResourceTraffic) provider(providerID int) apiopenapi.GatewayResourceTraffic {
+	return t.row(t.byProvider[providerID])
+}
+
+func (t gatewayResourceTraffic) model(model string) apiopenapi.GatewayResourceTraffic {
+	return t.row(t.byModel[normalizeGatewayTrafficModel(model)])
+}
+
+func (t gatewayResourceTraffic) route(model string, providerID int) apiopenapi.GatewayResourceTraffic {
+	return t.row(t.byRoute[gatewayRouteTrafficKey(model, providerID)])
+}
+
+func (t gatewayResourceTraffic) endpoint(key string) apiopenapi.GatewayResourceTraffic {
+	return t.row(t.byEndpoint[key])
+}
+
+func (t gatewayResourceTraffic) row(acc gatewayResourceTrafficAccumulator) apiopenapi.GatewayResourceTraffic {
+	window := t.window
+	if window <= 0 {
+		window = defaultGatewayResourceTrafficWindow
+	}
+	successRate := float32(0)
+	if acc.Requests > 0 {
+		successRate = float32(acc.Requests-acc.Errors) / float32(acc.Requests)
+	}
+	return apiopenapi.GatewayResourceTraffic{
+		ErrorCount:    acc.Errors,
+		LastRequestAt: cloneTimePtr(acc.LastRequestAt),
+		RequestCount:  acc.Requests,
+		SuccessRate:   successRate,
+		WindowSeconds: int(window.Seconds()),
+	}
+}
+
+func (t gatewayResourceTraffic) addProvider(providerID int, log usagecontract.UsageLog) {
+	acc := t.byProvider[providerID]
+	acc.add(log)
+	t.byProvider[providerID] = acc
+}
+
+func (t gatewayResourceTraffic) addModel(model string, log usagecontract.UsageLog) {
+	key := normalizeGatewayTrafficModel(model)
+	if key == "" {
+		return
+	}
+	acc := t.byModel[key]
+	acc.add(log)
+	t.byModel[key] = acc
+}
+
+func (t gatewayResourceTraffic) addRoute(model string, providerID int, log usagecontract.UsageLog) {
+	key := gatewayRouteTrafficKey(model, providerID)
+	if key == "" {
+		return
+	}
+	acc := t.byRoute[key]
+	acc.add(log)
+	t.byRoute[key] = acc
+}
+
+func (t gatewayResourceTraffic) addEndpoint(key string, log usagecontract.UsageLog) {
+	acc := t.byEndpoint[key]
+	acc.add(log)
+	t.byEndpoint[key] = acc
+}
+
+func (a *gatewayResourceTrafficAccumulator) add(log usagecontract.UsageLog) {
+	created := log.CreatedAt.UTC()
+	a.Requests++
+	if !log.Success {
+		a.Errors++
+	}
+	if a.LastRequestAt == nil || created.After(*a.LastRequestAt) {
+		a.LastRequestAt = &created
+	}
+}
+
+func gatewayUsageModelKey(log usagecontract.UsageLog) string {
+	if model := normalizeGatewayTrafficModel(log.RequestedModel); model != "" {
+		return model
+	}
+	return normalizeGatewayTrafficModel(log.Model)
+}
+
+func normalizeGatewayTrafficModel(model string) string {
+	return strings.ToLower(strings.TrimSpace(model))
+}
+
+func gatewayRouteTrafficKey(model string, providerID int) string {
+	model = normalizeGatewayTrafficModel(model)
+	if model == "" || providerID <= 0 {
+		return ""
+	}
+	return model + ":" + strconv.Itoa(providerID)
+}
+
+func gatewayEndpointTrafficKey(sourceEndpoint string) string {
+	endpoint := strings.TrimSpace(sourceEndpoint)
+	if endpoint == "" {
+		return ""
+	}
+	for _, key := range gatewayEndpointResourceKeys {
+		if endpoint == gatewayEndpointSourceEndpoint(key) {
+			return key
+		}
+	}
+	switch {
+	case strings.HasPrefix(endpoint, "/v1/responses/") && strings.HasSuffix(endpoint, "/input_items"):
+		return capabilitiescontract.KeyResponsesInputItems
+	case strings.HasPrefix(endpoint, "/v1beta/models/") && (strings.HasSuffix(endpoint, ":generateContent") || strings.HasSuffix(endpoint, ":streamGenerateContent")):
+		return capabilitiescontract.KeyGeminiGenerateContent
+	case strings.HasPrefix(endpoint, "/v1beta/models/") && strings.HasSuffix(endpoint, ":countTokens"):
+		return capabilitiescontract.KeyGeminiCountTokens
+	case strings.HasPrefix(endpoint, "/v1/videos"):
+		return capabilitiescontract.KeyVideos
+	default:
+		return ""
+	}
 }
 
 func buildGatewayResourceSummary(input gatewayResourceSummaryInput) apiopenapi.GatewayResourceSummary {
@@ -119,6 +303,7 @@ func buildGatewayResourceSummary(input gatewayResourceSummaryInput) apiopenapi.G
 	}
 	quotaExhaustedByAccount := quotaExhaustedAccounts(input.QuotasByAccount, now)
 	proxyStates := buildProxyResourceStates(input.Proxies, now)
+	traffic := buildGatewayResourceTraffic(input.UsageLogs, now, input.TrafficWindow)
 	activeKeys := activeAPIKeys(input.APIKeys)
 	activeModels := activeModels(input.Models)
 	activeModelIDs := make(map[int]struct{}, len(activeModels))
@@ -206,6 +391,7 @@ func buildGatewayResourceSummary(input gatewayResourceSummaryInput) apiopenapi.G
 			ScopedKeyCount:         scopedProviderKeys,
 			Status:                 status,
 			TotalAccounts:          len(accounts),
+			Traffic:                traffic.provider(provider.ID),
 		})
 	}
 	activeProviders := 0
@@ -220,9 +406,9 @@ func buildGatewayResourceSummary(input gatewayResourceSummaryInput) apiopenapi.G
 			activeAccounts++
 		}
 	}
-	modelRows := buildGatewayModelResourceRows(input.Context, activeModels, activeModelMappings, input.Providers, routableAccountsByProvider, activeKeys, input.Billing, now)
-	routeRows := buildGatewayRouteResourceRows(input.Context, activeModels, activeModelMappings, input.Providers, routableAccountsByProvider, providerGroupIDs, activeKeys, input.Billing, now)
-	endpointRows := buildGatewayEndpointResourceSummaryRows(modelRows, routeRows)
+	modelRows := buildGatewayModelResourceRows(input.Context, activeModels, activeModelMappings, input.Providers, routableAccountsByProvider, activeKeys, input.Billing, now, traffic)
+	routeRows := buildGatewayRouteResourceRows(input.Context, activeModels, activeModelMappings, input.Providers, routableAccountsByProvider, providerGroupIDs, activeKeys, input.Billing, now, traffic)
+	endpointRows := buildGatewayEndpointResourceSummaryRows(modelRows, routeRows, traffic)
 	return apiopenapi.GatewayResourceSummary{
 		ActiveAccounts:         activeAccounts,
 		ActiveApiKeys:          len(activeKeys),
@@ -288,6 +474,7 @@ func buildGatewayModelResourceRows(
 	activeKeys []apikeycontract.APIKey,
 	billing *billingservice.Service,
 	now time.Time,
+	traffic gatewayResourceTraffic,
 ) []apiopenapi.GatewayModelResourceRow {
 	if ctx == nil {
 		ctx = context.Background()
@@ -350,6 +537,7 @@ func buildGatewayModelResourceRows(
 			RoutableAccounts:    routableAccountCount,
 			ScopedKeyCount:      scopedKeyCount,
 			Status:              status,
+			Traffic:             traffic.model(model.CanonicalName),
 		})
 	}
 	return rows
@@ -365,6 +553,7 @@ func buildGatewayRouteResourceRows(
 	activeKeys []apikeycontract.APIKey,
 	billing *billingservice.Service,
 	now time.Time,
+	traffic gatewayResourceTraffic,
 ) []apiopenapi.GatewayRouteResourceRow {
 	if ctx == nil {
 		ctx = context.Background()
@@ -414,6 +603,7 @@ func buildGatewayRouteResourceRows(
 			RoutableAccounts: routableAccountCount,
 			ScopedKeyCount:   scopedKeyCount,
 			Status:           status,
+			Traffic:          traffic.route(model.CanonicalName, provider.ID),
 			UpstreamModel:    upstreamModel,
 		})
 	}
@@ -434,6 +624,7 @@ type gatewayEndpointResourceSummaryStats struct {
 func buildGatewayEndpointResourceSummaryRows(
 	modelRows []apiopenapi.GatewayModelResourceRow,
 	routeRows []apiopenapi.GatewayRouteResourceRow,
+	traffic gatewayResourceTraffic,
 ) []apiopenapi.GatewayEndpointResourceSummaryRow {
 	statsByKey := make(map[string]*gatewayEndpointResourceSummaryStats, len(gatewayEndpointResourceKeys))
 	for _, key := range gatewayEndpointResourceKeys {
@@ -475,6 +666,7 @@ func buildGatewayEndpointResourceSummaryRows(
 			Routes:                        stats.Routes,
 			SourceEndpoint:                gatewayEndpointSourceEndpoint(key),
 			Status:                        gatewayEndpointSummaryStatus(*stats),
+			Traffic:                       traffic.endpoint(key),
 			UnavailableModelAccountRoutes: stats.UnavailableModelAccountRoutes,
 			UnsupportedAccountRoutes:      stats.UnsupportedAccountRoutes,
 		})

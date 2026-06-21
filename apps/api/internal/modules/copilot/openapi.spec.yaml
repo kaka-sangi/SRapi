@@ -21838,6 +21838,38 @@ components:
           minimum: 0
           description: Active accounts blocked by a missing, disabled, expired, or otherwise unavailable proxy binding.
 
+    GatewayResourceTraffic:
+      type: object
+      required:
+        - window_seconds
+        - request_count
+        - error_count
+        - success_rate
+      properties:
+        window_seconds:
+          type: integer
+          minimum: 1
+          description: Rolling runtime usage window used for the traffic counters.
+        request_count:
+          type: integer
+          minimum: 0
+          description: Gateway requests observed in the rolling window.
+        error_count:
+          type: integer
+          minimum: 0
+          description: Failed gateway requests observed in the rolling window.
+        success_rate:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Successful requests divided by request_count. Zero when request_count is zero.
+        last_request_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Most recent gateway request observed for this resource.
+
     GatewayProviderResourceRow:
       type: object
       required:
@@ -21851,6 +21883,7 @@ components:
         - active_model_mappings
         - api_key_count
         - scoped_key_count
+        - traffic
         - status
         - reasons
       properties:
@@ -21882,6 +21915,8 @@ components:
         scoped_key_count:
           type: integer
           minimum: 0
+        traffic:
+          $ref: "#/components/schemas/GatewayResourceTraffic"
         status:
           $ref: "#/components/schemas/GatewayProviderResourceStatus"
         reasons:
@@ -21956,6 +21991,7 @@ components:
         - candidate_account_routes
         - unsupported_account_routes
         - unavailable_model_account_routes
+        - traffic
         - status
       properties:
         key:
@@ -22015,6 +22051,8 @@ components:
           type: integer
           minimum: 0
           description: Sum of account-route observations whose effective model mapping is blocked by excluded_models or supported_models metadata.
+        traffic:
+          $ref: "#/components/schemas/GatewayResourceTraffic"
         status:
           $ref: "#/components/schemas/GatewayProviderResourceStatus"
 
@@ -22071,6 +22109,7 @@ components:
         - pricing
         - api_key_count
         - scoped_key_count
+        - traffic
         - status
         - reasons
       properties:
@@ -22097,6 +22136,8 @@ components:
         scoped_key_count:
           type: integer
           minimum: 0
+        traffic:
+          $ref: "#/components/schemas/GatewayResourceTraffic"
         status:
           $ref: "#/components/schemas/GatewayProviderResourceStatus"
         reasons:
@@ -22116,6 +22157,7 @@ components:
         - pricing
         - api_key_count
         - scoped_key_count
+        - traffic
         - status
         - reasons
       properties:
@@ -22142,6 +22184,8 @@ components:
         scoped_key_count:
           type: integer
           minimum: 0
+        traffic:
+          $ref: "#/components/schemas/GatewayResourceTraffic"
         status:
           $ref: "#/components/schemas/GatewayProviderResourceStatus"
         reasons:

@@ -20,6 +20,7 @@ import (
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
+	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
@@ -364,6 +365,73 @@ func TestBuildGatewayResourceSummaryReportsPricingCoverage(t *testing.T) {
 		row.Pricing.PricedRoutes != row.Pricing.TotalRoutes {
 		t.Fatalf("unexpected priced coverage: %+v", row.Pricing)
 	}
+}
+
+func TestBuildGatewayResourceSummaryReportsRecentTraffic(t *testing.T) {
+	now := time.Date(2026, 6, 20, 12, 0, 0, 0, time.UTC)
+	providerID := 1
+	lastRequestAt := now.Add(-time.Hour)
+	summary := buildGatewayResourceSummary(gatewayResourceSummaryInput{
+		Context: context.Background(),
+		Providers: []providercontract.Provider{
+			testGatewayResourceProvider(providerID, "traffic-provider", providercontract.StatusActive),
+		},
+		Accounts: []accountcontract.ProviderAccount{
+			testGatewayResourceAccount(10, providerID, accountcontract.StatusActive, nil),
+		},
+		Models: []modelcontract.Model{
+			testGatewayResourceModel(1000, modelcontract.StatusActive),
+		},
+		ModelMappings: []modelcontract.ModelProviderMapping{
+			{ID: 500, ModelID: 1000, ProviderID: providerID, UpstreamModelName: "upstream-model", Status: modelcontract.StatusActive},
+		},
+		APIKeys: []apikeycontract.APIKey{
+			{ID: 1, Status: apikeycontract.StatusActive},
+		},
+		UsageLogs: []usagecontract.UsageLog{
+			{
+				ProviderID:     ptrInt(providerID),
+				RequestedModel: "model-1000",
+				SourceEndpoint: "/v1/chat/completions",
+				Success:        true,
+				CreatedAt:      now.Add(-2 * time.Hour),
+			},
+			{
+				ProviderID:     ptrInt(providerID),
+				RequestedModel: "model-1000",
+				SourceEndpoint: "/v1beta/models/model-1000:generateContent",
+				Success:        false,
+				CreatedAt:      lastRequestAt,
+			},
+			{
+				ProviderID:     ptrInt(providerID),
+				RequestedModel: "model-1000",
+				SourceEndpoint: "/v1/responses",
+				Success:        false,
+				CreatedAt:      now.Add(-25 * time.Hour),
+			},
+		},
+		TrafficWindow: 24 * time.Hour,
+		Now:           now,
+	})
+
+	providerRow := findGatewayResourceRow(t, summary, "traffic-provider")
+	assertGatewayTraffic(t, providerRow.Traffic, 2, 1, lastRequestAt)
+
+	modelRow := findGatewayModelResourceRow(t, summary, "model-1000")
+	assertGatewayTraffic(t, modelRow.Traffic, 2, 1, lastRequestAt)
+
+	routeRow := findGatewayRouteResourceRow(t, summary, "model-1000", "traffic-provider")
+	assertGatewayTraffic(t, routeRow.Traffic, 2, 1, lastRequestAt)
+
+	chatEndpoint := findGatewayEndpointSummaryRow(t, summary, apiopenapi.GatewayEndpointResourceSummaryRowKeyChatCompletions)
+	assertGatewayTraffic(t, chatEndpoint.Traffic, 1, 0, now.Add(-2*time.Hour))
+
+	geminiEndpoint := findGatewayEndpointSummaryRow(t, summary, apiopenapi.GatewayEndpointResourceSummaryRowKeyGeminiGenerateContent)
+	assertGatewayTraffic(t, geminiEndpoint.Traffic, 1, 1, lastRequestAt)
+
+	responsesEndpoint := findGatewayEndpointSummaryRow(t, summary, apiopenapi.GatewayEndpointResourceSummaryRowKeyResponses)
+	assertGatewayTraffic(t, responsesEndpoint.Traffic, 0, 0, time.Time{})
 }
 
 func TestGatewayResourceFixesIncludesDefaultZeroRoutePricing(t *testing.T) {
@@ -750,6 +818,28 @@ func assertEndpointDiagnostics(t *testing.T, endpoint apiopenapi.GatewayEndpoint
 		endpoint.RoutableAccounts != want.routableAccounts ||
 		endpoint.Status != want.status {
 		t.Fatalf("endpoint diagnostics = %+v, want %+v", endpoint, want)
+	}
+}
+
+func assertGatewayTraffic(t *testing.T, traffic apiopenapi.GatewayResourceTraffic, requests int, errors int, lastRequestAt time.Time) {
+	t.Helper()
+	if traffic.RequestCount != requests ||
+		traffic.ErrorCount != errors ||
+		traffic.WindowSeconds != int((24*time.Hour).Seconds()) {
+		t.Fatalf("traffic = %+v, want requests=%d errors=%d window=24h", traffic, requests, errors)
+	}
+	if requests == 0 {
+		if traffic.SuccessRate != 0 || traffic.LastRequestAt != nil {
+			t.Fatalf("empty traffic = %+v, want zero success rate and no last request", traffic)
+		}
+		return
+	}
+	wantSuccessRate := float32(requests-errors) / float32(requests)
+	if traffic.SuccessRate != wantSuccessRate {
+		t.Fatalf("traffic success rate = %v, want %v", traffic.SuccessRate, wantSuccessRate)
+	}
+	if traffic.LastRequestAt == nil || !traffic.LastRequestAt.Equal(lastRequestAt) {
+		t.Fatalf("traffic last request = %v, want %v", traffic.LastRequestAt, lastRequestAt)
 	}
 }
 

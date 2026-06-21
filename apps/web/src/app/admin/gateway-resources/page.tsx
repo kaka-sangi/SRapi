@@ -41,6 +41,7 @@ import {
 } from "@/hooks/admin-queries";
 import { useToast } from "@/context/ToastContext";
 import { adminErrorMessage } from "@/lib/admin-api";
+import { formatCompactNumber, formatDateTime, formatPercent } from "@/lib/admin-format";
 import { adminRequestEvidenceHref, adminSchedulerDecisionsHref } from "@/lib/admin-log-links";
 import {
   PROTOCOL_CONVERSION_ROUTES,
@@ -52,6 +53,7 @@ import type {
   GatewayEndpointResourceSummaryRow,
   GatewayProviderResourceReason,
   GatewayProviderResourceStatus,
+  GatewayResourceTraffic,
   GatewayResourceFix,
   GatewayModelResourceRow,
   GatewayPricingCoverage,
@@ -259,6 +261,7 @@ function GatewayResourcesContent() {
                         <TableHead className="text-right">
                           {t("adminGatewayResources.apiKeys")}
                         </TableHead>
+                        <TableHead>{t("adminGatewayResources.traffic")}</TableHead>
                         <TableHead>{t("adminCommon.status")}</TableHead>
                         <TableHead>{t("adminGatewayResources.blockers")}</TableHead>
                         <TableHead>{t("adminGatewayResources.rowActions")}</TableHead>
@@ -305,6 +308,7 @@ function GatewayResourcesContent() {
                         <TableHead className="text-right">
                           {t("adminGatewayResources.apiKeys")}
                         </TableHead>
+                        <TableHead>{t("adminGatewayResources.traffic")}</TableHead>
                         <TableHead>{t("adminCommon.status")}</TableHead>
                         <TableHead>{t("adminGatewayResources.blockers")}</TableHead>
                         <TableHead>{t("adminGatewayResources.rowActions")}</TableHead>
@@ -347,6 +351,7 @@ function GatewayResourcesContent() {
                         <TableHead className="text-right">
                           {t("adminGatewayResources.apiKeys")}
                         </TableHead>
+                        <TableHead>{t("adminGatewayResources.traffic")}</TableHead>
                         <TableHead>{t("adminCommon.status")}</TableHead>
                         <TableHead>{t("adminGatewayResources.blockers")}</TableHead>
                         <TableHead>{t("adminGatewayResources.rowActions")}</TableHead>
@@ -910,6 +915,7 @@ function GatewayEndpointSummaryItem({ row }: { row: GatewayEndpointResourceSumma
           ready={row.routable_account_routes > 0}
         />
       </div>
+      <GatewayTrafficSummary traffic={row.traffic} compact />
       {row.unsupported_account_routes > 0 || row.unavailable_model_account_routes > 0 ? (
         <div className="flex flex-wrap gap-1">
           {row.unsupported_account_routes > 0 ? (
@@ -1001,6 +1007,7 @@ function endpointSummaryTitle(
     `${t("adminGatewayResources.endpointAccounts")}: ${row.routable_account_routes}/${row.candidate_account_routes}`,
     `${t("adminGatewayResources.endpointUnsupported")}: ${row.unsupported_account_routes}`,
     `${t("adminGatewayResources.endpointModelBlocked")}: ${row.unavailable_model_account_routes}`,
+    gatewayTrafficTitle(row.traffic, t),
   ].join("\n");
 }
 
@@ -1053,6 +1060,9 @@ function ModelResourceRow({ row }: { row: GatewayModelResourceRow }) {
         {row.scoped_key_count > 0 ? (
           <span className="text-srapi-text-tertiary"> · {row.scoped_key_count}</span>
         ) : null}
+      </TableCell>
+      <TableCell>
+        <GatewayTrafficSummary traffic={row.traffic} />
       </TableCell>
       <TableCell>
         <span className="inline-flex items-center gap-1.5">
@@ -1136,6 +1146,9 @@ function RouteResourceRow({ row }: { row: GatewayRouteResourceRow }) {
         {row.scoped_key_count > 0 ? (
           <span className="text-srapi-text-tertiary"> · {row.scoped_key_count}</span>
         ) : null}
+      </TableCell>
+      <TableCell>
+        <GatewayTrafficSummary traffic={row.traffic} />
       </TableCell>
       <TableCell>
         <span className="inline-flex items-center gap-1.5">
@@ -1471,11 +1484,15 @@ function firstGatewayEndpoint(endpoints: GatewayEndpointResourceRow[]) {
   );
 }
 
-function hasProvider(row: GatewayFixActionRow): row is GatewayProviderResourceRow | GatewayRouteResourceRow {
+function hasProvider(
+  row: GatewayFixActionRow,
+): row is GatewayProviderResourceRow | GatewayRouteResourceRow {
   return "provider" in row;
 }
 
-function hasModel(row: GatewayFixActionRow): row is GatewayModelResourceRow | GatewayRouteResourceRow {
+function hasModel(
+  row: GatewayFixActionRow,
+): row is GatewayModelResourceRow | GatewayRouteResourceRow {
   return "model" in row;
 }
 
@@ -1523,6 +1540,72 @@ function endpointTitle(
     `${t("adminGatewayResources.endpointDiagnostics.candidate")}: ${endpoint.candidate_accounts}`,
     `${t("adminGatewayResources.endpointDiagnostics.unsupported")}: ${endpoint.unsupported_accounts}`,
     `${t("adminGatewayResources.endpointDiagnostics.unavailableModel")}: ${endpoint.unavailable_model_accounts}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function GatewayTrafficSummary({
+  traffic,
+  compact = false,
+}: {
+  traffic: GatewayResourceTraffic;
+  compact?: boolean;
+}) {
+  const { t } = useLanguage();
+  const requestCount = traffic.request_count ?? 0;
+  const errorCount = traffic.error_count ?? 0;
+  const hasRequests = requestCount > 0;
+  const lastRequest = formatDateTime(traffic.last_request_at);
+  return (
+    <div
+      className={compact ? "flex flex-wrap gap-1" : "flex min-w-[130px] flex-col items-start gap-1"}
+      title={gatewayTrafficTitle(traffic, t)}
+    >
+      <span
+        className={
+          errorCount > 0
+            ? "border-srapi-error/20 bg-srapi-error/10 text-srapi-error inline-flex w-fit items-center rounded-md border px-1.5 py-0.5 font-mono text-[10px]"
+            : "border-srapi-border bg-srapi-card-muted text-srapi-text-secondary inline-flex w-fit items-center rounded-md border px-1.5 py-0.5 font-mono text-[10px]"
+        }
+      >
+        {t("adminGatewayResources.trafficRequests", {
+          count: formatCompactNumber(requestCount),
+        })}
+        {errorCount > 0 ? (
+          <span className="ml-1">
+            {t("adminGatewayResources.trafficErrors", {
+              count: formatCompactNumber(errorCount),
+            })}
+          </span>
+        ) : null}
+      </span>
+      <span className="text-2xs text-srapi-text-tertiary truncate font-mono">
+        {hasRequests ? lastRequest : t("adminGatewayResources.noRecentTraffic")}
+      </span>
+    </div>
+  );
+}
+
+function gatewayTrafficTitle(
+  traffic: GatewayResourceTraffic,
+  t: (key: string, params?: Record<string, string | number>) => string,
+) {
+  const hours = Math.max(1, Math.round((traffic.window_seconds ?? 0) / 3600));
+  return [
+    t("adminGatewayResources.trafficWindow", { hours }),
+    t("adminGatewayResources.trafficRequests", {
+      count: formatCompactNumber(traffic.request_count),
+    }),
+    t("adminGatewayResources.trafficErrors", {
+      count: formatCompactNumber(traffic.error_count),
+    }),
+    t("adminGatewayResources.trafficSuccessRate", {
+      rate: formatPercent(traffic.success_rate),
+    }),
+    t("adminGatewayResources.trafficLastRequest", {
+      time: formatDateTime(traffic.last_request_at),
+    }),
   ].join("\n");
 }
 
@@ -1609,6 +1692,9 @@ function ProviderResourceRow({ row }: { row: GatewayProviderResourceRow }) {
         {row.scoped_key_count > 0 ? (
           <span className="text-srapi-text-tertiary"> · {row.scoped_key_count}</span>
         ) : null}
+      </TableCell>
+      <TableCell>
+        <GatewayTrafficSummary traffic={row.traffic} />
       </TableCell>
       <TableCell>
         <span className="inline-flex items-center gap-1.5">
