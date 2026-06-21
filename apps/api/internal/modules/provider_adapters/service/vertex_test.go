@@ -10,6 +10,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -131,6 +132,97 @@ func TestPrepareVertexRequest_InjectsBearerTokenAndMintsURL(t *testing.T) {
 	}
 	if got := atomic.LoadInt32(&oauthCalls); got != 1 {
 		t.Fatalf("token cache should collapse identical (client_email, scope), got %d upstream calls", got)
+	}
+}
+
+func TestVertexProjectList_AcceptsBothRawAndTypedSlices(t *testing.T) {
+	rawJSON := []any{"alpha", "  bravo  ", "", 42, "charlie"}
+	got := vertexProjectList(map[string]any{"project_ids": rawJSON})
+	want := []string{"alpha", "bravo", "charlie"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("raw []any: got %v want %v", got, want)
+	}
+	typed := []string{"alpha", "", "  bravo  "}
+	got = vertexProjectList(map[string]any{"project_ids": typed})
+	if !reflect.DeepEqual(got, []string{"alpha", "bravo"}) {
+		t.Fatalf("typed []string: got %v", got)
+	}
+	if vertexProjectList(map[string]any{}) != nil {
+		t.Fatal("absent key must return nil")
+	}
+}
+
+func TestVertexProjectRotator_AdvancesAndWraps(t *testing.T) {
+	rot := newVertexProjectRotator()
+	projects := []string{"alpha", "bravo", "charlie"}
+	if got := rot.pick(7, projects); got != "alpha" {
+		t.Fatalf("first pick = %s, want alpha", got)
+	}
+	rot.advance(7, "alpha", projects)
+	if got := rot.pick(7, projects); got != "bravo" {
+		t.Fatalf("after advance = %s, want bravo", got)
+	}
+	rot.advance(7, "bravo", projects)
+	rot.advance(7, "charlie", projects)
+	if got := rot.pick(7, projects); got != "alpha" {
+		t.Fatalf("wrap = %s, want alpha", got)
+	}
+	// Stale advance (someone else already rotated) must NOT double-rotate.
+	rot.advance(7, "bravo", projects) // current is alpha now
+	if got := rot.pick(7, projects); got != "alpha" {
+		t.Fatalf("stale advance leaked: %s", got)
+	}
+}
+
+func TestVertexHandleDispatchError_RotatesProjectOn429(t *testing.T) {
+	resetVertexTokenSource()
+	t.Cleanup(resetVertexTokenSource)
+	saJSON := mustVertexServiceAccountJSON(t, "https://example.invalid/")
+	req := contract.ConversationRequest{
+		Account: accountcontract.ProviderAccount{
+			ID:           99,
+			RuntimeClass: accountcontract.RuntimeClassServiceAccountJSON,
+			Metadata: map[string]any{
+				"region":      "us-central1",
+				"project_ids": []any{"alpha", "bravo"},
+			},
+		},
+		Credential: map[string]any{"service_account_json": saJSON},
+	}
+	if got := vertexProject(req.Account.ID, req.Account.Metadata, nil); got != "alpha" {
+		t.Fatalf("initial project = %s, want alpha", got)
+	}
+	vertexHandleDispatchError(req, contract.ProviderError{
+		Class:      "rate_limit",
+		StatusCode: http.StatusTooManyRequests,
+		Message:    "RESOURCE_EXHAUSTED",
+	})
+	if got := vertexProject(req.Account.ID, req.Account.Metadata, nil); got != "bravo" {
+		t.Fatalf("after 429 project = %s, want bravo", got)
+	}
+}
+
+func TestVertexHandleDispatchError_NoOpForSingleProject(t *testing.T) {
+	resetVertexTokenSource()
+	t.Cleanup(resetVertexTokenSource)
+	saJSON := mustVertexServiceAccountJSON(t, "https://example.invalid/")
+	req := contract.ConversationRequest{
+		Account: accountcontract.ProviderAccount{
+			ID:           100,
+			RuntimeClass: accountcontract.RuntimeClassServiceAccountJSON,
+			Metadata: map[string]any{
+				"region":     "us-central1",
+				"project_id": "solo",
+			},
+		},
+		Credential: map[string]any{"service_account_json": saJSON},
+	}
+	vertexHandleDispatchError(req, contract.ProviderError{
+		Class:      "rate_limit",
+		StatusCode: http.StatusTooManyRequests,
+	})
+	if got := vertexProject(req.Account.ID, req.Account.Metadata, nil); got != "solo" {
+		t.Fatalf("single-project account must stay on solo, got %s", got)
 	}
 }
 

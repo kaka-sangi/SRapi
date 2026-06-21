@@ -38,6 +38,7 @@ const (
 var (
 	vertexTokenSourceOnce sync.Once
 	vertexTokenSource     *platformvertex.TokenSource
+	vertexProjectRotator  = newVertexProjectRotator()
 )
 
 func vertexSharedTokenSource() *platformvertex.TokenSource {
@@ -45,6 +46,52 @@ func vertexSharedTokenSource() *platformvertex.TokenSource {
 		vertexTokenSource = platformvertex.NewTokenSource(nil)
 	})
 	return vertexTokenSource
+}
+
+// vertexProjectRotation tracks the current project cursor for each account
+// across the in-process rotator. The cursor is bumped when the upstream
+// returns RESOURCE_EXHAUSTED / 429 so the very next dispatch attempt
+// targets the next project in the operator-supplied project_ids list. The
+// state is per-process — Redis-style synchronization across replicas is
+// not in scope here because the cursor is monotone-mod-N and converges
+// to the same project quickly.
+type vertexProjectRotation struct {
+	mu     sync.Mutex
+	cursor map[int]int
+}
+
+func newVertexProjectRotator() *vertexProjectRotation {
+	return &vertexProjectRotation{cursor: map[int]int{}}
+}
+
+// pick returns the current project for accountID, applying cursor %
+// len(projects) so a shrunk project_ids list still resolves cleanly.
+func (r *vertexProjectRotation) pick(accountID int, projects []string) string {
+	if len(projects) == 0 {
+		return ""
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	idx := r.cursor[accountID] % len(projects)
+	return projects[idx]
+}
+
+// advance bumps the cursor so the next pick returns the next project.
+// Callers pass the project they just used so a race between two
+// failing dispatches against the same project only advances once.
+func (r *vertexProjectRotation) advance(accountID int, usedProject string, projects []string) {
+	if len(projects) == 0 {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	current := r.cursor[accountID] % len(projects)
+	if usedProject != "" && projects[current] != usedProject {
+		// Someone else already rotated past the project we tried — leave
+		// the cursor where it is so we don't double-rotate.
+		return
+	}
+	r.cursor[accountID] = (current + 1) % len(projects)
 }
 
 func isVertexAccount(req contract.ConversationRequest) bool {
@@ -65,7 +112,7 @@ func prepareVertexRequest(ctx context.Context, req contract.ConversationRequest)
 	// account fails fast and cheap instead of consuming an upstream token
 	// exchange round-trip every dispatch attempt.
 	region := vertexRegion(req.Account.Metadata)
-	project := vertexProject(req.Account.Metadata, sa)
+	project := vertexProject(req.Account.ID, req.Account.Metadata, sa)
 	if project == "" {
 		return req, "", contract.ProviderError{Class: "configuration_error", StatusCode: http.StatusBadGateway, Message: "vertex account missing project_id"}
 	}
@@ -95,16 +142,34 @@ func invalidateVertexToken(req contract.ConversationRequest) {
 	vertexSharedTokenSource().Invalidate(sa, vertexScope)
 }
 
-// vertexHandleDispatchError forces a token refresh on the next call when the
-// upstream rejected our access token. The actual retry happens through the
-// standard gateway failover loop — this just prevents us from re-sending
-// the same expired token to the next candidate retry.
+// vertexHandleDispatchError reacts to upstream failure signals that Vertex
+// emits asymmetrically:
+//
+//   - 401/403 → invalidate the cached access token so a rotated key
+//     surfaces on the very next failover attempt.
+//   - 429 / quota_exhausted → advance the project rotator so the next
+//     attempt routes against a different project_ids[] entry. Operators
+//     who have only configured a single project no-op gracefully because
+//     the rotator skips the bump when project_ids is empty.
 func vertexHandleDispatchError(req contract.ConversationRequest, err error) {
 	var providerErr contract.ProviderError
-	if errors.As(err, &providerErr) {
-		if providerErr.StatusCode == http.StatusUnauthorized || providerErr.StatusCode == http.StatusForbidden {
-			invalidateVertexToken(req)
+	if !errors.As(err, &providerErr) {
+		return
+	}
+	switch {
+	case providerErr.StatusCode == http.StatusUnauthorized || providerErr.StatusCode == http.StatusForbidden:
+		invalidateVertexToken(req)
+	case providerErr.StatusCode == http.StatusTooManyRequests || providerErr.Class == "quota_exhausted" || providerErr.Class == "rate_limit":
+		sa, parseErr := vertexServiceAccountFromCredential(req.Credential)
+		if parseErr != nil {
+			return
 		}
+		projects := vertexProjectList(req.Account.Metadata)
+		if len(projects) <= 1 {
+			return
+		}
+		used := vertexProject(req.Account.ID, req.Account.Metadata, sa)
+		vertexProjectRotator.advance(req.Account.ID, used, projects)
 	}
 }
 
@@ -159,7 +224,13 @@ func vertexRegion(metadata map[string]any) string {
 	return vertexDefaultRegion
 }
 
-func vertexProject(metadata map[string]any, sa *platformvertex.ServiceAccount) string {
+func vertexProject(accountID int, metadata map[string]any, sa *platformvertex.ServiceAccount) string {
+	// A non-empty project_ids list takes precedence so the rotator can
+	// switch between projects on quota exhaustion. Single-project
+	// accounts continue to read the legacy project_id metadata field.
+	if projects := vertexProjectList(metadata); len(projects) > 0 {
+		return vertexProjectRotator.pick(accountID, projects)
+	}
 	if project := mapString(metadata, "project_id"); project != "" {
 		return project
 	}
@@ -170,6 +241,40 @@ func vertexProject(metadata map[string]any, sa *platformvertex.ServiceAccount) s
 		return sa.ProjectID
 	}
 	return ""
+}
+
+// vertexProjectList reads the project_ids array from metadata. Accepts
+// both []any (raw JSON unmarshal) and []string (already-typed). Drops
+// blank entries so partial form input doesn't ghost-rotate to "".
+func vertexProjectList(metadata map[string]any) []string {
+	value, ok := metadata["project_ids"]
+	if !ok {
+		return nil
+	}
+	var items []any
+	switch v := value.(type) {
+	case []any:
+		items = v
+	case []string:
+		out := make([]string, 0, len(v))
+		for _, entry := range v {
+			if trimmed := strings.TrimSpace(entry); trimmed != "" {
+				out = append(out, trimmed)
+			}
+		}
+		return out
+	default:
+		return nil
+	}
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		if s, ok := item.(string); ok {
+			if trimmed := strings.TrimSpace(s); trimmed != "" {
+				out = append(out, trimmed)
+			}
+		}
+	}
+	return out
 }
 
 func cloneCredentialMap(in map[string]any) map[string]any {
