@@ -100,3 +100,53 @@ func TestClassifyProviderHTTPErrorCloudflareChallenge(t *testing.T) {
 		t.Fatalf("normal 403 should not carry cf_ray metadata, got %v", normal.Metadata["cf_ray"])
 	}
 }
+
+// TestClassifyGeminiProviderHTTPErrorRecognizesAntigravityCreditExhaustion
+// proves the Gemini classifier promotes Antigravity credit-balance
+// exhaustion (signalled via google.rpc.ErrorInfo.reason =
+// INSUFFICIENT_G1_CREDITS_BALANCE) to the quota_exhausted class instead
+// of the generic rate_limit. Without the explicit reason check the
+// keyword fallback misses the underscore-cased enum and the account
+// gets cooled down briefly then re-picked.
+func TestClassifyGeminiProviderHTTPErrorRecognizesAntigravityCreditExhaustion(t *testing.T) {
+	body := []byte(`{"error":{"code":429,"message":"insufficient credit balance",` +
+		`"status":"RESOURCE_EXHAUSTED","details":[` +
+		`{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"INSUFFICIENT_G1_CREDITS_BALANCE"}` +
+		`]}}`)
+	got := classifyGeminiProviderHTTPError(http.StatusTooManyRequests, body)
+	if got.Class != "quota_exhausted" {
+		t.Fatalf("credit balance exhausted class = %q, want quota_exhausted", got.Class)
+	}
+}
+
+// QUOTA_EXHAUSTED reason without a retryDelay should also classify as
+// quota_exhausted (was previously only caught via the keyword fallback,
+// which depended on the human message text — fragile).
+func TestClassifyGeminiProviderHTTPErrorRecognizesQuotaExhaustedReason(t *testing.T) {
+	body := []byte(`{"error":{"code":429,"message":"resource exhausted",` +
+		`"status":"RESOURCE_EXHAUSTED","details":[` +
+		`{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"QUOTA_EXHAUSTED"}` +
+		`]}}`)
+	got := classifyGeminiProviderHTTPError(http.StatusTooManyRequests, body)
+	if got.Class != "quota_exhausted" {
+		t.Fatalf("quota exhausted reason class = %q, want quota_exhausted", got.Class)
+	}
+}
+
+// RATE_LIMIT_EXCEEDED with a structured retryDelay must NOT be promoted
+// to quota_exhausted — it's a transient throttle that should drive a
+// short cooldown via the parsed RetryAfter (wave-4 item 1).
+func TestClassifyGeminiProviderHTTPErrorKeepsRateLimitExceededAsRateLimit(t *testing.T) {
+	body := []byte(`{"error":{"code":429,"message":"slow down",` +
+		`"status":"RESOURCE_EXHAUSTED","details":[` +
+		`{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"RATE_LIMIT_EXCEEDED"},` +
+		`{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"2s"}` +
+		`]}}`)
+	got := classifyGeminiProviderHTTPError(http.StatusTooManyRequests, body)
+	if got.Class != "rate_limit" {
+		t.Fatalf("rate_limit_exceeded class = %q, want rate_limit", got.Class)
+	}
+	if got.RetryAfter == nil {
+		t.Fatalf("expected parsed retryDelay to populate RetryAfter")
+	}
+}

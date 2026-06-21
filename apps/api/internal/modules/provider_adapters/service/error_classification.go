@@ -202,6 +202,17 @@ func providerErrorBodyIndicatesSessionInvalid(body []byte, message string) bool 
 }
 
 func providerErrorBodyIndicatesGeminiQuotaExhausted(body []byte, message string) bool {
+	// Antigravity surfaces credit-balance exhaustion as
+	// `google.rpc.ErrorInfo.reason = INSUFFICIENT_G1_CREDITS_BALANCE`, with
+	// no retryDelay and no quota_exhausted keyword in the human message.
+	// Treat that as a hard quota_exhausted explicitly so the cooldown
+	// promotes from the generic rate-limit default to the quota window
+	// the rate-limit module reserves for true exhaustion. Matches the
+	// CLIProxyAPI antigravity executor's `antigravityHasExplicit
+	// CreditsBalanceExhaustedReason` gate.
+	if providerErrorBodyHasGoogleReason(body, "INSUFFICIENT_G1_CREDITS_BALANCE", "QUOTA_EXHAUSTED") {
+		return true
+	}
 	if providerErrorBodyHasGoogleReason(body, "RATE_LIMIT_EXCEEDED", "MODEL_CAPACITY_EXHAUSTED") {
 		return false
 	}
