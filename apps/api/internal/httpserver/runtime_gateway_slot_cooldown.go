@@ -61,10 +61,11 @@ func (rt *runtimeState) acquireGatewayAccountConcurrencySlot(ctx context.Context
 	return release, true, nil
 }
 
-// recordGatewayAccountRateLimitCooldown records an upstream 429 hit in the
-// in-process cooldown when the account opted in. retryAfter ≤ 0 is treated
-// as "use module default" (the module clamps to >= 1s anyway).
-func (rt *runtimeState) recordGatewayAccountRateLimitCooldown(account accountcontract.ProviderAccount, retryAfter time.Duration) {
+// recordGatewayAccountRateLimitCooldown records an upstream 429 hit
+// against the (accountID, model) pair so a 429 on one model never blocks
+// a different model on the same credential. retryAfter ≤ 0 is treated as
+// "use module default" (the module clamps to >= 1s anyway).
+func (rt *runtimeState) recordGatewayAccountRateLimitCooldown(account accountcontract.ProviderAccount, model string, retryAfter time.Duration) {
 	if rt.rateLimitCooldown == nil {
 		return
 	}
@@ -74,19 +75,20 @@ func (rt *runtimeState) recordGatewayAccountRateLimitCooldown(account accountcon
 	if account.ID <= 0 {
 		return
 	}
-	rt.rateLimitCooldown.RecordRateLimitHit(int64(account.ID), retryAfter)
+	rt.rateLimitCooldown.RecordRateLimitHit(int64(account.ID), model, retryAfter)
 }
 
-// gatewayCooldownedAccountIDs returns every account currently in the
-// in-process 429 cooldown — caller appends them to ExcludedAccountIDs so the
-// scheduler skips them on this attempt. Safe to call when the cooldown
-// module is nil (returns nil). The cooldown set is bounded by the module's
-// LRU cap (4096), so this is cheap.
-func (rt *runtimeState) gatewayCooldownedAccountIDs() []int {
+// gatewayCooldownedAccountIDs returns every account currently in
+// cooldown for the supplied model — caller appends them to
+// ExcludedAccountIDs so the scheduler skips them on this attempt. The
+// set is the union of (accountID, model) and account-wide entries: a
+// 429 on any model still excludes its account, while a 429 on a
+// sibling model never does.
+func (rt *runtimeState) gatewayCooldownedAccountIDs(model string) []int {
 	if rt.rateLimitCooldown == nil {
 		return nil
 	}
-	ids64 := rt.rateLimitCooldown.CooldownedIDs()
+	ids64 := rt.rateLimitCooldown.CooldownedIDs(model)
 	if len(ids64) == 0 {
 		return nil
 	}

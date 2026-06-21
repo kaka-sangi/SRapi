@@ -622,7 +622,7 @@ NextCandidate:
 		// excluded set so the scheduler skips them. The asynchronous
 		// metadata write to cooldown_until is the source of truth — this
 		// cooldown is a per-process synchronous accelerator.
-		for _, id := range s.runtime.gatewayCooldownedAccountIDs() {
+		for _, id := range s.runtime.gatewayCooldownedAccountIDs(canonical.CanonicalModel) {
 			attemptReq.ExcludedAccountIDs = append(attemptReq.ExcludedAccountIDs, id)
 		}
 
@@ -729,11 +729,11 @@ NextCandidate:
 			if errorClass, upstreamStatus, _ := providerGatewayError(err); errorClass != "" || upstreamStatus > 0 {
 				decision := ClassifyUpstreamError(upstreamStatus, nil, err)
 				if decision.Class == "transient" && decision.RetryAfterMs > 0 {
-					s.runtime.recordGatewayAccountRateLimitCooldown(result.Candidate.Account, time.Duration(decision.RetryAfterMs)*time.Millisecond)
+					s.runtime.recordGatewayAccountRateLimitCooldown(result.Candidate.Account, canonical.CanonicalModel, time.Duration(decision.RetryAfterMs)*time.Millisecond)
 				} else if upstreamStatus == http.StatusTooManyRequests {
 					// 429 without a Retry-After header still counts toward
 					// the consecutive-disable threshold.
-					s.runtime.recordGatewayAccountRateLimitCooldown(result.Candidate.Account, 0)
+					s.runtime.recordGatewayAccountRateLimitCooldown(result.Candidate.Account, canonical.CanonicalModel, 0)
 				}
 			}
 
