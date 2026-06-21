@@ -155,6 +155,26 @@ func rowTextLower(values ...string) string {
 	return strings.ToLower(strings.Join(values, " "))
 }
 
+// accountMatchesSearch reports whether `search` (already lower-cased and
+// trimmed) is a substring of the account name, upstream client, or
+// stringified numeric ID. Empty search yields no narrowing — the caller
+// is expected to short-circuit before invoking the helper.
+func accountMatchesSearch(account accountcontract.ProviderAccount, search string) bool {
+	if search == "" {
+		return true
+	}
+	if strings.Contains(strings.ToLower(account.Name), search) {
+		return true
+	}
+	if account.UpstreamClient != nil && strings.Contains(strings.ToLower(strings.TrimSpace(*account.UpstreamClient)), search) {
+		return true
+	}
+	if strings.Contains(strconv.Itoa(account.ID), search) {
+		return true
+	}
+	return false
+}
+
 func filterAccounts(accounts []accountcontract.ProviderAccount, status, providerID string) []accountcontract.ProviderAccount {
 	status = strings.TrimSpace(status)
 	providerID = strings.TrimSpace(providerID)

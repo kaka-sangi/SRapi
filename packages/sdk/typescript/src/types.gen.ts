@@ -13454,6 +13454,14 @@ export type ListAdminAccountsData = {
          * Restrict to accounts that are members of the given account group.
          */
         group_id?: Id;
+        /**
+         * Case-insensitive substring match against the account name, upstream client, or numeric ID.
+         */
+        search?: string;
+        /**
+         * Restrict to a single account runtime class (api_key, oauth_refresh, oauth_device_code, etc).
+         */
+        runtime_class?: string;
     };
     url: '/api/v1/admin/accounts';
 };

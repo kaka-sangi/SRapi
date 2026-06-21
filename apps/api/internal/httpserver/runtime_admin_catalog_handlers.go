@@ -895,6 +895,27 @@ func (s *Server) handleListAdminAccounts(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	accounts = filterAccounts(accounts, r.URL.Query().Get("status"), r.URL.Query().Get("provider_id"))
+	if runtimeClass := strings.TrimSpace(r.URL.Query().Get("runtime_class")); runtimeClass != "" {
+		filtered := make([]accountcontract.ProviderAccount, 0, len(accounts))
+		for _, account := range accounts {
+			if string(account.RuntimeClass) == runtimeClass {
+				filtered = append(filtered, account)
+			}
+		}
+		accounts = filtered
+	}
+	if search := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("search"))); search != "" {
+		// Case-insensitive substring match across name / upstream client / id.
+		// Keeps the contract narrow: operators see "type in part of a name
+		// and the row appears", which is what the upstream sub2api UI does.
+		filtered := make([]accountcontract.ProviderAccount, 0, len(accounts))
+		for _, account := range accounts {
+			if accountMatchesSearch(account, search) {
+				filtered = append(filtered, account)
+			}
+		}
+		accounts = filtered
+	}
 	if groupIDRaw := strings.TrimSpace(r.URL.Query().Get("group_id")); groupIDRaw != "" {
 		groupID, parseErr := strconv.Atoi(groupIDRaw)
 		if parseErr != nil || groupID <= 0 {

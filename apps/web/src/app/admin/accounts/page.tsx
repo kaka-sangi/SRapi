@@ -9,7 +9,7 @@ import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu, type RowAction } from "@/components/admin/row-actions";
-import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
+import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-toolbar";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
@@ -167,6 +167,16 @@ function normalizeAccountIds(ids: string[]): string[] {
   return [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
 }
 
+const RUNTIME_CLASS_FILTER_OPTIONS: { value: string; labelKey: string }[] = [
+  { value: "api_key", labelKey: "adminAccounts.runtimeClassLabel.api_key" },
+  { value: "oauth_refresh", labelKey: "adminAccounts.runtimeClassLabel.oauth_refresh" },
+  { value: "oauth_device_code", labelKey: "adminAccounts.runtimeClassLabel.oauth_device_code" },
+  { value: "web_session_cookie", labelKey: "adminAccounts.runtimeClassLabel.web_session_cookie" },
+  { value: "cli_client_token", labelKey: "adminAccounts.runtimeClassLabel.cli_client_token" },
+  { value: "custom_reverse_proxy", labelKey: "adminAccounts.runtimeClassLabel.custom_reverse_proxy" },
+  { value: "service_account_json", labelKey: "adminAccounts.runtimeClassLabel.service_account_json" },
+];
+
 function AccountsContent() {
   const { t } = useLanguage();
   const { toast } = useToast();
@@ -194,13 +204,17 @@ function AccountsContent() {
     (readOnlyHealthView ? "active" : undefined);
   const providerFilter = list.filters.providerId || undefined;
   const groupFilter = list.filters.groupId || undefined;
+  const runtimeClassFilter = list.filters.runtimeClass || undefined;
   const focusedAccountId = list.filters.accountId || undefined;
+  const searchQuery = list.search || undefined;
   const accounts = useAdminAccounts({
     page: list.page,
     page_size: list.pageSize,
     status: statusFilter,
     provider_id: providerFilter,
     group_id: groupFilter,
+    runtime_class: runtimeClassFilter,
+    search: searchQuery,
   });
   const accountRows = accounts.data?.data;
   const focusedAccount = useAdminAccount(focusedAccountId ?? null);
@@ -312,7 +326,9 @@ function AccountsContent() {
       ? (focusedAccountTarget ?? null)
       : null;
   const detailTarget = manualDetailTarget ?? autoDetailTarget;
-  const isFiltered = Boolean(statusFilter || providerFilter || groupFilter);
+  const isFiltered = Boolean(
+    statusFilter || providerFilter || groupFilter || runtimeClassFilter || searchQuery,
+  );
 
   function toastBatchResult({
     total,
@@ -1141,6 +1157,11 @@ function AccountsContent() {
 
   const toolbar = (
     <ListToolbar>
+      <SearchInput
+        value={list.searchInput}
+        onChange={list.setSearchInput}
+        placeholder={t("adminAccounts.searchPlaceholder")}
+      />
       <FilterSelect
         value={statusFilter}
         onChange={(v) => list.setFilter("status", v)}
@@ -1155,6 +1176,12 @@ function AccountsContent() {
           allLabel={t("adminAccounts.allProviders")}
         />
       ) : null}
+      <FilterSelect
+        value={runtimeClassFilter}
+        onChange={(v) => list.setFilter("runtimeClass", v)}
+        options={RUNTIME_CLASS_FILTER_OPTIONS.map((opt) => ({ value: opt.value, label: t(opt.labelKey) }))}
+        allLabel={t("adminAccounts.allRuntimeClasses")}
+      />
       {groupFilterOptions.length > 0 ? (
         <FilterSelect
           value={groupFilter}

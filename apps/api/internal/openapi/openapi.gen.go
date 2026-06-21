@@ -13489,6 +13489,12 @@ type ListAdminAccountsParams struct {
 
 	// GroupId Restrict to accounts that are members of the given account group.
 	GroupId *Id `form:"group_id,omitempty" json:"group_id,omitempty"`
+
+	// Search Case-insensitive substring match against the account name, upstream client, or numeric ID.
+	Search *string `form:"search,omitempty" json:"search,omitempty"`
+
+	// RuntimeClass Restrict to a single account runtime class (api_key, oauth_refresh, oauth_device_code, etc).
+	RuntimeClass *string `form:"runtime_class,omitempty" json:"runtime_class,omitempty"`
 }
 
 // ListAdminAccountsAvailabilityParams defines parameters for ListAdminAccountsAvailability.
@@ -25553,6 +25559,32 @@ func (siw *ServerInterfaceWrapper) ListAdminAccounts(w http.ResponseWriter, r *h
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "group_id"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "group_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "search" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "search", r.URL.Query(), &params.Search, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "search"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "search", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "runtime_class" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "runtime_class", r.URL.Query(), &params.RuntimeClass, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "runtime_class"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "runtime_class", Err: err})
 		}
 		return
 	}
