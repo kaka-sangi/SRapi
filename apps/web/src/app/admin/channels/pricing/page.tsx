@@ -11,6 +11,8 @@ import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
+import { Card } from "@/components/ui/card";
+import { QuietBadge } from "@/components/ui/quiet-badge";
 import {
   useAdminPricingRules,
   useAdminPricingRulePresets,
@@ -35,7 +37,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { adminErrorMessage } from "@/lib/admin-api";
-import { formatMoney } from "@/lib/admin-format";
+import { formatInteger, formatMoney } from "@/lib/admin-format";
 import {
   emptyPricingRuleForm,
   pricingRuleFormFromRule,
@@ -43,7 +45,7 @@ import {
   buildUpdatePricingRuleBody,
   type PricingRuleFormState,
 } from "@/lib/admin-subscription-form";
-import type { PricingRule } from "@/lib/sdk-types";
+import type { PricingRule, PricingRulePreset } from "@/lib/sdk-types";
 
 export default function ChannelPricingPage() {
   return (
@@ -59,6 +61,7 @@ function PricingContent() {
   const list = useAdminList();
   const colVis = useColumnVisibility("admin-channel-pricing", []);
   const rules = useAdminPricingRules({ page: list.page, page_size: list.pageSize });
+  const allRules = useAdminPricingRules();
   const presets = useAdminPricingRulePresets();
   const models = useAdminModels();
   const providers = useAdminProviders();
@@ -73,6 +76,7 @@ function PricingContent() {
   const [importing, setImporting] = useState(false);
   const [importText, setImportText] = useState("");
   const [importError, setImportError] = useState<string | null>(null);
+  const presetCoverage = buildPresetCoverage(presets.data ?? [], allRules.data?.data ?? []);
 
   function openImport(open: boolean) {
     setImporting(open);
@@ -110,6 +114,24 @@ function PricingContent() {
   async function installBuiltInPresets() {
     try {
       const result = await installPresetsMut.mutateAsync(undefined);
+      toast({
+        title: t("adminPricing.presetsInstalled", { count: result.created }),
+        description: t("adminPricing.presetsInstalledHint", {
+          requested: String(result.requested),
+          validated: String(result.validated),
+        }),
+        tone: result.errors.length > 0 ? "warning" : "success",
+      });
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+    }
+  }
+
+  async function installMissingPresets() {
+    if (presetCoverage.missing.length === 0) return;
+    try {
+      const families = presetCoverage.missing.map((preset) => preset.model_family);
+      const result = await installPresetsMut.mutateAsync({ families });
       toast({
         title: t("adminPricing.presetsInstalled", { count: result.created }),
         description: t("adminPricing.presetsInstalledHint", {
@@ -308,17 +330,6 @@ function PricingContent() {
                 .map((c) => ({ key: c.key, label: c.header }))}
               visibility={colVis}
             />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void installBuiltInPresets()}
-              loading={installPresetsMut.isPending}
-              disabled={presets.isLoading || installPresetsMut.isPending}
-            >
-              {installPresetsMut.isPending
-                ? t("adminPricing.installingPresets")
-                : t("adminPricing.installPresets")}
-            </Button>
             <Button variant="outline" size="sm" onClick={() => openImport(true)}>
               {t("adminPricing.bulkImport")}
             </Button>
@@ -327,6 +338,15 @@ function PricingContent() {
             </Button>
           </div>
         }
+      />
+      <PricingPresetPanel
+        presets={presets.data ?? []}
+        coverage={presetCoverage}
+        loading={presets.isLoading || allRules.isLoading}
+        installing={installPresetsMut.isPending}
+        totalRules={allRules.data?.pagination?.total ?? allRules.data?.data.length ?? 0}
+        onInstallMissing={() => void installMissingPresets()}
+        onInstallAll={() => void installBuiltInPresets()}
       />
       <AdminListView
         query={rules}
@@ -434,6 +454,169 @@ function PricingContent() {
       </Dialog>
     </>
   );
+}
+
+interface PricingPresetCoverage {
+  installed: PricingRulePreset[];
+  missing: PricingRulePreset[];
+}
+
+function PricingPresetPanel({
+  presets,
+  coverage,
+  loading,
+  installing,
+  totalRules,
+  onInstallMissing,
+  onInstallAll,
+}: {
+  presets: PricingRulePreset[];
+  coverage: PricingPresetCoverage;
+  loading: boolean;
+  installing: boolean;
+  totalRules: number;
+  onInstallMissing: () => void;
+  onInstallAll: () => void;
+}) {
+  const { t } = useLanguage();
+  const total = presets.length;
+  const installed = coverage.installed.length;
+  const missing = coverage.missing.length;
+  const missingPreview = coverage.missing
+    .slice(0, 6)
+    .map((preset) => preset.model_family)
+    .join(", ");
+  const samplePresets = presets.slice(0, 5);
+
+  return (
+    <Card className="mb-4 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <Tag className="text-srapi-text-tertiary size-4" />
+            <h2 className="text-srapi-text-primary font-medium">
+              {t("adminPricing.presetPanelTitle")}
+            </h2>
+            <QuietBadge
+              status={missing === 0 && total > 0 ? "active" : "limited"}
+              label={t("adminPricing.presetCoverage", {
+                installed: formatInteger(installed),
+                total: formatInteger(total),
+              })}
+            />
+          </div>
+          <p className="text-2xs text-srapi-text-tertiary mt-1 max-w-3xl">
+            {t("adminPricing.presetPanelHint")}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={onInstallMissing}
+            loading={installing}
+            disabled={loading || installing || missing === 0}
+          >
+            {missing === 0
+              ? t("adminPricing.presetAllCovered")
+              : t("adminPricing.installMissingPresets")}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onInstallAll}
+            loading={installing}
+            disabled={loading || installing || total === 0}
+          >
+            {t("adminPricing.installAllPresets")}
+          </Button>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+        <PresetMetric label={t("adminPricing.presetTotal")} value={formatInteger(total)} />
+        <PresetMetric
+          label={t("adminPricing.presetMissingFamilies")}
+          value={formatInteger(missing)}
+        />
+        <PresetMetric
+          label={t("adminPricing.presetRulesLoaded")}
+          value={formatInteger(totalRules)}
+        />
+      </div>
+
+      {loading ? (
+        <p className="text-2xs text-srapi-text-tertiary mt-3">{t("adminPricing.presetLoading")}</p>
+      ) : missing > 0 ? (
+        <p className="text-2xs text-srapi-text-tertiary mt-3">
+          {t("adminPricing.presetMissingPreview", { families: missingPreview })}
+        </p>
+      ) : (
+        <p className="text-2xs text-srapi-success mt-3">{t("adminPricing.presetAllCoveredHint")}</p>
+      )}
+
+      {samplePresets.length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {samplePresets.map((preset) => (
+            <span
+              key={preset.model_family}
+              className="border-srapi-border bg-srapi-card-muted text-srapi-text-secondary text-2xs inline-flex max-w-full min-w-0 items-center gap-2 rounded-md border px-2.5 py-1 font-mono"
+              title={t("adminPricing.presetSource", {
+                source: preset.source ?? "built-in",
+              })}
+            >
+              <span className="text-srapi-text-primary truncate">{preset.model_family}</span>
+              <span className="text-srapi-text-tertiary">
+                {t("adminPricing.presetTokenPrices", {
+                  input: formatMoney(preset.input_price_per_million_tokens, preset.currency),
+                  output: formatMoney(preset.output_price_per_million_tokens, preset.currency),
+                })}
+              </span>
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
+function PresetMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="border-srapi-border bg-srapi-card-muted rounded-md border px-3 py-2">
+      <div className="text-srapi-text-tertiary text-[10px] tracking-wide uppercase">{label}</div>
+      <div className="text-srapi-text-primary mt-1 font-mono text-sm">{value}</div>
+    </div>
+  );
+}
+
+function buildPresetCoverage(
+  presets: PricingRulePreset[],
+  rules: PricingRule[],
+): PricingPresetCoverage {
+  const installedFamilies = new Set(
+    rules
+      .filter(
+        (rule) =>
+          String(rule.model_id) === "0" &&
+          String(rule.provider_id) === "0" &&
+          Boolean(rule.model_family),
+      )
+      .map((rule) => normalizeFamily(rule.model_family)),
+  );
+  const installed: PricingRulePreset[] = [];
+  const missing: PricingRulePreset[] = [];
+  for (const preset of presets) {
+    if (installedFamilies.has(normalizeFamily(preset.model_family))) {
+      installed.push(preset);
+    } else {
+      missing.push(preset);
+    }
+  }
+  return { installed, missing };
+}
+
+function normalizeFamily(value: string | null | undefined): string {
+  return (value ?? "").trim().toLowerCase();
 }
 
 function formatBillingMode(mode: PricingRule["billing_mode"], t: (key: string) => string): string {
