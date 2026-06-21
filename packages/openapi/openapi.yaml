@@ -4667,7 +4667,9 @@ paths:
       description: >-
         Redeems the authorization code returned to the operator's redirect at the
         provider token endpoint and returns the minted (write-only) credential to
-        submit to POST /admin/accounts.
+        submit to POST /admin/accounts. Operators may submit either the raw code
+        or the full callback URL; callback URLs are parsed server-side and their
+        state is validated before token exchange.
       security:
         - cookieAuth: []
           csrfHeader: []
@@ -24911,13 +24913,17 @@ components:
       type: object
       required:
         - session_id
-        - code
         - state
       properties:
         session_id:
           type: string
         code:
           type: string
+          description: Raw authorization/setup code, or a full callback URL for backwards-compatible clients.
+          minLength: 1
+        callback_url:
+          type: string
+          description: Full redirect/callback URL containing code and state query parameters.
           minLength: 1
         state:
           type: string

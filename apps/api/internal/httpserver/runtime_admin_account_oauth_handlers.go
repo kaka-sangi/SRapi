@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -82,9 +83,14 @@ func (s *Server) handleExchangeAdminAccountOAuthCode(w http.ResponseWriter, r *h
 		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid oauth exchange request", requestID)
 		return
 	}
+	code, state, err := normalizeAccountOAuthExchangeInput(derefString(body.Code), derefString(body.CallbackUrl), body.State)
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid oauth callback", requestID)
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), accountOAuthProvisionTimeout)
 	defer cancel()
-	credential, err := provisioning.ExchangeCode(ctx, body.SessionId, body.Code, body.State)
+	credential, err := provisioning.ExchangeCode(ctx, body.SessionId, code, state)
 	if err != nil {
 		s.writeAccountOAuthProvisioningError(w, err, requestID)
 		return
@@ -97,6 +103,46 @@ func (s *Server) handleExchangeAdminAccountOAuthCode(w http.ResponseWriter, r *h
 		Data:      accountOAuthCredentialToAPI(body.SessionId, credential),
 		RequestId: requestID,
 	})
+}
+
+func normalizeAccountOAuthExchangeInput(codeValue, callbackURLValue, stateValue string) (string, string, error) {
+	state := strings.TrimSpace(stateValue)
+	callbackURL := strings.TrimSpace(callbackURLValue)
+	code := strings.TrimSpace(codeValue)
+	if callbackURL == "" && looksLikeAccountOAuthCallbackURL(code) {
+		callbackURL = code
+		code = ""
+	}
+	if callbackURL != "" {
+		parsed, err := url.Parse(callbackURL)
+		if err != nil || parsed.RawQuery == "" {
+			return "", "", provisioningservice.ErrInvalidInput
+		}
+		query := parsed.Query()
+		if providerErr := strings.TrimSpace(query.Get("error")); providerErr != "" {
+			return "", "", provisioningservice.ErrInvalidInput
+		}
+		code = strings.TrimSpace(query.Get("code"))
+		if callbackState := strings.TrimSpace(query.Get("state")); callbackState != "" {
+			state = callbackState
+		}
+	}
+	if code == "" || state == "" {
+		return "", "", provisioningservice.ErrInvalidInput
+	}
+	return code, state, nil
+}
+
+func looksLikeAccountOAuthCallbackURL(value string) bool {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return false
+	}
+	parsed, err := url.Parse(trimmed)
+	if err != nil {
+		return false
+	}
+	return parsed.Scheme != "" && parsed.Host != ""
 }
 
 func (s *Server) handleStartAdminAccountOAuthDeviceCode(w http.ResponseWriter, r *http.Request) {

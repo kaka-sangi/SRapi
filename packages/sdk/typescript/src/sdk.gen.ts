@@ -1914,7 +1914,7 @@ export const startAdminAccountOAuthAuthorizeUrl = <ThrowOnError extends boolean 
 /**
  * Exchange an authorization code into a provisioned account credential.
  *
- * Redeems the authorization code returned to the operator's redirect at the provider token endpoint and returns the minted (write-only) credential to submit to POST /admin/accounts.
+ * Redeems the authorization code returned to the operator's redirect at the provider token endpoint and returns the minted (write-only) credential to submit to POST /admin/accounts. Operators may submit either the raw code or the full callback URL; callback URLs are parsed server-side and their state is validated before token exchange.
  */
 export const exchangeAdminAccountOAuthCode = <ThrowOnError extends boolean = false>(options: Options<ExchangeAdminAccountOAuthCodeData, ThrowOnError>) => (options.client ?? client).post<ExchangeAdminAccountOAuthCodeResponses, ExchangeAdminAccountOAuthCodeErrors, ThrowOnError>({
     security: [{

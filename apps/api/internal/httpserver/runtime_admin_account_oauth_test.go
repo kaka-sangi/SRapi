@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -77,8 +78,10 @@ func TestAdminAccountOAuthAuthorizeURLShape(t *testing.T) {
 }
 
 func TestAdminAccountOAuthExchangeHappyPath(t *testing.T) {
+	var gotForm url.Values
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = r.ParseForm()
+		gotForm = r.PostForm
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"access_token":"acc-9","refresh_token":"ref-9","token_type":"Bearer","expires_in":3600}`)
 	}))
@@ -115,6 +118,105 @@ func TestAdminAccountOAuthExchangeHappyPath(t *testing.T) {
 	}
 	if credResp.Data.HasRefreshToken == nil || !*credResp.Data.HasRefreshToken {
 		t.Fatalf("expected has_refresh_token true")
+	}
+	if gotForm.Get("code") != "auth-code-x" {
+		t.Fatalf("expected token exchange code auth-code-x, got form %v", gotForm)
+	}
+}
+
+func TestAdminAccountOAuthExchangeAcceptsCallbackURL(t *testing.T) {
+	var gotForm url.Values
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		gotForm = r.PostForm
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"access_token":"acc-callback","refresh_token":"ref-callback","token_type":"Bearer"}`)
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+
+	startBody := `{"config":{"client_id":"c","authorize_url":"https://provider.example/authorize","token_url":"` + upstream.URL + `/token","redirect_uri":"http://localhost:8080/cb"}}`
+	startRec := adminAccountOAuthDo(t, handler, http.MethodPost, "/api/v1/admin/accounts/oauth/authorize-url", startBody, sessionCookie, loginResp.Data.CsrfToken)
+	if startRec.Code != http.StatusCreated {
+		t.Fatalf("expected start 201, got %d body=%s", startRec.Code, startRec.Body.String())
+	}
+	var startResp apiopenapi.AccountOAuthAuthorizeUrlResponse
+	if err := json.NewDecoder(startRec.Body).Decode(&startResp); err != nil {
+		t.Fatalf("decode start: %v", err)
+	}
+
+	callbackURL := "http://localhost:8080/cb?code=auth-code-callback&state=" + url.QueryEscape(startResp.Data.State)
+	exchangeBody := `{"session_id":"` + startResp.Data.SessionId + `","callback_url":` + strconv.Quote(callbackURL) + `,"state":"manual-state-ignored"}`
+	exchangeRec := adminAccountOAuthDo(t, handler, http.MethodPost, "/api/v1/admin/accounts/oauth/exchange", exchangeBody, sessionCookie, loginResp.Data.CsrfToken)
+	if exchangeRec.Code != http.StatusOK {
+		t.Fatalf("expected exchange 200, got %d body=%s", exchangeRec.Code, exchangeRec.Body.String())
+	}
+	if gotForm.Get("code") != "auth-code-callback" {
+		t.Fatalf("expected token exchange code from callback URL, got form %v", gotForm)
+	}
+}
+
+func TestNormalizeAccountOAuthExchangeInput(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		code        string
+		callbackURL string
+		state       string
+		wantCode    string
+		wantState   string
+		wantErr     bool
+	}{
+		{
+			name:      "raw code",
+			code:      " auth-code ",
+			state:     " state-1 ",
+			wantCode:  "auth-code",
+			wantState: "state-1",
+		},
+		{
+			name:      "callback url in code field",
+			code:      "https://local.example/callback?code=from-url&state=state-url",
+			state:     "state-request",
+			wantCode:  "from-url",
+			wantState: "state-url",
+		},
+		{
+			name:        "callback url field",
+			callbackURL: "https://local.example/callback?code=from-callback&state=state-callback",
+			state:       "state-request",
+			wantCode:    "from-callback",
+			wantState:   "state-callback",
+		},
+		{
+			name:        "provider error",
+			callbackURL: "https://local.example/callback?error=access_denied&state=state-callback",
+			state:       "state-request",
+			wantErr:     true,
+		},
+		{
+			name:    "missing code",
+			code:    "https://local.example/callback?state=state-url",
+			state:   "state-request",
+			wantErr: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			gotCode, gotState, err := normalizeAccountOAuthExchangeInput(tc.code, tc.callbackURL, tc.state)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("expected error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if gotCode != tc.wantCode || gotState != tc.wantState {
+				t.Fatalf("got code/state %q/%q, want %q/%q", gotCode, gotState, tc.wantCode, tc.wantState)
+			}
+		})
 	}
 }
 

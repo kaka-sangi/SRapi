@@ -3240,7 +3240,14 @@ export type AccountOAuthAuthorizeUrlResponse = {
 
 export type AccountOAuthExchangeRequest = {
     session_id: string;
-    code: string;
+    /**
+     * Raw authorization/setup code, or a full callback URL for backwards-compatible clients.
+     */
+    code?: string;
+    /**
+     * Full redirect/callback URL containing code and state query parameters.
+     */
+    callback_url?: string;
     state: string;
 };
 

@@ -218,11 +218,21 @@ export const accountsApi = {
   exchangeAccountOAuthCode(input: {
     sessionId: string;
     code: string;
+    callbackUrl?: string;
     state: string;
   }): Promise<AccountOAuthCredential> {
+    const rawCode = input.code.trim();
+    const rawCallbackUrl = input.callbackUrl?.trim() ?? "";
+    const callbackUrl = rawCallbackUrl.includes("://") ? rawCallbackUrl : undefined;
+    const code = callbackUrl ? undefined : rawCode;
     return unwrapData(() =>
       exchangeAdminAccountOAuthCode({
-        body: { session_id: input.sessionId, code: input.code, state: input.state },
+        body: {
+          session_id: input.sessionId,
+          code,
+          callback_url: callbackUrl,
+          state: input.state,
+        },
         throwOnError: true,
       }),
     );

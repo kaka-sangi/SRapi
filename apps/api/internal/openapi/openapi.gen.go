@@ -4624,9 +4624,13 @@ type AccountOAuthDevicePollRequest struct {
 
 // AccountOAuthExchangeRequest defines model for AccountOAuthExchangeRequest.
 type AccountOAuthExchangeRequest struct {
-	Code      string `json:"code"`
-	SessionId string `json:"session_id"`
-	State     string `json:"state"`
+	// CallbackUrl Full redirect/callback URL containing code and state query parameters.
+	CallbackUrl *string `json:"callback_url,omitempty"`
+
+	// Code Raw authorization/setup code, or a full callback URL for backwards-compatible clients.
+	Code      *string `json:"code,omitempty"`
+	SessionId string  `json:"session_id"`
+	State     string  `json:"state"`
 }
 
 // AccountOAuthPending defines model for AccountOAuthPending.

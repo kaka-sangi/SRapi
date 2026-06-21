@@ -201,6 +201,7 @@ export function AccountOAuthAuthorizeDialog({
       const credential = await adminApi.exchangeAccountOAuthCode({
         sessionId: authSessionId,
         code: callbackCode.trim(),
+        callbackUrl: callbackCode.trim(),
         state: authState,
       });
       complete(credential);
