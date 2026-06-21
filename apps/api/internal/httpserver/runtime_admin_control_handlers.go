@@ -855,6 +855,7 @@ func (s *Server) handleListAdminPricingRules(w http.ResponseWriter, r *http.Requ
 	for _, item := range items {
 		data = append(data, toAPIPricingRule(item))
 	}
+	data = s.filterAPIPricingRules(r.Context(), data, r.URL.Query().Get("model_id"), r.URL.Query().Get("provider_id"), r.URL.Query().Get("q"))
 	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.PricingRuleListResponse{
 		Data:       data,

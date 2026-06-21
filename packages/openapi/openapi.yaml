@@ -9329,6 +9329,17 @@ paths:
       parameters:
         - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/SearchQuery"
+        - name: model_id
+          in: query
+          description: Restrict to pricing rules for a specific model id. Use 0 for model-family rules.
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: provider_id
+          in: query
+          description: Restrict to pricing rules for a specific provider id. Use 0 for provider-agnostic rules.
+          schema:
+            $ref: "#/components/schemas/Id"
       responses:
         "200":
           description: Pricing rule list.

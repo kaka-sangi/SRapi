@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -66,6 +67,92 @@ func filterModelMappings(mappings []modelcontract.ModelProviderMapping, status s
 		out = append(out, mapping)
 	}
 	return out
+}
+
+func (s *Server) filterAPIPricingRules(ctx context.Context, rules []apiopenapi.PricingRule, modelID, providerID, q string) []apiopenapi.PricingRule {
+	modelID = strings.TrimSpace(modelID)
+	providerID = strings.TrimSpace(providerID)
+	q = strings.ToLower(strings.TrimSpace(q))
+	if modelID == "" && providerID == "" && q == "" {
+		return rules
+	}
+	modelLabels := map[string]string{}
+	providerLabels := map[string]string{}
+	if q != "" {
+		modelLabels = s.pricingRuleModelLabels(ctx)
+		providerLabels = s.pricingRuleProviderLabels(ctx)
+	}
+	out := make([]apiopenapi.PricingRule, 0, len(rules))
+	for _, rule := range rules {
+		if modelID != "" && string(rule.ModelId) != modelID {
+			continue
+		}
+		if providerID != "" && string(rule.ProviderId) != providerID {
+			continue
+		}
+		if q != "" && !pricingRuleMatchesQuery(rule, modelLabels, providerLabels, q) {
+			continue
+		}
+		out = append(out, rule)
+	}
+	return out
+}
+
+func (s *Server) pricingRuleModelLabels(ctx context.Context) map[string]string {
+	labels := map[string]string{"0": "model family any model family"}
+	if s.runtime == nil || s.runtime.models == nil {
+		return labels
+	}
+	models, err := s.runtime.models.List(ctx)
+	if err != nil {
+		return labels
+	}
+	for _, model := range models {
+		labels[strconv.Itoa(model.ID)] = rowTextLower(model.CanonicalName, model.DisplayName)
+	}
+	return labels
+}
+
+func (s *Server) pricingRuleProviderLabels(ctx context.Context) map[string]string {
+	labels := map[string]string{"0": "any provider"}
+	if s.runtime == nil || s.runtime.providers == nil {
+		return labels
+	}
+	providers, err := s.runtime.providers.List(ctx)
+	if err != nil {
+		return labels
+	}
+	for _, provider := range providers {
+		labels[strconv.Itoa(provider.ID)] = rowTextLower(provider.Name, provider.DisplayName, string(provider.Protocol), string(provider.AdapterType))
+	}
+	return labels
+}
+
+func pricingRuleMatchesQuery(rule apiopenapi.PricingRule, modelLabels map[string]string, providerLabels map[string]string, q string) bool {
+	return strings.Contains(rowTextLower(
+		string(rule.Id),
+		string(rule.ModelId),
+		string(rule.ProviderId),
+		optionalAPIPricingRuleModelFamily(rule),
+		string(rule.BillingMode),
+		rule.Currency,
+		rule.InputPricePerMillionTokens,
+		rule.OutputPricePerMillionTokens,
+		rule.PerRequestPrice,
+		modelLabels[string(rule.ModelId)],
+		providerLabels[string(rule.ProviderId)],
+	), q)
+}
+
+func optionalAPIPricingRuleModelFamily(rule apiopenapi.PricingRule) string {
+	if rule.ModelFamily == nil {
+		return ""
+	}
+	return *rule.ModelFamily
+}
+
+func rowTextLower(values ...string) string {
+	return strings.ToLower(strings.Join(values, " "))
 }
 
 func filterAccounts(accounts []accountcontract.ProviderAccount, status, providerID string) []accountcontract.ProviderAccount {

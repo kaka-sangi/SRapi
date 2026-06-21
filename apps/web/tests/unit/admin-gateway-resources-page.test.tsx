@@ -75,6 +75,11 @@ describe("AdminGatewayResourcesPage", () => {
     expect(screen.getByText("健康")).toBeInTheDocument();
     expect(screen.getByText("配额")).toBeInTheDocument();
     expect(screen.getAllByText("代理").length).toBeGreaterThan(1);
+    expect(screen.getByRole("link", { name: "账号" })).toHaveAttribute(
+      "href",
+      "/admin/accounts?f_providerId=p1",
+    );
+    expect(screen.getByRole("link", { name: "代理" })).toHaveAttribute("href", "/admin/proxies");
     expect(screen.getByRole("heading", { name: /端点总览/ })).toBeInTheDocument();
     expect(screen.getAllByText("路由").length).toBeGreaterThan(0);
     expect(screen.getByText("模型可服务性")).toBeInTheDocument();
@@ -172,6 +177,10 @@ describe("AdminGatewayResourcesPage", () => {
     expect(screen.getByText("路由明细")).toBeInTheDocument();
     expect(screen.getByText("gpt-4.1-free-upstream")).toBeInTheDocument();
     expect(screen.getAllByText("默认零价").length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: "定价" })).toHaveAttribute(
+      "href",
+      "/admin/channels/pricing?f_modelId=m2&f_providerId=p1",
+    );
     expect(screen.queryByText("gpt-4.1-upstream")).not.toBeInTheDocument();
     expect(screen.queryByText("没有匹配的网关资源")).not.toBeInTheDocument();
   });

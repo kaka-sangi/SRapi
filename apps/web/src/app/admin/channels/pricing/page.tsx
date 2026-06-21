@@ -5,6 +5,7 @@ import { Tag } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
+import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-toolbar";
 import { ResourceFormDialog, type FieldConfig } from "@/components/admin/resource-form-dialog";
 import { RowActionsMenu, type RowAction } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
@@ -60,7 +61,16 @@ function PricingContent() {
   const { toast } = useToast();
   const list = useAdminList();
   const colVis = useColumnVisibility("admin-channel-pricing", []);
-  const rules = useAdminPricingRules({ page: list.page, page_size: list.pageSize });
+  const modelFilter = list.filters.modelId || undefined;
+  const providerFilter = list.filters.providerId || undefined;
+  const searchQuery = list.search || undefined;
+  const rules = useAdminPricingRules({
+    page: list.page,
+    page_size: list.pageSize,
+    q: searchQuery,
+    model_id: modelFilter,
+    provider_id: providerFilter,
+  });
   const allRules = useAdminPricingRules();
   const presets = useAdminPricingRulePresets();
   const models = useAdminModels();
@@ -157,6 +167,7 @@ function PricingContent() {
     value: p.id,
     label: p.display_name ?? p.id,
   }));
+  const isFiltered = Boolean(searchQuery || modelFilter || providerFilter);
   const billingModeOptions = [
     { value: "token", label: t("adminPricing.billingModeToken") },
     { value: "per_request", label: t("adminPricing.billingModePerRequest") },
@@ -357,6 +368,31 @@ function PricingContent() {
         emptyTitle={t("adminPricing.emptyTitle")}
         emptyBody={t("adminPricing.emptyBody")}
         minWidth={520}
+        isFiltered={isFiltered}
+        noResultsTitle={t("adminPricing.emptyFilteredTitle")}
+        noResultsBody={t("adminPricing.emptyFilteredBody")}
+        onClearFilters={list.clearFilters}
+        toolbar={
+          <ListToolbar>
+            <SearchInput
+              value={list.searchInput}
+              onChange={list.setSearchInput}
+              placeholder={t("adminPricing.searchPlaceholder")}
+            />
+            <FilterSelect
+              value={modelFilter}
+              onChange={(value) => list.setFilter("modelId", value)}
+              options={[{ value: "0", label: t("adminPricing.anyModelFamily") }, ...modelOptions]}
+              allLabel={t("adminPricing.allModels")}
+            />
+            <FilterSelect
+              value={providerFilter}
+              onChange={(value) => list.setFilter("providerId", value)}
+              options={[{ value: "0", label: t("adminPricing.anyProvider") }, ...providerOptions]}
+              allLabel={t("adminPricing.allProviders")}
+            />
+          </ListToolbar>
+        }
         rowActions={(r) => {
           const actions: RowAction[] = [
             { label: t("common.edit"), onSelect: () => setEditing(r) },

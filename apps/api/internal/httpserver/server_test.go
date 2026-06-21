@@ -2145,6 +2145,9 @@ func TestAdminSubscriptionPricingControlPlane(t *testing.T) {
 		!pricingRuleListHasID(rulesResp.Data, presetRuleID) {
 		t.Fatalf("unexpected pricing rule list: %+v", rulesResp.Data)
 	}
+	assertPricingRuleListIDs(t, handler, sessionCookie, "/api/v1/admin/pricing-rules?model_id="+string(modelResp.Data.Id), pricingResp.Data.Id, bulkResp.Data.Rules[0].Id)
+	assertPricingRuleListIDs(t, handler, sessionCookie, "/api/v1/admin/pricing-rules?provider_id=0", presetRuleID)
+	assertPricingRuleListIDs(t, handler, sessionCookie, "/api/v1/admin/pricing-rules?q=subscription+provider", pricingResp.Data.Id, bulkResp.Data.Rules[0].Id)
 
 	auditReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/audit-logs", nil)
 	auditReq.AddCookie(sessionCookie)
@@ -11823,6 +11826,29 @@ func pricingRuleListHasID(items []apiopenapi.PricingRule, id apiopenapi.Id) bool
 		}
 	}
 	return false
+}
+
+func assertPricingRuleListIDs(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, path string, ids ...apiopenapi.Id) {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, path, nil)
+	req.AddCookie(sessionCookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected pricing rule list 200 for %s, got %d body=%s", path, rec.Code, rec.Body.String())
+	}
+	var resp apiopenapi.PricingRuleListResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode pricing rule list for %s: %v", path, err)
+	}
+	if len(resp.Data) != len(ids) {
+		t.Fatalf("expected pricing rules %v for %s, got %+v", ids, path, resp.Data)
+	}
+	for _, id := range ids {
+		if !pricingRuleListHasID(resp.Data, id) {
+			t.Fatalf("expected pricing rule %s for %s, got %+v", id, path, resp.Data)
+		}
+	}
 }
 
 func auditContractLogHasAction(items []auditcontract.Log, action string) bool {

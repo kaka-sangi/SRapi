@@ -17777,6 +17777,15 @@ export type ListAdminPricingRulesData = {
     query?: {
         page?: number;
         page_size?: number;
+        q?: string;
+        /**
+         * Restrict to pricing rules for a specific model id. Use 0 for model-family rules.
+         */
+        model_id?: Id;
+        /**
+         * Restrict to pricing rules for a specific provider id. Use 0 for provider-agnostic rules.
+         */
+        provider_id?: Id;
     };
     url: '/api/v1/admin/pricing-rules';
 };

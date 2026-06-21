@@ -260,6 +260,7 @@ function GatewayResourcesContent() {
                         </TableHead>
                         <TableHead>{t("adminCommon.status")}</TableHead>
                         <TableHead>{t("adminGatewayResources.blockers")}</TableHead>
+                        <TableHead>{t("adminGatewayResources.fixActions")}</TableHead>
                       </tr>
                     </TableHeader>
                     <TableBody>
@@ -305,6 +306,7 @@ function GatewayResourcesContent() {
                         </TableHead>
                         <TableHead>{t("adminCommon.status")}</TableHead>
                         <TableHead>{t("adminGatewayResources.blockers")}</TableHead>
+                        <TableHead>{t("adminGatewayResources.fixActions")}</TableHead>
                       </tr>
                     </TableHeader>
                     <TableBody>
@@ -346,6 +348,7 @@ function GatewayResourcesContent() {
                         </TableHead>
                         <TableHead>{t("adminCommon.status")}</TableHead>
                         <TableHead>{t("adminGatewayResources.blockers")}</TableHead>
+                        <TableHead>{t("adminGatewayResources.fixActions")}</TableHead>
                       </tr>
                     </TableHeader>
                     <TableBody>
@@ -1041,6 +1044,9 @@ function ModelResourceRow({ row }: { row: GatewayModelResourceRow }) {
           <span className="text-2xs text-srapi-text-tertiary">-</span>
         )}
       </TableCell>
+      <TableCell>
+        <GatewayRowFixActions row={row} />
+      </TableCell>
     </TableRow>
   );
 }
@@ -1120,6 +1126,9 @@ function RouteResourceRow({ row }: { row: GatewayRouteResourceRow }) {
         ) : (
           <span className="text-2xs text-srapi-text-tertiary">-</span>
         )}
+      </TableCell>
+      <TableCell>
+        <GatewayRowFixActions row={row} />
       </TableCell>
     </TableRow>
   );
@@ -1215,6 +1224,216 @@ function endpointDiagnosticsHref(
     return `${ADMIN_ROUTES.accounts}?f_providerId=${encodeURIComponent(row.provider.id)}`;
   }
   return `${ADMIN_ROUTES.models}?q=${encodeURIComponent(row.model.canonical_name)}`;
+}
+
+type GatewayFixActionRow =
+  | GatewayProviderResourceRow
+  | GatewayModelResourceRow
+  | GatewayRouteResourceRow;
+
+interface GatewayFixAction {
+  key: string;
+  href: string;
+  labelKey: string;
+}
+
+function GatewayRowFixActions({ row }: { row: GatewayFixActionRow }) {
+  const { t } = useLanguage();
+  const actions = gatewayRowFixActions(row);
+  if (actions.length === 0) {
+    return <span className="text-2xs text-srapi-text-tertiary">-</span>;
+  }
+  return (
+    <div className="flex min-w-[130px] flex-wrap gap-1">
+      {actions.slice(0, 3).map((action) => (
+        <Link
+          key={action.key}
+          href={action.href}
+          className="border-srapi-border bg-srapi-card-muted hover:border-srapi-border-strong text-2xs text-srapi-text-secondary rounded-md border px-2 py-1 font-mono transition-colors"
+        >
+          {t(`adminGatewayResources.fixAction.${action.labelKey}`)}
+        </Link>
+      ))}
+      {actions.length > 3 ? (
+        <span className="text-2xs text-srapi-text-tertiary font-mono">+{actions.length - 3}</span>
+      ) : null}
+    </div>
+  );
+}
+
+function gatewayRowFixActions(row: GatewayFixActionRow): GatewayFixAction[] {
+  const actions: GatewayFixAction[] = [];
+  const add = (action: GatewayFixAction) => {
+    if (!actions.some((existing) => existing.key === action.key)) {
+      actions.push(action);
+    }
+  };
+
+  if (hasProvider(row)) {
+    if (hasAccountBlockers(row)) {
+      if (
+        row.account_blockers.inactive > 0 ||
+        row.account_blockers.health > 0 ||
+        row.account_blockers.quota > 0
+      ) {
+        add({
+          key: "accounts",
+          href: accountsHref(row.provider.id),
+          labelKey: "accounts",
+        });
+      }
+      if (row.account_blockers.proxy > 0) {
+        add({
+          key: "proxies",
+          href: ADMIN_ROUTES.proxies,
+          labelKey: "proxies",
+        });
+      }
+    }
+    for (const reason of row.reasons) {
+      if (reason === "provider_disabled") {
+        add({
+          key: "provider",
+          href: providerHref(row.provider.name),
+          labelKey: "provider",
+        });
+      }
+      if (reason === "no_active_accounts" || reason === "no_routable_accounts") {
+        add({
+          key: "accounts",
+          href: accountsHref(row.provider.id),
+          labelKey: "accounts",
+        });
+      }
+      if (reason === "proxy_attention") {
+        add({
+          key: "proxies",
+          href: ADMIN_ROUTES.proxies,
+          labelKey: "proxies",
+        });
+      }
+      if (reason === "no_api_keys") {
+        add({
+          key: "apiKeys",
+          href: ADMIN_ROUTES.apiKeys,
+          labelKey: "apiKeys",
+        });
+      }
+      if (reason === "no_model_mappings") {
+        add({
+          key: "mappings",
+          href: hasModel(row) ? modelsHref(row.model.canonical_name) : ADMIN_ROUTES.models,
+          labelKey: "modelMappings",
+        });
+      }
+    }
+  }
+
+  if (hasModel(row)) {
+    for (const reason of row.reasons) {
+      if (reason === "no_active_models") {
+        add({ key: "models", href: modelsHref(row.model.canonical_name), labelKey: "models" });
+      }
+      if (reason === "pricing_uncovered") {
+        add({
+          key: "pricing",
+          href: pricingHref(
+            row.model.id,
+            hasProvider(row) ? row.provider.id : undefined,
+            row.model.canonical_name,
+          ),
+          labelKey: "pricing",
+        });
+      }
+    }
+    if (gatewayPricingNeedsAttention(row.pricing)) {
+      add({
+        key: "pricing",
+        href: pricingHref(
+          row.model.id,
+          hasProvider(row) ? row.provider.id : undefined,
+          row.model.canonical_name,
+        ),
+        labelKey: "pricing",
+      });
+    }
+    for (const endpoint of row.endpoints) {
+      if (endpoint.status !== "blocked") continue;
+      if (hasProvider(row) && endpoint.unsupported_accounts > 0) {
+        add({
+          key: "endpointSwitches",
+          href: providerHref(row.provider.name),
+          labelKey: "endpointSwitches",
+        });
+      }
+      if (hasProvider(row) && endpoint.unavailable_model_accounts > 0) {
+        add({
+          key: "accountModels",
+          href: accountsHref(row.provider.id),
+          labelKey: "accountModels",
+        });
+      }
+    }
+  }
+
+  if (!hasProvider(row)) {
+    for (const reason of row.reasons) {
+      if (reason === "no_model_mappings") {
+        add({
+          key: "mappings",
+          href: modelsHref(hasModel(row) ? row.model.canonical_name : ""),
+          labelKey: "modelMappings",
+        });
+      }
+      if (reason === "no_api_keys") {
+        add({ key: "apiKeys", href: ADMIN_ROUTES.apiKeys, labelKey: "apiKeys" });
+      }
+    }
+  }
+
+  return actions;
+}
+
+function hasProvider(row: GatewayFixActionRow): row is GatewayProviderResourceRow | GatewayRouteResourceRow {
+  return "provider" in row;
+}
+
+function hasModel(row: GatewayFixActionRow): row is GatewayModelResourceRow | GatewayRouteResourceRow {
+  return "model" in row;
+}
+
+function hasAccountBlockers(row: GatewayFixActionRow): row is GatewayProviderResourceRow {
+  return "account_blockers" in row;
+}
+
+function providerHref(providerName: string) {
+  return `${ADMIN_ROUTES.providers}?q=${encodeURIComponent(providerName)}`;
+}
+
+function modelsHref(modelName: string) {
+  return modelName
+    ? `${ADMIN_ROUTES.models}?q=${encodeURIComponent(modelName)}`
+    : ADMIN_ROUTES.models;
+}
+
+function accountsHref(providerID: string | number) {
+  return `${ADMIN_ROUTES.accounts}?f_providerId=${encodeURIComponent(String(providerID))}`;
+}
+
+function pricingHref(
+  modelID: string | number,
+  providerID: string | number | undefined,
+  fallbackSearch: string,
+) {
+  const params = new URLSearchParams();
+  params.set("f_modelId", String(modelID));
+  if (providerID !== undefined) {
+    params.set("f_providerId", String(providerID));
+  } else if (fallbackSearch) {
+    params.set("q", fallbackSearch);
+  }
+  const qs = params.toString();
+  return qs ? `${ADMIN_ROUTES.channelsPricing}?${qs}` : ADMIN_ROUTES.channelsPricing;
 }
 
 function endpointTitle(
@@ -1335,6 +1554,9 @@ function ProviderResourceRow({ row }: { row: GatewayProviderResourceRow }) {
         ) : (
           <span className="text-2xs text-srapi-text-tertiary">—</span>
         )}
+      </TableCell>
+      <TableCell>
+        <GatewayRowFixActions row={row} />
       </TableCell>
     </TableRow>
   );

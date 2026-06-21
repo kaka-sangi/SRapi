@@ -13790,8 +13790,15 @@ type ListAdminPaymentProvidersParams struct {
 
 // ListAdminPricingRulesParams defines parameters for ListAdminPricingRules.
 type ListAdminPricingRulesParams struct {
-	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
-	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+	Page     *Page        `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize    `form:"page_size,omitempty" json:"page_size,omitempty"`
+	Q        *SearchQuery `form:"q,omitempty" json:"q,omitempty"`
+
+	// ModelId Restrict to pricing rules for a specific model id. Use 0 for model-family rules.
+	ModelId *Id `form:"model_id,omitempty" json:"model_id,omitempty"`
+
+	// ProviderId Restrict to pricing rules for a specific provider id. Use 0 for provider-agnostic rules.
+	ProviderId *Id `form:"provider_id,omitempty" json:"provider_id,omitempty"`
 }
 
 // BulkImportAdminPricingRulesJSONBody defines parameters for BulkImportAdminPricingRules.
@@ -32959,6 +32966,45 @@ func (siw *ServerInterfaceWrapper) ListAdminPricingRules(w http.ResponseWriter, 
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "model_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "model_id", r.URL.Query(), &params.ModelId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "model_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "model_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "provider_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "provider_id", r.URL.Query(), &params.ProviderId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "provider_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider_id", Err: err})
 		}
 		return
 	}

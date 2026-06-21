@@ -9,6 +9,7 @@ import type { PricingRule, PricingRulePreset } from "@/lib/sdk-types";
 
 const mocks = vi.hoisted(() => ({
   installPresets: vi.fn(),
+  pricingRulesParams: vi.fn(),
   toast: vi.fn(),
 }));
 
@@ -40,7 +41,14 @@ vi.mock("@/context/ToastContext", () => ({
 }));
 
 vi.mock("@/hooks/admin-queries", () => ({
-  useAdminPricingRules: (params?: { page?: number; page_size?: number }) => {
+  useAdminPricingRules: (params?: {
+    page?: number;
+    page_size?: number;
+    q?: string;
+    model_id?: string;
+    provider_id?: string;
+  }) => {
+    mocks.pricingRulesParams(params);
     const all = [
       pricingRule({
         id: "rule-1",
@@ -90,6 +98,7 @@ vi.mock("@/hooks/admin-queries", () => ({
 describe("ChannelPricingPage", () => {
   beforeEach(() => {
     mocks.installPresets.mockReset();
+    mocks.pricingRulesParams.mockReset();
     mocks.installPresets.mockResolvedValue({
       created: 2,
       requested: 2,
@@ -125,6 +134,27 @@ describe("ChannelPricingPage", () => {
       description: "内置模型系列 2 个，命中 2 个。",
       tone: "success",
     });
+  });
+
+  it("restores gateway resource pricing filters from the URL", async () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/admin/channels/pricing?q=gpt-4.1&f_modelId=m2&f_providerId=p1",
+    );
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(mocks.pricingRulesParams).toHaveBeenCalledWith(
+        expect.objectContaining({
+          q: "gpt-4.1",
+          model_id: "m2",
+          provider_id: "p1",
+        }),
+      );
+    });
+    expect(screen.getByDisplayValue("gpt-4.1")).toBeInTheDocument();
   });
 });
 
