@@ -67,7 +67,8 @@ Downstream SDK / App Request
 
 - SRapi 对下游暴露 OpenAI-compatible、Anthropic-compatible、Gemini-compatible 或其他统一 API。
 - SRapi 对上游不是调用普通 API SDK 形态，而是模拟目标官方客户端或非 API Key 客户端形态。
-- 这里的“反代 / 2api”重点在上游请求模拟：SRapi 直接构造 ChatGPT Web、Codex、Claude Code、Gemini CLI、Antigravity 等官方客户端会发出的 upstream request，并用选中账号的 OAuth、session、desktop、CLI 或 IDE token 发给它们的真实上游。
+- 这里的“反代 / 2api”重点在上游请求模拟：SRapi 直接构造 ChatGPT Web、Codex、Claude Code、Antigravity 等官方客户端会发出的 upstream request，并用选中账号的 OAuth、session、desktop、CLI 或 IDE token 发给它们的真实上游。
+- Gemini CLI / Code Assist 已停止作为当前迁移目标；历史兼容面不应继续出现在管理员新建入口或当前目标文档里。
 - 选中账号的 `runtime_class`、`upstream_client`、credential、proxy、cookie jar、User-Agent、header template 决定上游看到的请求身份。
 - OAuth / session / desktop / CLI / IDE credential 是 2api 路径的默认身份来源；`api_key` 账号不是 2api 身份来源。
 - Gateway service 不新增 Codex / Claude Code / Antigravity 本地 DTO；协议模拟属于 Provider Adapter / Runtime Adapter。
@@ -93,7 +94,6 @@ SRapi 2api 反代不是：
 | `reverse-proxy-chatgpt-web` | ChatGPT Web 客户端 | ChatGPT `/backend-api/conversation`，browser / OAI device-session / Sentinel requirements headers，ChatGPT Web Conversation body，ChatGPT OAuth / Web session credential。 |
 | `reverse-proxy-codex-cli` | Codex CLI / ChatGPT Codex 客户端 | Codex `/backend-api/codex/responses` 或 Responses WebSocket，Codex headers、session/cache headers、Codex OAuth / device / CLI client token。 |
 | `reverse-proxy-claude-code-cli` | Claude Code 客户端 | Anthropic Messages 端点上的 Claude Code OAuth / setup-token credential header、Claude Code beta/version/cache/signing/body conventions。 |
-| `reverse-proxy-gemini-cli` | Gemini CLI / Code Assist 客户端 | Gemini Code Assist / Cloud Code endpoints、project/user context、Google OAuth credential behavior。 |
 | `reverse-proxy-antigravity` | Antigravity Desktop / IDE 客户端 | Google Cloud Code / Antigravity internal endpoints、desktop/IDE token, user-agent, HTTP behavior, protocol-specific payload. |
 | `custom_reverse_proxy` | Operator-defined upstream client | Explicit endpoint and egress profile defined by operator metadata. |
 

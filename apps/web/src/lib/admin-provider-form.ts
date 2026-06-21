@@ -21,7 +21,6 @@ export const PROVIDER_ADAPTER_TYPES: ProviderAdapterType[] = [
   "reverse-proxy-codex-cli",
   "reverse-proxy-claude-web",
   "reverse-proxy-claude-code-cli",
-  "reverse-proxy-gemini-cli",
   "reverse-proxy-antigravity",
   "custom",
 ];
