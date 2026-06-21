@@ -510,7 +510,10 @@ export type PasswordlessLoginRequest = {
 export type SiteConfig = {
     site_name: string;
     logo_url: string;
+    site_subtitle: string;
     version_label: string;
+    contact_info: string;
+    doc_url: string;
     custom_menus: Array<CustomMenuItem>;
     user_agreement: string;
     privacy_policy: string;
@@ -3890,8 +3893,11 @@ export type SecretConfigured = {
 
 export type AdminSettingsGeneral = {
     site_name: string;
+    site_subtitle: string;
     logo_url: string;
     version_label: string;
+    contact_info: string;
+    doc_url: string;
     custom_menus: Array<CustomMenuItem>;
 };
 

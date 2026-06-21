@@ -18899,8 +18899,11 @@ components:
       type: object
       required:
         - site_name
+        - site_subtitle
         - logo_url
         - version_label
+        - contact_info
+        - doc_url
         - custom_menus
         - user_agreement
         - privacy_policy
@@ -18909,7 +18912,13 @@ components:
           type: string
         logo_url:
           type: string
+        site_subtitle:
+          type: string
         version_label:
+          type: string
+        contact_info:
+          type: string
+        doc_url:
           type: string
         custom_menus:
           type: array
@@ -26484,20 +26493,32 @@ components:
       type: object
       required:
         - site_name
+        - site_subtitle
         - logo_url
         - version_label
+        - contact_info
+        - doc_url
         - custom_menus
       properties:
         site_name:
           type: string
           minLength: 1
           maxLength: 80
+        site_subtitle:
+          type: string
+          maxLength: 160
         logo_url:
           type: string
           maxLength: 2048
         version_label:
           type: string
           maxLength: 80
+        contact_info:
+          type: string
+          maxLength: 240
+        doc_url:
+          type: string
+          maxLength: 2048
         custom_menus:
           type: array
           items:

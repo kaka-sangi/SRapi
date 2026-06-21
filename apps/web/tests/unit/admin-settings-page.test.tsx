@@ -144,6 +144,27 @@ describe("AdminSettingsPage", () => {
     ]);
   });
 
+  it("edits public site branding fields", async () => {
+    const user = userEvent.setup();
+    mocks.searchParams = new URLSearchParams("");
+    mocks.updateSettings.mockImplementation(async (body: AdminSettings) => body);
+    renderPage();
+
+    await user.clear(screen.getByLabelText("站点副标题"));
+    await user.type(screen.getByLabelText("站点副标题"), "Private AI workspace");
+    await user.type(screen.getByLabelText("联系方式"), "support@example.com");
+    await user.type(screen.getByLabelText("文档链接"), "https://docs.example.com");
+    await user.click(screen.getByRole("button", { name: "保存更改" }));
+
+    await waitFor(() => expect(mocks.updateSettings).toHaveBeenCalled());
+    const submitted = mocks.updateSettings.mock.calls[0][0] as AdminSettings;
+    expect(submitted.general).toMatchObject({
+      site_subtitle: "Private AI workspace",
+      contact_info: "support@example.com",
+      doc_url: "https://docs.example.com",
+    });
+  });
+
   it("edits security allowlist and non-secret oauth provider configs", async () => {
     const user = userEvent.setup();
     mocks.searchParams = new URLSearchParams("tab=security");
@@ -286,8 +307,11 @@ function settings(): AdminSettings {
   return {
     general: {
       site_name: "SRapi",
+      site_subtitle: "AI gateway control plane",
       logo_url: "",
       version_label: "",
+      contact_info: "",
+      doc_url: "",
       custom_menus: [],
     },
     agreement: {

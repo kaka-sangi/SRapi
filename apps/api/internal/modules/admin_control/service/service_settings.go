@@ -109,8 +109,11 @@ func defaultAdminSettings(now time.Time) admincontrol.AdminSettings {
 	return admincontrol.AdminSettings{
 		General: admincontrol.AdminSettingsGeneral{
 			SiteName:     "SRapi",
+			SiteSubtitle: "AI gateway control plane",
 			LogoURL:      "",
 			VersionLabel: "",
+			ContactInfo:  "",
+			DocURL:       "",
 			CustomMenus:  []admincontrol.CustomMenuItem{},
 		},
 		Agreement: admincontrol.AdminSettingsAgreement{},
@@ -191,8 +194,11 @@ func defaultAdminSettings(now time.Time) admincontrol.AdminSettings {
 
 func normalizeAdminSettings(settings admincontrol.AdminSettings) (admincontrol.AdminSettings, error) {
 	settings.General.SiteName = strings.TrimSpace(settings.General.SiteName)
+	settings.General.SiteSubtitle = strings.TrimSpace(settings.General.SiteSubtitle)
 	settings.General.LogoURL = strings.TrimSpace(settings.General.LogoURL)
 	settings.General.VersionLabel = strings.TrimSpace(settings.General.VersionLabel)
+	settings.General.ContactInfo = strings.TrimSpace(settings.General.ContactInfo)
+	settings.General.DocURL = strings.TrimSpace(settings.General.DocURL)
 	settings.Users.DefaultBalance = strings.TrimSpace(settings.Users.DefaultBalance)
 	settings.Users.DefaultGroup = strings.TrimSpace(settings.Users.DefaultGroup)
 	settings.Gateway.SchedulerStrategyShadowStrategy = strings.TrimSpace(settings.Gateway.SchedulerStrategyShadowStrategy)
@@ -227,7 +233,7 @@ func normalizeAdminSettings(settings admincontrol.AdminSettings) (admincontrol.A
 	settings.Gateway.MaxRetryCredentials = normalizeGatewayMaxRetryCredentials(settings.Gateway.MaxRetryCredentials)
 	settings.Gateway.MaxRetryIntervalMS = normalizeGatewayMaxRetryIntervalMS(settings.Gateway.MaxRetryIntervalMS)
 	settings.Gateway.PassthroughHeaderAllowlist = normalizePassthroughHeaderAllowlist(settings.Gateway.PassthroughHeaderAllowlist)
-	if settings.General.SiteName == "" || !validDecimal(settings.Users.DefaultBalance) || settings.Users.RPMLimitDefault < 0 || settings.Gateway.StreamTimeoutSeconds <= 0 || settings.Backup.RetentionDays <= 0 {
+	if !validGeneralSettings(settings.General) || !validDecimal(settings.Users.DefaultBalance) || settings.Users.RPMLimitDefault < 0 || settings.Gateway.StreamTimeoutSeconds <= 0 || settings.Backup.RetentionDays <= 0 {
 		return admincontrol.AdminSettings{}, admincontrol.ErrInvalidInput
 	}
 	if settings.Gateway.SchedulerStrategyRolloutPercent < 0 || settings.Gateway.SchedulerStrategyRolloutPercent > 100 {
@@ -321,6 +327,19 @@ func normalizeAdminSettings(settings admincontrol.AdminSettings) (admincontrol.A
 		settings.Copilot.ProviderAccountID = 0
 	}
 	return settings, nil
+}
+
+func validGeneralSettings(settings admincontrol.AdminSettingsGeneral) bool {
+	if settings.SiteName == "" || len(settings.SiteName) > 80 {
+		return false
+	}
+	if len(settings.SiteSubtitle) > 160 || len(settings.VersionLabel) > 80 || len(settings.ContactInfo) > 240 {
+		return false
+	}
+	if settings.LogoURL != "" && !validPublicHTTPBaseURL(settings.LogoURL) {
+		return false
+	}
+	return settings.DocURL == "" || validPublicHTTPBaseURL(settings.DocURL)
 }
 
 // gatewayRetryCountDefault / gatewayRetryCountMax bound the operator-tunable

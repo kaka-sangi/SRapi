@@ -52,8 +52,11 @@ func (s *Server) handleSiteConfig(w http.ResponseWriter, r *http.Request) {
 	writeJSONAny(w, http.StatusOK, map[string]any{
 		"data": map[string]any{
 			"site_name":      settings.General.SiteName,
+			"site_subtitle":  settings.General.SiteSubtitle,
 			"logo_url":       settings.General.LogoURL,
 			"version_label":  settings.General.VersionLabel,
+			"contact_info":   settings.General.ContactInfo,
+			"doc_url":        settings.General.DocURL,
 			"custom_menus":   publicCustomMenus(settings.General.CustomMenus),
 			"user_agreement": settings.Agreement.UserAgreement,
 			"privacy_policy": settings.Agreement.PrivacyPolicy,

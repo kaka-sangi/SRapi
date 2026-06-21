@@ -116,8 +116,11 @@ type AdminSettingsCopilot struct {
 }
 type AdminSettingsGeneral struct {
 	SiteName     string           `json:"site_name"`
+	SiteSubtitle string           `json:"site_subtitle"`
 	LogoURL      string           `json:"logo_url"`
 	VersionLabel string           `json:"version_label"`
+	ContactInfo  string           `json:"contact_info"`
+	DocURL       string           `json:"doc_url"`
 	CustomMenus  []CustomMenuItem `json:"custom_menus"`
 }
 

@@ -142,6 +142,48 @@ func TestUpdateAdminSettingsRejectsInvalidCustomMenuURL(t *testing.T) {
 	}
 }
 
+func TestUpdateAdminSettingsNormalizesSiteBranding(t *testing.T) {
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.June, 21, 11, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	settings, err := svc.GetAdminSettings(context.Background())
+	if err != nil {
+		t.Fatalf("get admin settings: %v", err)
+	}
+	settings.General.SiteName = " Operator Gateway "
+	settings.General.SiteSubtitle = " Private AI access "
+	settings.General.ContactInfo = " support@example.com "
+	settings.General.DocURL = " https://docs.example.com/ "
+
+	updated, err := svc.UpdateAdminSettings(context.Background(), settings, 1)
+	if err != nil {
+		t.Fatalf("update admin settings: %v", err)
+	}
+	if updated.General.SiteName != "Operator Gateway" || updated.General.SiteSubtitle != "Private AI access" || updated.General.ContactInfo != "support@example.com" || updated.General.DocURL != "https://docs.example.com/" {
+		t.Fatalf("unexpected normalized branding: %+v", updated.General)
+	}
+}
+
+func TestUpdateAdminSettingsRejectsInvalidSiteDocURL(t *testing.T) {
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.June, 21, 11, 5, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	settings, err := svc.GetAdminSettings(context.Background())
+	if err != nil {
+		t.Fatalf("get admin settings: %v", err)
+	}
+	settings.General.DocURL = "javascript:alert(1)"
+
+	_, err = svc.UpdateAdminSettings(context.Background(), settings, 1)
+	if !errors.Is(err, admincontrol.ErrInvalidInput) {
+		t.Fatalf("expected invalid site doc URL error, got %v", err)
+	}
+}
+
 func TestDefaultAdminSettingsIncludesSafePassthroughHeaderAllowlist(t *testing.T) {
 	store := admincontrolmemory.New()
 	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.June, 12, 10, 0, 0, 0, time.UTC)})

@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { useCaptcha } from "@/components/auth/captcha";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { LanguageToggle } from "@/components/layout/language-toggle";
+import type { SiteConfig } from "@/lib/api/types";
 
 /**
  * Self-service sign-up. Registration is gated server-side by
@@ -30,7 +31,7 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [site, setSite] = useState<{ site_name: string; user_agreement: string; privacy_policy: string } | null>(null);
+  const [site, setSite] = useState<SiteConfig | null>(null);
   const [attributes, setAttributes] = useState<CurrentUserAttribute[]>([]);
   const [attributeValues, setAttributeValues] = useState<Record<number, string>>({});
   const captcha = useCaptcha();
@@ -96,7 +97,9 @@ export default function RegisterPage() {
         <div className="animate-bloom w-full max-w-sm">
           <Card className="card-raised p-7 sm:p-8">
             <h1 className="font-serif text-2xl text-srapi-text-primary">{t("authRegister.title")}</h1>
-            <p className="mt-1.5 text-sm text-srapi-text-secondary">{t("authRegister.subtitle")}</p>
+            <p className="mt-1.5 text-sm text-srapi-text-secondary">
+              {site?.site_subtitle?.trim() || t("authRegister.subtitle")}
+            </p>
             <form onSubmit={handleSubmit} noValidate className="mt-7 space-y-5">
               <div>
                 <Label htmlFor="reg-name">{t("authRegister.name")}</Label>
@@ -217,6 +220,16 @@ export default function RegisterPage() {
                 {t("authRegister.signIn")}
               </Link>
             </p>
+            {(site?.doc_url || site?.contact_info) ? (
+              <div className="mt-4 flex justify-center gap-3 text-2xs text-srapi-text-tertiary">
+                {site.doc_url ? (
+                  <a href={site.doc_url} className="underline-offset-4 hover:underline">
+                    {t("login.docsLink")}
+                  </a>
+                ) : null}
+                {site.contact_info ? <span>{site.contact_info}</span> : null}
+              </div>
+            ) : null}
           </Card>
         </div>
       </main>

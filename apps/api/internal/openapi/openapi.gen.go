@@ -5330,9 +5330,12 @@ type AdminSettingsGatewayProtocolConversionRoutes string
 
 // AdminSettingsGeneral defines model for AdminSettingsGeneral.
 type AdminSettingsGeneral struct {
+	ContactInfo  string           `json:"contact_info"`
 	CustomMenus  []CustomMenuItem `json:"custom_menus"`
+	DocUrl       string           `json:"doc_url"`
 	LogoUrl      string           `json:"logo_url"`
 	SiteName     string           `json:"site_name"`
+	SiteSubtitle string           `json:"site_subtitle"`
 	VersionLabel string           `json:"version_label"`
 }
 
@@ -11992,10 +11995,13 @@ type SetupStatusResponse struct {
 
 // SiteConfig defines model for SiteConfig.
 type SiteConfig struct {
+	ContactInfo   string           `json:"contact_info"`
 	CustomMenus   []CustomMenuItem `json:"custom_menus"`
+	DocUrl        string           `json:"doc_url"`
 	LogoUrl       string           `json:"logo_url"`
 	PrivacyPolicy string           `json:"privacy_policy"`
 	SiteName      string           `json:"site_name"`
+	SiteSubtitle  string           `json:"site_subtitle"`
 	UserAgreement string           `json:"user_agreement"`
 	VersionLabel  string           `json:"version_label"`
 }

@@ -7,6 +7,7 @@ import { FirstRunRedirect } from "@/components/auth/first-run-redirect";
 import { LoginForm } from "@/components/auth/login-form";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { LanguageToggle } from "@/components/layout/language-toggle";
+import { useSiteConfig } from "@/hooks/queries";
 
 // Orchestrated entrance: each element rises with a spring, sequenced by index.
 // The stagger lives in CSS (--stagger-index → animation-delay), so it stays on
@@ -15,6 +16,11 @@ const rise = (i: number) => ({ "--stagger-index": i }) as CSSProperties;
 
 export default function LandingPage() {
   const { t } = useLanguage();
+  const siteConfig = useSiteConfig();
+  const site = siteConfig.data;
+  const siteName = site?.site_name?.trim() || "SRapi";
+  const siteSubtitle = site?.site_subtitle?.trim() || t("login.subhead");
+  const versionLabel = site?.version_label?.trim() || t("common.version");
 
   return (
     <div className="relative flex min-h-dvh flex-col">
@@ -24,8 +30,8 @@ export default function LandingPage() {
       {/* top bar — chrome stays static so the toggles are instantly usable */}
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
         <div className="flex items-baseline gap-2">
-          <span className="font-serif text-2xl leading-none text-srapi-text-primary">SRapi</span>
-          <span className="font-mono text-2xs text-srapi-text-tertiary">{t("common.version")}</span>
+          <span className="font-serif text-2xl leading-none text-srapi-text-primary">{siteName}</span>
+          <span className="font-mono text-2xs text-srapi-text-tertiary">{versionLabel}</span>
         </div>
         <div className="flex items-center gap-2">
           <LanguageToggle />
@@ -57,7 +63,7 @@ export default function LandingPage() {
               className="anim-rise mt-8 max-w-md text-md leading-relaxed text-srapi-text-secondary"
               style={rise(2)}
             >
-              {t("login.subhead")}
+              {siteSubtitle}
             </p>
             <p
               className="anim-rise mt-10 border-t border-srapi-border pt-5 font-mono text-2xs leading-relaxed text-srapi-text-tertiary"
@@ -79,8 +85,15 @@ export default function LandingPage() {
       {/* footer */}
       <footer className="anim-rise mx-auto w-full max-w-6xl px-6 py-7" style={rise(4)}>
         <div className="flex items-center justify-between border-t border-srapi-border pt-6 font-mono text-2xs text-srapi-text-tertiary">
-          <span>© 2026 SRapi</span>
-          <span>{t("login.eyebrow")}</span>
+          <span>© 2026 {siteName}</span>
+          <span className="flex items-center gap-3">
+            {site?.doc_url ? (
+              <a href={site.doc_url} className="underline-offset-4 hover:text-srapi-text-secondary hover:underline">
+                {t("login.docsLink")}
+              </a>
+            ) : null}
+            {site?.contact_info ? <span>{site.contact_info}</span> : <span>{t("login.eyebrow")}</span>}
+          </span>
         </div>
       </footer>
     </div>

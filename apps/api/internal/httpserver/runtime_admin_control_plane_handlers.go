@@ -779,9 +779,12 @@ func toAPIAdminSettings(in admincontrol.AdminSettings) apiopenapi.AdminSettings 
 			StreamTimeoutSeconds:                 in.Gateway.StreamTimeoutSeconds,
 		},
 		General: apiopenapi.AdminSettingsGeneral{
+			ContactInfo:  in.General.ContactInfo,
 			CustomMenus:  toAPICustomMenus(in.General.CustomMenus),
+			DocUrl:       in.General.DocURL,
 			LogoUrl:      in.General.LogoURL,
 			SiteName:     in.General.SiteName,
+			SiteSubtitle: in.General.SiteSubtitle,
 			VersionLabel: in.General.VersionLabel,
 		},
 		Payment: apiopenapi.AdminSettingsPayment{
@@ -880,9 +883,12 @@ func adminSettingsFromAPI(in apiopenapi.AdminSettings) admincontrol.AdminSetting
 			StreamTimeoutSeconds:                 in.Gateway.StreamTimeoutSeconds,
 		},
 		General: admincontrol.AdminSettingsGeneral{
+			ContactInfo:  in.General.ContactInfo,
 			CustomMenus:  customMenusFromAPI(in.General.CustomMenus),
+			DocURL:       in.General.DocUrl,
 			LogoURL:      in.General.LogoUrl,
 			SiteName:     in.General.SiteName,
+			SiteSubtitle: in.General.SiteSubtitle,
 			VersionLabel: in.General.VersionLabel,
 		},
 		Payment: admincontrol.AdminSettingsPayment{

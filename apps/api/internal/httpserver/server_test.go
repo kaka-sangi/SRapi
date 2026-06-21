@@ -1645,6 +1645,9 @@ func TestSiteConfigFiltersAdminOnlyCustomMenus(t *testing.T) {
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 
 	settingsResp := mustGetAdminSettings(t, handler, sessionCookie)
+	settingsResp.Data.General.SiteSubtitle = "Operator console"
+	settingsResp.Data.General.ContactInfo = "support@example.com"
+	settingsResp.Data.General.DocUrl = "https://docs.example.com"
 	settingsResp.Data.General.CustomMenus = []apiopenapi.CustomMenuItem{
 		{
 			Id:         "docs",
@@ -1683,11 +1686,17 @@ func TestSiteConfigFiltersAdminOnlyCustomMenus(t *testing.T) {
 	}
 	var payload struct {
 		Data struct {
-			CustomMenus []apiopenapi.CustomMenuItem `json:"custom_menus"`
+			SiteSubtitle string                      `json:"site_subtitle"`
+			ContactInfo  string                      `json:"contact_info"`
+			DocURL       string                      `json:"doc_url"`
+			CustomMenus  []apiopenapi.CustomMenuItem `json:"custom_menus"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(siteRec.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode site config: %v", err)
+	}
+	if payload.Data.SiteSubtitle != "Operator console" || payload.Data.ContactInfo != "support@example.com" || payload.Data.DocURL != "https://docs.example.com" {
+		t.Fatalf("unexpected site branding fields: %+v", payload.Data)
 	}
 	if len(payload.Data.CustomMenus) != 1 {
 		t.Fatalf("custom menus len = %d, want 1: %+v", len(payload.Data.CustomMenus), payload.Data.CustomMenus)

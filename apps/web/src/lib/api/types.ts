@@ -153,8 +153,11 @@ export type LiveModel = {
 
 export type SiteConfig = {
   site_name: string;
+  site_subtitle: string;
   logo_url: string;
   version_label: string;
+  contact_info: string;
+  doc_url: string;
   custom_menus: CustomMenuItem[];
   user_agreement: string;
   privacy_policy: string;

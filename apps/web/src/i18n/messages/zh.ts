@@ -247,6 +247,7 @@ export const zh: Messages = {
     continueWith: "使用 {name} 登录",
     noAccount: "还没有账号？",
     keyUsageLink: "免登录查询密钥用量",
+    docsLink: "文档",
     signUp: "注册",
     twoFactorTitle: "两步验证",
     twoFactorHint: "请输入身份验证器应用中的 6 位验证码。",
@@ -3031,8 +3032,11 @@ export const zh: Messages = {
     fields: {
       // general
       site_name: "站点名称",
+      site_subtitle: "站点副标题",
       logo_url: "Logo 链接",
       version_label: "版本标签",
+      contact_info: "联系方式",
+      doc_url: "文档链接",
       // agreement
       user_agreement: "用户协议",
       privacy_policy: "隐私政策",
