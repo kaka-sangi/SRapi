@@ -1,16 +1,39 @@
 import { useLanguage } from "@/context/LanguageContext";
+import type { ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { TagInput } from "@/components/ui/tag-input";
 import { MultiSelect, type MultiSelectOption } from "@/components/ui/multi-select";
 import { KeyValueEditor } from "@/components/ui/key-value-editor";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   PROTOCOL_CONVERSION_ROUTES,
   type AdminSettingsDraft,
   type ProtocolConversionRoute,
 } from "@/lib/admin-settings-form";
 import { type SpecialField, fieldLabel } from "./settings-fields";
+import type {
+  AuthIdentityProvider,
+  OAuthProviderConfig,
+} from "../../../../../../packages/sdk/typescript/src/types.gen";
+
+const OAUTH_PROVIDERS = [
+  "oidc",
+  "github",
+  "google",
+  "linuxdo",
+  "wechat",
+  "dingtalk",
+] as const satisfies readonly AuthIdentityProvider[];
 
 /**
  * Render one "special" settings field with a graphical control: chips for plain
@@ -128,6 +151,18 @@ export function SpecialFieldRow({
     );
   }
 
+  if (field.kind === "oauth-provider-configs") {
+    const configs = Array.isArray(value) ? (value as OAuthProviderConfig[]) : [];
+    return (
+      <OAuthProviderConfigsEditor
+        id={id}
+        label={label}
+        value={configs}
+        onChange={(next) => onChange(field.key, next)}
+      />
+    );
+  }
+
   return (
     <div>
       <Label htmlFor={id}>{label}</Label>
@@ -148,4 +183,219 @@ function protocolConversionRouteOptions(t: (key: string) => string): Array<{ val
     value,
     label: t(`adminSettings.protocolConversionRoutes.${value}`),
   }));
+}
+
+function OAuthProviderConfigsEditor({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: OAuthProviderConfig[];
+  onChange: (next: OAuthProviderConfig[]) => void;
+}) {
+  const { t } = useLanguage();
+
+  function update(index: number, patch: Partial<OAuthProviderConfig>) {
+    onChange(value.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+  }
+
+  function remove(index: number) {
+    onChange(value.filter((_, i) => i !== index));
+  }
+
+  function add() {
+    onChange([
+      ...value,
+      {
+        provider: "oidc",
+        provider_key: "",
+        display_name: "",
+        client_id: "",
+        authorize_url: "",
+        token_auth_method: "none",
+        redirect_uri: "",
+        scopes: [],
+      },
+    ]);
+  }
+
+  return (
+    <div id={id} className="space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        <Label>{label}</Label>
+        <Button type="button" variant="outline" size="sm" onClick={add}>
+          {t("adminSettings.addOAuthProviderConfig")}
+        </Button>
+      </div>
+      <p className="text-2xs text-srapi-text-tertiary">
+        {t("adminSettings.oauthProviderConfigsHint")}
+      </p>
+      {value.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-srapi-border px-3 py-4 text-sm text-srapi-text-tertiary">
+          {t("adminSettings.oauthProviderConfigsEmpty")}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {value.map((config, index) => (
+            <div key={index} className="rounded-lg border border-srapi-border p-3">
+              <div className="grid gap-3 lg:grid-cols-12">
+                <Field className="lg:col-span-2" label={t("adminSettings.oauthFields.provider")}>
+                  <Select
+                    value={config.provider}
+                    onValueChange={(provider) =>
+                      update(index, { provider: provider as AuthIdentityProvider })
+                    }
+                  >
+                    <SelectTrigger className="h-9 rounded-lg">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {OAUTH_PROVIDERS.map((provider) => (
+                        <SelectItem key={provider} value={provider}>
+                          {provider}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field
+                  className="lg:col-span-2"
+                  htmlFor={`oauth-${index}-provider-key`}
+                  label={t("adminSettings.oauthFields.providerKey")}
+                >
+                  <Input
+                    id={`oauth-${index}-provider-key`}
+                    className="h-9"
+                    value={config.provider_key}
+                    onChange={(event) => update(index, { provider_key: event.target.value })}
+                  />
+                </Field>
+                <Field
+                  className="lg:col-span-2"
+                  htmlFor={`oauth-${index}-display-name`}
+                  label={t("adminSettings.oauthFields.displayName")}
+                >
+                  <Input
+                    id={`oauth-${index}-display-name`}
+                    className="h-9"
+                    value={config.display_name}
+                    onChange={(event) => update(index, { display_name: event.target.value })}
+                  />
+                </Field>
+                <Field
+                  className="lg:col-span-3"
+                  htmlFor={`oauth-${index}-client-id`}
+                  label={t("adminSettings.oauthFields.clientId")}
+                >
+                  <Input
+                    id={`oauth-${index}-client-id`}
+                    className="h-9 font-mono text-xs"
+                    value={config.client_id}
+                    onChange={(event) => update(index, { client_id: event.target.value })}
+                  />
+                </Field>
+                <div className="flex items-end justify-end lg:col-span-3">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => remove(index)}
+                  >
+                    {t("common.delete")}
+                  </Button>
+                </div>
+                <Field
+                  className="lg:col-span-6"
+                  htmlFor={`oauth-${index}-authorize-url`}
+                  label={t("adminSettings.oauthFields.authorizeUrl")}
+                >
+                  <Input
+                    id={`oauth-${index}-authorize-url`}
+                    className="h-9 font-mono text-xs"
+                    value={config.authorize_url}
+                    onChange={(event) => update(index, { authorize_url: event.target.value })}
+                  />
+                </Field>
+                <Field
+                  className="lg:col-span-6"
+                  htmlFor={`oauth-${index}-redirect-uri`}
+                  label={t("adminSettings.oauthFields.redirectUri")}
+                >
+                  <Input
+                    id={`oauth-${index}-redirect-uri`}
+                    className="h-9 font-mono text-xs"
+                    value={config.redirect_uri}
+                    onChange={(event) => update(index, { redirect_uri: event.target.value })}
+                  />
+                </Field>
+                <Field
+                  className="lg:col-span-6"
+                  htmlFor={`oauth-${index}-token-url`}
+                  label={t("adminSettings.oauthFields.tokenUrl")}
+                >
+                  <Input
+                    id={`oauth-${index}-token-url`}
+                    className="h-9 font-mono text-xs"
+                    value={config.token_url ?? ""}
+                    onChange={(event) => update(index, { token_url: event.target.value })}
+                  />
+                </Field>
+                <Field
+                  className="lg:col-span-6"
+                  htmlFor={`oauth-${index}-userinfo-url`}
+                  label={t("adminSettings.oauthFields.userinfoUrl")}
+                >
+                  <Input
+                    id={`oauth-${index}-userinfo-url`}
+                    className="h-9 font-mono text-xs"
+                    value={config.userinfo_url ?? ""}
+                    onChange={(event) => update(index, { userinfo_url: event.target.value })}
+                  />
+                </Field>
+                <Field
+                  className="lg:col-span-12"
+                  htmlFor={`oauth-${index}-scopes`}
+                  label={t("adminSettings.oauthFields.scopes")}
+                >
+                  <TagInput
+                    id={`oauth-${index}-scopes`}
+                    value={config.scopes}
+                    onChange={(scopes) => update(index, { scopes })}
+                    placeholder="openid, email, profile"
+                  />
+                </Field>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Field({
+  label,
+  className,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  className?: string;
+  htmlFor?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={className}>
+      <label
+        htmlFor={htmlFor}
+        className="mb-1.5 block text-2xs font-medium uppercase tracking-wide text-srapi-text-tertiary"
+      >
+        {label}
+      </label>
+      {children}
+    </div>
+  );
 }

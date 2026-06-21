@@ -86,6 +86,65 @@ describe("AdminSettingsPage", () => {
     });
   });
 
+  it("edits security allowlist and non-secret oauth provider configs", async () => {
+    const user = userEvent.setup();
+    mocks.searchParams = new URLSearchParams("tab=security");
+    mocks.updateSettings.mockImplementation(async (body: AdminSettings) => ({
+      ...body,
+      security: {
+        ...body.security,
+        registration_email_suffix_allowlist: ["@example.com"],
+        oauth_provider_configs: [
+          {
+            provider: "oidc",
+            provider_key: "issuer-main",
+            display_name: "Main issuer",
+            client_id: "client-123",
+            authorize_url: "https://idp.example/authorize",
+            token_url: "https://idp.example/token",
+            userinfo_url: "https://idp.example/userinfo",
+            token_auth_method: "none",
+            redirect_uri: "https://api.example/api/v1/auth/oauth/oidc/callback",
+            scopes: ["openid", "email"],
+          },
+        ],
+      },
+    }));
+    renderPage();
+
+    await user.type(screen.getByLabelText("注册邮箱后缀白名单"), "@example.com{Enter}");
+    await user.click(screen.getByRole("button", { name: "添加提供方配置" }));
+
+    await user.type(screen.getByLabelText("实例标识"), "issuer-main");
+    await user.type(screen.getByLabelText("显示名称"), "Main issuer");
+    await user.type(screen.getByLabelText("Client ID"), "client-123");
+    await user.type(screen.getByLabelText("授权 URL"), "https://idp.example/authorize");
+    await user.type(
+      screen.getByLabelText("回调 URI"),
+      "https://api.example/api/v1/auth/oauth/oidc/callback",
+    );
+    await user.type(screen.getByLabelText("Token URL"), "https://idp.example/token");
+    await user.type(screen.getByLabelText("UserInfo URL"), "https://idp.example/userinfo");
+    await user.type(screen.getByPlaceholderText("openid, email, profile"), "openid email{Enter}");
+
+    await user.click(screen.getByRole("button", { name: "保存更改" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByRole("textbox"), "SAVE SECURITY SETTINGS");
+    await user.click(within(dialog).getByRole("button", { name: "保存" }));
+
+    await waitFor(() => expect(mocks.updateSettings).toHaveBeenCalled());
+    const submitted = mocks.updateSettings.mock.calls[0][0] as AdminSettings;
+    expect(submitted.security.registration_email_suffix_allowlist).toEqual(["@example.com"]);
+    expect(submitted.security.oauth_provider_configs[0]).toMatchObject({
+      provider: "oidc",
+      provider_key: "issuer-main",
+      client_id: "client-123",
+      token_auth_method: "none",
+      scopes: ["openid", "email"],
+    });
+    expect(await screen.findByText("已保存")).toBeInTheDocument();
+  });
+
   it("uses the normalized settings returned by the server after save", async () => {
     const user = userEvent.setup();
     mocks.updateSettings.mockImplementation(async (body: AdminSettings) => ({

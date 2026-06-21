@@ -2954,6 +2954,21 @@ export const zh: Messages = {
     templateKeyPlaceholder: "事件标识",
     templateValuePlaceholder: "模板内容",
     customMenusHint: "高级 —— 菜单对象的 JSON 数组。",
+    addOAuthProviderConfig: "添加提供方配置",
+    oauthProviderConfigsHint:
+      "这里只保存非密钥授权配置。Client Secret 必须留在部署密钥中，不能写入系统设置。",
+    oauthProviderConfigsEmpty: "尚未配置 OAuth 提供方实例。",
+    oauthFields: {
+      provider: "提供方",
+      providerKey: "实例标识",
+      displayName: "显示名称",
+      clientId: "Client ID",
+      authorizeUrl: "授权 URL",
+      redirectUri: "回调 URI",
+      tokenUrl: "Token URL",
+      userinfoUrl: "UserInfo URL",
+      scopes: "Scopes",
+    },
     testEmail: {
       title: "发送测试邮件",
       hint: "请先保存 SMTP 配置，再发送一封测试邮件以确认凭据可用。SMTP 密码为只写，因此这是验证它的唯一方式。",
@@ -2991,6 +3006,9 @@ export const zh: Messages = {
       // security
       registration_enabled: "开放注册",
       oauth_enabled: "启用 OAuth",
+      registration_email_suffix_allowlist: "注册邮箱后缀白名单",
+      registration_email_suffix_allowlist_hint:
+        "填写 @example.com 这类规范后缀。留空表示允许所有合法邮箱域名注册。",
       // users
       default_balance: "默认余额",
       default_group: "默认分组",

@@ -3024,6 +3024,21 @@ export const en = {
     templateKeyPlaceholder: "event key",
     templateValuePlaceholder: "template body",
     customMenusHint: "Advanced — JSON array of menu objects.",
+    addOAuthProviderConfig: "Add provider config",
+    oauthProviderConfigsHint:
+      "Non-secret authorization settings only. Client secrets stay in deployment secrets and are never stored here.",
+    oauthProviderConfigsEmpty: "No OAuth provider configs.",
+    oauthFields: {
+      provider: "Provider",
+      providerKey: "Provider key",
+      displayName: "Display name",
+      clientId: "Client ID",
+      authorizeUrl: "Authorize URL",
+      redirectUri: "Redirect URI",
+      tokenUrl: "Token URL",
+      userinfoUrl: "UserInfo URL",
+      scopes: "Scopes",
+    },
     testEmail: {
       title: "Send test email",
       hint: "Save the SMTP fields first, then send a probe to confirm the credentials work. The SMTP password is write-only, so this is the only way to verify it.",
@@ -3057,6 +3072,9 @@ export const en = {
       payments_enabled: "Payments enabled",
       registration_enabled: "Open registration",
       oauth_enabled: "OAuth enabled",
+      registration_email_suffix_allowlist: "Allowed registration email suffixes",
+      registration_email_suffix_allowlist_hint:
+        "Use normalized suffixes such as @example.com. Empty allows every valid email domain.",
       default_balance: "Default balance",
       default_group: "Default group",
       user_self_delete_enabled: "Allow self-deletion",

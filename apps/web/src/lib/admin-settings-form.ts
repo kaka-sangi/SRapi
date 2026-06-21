@@ -2,6 +2,7 @@ import type {
   AdminSettings,
   AdminSettingsCopilotWritable,
   AdminSettingsGateway,
+  OAuthProviderConfig,
 } from "../../../../packages/sdk/typescript/src/types.gen";
 
 // The write model carries the write-only `dedicated_api_key`; the copilot
@@ -49,7 +50,9 @@ export interface AdminSettingsDraft {
   value: AdminSettings;
   customMenusJson: string;
   enabledChannels: string[];
+  registrationEmailSuffixAllowlist: string[];
   oauthProviders: string[];
+  oauthProviderConfigs: OAuthProviderConfig[];
   schedulerRolloutModels: string[];
   schedulerRolloutApiKeyHashes: string[];
   protocolConversionRoutes: ProtocolConversionRoute[];
@@ -69,7 +72,9 @@ export function createSettingsDraft(value: AdminSettings): AdminSettingsDraft {
     value,
     customMenusJson: JSON.stringify(value.general.custom_menus ?? [], null, 2),
     enabledChannels: [...(value.features.enabled_channels ?? [])],
+    registrationEmailSuffixAllowlist: [...(value.security.registration_email_suffix_allowlist ?? [])],
     oauthProviders: [...(value.security.oauth_providers ?? [])],
+    oauthProviderConfigs: cloneOAuthProviderConfigs(value.security.oauth_provider_configs),
     schedulerRolloutModels: [...(value.gateway.scheduler_strategy_rollout_models ?? [])],
     schedulerRolloutApiKeyHashes: [...(value.gateway.scheduler_strategy_rollout_api_key_hashes ?? [])],
     protocolConversionRoutes: cleanProtocolConversionRoutes(value.gateway.protocol_conversion_routes),
@@ -93,7 +98,9 @@ export function materializeSettingsDraft(draft: AdminSettingsDraft): AdminSettin
     },
     security: {
       ...draft.value.security,
+      registration_email_suffix_allowlist: cleanList(draft.registrationEmailSuffixAllowlist),
       oauth_providers: cleanList(draft.oauthProviders),
+      oauth_provider_configs: cleanOAuthProviderConfigs(draft.oauthProviderConfigs),
     },
     gateway: {
       ...draft.value.gateway,
@@ -178,6 +185,43 @@ function cleanTemplates(map: Record<string, string> | undefined): Record<string,
   for (const [key, value] of Object.entries(map ?? {})) {
     const trimmed = key.trim();
     if (trimmed) out[trimmed] = typeof value === "string" ? value : JSON.stringify(value);
+  }
+  return out;
+}
+
+function cloneOAuthProviderConfigs(
+  values: readonly OAuthProviderConfig[] | undefined,
+): OAuthProviderConfig[] {
+  return (values ?? []).map((value) => ({
+    ...value,
+    scopes: [...(value.scopes ?? [])],
+  }));
+}
+
+function cleanOAuthProviderConfigs(
+  values: readonly OAuthProviderConfig[] | undefined,
+): OAuthProviderConfig[] {
+  return (values ?? []).map((value) => ({
+    provider: value.provider,
+    provider_key: value.provider_key.trim(),
+    display_name: value.display_name.trim(),
+    client_id: value.client_id.trim(),
+    authorize_url: value.authorize_url.trim(),
+    token_url: value.token_url?.trim() || undefined,
+    userinfo_url: value.userinfo_url?.trim() || undefined,
+    token_auth_method: "none",
+    redirect_uri: value.redirect_uri.trim(),
+    scopes: cleanOAuthScopes(value.scopes),
+  }));
+}
+
+function cleanOAuthScopes(items: readonly string[] | undefined): string[] {
+  const out: string[] = [];
+  for (const item of items ?? []) {
+    for (const scope of item.replaceAll(",", " ").split(/\s+/)) {
+      const trimmed = scope.trim();
+      if (trimmed && !out.includes(trimmed)) out.push(trimmed);
+    }
   }
   return out;
 }

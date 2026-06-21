@@ -2,7 +2,13 @@ import type { AdminSettingsDraft } from "@/lib/admin-settings-form";
 import { type SettingsTab } from "@/lib/admin-settings-form";
 
 /** Graphical controls for the list/map fields the draft tracks outside `value`. */
-export type SpecialKind = "tags" | "models" | "conversion-routes" | "templates" | "json";
+export type SpecialKind =
+  | "tags"
+  | "models"
+  | "conversion-routes"
+  | "templates"
+  | "oauth-provider-configs"
+  | "json";
 export interface SpecialField {
   key: keyof AdminSettingsDraft;
   kind: SpecialKind;
@@ -11,7 +17,19 @@ export interface SpecialField {
 export const SPECIAL_FIELDS: Partial<Record<SettingsTab, SpecialField[]>> = {
   general: [{ key: "customMenusJson", kind: "json", skip: "custom_menus" }],
   features: [{ key: "enabledChannels", kind: "tags", skip: "enabled_channels" }],
-  security: [{ key: "oauthProviders", kind: "tags", skip: "oauth_providers" }],
+  security: [
+    {
+      key: "registrationEmailSuffixAllowlist",
+      kind: "tags",
+      skip: "registration_email_suffix_allowlist",
+    },
+    { key: "oauthProviders", kind: "tags", skip: "oauth_providers" },
+    {
+      key: "oauthProviderConfigs",
+      kind: "oauth-provider-configs",
+      skip: "oauth_provider_configs",
+    },
+  ],
   gateway: [
     { key: "schedulerRolloutModels", kind: "models", skip: "scheduler_strategy_rollout_models" },
     {
