@@ -17842,6 +17842,36 @@ components:
       type: object
       additionalProperties: true
 
+    CustomMenuItem:
+      type: object
+      required:
+        - id
+        - label
+        - url
+        - visibility
+        - sort_order
+      properties:
+        id:
+          type: string
+          maxLength: 80
+          description: Stable operator-defined identifier for the menu entry.
+        label:
+          type: string
+          minLength: 1
+          maxLength: 80
+        url:
+          type: string
+          minLength: 1
+          maxLength: 2048
+          description: Internal absolute path or external http(s) URL.
+        visibility:
+          type: string
+          enum: [user, admin]
+          description: Which sidebar role should render this custom menu.
+        sort_order:
+          type: integer
+          minimum: 0
+
     Pagination:
       type: object
       required:
@@ -18884,8 +18914,7 @@ components:
         custom_menus:
           type: array
           items:
-            type: object
-            additionalProperties: true
+            $ref: "#/components/schemas/CustomMenuItem"
         user_agreement:
           type: string
         privacy_policy:
@@ -26472,7 +26501,7 @@ components:
         custom_menus:
           type: array
           items:
-            $ref: "#/components/schemas/JsonObject"
+            $ref: "#/components/schemas/CustomMenuItem"
 
     AdminSettingsAgreement:
       type: object

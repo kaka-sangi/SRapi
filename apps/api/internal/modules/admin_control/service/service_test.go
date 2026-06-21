@@ -92,6 +92,56 @@ func TestUpdateAdminSettingsNormalizesPassthroughHeaderAllowlist(t *testing.T) {
 	}
 }
 
+func TestUpdateAdminSettingsNormalizesCustomMenus(t *testing.T) {
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.June, 21, 10, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	settings, err := svc.GetAdminSettings(context.Background())
+	if err != nil {
+		t.Fatalf("get admin settings: %v", err)
+	}
+	settings.General.CustomMenus = []admincontrol.CustomMenuItem{
+		{Label: " Docs ", URL: " https://docs.example.com ", Visibility: " user ", SortOrder: 2},
+		{ID: "admin-tools", Label: "Admin tools", URL: "/admin/tools", Visibility: "admin", SortOrder: 1},
+		{Label: "", URL: ""},
+	}
+
+	updated, err := svc.UpdateAdminSettings(context.Background(), settings, 1)
+	if err != nil {
+		t.Fatalf("update admin settings: %v", err)
+	}
+	menus := updated.General.CustomMenus
+	if len(menus) != 2 {
+		t.Fatalf("custom menus len = %d, want 2: %+v", len(menus), menus)
+	}
+	if menus[0].ID != "admin-tools" || menus[0].Visibility != "admin" || menus[0].SortOrder != 0 {
+		t.Fatalf("unexpected first menu: %+v", menus[0])
+	}
+	if menus[1].ID != "docs" || menus[1].Label != "Docs" || menus[1].URL != "https://docs.example.com" || menus[1].Visibility != "user" || menus[1].SortOrder != 1 {
+		t.Fatalf("unexpected second menu: %+v", menus[1])
+	}
+}
+
+func TestUpdateAdminSettingsRejectsInvalidCustomMenuURL(t *testing.T) {
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.June, 21, 10, 5, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	settings, err := svc.GetAdminSettings(context.Background())
+	if err != nil {
+		t.Fatalf("get admin settings: %v", err)
+	}
+	settings.General.CustomMenus = []admincontrol.CustomMenuItem{{Label: "Bad", URL: "javascript:alert(1)"}}
+
+	_, err = svc.UpdateAdminSettings(context.Background(), settings, 1)
+	if !errors.Is(err, admincontrol.ErrInvalidInput) {
+		t.Fatalf("expected invalid custom menu error, got %v", err)
+	}
+}
+
 func TestDefaultAdminSettingsIncludesSafePassthroughHeaderAllowlist(t *testing.T) {
 	store := admincontrolmemory.New()
 	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.June, 12, 10, 0, 0, 0, time.UTC)})

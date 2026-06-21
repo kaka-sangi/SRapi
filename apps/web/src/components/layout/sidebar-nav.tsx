@@ -5,8 +5,10 @@ import { usePathname } from "next/navigation";
 import { ExternalLink, Link2 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useLanguage } from "@/context/LanguageContext";
+import { useAdminSettings } from "@/hooks/admin-queries";
 import { useSiteConfig } from "@/hooks/queries";
 import { navSectionsForRole } from "./nav-items";
+import type { CustomMenuItem } from "../../../../../packages/sdk/typescript/src/types.gen";
 
 interface CustomMenu {
   label: string;
@@ -14,23 +16,22 @@ interface CustomMenu {
   external: boolean;
 }
 
-/** Normalizes the operator-authored `custom_menus` JSON (freeform objects) into
- * renderable links. Tolerates label/name/title and url/href/link key spellings;
- * drops entries without both a label and a usable URL. */
-function parseCustomMenus(raw: unknown): CustomMenu[] {
+function parseCustomMenus(raw: unknown, role: "admin" | "user"): CustomMenu[] {
   if (!Array.isArray(raw)) return [];
-  const menus: CustomMenu[] = [];
+  const menus: Array<CustomMenu & { sortOrder: number }> = [];
   for (const entry of raw) {
     if (typeof entry !== "object" || entry === null) continue;
     const obj = entry as Record<string, unknown>;
-    const label = firstString(obj.label, obj.name, obj.title);
-    const url = firstString(obj.url, obj.href, obj.link);
+    const label = firstString(obj.label);
+    const url = firstString(obj.url);
+    const visibility = obj.visibility === "admin" ? "admin" : "user";
+    if (visibility !== role) continue;
     if (!label || !url) continue;
     const external = /^https?:\/\//i.test(url);
     if (!external && !url.startsWith("/")) continue;
-    menus.push({ label, url, external });
+    menus.push({ label, url, external, sortOrder: numberValue(obj.sort_order) });
   }
-  return menus;
+  return menus.sort((a, b) => a.sortOrder - b.sortOrder).map(({ sortOrder: _sortOrder, ...menu }) => menu);
 }
 
 function firstString(...values: unknown[]): string {
@@ -38,6 +39,10 @@ function firstString(...values: unknown[]): string {
     if (typeof value === "string" && value.trim() !== "") return value.trim();
   }
   return "";
+}
+
+function numberValue(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : Number.MAX_SAFE_INTEGER;
 }
 
 const TOUR_TAGS: Record<string, string> = {
@@ -58,7 +63,12 @@ export function SidebarNav({
   const { t } = useLanguage();
   const sections = navSectionsForRole(role);
   const siteConfig = useSiteConfig();
-  const customMenus = parseCustomMenus(siteConfig.data?.custom_menus);
+  const adminSettings = useAdminSettings({ enabled: role === "admin" });
+  const rawCustomMenus: CustomMenuItem[] | undefined =
+    role === "admin"
+      ? adminSettings.data?.general.custom_menus
+      : siteConfig.data?.custom_menus;
+  const customMenus = parseCustomMenus(rawCustomMenus, role);
 
   function isActive(href: string): boolean {
     if (href === "/dashboard" || href === "/admin") return pathname === href;

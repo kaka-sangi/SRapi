@@ -2,6 +2,7 @@ package contract
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 )
@@ -117,8 +118,51 @@ type AdminSettingsGeneral struct {
 	SiteName     string           `json:"site_name"`
 	LogoURL      string           `json:"logo_url"`
 	VersionLabel string           `json:"version_label"`
-	CustomMenus  []map[string]any `json:"custom_menus"`
+	CustomMenus  []CustomMenuItem `json:"custom_menus"`
 }
+
+// CustomMenuItem is an operator-managed sidebar link.
+type CustomMenuItem struct {
+	ID         string `json:"id"`
+	Label      string `json:"label"`
+	URL        string `json:"url"`
+	Visibility string `json:"visibility"`
+	SortOrder  int    `json:"sort_order"`
+}
+
+// UnmarshalJSON accepts the current schema and legacy name/title/href/link menu keys.
+func (m *CustomMenuItem) UnmarshalJSON(data []byte) error {
+	type alias CustomMenuItem
+	var raw struct {
+		alias
+		Name  string `json:"name"`
+		Title string `json:"title"`
+		Href  string `json:"href"`
+		Link  string `json:"link"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*m = CustomMenuItem(raw.alias)
+	if m.Label == "" {
+		switch {
+		case raw.Name != "":
+			m.Label = raw.Name
+		case raw.Title != "":
+			m.Label = raw.Title
+		}
+	}
+	if m.URL == "" {
+		switch {
+		case raw.Href != "":
+			m.URL = raw.Href
+		case raw.Link != "":
+			m.URL = raw.Link
+		}
+	}
+	return nil
+}
+
 type AdminSettingsAgreement struct {
 	UserAgreement string `json:"user_agreement"`
 	PrivacyPolicy string `json:"privacy_policy"`

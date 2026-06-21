@@ -1,5 +1,6 @@
 import { useLanguage } from "@/context/LanguageContext";
 import type { ReactNode } from "react";
+import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -23,6 +24,7 @@ import {
 import { type SpecialField, fieldLabel } from "./settings-fields";
 import type {
   AuthIdentityProvider,
+  CustomMenuItem,
   OAuthProviderConfig,
 } from "../../../../../../packages/sdk/typescript/src/types.gen";
 
@@ -37,9 +39,9 @@ const OAUTH_PROVIDERS = [
 
 /**
  * Render one "special" settings field with a graphical control: chips for plain
- * string lists, a searchable model picker for the scheduler rollout scope, a
- * key→value editor for the email-template map, and a JSON box only for the
- * freeform custom-menus array (which has no fixed shape).
+ * string lists, a searchable model picker for scheduler rollout scope,
+ * key→value editor for the email-template map, and structured editors for
+ * custom menus / OAuth provider configs.
  */
 export function SpecialFieldRow({
   field,
@@ -163,6 +165,18 @@ export function SpecialFieldRow({
     );
   }
 
+  if (field.kind === "custom-menus") {
+    const menus = Array.isArray(value) ? (value as CustomMenuItem[]) : [];
+    return (
+      <CustomMenusEditor
+        id={id}
+        label={label}
+        value={menus}
+        onChange={(next) => onChange(field.key, next)}
+      />
+    );
+  }
+
   return (
     <div>
       <Label htmlFor={id}>{label}</Label>
@@ -183,6 +197,173 @@ function protocolConversionRouteOptions(t: (key: string) => string): Array<{ val
     value,
     label: t(`adminSettings.protocolConversionRoutes.${value}`),
   }));
+}
+
+function CustomMenusEditor({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: CustomMenuItem[];
+  onChange: (next: CustomMenuItem[]) => void;
+}) {
+  const { t } = useLanguage();
+
+  function update(index: number, patch: Partial<CustomMenuItem>) {
+    onChange(reindex(value.map((item, i) => (i === index ? { ...item, ...patch } : item))));
+  }
+
+  function add() {
+    onChange([
+      ...value,
+      {
+        id: "",
+        label: "",
+        url: "",
+        visibility: "user",
+        sort_order: value.length,
+      },
+    ]);
+  }
+
+  function remove(index: number) {
+    onChange(reindex(value.filter((_, i) => i !== index)));
+  }
+
+  function move(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= value.length) return;
+    const next = [...value];
+    [next[index], next[target]] = [next[target], next[index]];
+    onChange(reindex(next));
+  }
+
+  return (
+    <div id={id} className="space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        <Label>{label}</Label>
+        <Button type="button" variant="outline" size="sm" onClick={add}>
+          <Plus className="size-3.5" aria-hidden />
+          {t("adminSettings.addCustomMenu")}
+        </Button>
+      </div>
+      <p className="text-2xs text-srapi-text-tertiary">{t("adminSettings.customMenusHint")}</p>
+      {value.length === 0 ? (
+        <div className="rounded-md border border-dashed border-srapi-border px-3 py-4 text-sm text-srapi-text-tertiary">
+          {t("adminSettings.customMenusEmpty")}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {value.map((menu, index) => (
+            <div key={index} className="rounded-md border border-srapi-border p-3">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+                  {t("adminSettings.customMenuItem", { n: index + 1 })}
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={t("adminSettings.customMenuMoveUp")}
+                    disabled={index === 0}
+                    onClick={() => move(index, -1)}
+                  >
+                    <ChevronUp className="size-4" aria-hidden />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={t("adminSettings.customMenuMoveDown")}
+                    disabled={index === value.length - 1}
+                    onClick={() => move(index, 1)}
+                  >
+                    <ChevronDown className="size-4" aria-hidden />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={t("adminSettings.customMenuRemove")}
+                    onClick={() => remove(index)}
+                  >
+                    <Trash2 className="size-4 text-srapi-error" aria-hidden />
+                  </Button>
+                </div>
+              </div>
+              <div className="grid gap-3 lg:grid-cols-12">
+                <Field
+                  className="lg:col-span-3"
+                  htmlFor={`custom-menu-${index}-label`}
+                  label={t("adminSettings.customMenuFields.label")}
+                >
+                  <Input
+                    id={`custom-menu-${index}-label`}
+                    className="h-9"
+                    value={menu.label}
+                    onChange={(event) => update(index, { label: event.target.value })}
+                  />
+                </Field>
+                <Field
+                  className="lg:col-span-5"
+                  htmlFor={`custom-menu-${index}-url`}
+                  label={t("adminSettings.customMenuFields.url")}
+                >
+                  <Input
+                    id={`custom-menu-${index}-url`}
+                    className="h-9 font-mono text-xs"
+                    value={menu.url}
+                    placeholder="/dashboard"
+                    onChange={(event) => update(index, { url: event.target.value })}
+                  />
+                </Field>
+                <Field
+                  className="lg:col-span-2"
+                  label={t("adminSettings.customMenuFields.visibility")}
+                >
+                  <Select
+                    value={menu.visibility}
+                    onValueChange={(visibility) =>
+                      update(index, { visibility: visibility as CustomMenuItem["visibility"] })
+                    }
+                  >
+                    <SelectTrigger className="h-9 rounded-lg">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="user">{t("adminSettings.customMenuVisibility.user")}</SelectItem>
+                      <SelectItem value="admin">{t("adminSettings.customMenuVisibility.admin")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field
+                  className="lg:col-span-2"
+                  htmlFor={`custom-menu-${index}-id`}
+                  label={t("adminSettings.customMenuFields.id")}
+                >
+                  <Input
+                    id={`custom-menu-${index}-id`}
+                    className="h-9 font-mono text-xs"
+                    value={menu.id}
+                    placeholder="auto"
+                    onChange={(event) => update(index, { id: event.target.value })}
+                  />
+                </Field>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function reindex(values: CustomMenuItem[]): CustomMenuItem[] {
+  return values.map((value, index) => ({ ...value, sort_order: index }));
 }
 
 function OAuthProviderConfigsEditor({

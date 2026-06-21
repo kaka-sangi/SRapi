@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/url"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -23,6 +24,9 @@ const (
 	// updates invalidate immediately; cross-instance updates converge within
 	// the TTL.
 	adminSettingsCacheTTL = 3 * time.Second
+
+	customMenuVisibilityUser  = "user"
+	customMenuVisibilityAdmin = "admin"
 )
 
 var emailSuffixDomainPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$`)
@@ -107,7 +111,7 @@ func defaultAdminSettings(now time.Time) admincontrol.AdminSettings {
 			SiteName:     "SRapi",
 			LogoURL:      "",
 			VersionLabel: "",
-			CustomMenus:  []map[string]any{},
+			CustomMenus:  []admincontrol.CustomMenuItem{},
 		},
 		Agreement: admincontrol.AdminSettingsAgreement{},
 		Features: admincontrol.AdminSettingsFeatures{
@@ -204,6 +208,11 @@ func normalizeAdminSettings(settings admincontrol.AdminSettings) (admincontrol.A
 	if err != nil {
 		return admincontrol.AdminSettings{}, admincontrol.ErrInvalidInput
 	}
+	customMenus, err := normalizeCustomMenus(settings.General.CustomMenus)
+	if err != nil {
+		return admincontrol.AdminSettings{}, admincontrol.ErrInvalidInput
+	}
+	settings.General.CustomMenus = customMenus
 	settings.Security.RegistrationEmailSuffixAllowlist = registrationEmailSuffixAllowlist
 	settings.Security.OAuthProviders = uniqueTrimmedStrings(settings.Security.OAuthProviders)
 	oauthProviderConfigs, err := normalizeOAuthProviderConfigs(settings.Security.OAuthProviderConfigs)
@@ -253,7 +262,7 @@ func normalizeAdminSettings(settings admincontrol.AdminSettings) (admincontrol.A
 	}
 	settings.Email.SMTPConfigured = settings.Email.SMTPHost != "" && settings.Email.SMTPFrom != ""
 	if settings.General.CustomMenus == nil {
-		settings.General.CustomMenus = []map[string]any{}
+		settings.General.CustomMenus = []admincontrol.CustomMenuItem{}
 	}
 	if settings.Features.EnabledChannels == nil {
 		settings.Features.EnabledChannels = []string{}
@@ -427,6 +436,100 @@ func normalizeOAuthProviderConfigs(values []admincontrol.OAuthProviderConfig) ([
 	return out, nil
 }
 
+func normalizeCustomMenus(values []admincontrol.CustomMenuItem) ([]admincontrol.CustomMenuItem, error) {
+	if len(values) == 0 {
+		return []admincontrol.CustomMenuItem{}, nil
+	}
+	out := make([]admincontrol.CustomMenuItem, 0, len(values))
+	for _, value := range values {
+		label := strings.TrimSpace(value.Label)
+		menuURL := strings.TrimSpace(value.URL)
+		if label == "" && menuURL == "" {
+			continue
+		}
+		if label == "" || !validCustomMenuURL(menuURL) {
+			return nil, admincontrol.ErrInvalidInput
+		}
+		visibility := strings.ToLower(strings.TrimSpace(value.Visibility))
+		switch visibility {
+		case "":
+			visibility = customMenuVisibilityUser
+		case customMenuVisibilityUser, customMenuVisibilityAdmin:
+		default:
+			return nil, admincontrol.ErrInvalidInput
+		}
+		sortOrder := value.SortOrder
+		if sortOrder < 0 {
+			sortOrder = 0
+		}
+		id := normalizeCustomMenuID(value.ID)
+		if id == "" {
+			id = normalizeCustomMenuID(label)
+		}
+		if id == "" {
+			return nil, admincontrol.ErrInvalidInput
+		}
+		out = append(out, admincontrol.CustomMenuItem{
+			ID:         id,
+			Label:      label,
+			URL:        menuURL,
+			Visibility: visibility,
+			SortOrder:  sortOrder,
+		})
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].SortOrder == out[j].SortOrder {
+			return out[i].ID < out[j].ID
+		}
+		return out[i].SortOrder < out[j].SortOrder
+	})
+	for idx := range out {
+		out[idx].SortOrder = idx
+	}
+	return out, nil
+}
+
+func normalizeCustomMenuID(value string) string {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	var b strings.Builder
+	lastDash := false
+	for _, r := range normalized {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+			lastDash = false
+		case r == '-' || r == '_' || r == ' ' || r == '.':
+			if !lastDash && b.Len() > 0 {
+				b.WriteByte('-')
+				lastDash = true
+			}
+		}
+		if b.Len() >= 80 {
+			break
+		}
+	}
+	return strings.Trim(b.String(), "-")
+}
+
+func validCustomMenuURL(value string) bool {
+	if value == "" || strings.ContainsAny(value, "\r\n\t ") {
+		return false
+	}
+	if strings.HasPrefix(value, "/") {
+		return !strings.HasPrefix(value, "//")
+	}
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return false
+	}
+	switch strings.ToLower(parsed.Scheme) {
+	case "http", "https":
+		return true
+	default:
+		return false
+	}
+}
+
 func normalizeOAuthScopes(values []string) []string {
 	out := make([]string, 0, len(values))
 	seen := map[string]struct{}{}
@@ -596,7 +699,7 @@ func normalizePassthroughHeaderAllowlist(values []string) []string {
 }
 
 func cloneAdminSettings(settings admincontrol.AdminSettings) admincontrol.AdminSettings {
-	settings.General.CustomMenus = cloneAnyMapSlice(settings.General.CustomMenus)
+	settings.General.CustomMenus = cloneCustomMenus(settings.General.CustomMenus)
 	settings.Features.EnabledChannels = cloneStringSlice(settings.Features.EnabledChannels)
 	settings.Security.RegistrationEmailSuffixAllowlist = cloneStringSlice(settings.Security.RegistrationEmailSuffixAllowlist)
 	settings.Security.OAuthProviders = cloneStringSlice(settings.Security.OAuthProviders)
@@ -615,14 +718,12 @@ func cloneAdminSettings(settings admincontrol.AdminSettings) admincontrol.AdminS
 	return settings
 }
 
-func cloneAnyMapSlice(values []map[string]any) []map[string]any {
+func cloneCustomMenus(values []admincontrol.CustomMenuItem) []admincontrol.CustomMenuItem {
 	if values == nil {
 		return nil
 	}
-	out := make([]map[string]any, 0, len(values))
-	for _, value := range values {
-		out = append(out, cloneAnyMap(value))
-	}
+	out := make([]admincontrol.CustomMenuItem, len(values))
+	copy(out, values)
 	return out
 }
 

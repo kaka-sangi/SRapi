@@ -8,6 +8,7 @@ export type SpecialKind =
   | "conversion-routes"
   | "templates"
   | "oauth-provider-configs"
+  | "custom-menus"
   | "json";
 export interface SpecialField {
   key: keyof AdminSettingsDraft;
@@ -15,7 +16,7 @@ export interface SpecialField {
   skip: string;
 }
 export const SPECIAL_FIELDS: Partial<Record<SettingsTab, SpecialField[]>> = {
-  general: [{ key: "customMenusJson", kind: "json", skip: "custom_menus" }],
+  general: [{ key: "customMenus", kind: "custom-menus", skip: "custom_menus" }],
   features: [{ key: "enabledChannels", kind: "tags", skip: "enabled_channels" }],
   security: [
     {

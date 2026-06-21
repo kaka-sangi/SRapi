@@ -779,7 +779,7 @@ func toAPIAdminSettings(in admincontrol.AdminSettings) apiopenapi.AdminSettings 
 			StreamTimeoutSeconds:                 in.Gateway.StreamTimeoutSeconds,
 		},
 		General: apiopenapi.AdminSettingsGeneral{
-			CustomMenus:  mapsToJsonObjects(in.General.CustomMenus),
+			CustomMenus:  toAPICustomMenus(in.General.CustomMenus),
 			LogoUrl:      in.General.LogoURL,
 			SiteName:     in.General.SiteName,
 			VersionLabel: in.General.VersionLabel,
@@ -880,7 +880,7 @@ func adminSettingsFromAPI(in apiopenapi.AdminSettings) admincontrol.AdminSetting
 			StreamTimeoutSeconds:                 in.Gateway.StreamTimeoutSeconds,
 		},
 		General: admincontrol.AdminSettingsGeneral{
-			CustomMenus:  jsonObjectsToMaps(in.General.CustomMenus),
+			CustomMenus:  customMenusFromAPI(in.General.CustomMenus),
 			LogoURL:      in.General.LogoUrl,
 			SiteName:     in.General.SiteName,
 			VersionLabel: in.General.VersionLabel,
@@ -1640,6 +1640,34 @@ func idsFromAPI(values []apiopenapi.Id) ([]int, error) {
 		ids = append(ids, id)
 	}
 	return ids, nil
+}
+
+func toAPICustomMenus(values []admincontrol.CustomMenuItem) []apiopenapi.CustomMenuItem {
+	out := make([]apiopenapi.CustomMenuItem, 0, len(values))
+	for _, value := range values {
+		out = append(out, apiopenapi.CustomMenuItem{
+			Id:         value.ID,
+			Label:      value.Label,
+			SortOrder:  value.SortOrder,
+			Url:        value.URL,
+			Visibility: apiopenapi.CustomMenuItemVisibility(value.Visibility),
+		})
+	}
+	return out
+}
+
+func customMenusFromAPI(values []apiopenapi.CustomMenuItem) []admincontrol.CustomMenuItem {
+	out := make([]admincontrol.CustomMenuItem, 0, len(values))
+	for _, value := range values {
+		out = append(out, admincontrol.CustomMenuItem{
+			ID:         value.Id,
+			Label:      value.Label,
+			URL:        value.Url,
+			Visibility: string(value.Visibility),
+			SortOrder:  value.SortOrder,
+		})
+	}
+	return out
 }
 
 func mapsToJsonObjects(values []map[string]any) []apiopenapi.JsonObject {

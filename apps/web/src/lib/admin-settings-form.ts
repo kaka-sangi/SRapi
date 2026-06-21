@@ -2,6 +2,7 @@ import type {
   AdminSettings,
   AdminSettingsCopilotWritable,
   AdminSettingsGateway,
+  CustomMenuItem,
   OAuthProviderConfig,
 } from "../../../../packages/sdk/typescript/src/types.gen";
 
@@ -48,7 +49,7 @@ export const SETTINGS_TABS: Array<{ id: SettingsTab; label: string }> = [
 
 export interface AdminSettingsDraft {
   value: AdminSettings;
-  customMenusJson: string;
+  customMenus: CustomMenuItem[];
   enabledChannels: string[];
   registrationEmailSuffixAllowlist: string[];
   oauthProviders: string[];
@@ -70,7 +71,7 @@ export interface SettingsSaveConfirmationState {
 export function createSettingsDraft(value: AdminSettings): AdminSettingsDraft {
   return {
     value,
-    customMenusJson: JSON.stringify(value.general.custom_menus ?? [], null, 2),
+    customMenus: cloneCustomMenuItems(value.general.custom_menus),
     enabledChannels: [...(value.features.enabled_channels ?? [])],
     registrationEmailSuffixAllowlist: [...(value.security.registration_email_suffix_allowlist ?? [])],
     oauthProviders: [...(value.security.oauth_providers ?? [])],
@@ -85,12 +86,11 @@ export function createSettingsDraft(value: AdminSettings): AdminSettingsDraft {
 }
 
 export function materializeSettingsDraft(draft: AdminSettingsDraft): AdminSettings {
-  const customMenus = parseArrayOfObjects(draft.customMenusJson, "Custom menus");
   return {
     ...draft.value,
     general: {
       ...draft.value.general,
-      custom_menus: customMenus,
+      custom_menus: cleanCustomMenuItems(draft.customMenus),
     },
     features: {
       ...draft.value.features,
@@ -226,15 +226,34 @@ function cleanOAuthScopes(items: readonly string[] | undefined): string[] {
   return out;
 }
 
-function parseArrayOfObjects(value: string, fieldName: string): Array<Record<string, unknown>> {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(value || "[]") as unknown;
-  } catch {
-    throw new Error(`${fieldName} must be valid JSON.`);
-  }
-  if (!Array.isArray(parsed) || parsed.some((item) => !item || Array.isArray(item) || typeof item !== "object")) {
-    throw new Error(`${fieldName} must be a JSON array of objects.`);
-  }
-  return parsed as Array<Record<string, unknown>>;
+function cloneCustomMenuItems(values: readonly CustomMenuItem[] | undefined): CustomMenuItem[] {
+  return (values ?? []).map((value, index) => ({
+    id: value.id,
+    label: value.label,
+    url: value.url,
+    visibility: value.visibility,
+    sort_order: value.sort_order ?? index,
+  }));
+}
+
+function cleanCustomMenuItems(values: readonly CustomMenuItem[] | undefined): CustomMenuItem[] {
+  return (values ?? [])
+    .map((value, index): CustomMenuItem => ({
+      id: normalizeCustomMenuId(value.id || value.label),
+      label: value.label.trim(),
+      url: value.url.trim(),
+      visibility: value.visibility === "admin" ? "admin" : "user",
+      sort_order: index,
+    }))
+    .filter((value) => value.label && value.url);
+}
+
+function normalizeCustomMenuId(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._ -]+/g, "")
+    .replace(/[._\s-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
 }

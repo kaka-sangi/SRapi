@@ -103,10 +103,11 @@ export function useNotificationEmailTemplates() {
 }
 
 // ---- Settings ----
-export function useAdminSettings() {
+export function useAdminSettings(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.admin.settings(),
     queryFn: () => adminApi.getSettings(),
+    enabled: options?.enabled ?? true,
   });
 }
 

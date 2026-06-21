@@ -16,6 +16,23 @@ export type JsonObject = {
     [key: string]: unknown;
 };
 
+export type CustomMenuItem = {
+    /**
+     * Stable operator-defined identifier for the menu entry.
+     */
+    id: string;
+    label: string;
+    /**
+     * Internal absolute path or external http(s) URL.
+     */
+    url: string;
+    /**
+     * Which sidebar role should render this custom menu.
+     */
+    visibility: 'user' | 'admin';
+    sort_order: number;
+};
+
 export type Pagination = {
     page: number;
     page_size: number;
@@ -494,9 +511,7 @@ export type SiteConfig = {
     site_name: string;
     logo_url: string;
     version_label: string;
-    custom_menus: Array<{
-        [key: string]: unknown;
-    }>;
+    custom_menus: Array<CustomMenuItem>;
     user_agreement: string;
     privacy_policy: string;
 };
@@ -3877,7 +3892,7 @@ export type AdminSettingsGeneral = {
     site_name: string;
     logo_url: string;
     version_label: string;
-    custom_menus: Array<JsonObject>;
+    custom_menus: Array<CustomMenuItem>;
 };
 
 export type AdminSettingsAgreement = {

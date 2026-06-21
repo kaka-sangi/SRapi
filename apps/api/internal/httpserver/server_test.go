@@ -1640,6 +1640,63 @@ func TestAdminControlPlaneV1EndpointsAndAudit(t *testing.T) {
 	}
 }
 
+func TestSiteConfigFiltersAdminOnlyCustomMenus(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+
+	settingsResp := mustGetAdminSettings(t, handler, sessionCookie)
+	settingsResp.Data.General.CustomMenus = []apiopenapi.CustomMenuItem{
+		{
+			Id:         "docs",
+			Label:      "Docs",
+			Url:        "https://docs.example.com",
+			Visibility: apiopenapi.CustomMenuItemVisibilityUser,
+			SortOrder:  0,
+		},
+		{
+			Id:         "admin-tools",
+			Label:      "Admin tools",
+			Url:        "/admin/tools",
+			Visibility: apiopenapi.CustomMenuItemVisibilityAdmin,
+			SortOrder:  1,
+		},
+	}
+	body, err := json.Marshal(settingsResp.Data)
+	if err != nil {
+		t.Fatalf("marshal settings request: %v", err)
+	}
+	settingsReq := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings", bytes.NewReader(body))
+	settingsReq.Header.Set("Content-Type", "application/json")
+	settingsReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	settingsReq.AddCookie(sessionCookie)
+	settingsRec := httptest.NewRecorder()
+	handler.ServeHTTP(settingsRec, settingsReq)
+	if settingsRec.Code != http.StatusOK {
+		t.Fatalf("expected settings update 200, got %d body=%s", settingsRec.Code, settingsRec.Body.String())
+	}
+
+	siteReq := httptest.NewRequest(http.MethodGet, "/api/v1/site-config", nil)
+	siteRec := httptest.NewRecorder()
+	handler.ServeHTTP(siteRec, siteReq)
+	if siteRec.Code != http.StatusOK {
+		t.Fatalf("expected site-config 200, got %d body=%s", siteRec.Code, siteRec.Body.String())
+	}
+	var payload struct {
+		Data struct {
+			CustomMenus []apiopenapi.CustomMenuItem `json:"custom_menus"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(siteRec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode site config: %v", err)
+	}
+	if len(payload.Data.CustomMenus) != 1 {
+		t.Fatalf("custom menus len = %d, want 1: %+v", len(payload.Data.CustomMenus), payload.Data.CustomMenus)
+	}
+	if payload.Data.CustomMenus[0].Id != "docs" || payload.Data.CustomMenus[0].Visibility != apiopenapi.CustomMenuItemVisibilityUser {
+		t.Fatalf("unexpected public custom menu: %+v", payload.Data.CustomMenus[0])
+	}
+}
+
 func TestAdminOpsSLOAndAlertControlPlane(t *testing.T) {
 	usageStore := usagememory.New()
 	operationsStore := operationsmemory.NewWithUsageStore(usageStore)

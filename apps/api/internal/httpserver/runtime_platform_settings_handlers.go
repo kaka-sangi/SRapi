@@ -54,12 +54,23 @@ func (s *Server) handleSiteConfig(w http.ResponseWriter, r *http.Request) {
 			"site_name":      settings.General.SiteName,
 			"logo_url":       settings.General.LogoURL,
 			"version_label":  settings.General.VersionLabel,
-			"custom_menus":   settings.General.CustomMenus,
+			"custom_menus":   publicCustomMenus(settings.General.CustomMenus),
 			"user_agreement": settings.Agreement.UserAgreement,
 			"privacy_policy": settings.Agreement.PrivacyPolicy,
 		},
 		"request_id": requestID,
 	})
+}
+
+func publicCustomMenus(values []admincontrolcontract.CustomMenuItem) []admincontrolcontract.CustomMenuItem {
+	out := make([]admincontrolcontract.CustomMenuItem, 0, len(values))
+	for _, value := range values {
+		if value.Visibility == "admin" {
+			continue
+		}
+		out = append(out, value)
+	}
+	return out
 }
 
 // handleListPublicSubscriptionPlans returns the storefront catalog — only

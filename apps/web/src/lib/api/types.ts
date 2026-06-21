@@ -1,4 +1,7 @@
-import type { JsonObject } from '../../../../../packages/sdk/typescript/src/types.gen';
+import type {
+  CustomMenuItem,
+  JsonObject,
+} from '../../../../../packages/sdk/typescript/src/types.gen';
 import type {
   CurrentUser,
   ProviderAccountSummary,
@@ -152,7 +155,7 @@ export type SiteConfig = {
   site_name: string;
   logo_url: string;
   version_label: string;
-  custom_menus: JsonObject[];
+  custom_menus: CustomMenuItem[];
   user_agreement: string;
   privacy_policy: string;
 };

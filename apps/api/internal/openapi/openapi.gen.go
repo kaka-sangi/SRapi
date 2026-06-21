@@ -1166,6 +1166,24 @@ func (e CreateUserAttributeDefinitionRequestDataType) Valid() bool {
 	}
 }
 
+// Defines values for CustomMenuItemVisibility.
+const (
+	CustomMenuItemVisibilityAdmin CustomMenuItemVisibility = "admin"
+	CustomMenuItemVisibilityUser  CustomMenuItemVisibility = "user"
+)
+
+// Valid indicates whether the value is a known member of the CustomMenuItemVisibility enum.
+func (e CustomMenuItemVisibility) Valid() bool {
+	switch e {
+	case CustomMenuItemVisibilityAdmin:
+		return true
+	case CustomMenuItemVisibilityUser:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DomainEventOutboxStatus.
 const (
 	DomainEventOutboxStatusFailed    DomainEventOutboxStatus = "failed"
@@ -5312,10 +5330,10 @@ type AdminSettingsGatewayProtocolConversionRoutes string
 
 // AdminSettingsGeneral defines model for AdminSettingsGeneral.
 type AdminSettingsGeneral struct {
-	CustomMenus  []JsonObject `json:"custom_menus"`
-	LogoUrl      string       `json:"logo_url"`
-	SiteName     string       `json:"site_name"`
-	VersionLabel string       `json:"version_label"`
+	CustomMenus  []CustomMenuItem `json:"custom_menus"`
+	LogoUrl      string           `json:"logo_url"`
+	SiteName     string           `json:"site_name"`
+	VersionLabel string           `json:"version_label"`
 }
 
 // AdminSettingsPayment defines model for AdminSettingsPayment.
@@ -7858,6 +7876,23 @@ type CurrentUserAuthIdentityListResponse struct {
 	Data      []CurrentUserAuthIdentity `json:"data"`
 	RequestId RequestId                 `json:"request_id"`
 }
+
+// CustomMenuItem defines model for CustomMenuItem.
+type CustomMenuItem struct {
+	// Id Stable operator-defined identifier for the menu entry.
+	Id        string `json:"id"`
+	Label     string `json:"label"`
+	SortOrder int    `json:"sort_order"`
+
+	// Url Internal absolute path or external http(s) URL.
+	Url string `json:"url"`
+
+	// Visibility Which sidebar role should render this custom menu.
+	Visibility CustomMenuItemVisibility `json:"visibility"`
+}
+
+// CustomMenuItemVisibility Which sidebar role should render this custom menu.
+type CustomMenuItemVisibility string
 
 // DashboardModelDistribution defines model for DashboardModelDistribution.
 type DashboardModelDistribution struct {
@@ -11957,12 +11992,12 @@ type SetupStatusResponse struct {
 
 // SiteConfig defines model for SiteConfig.
 type SiteConfig struct {
-	CustomMenus   []map[string]interface{} `json:"custom_menus"`
-	LogoUrl       string                   `json:"logo_url"`
-	PrivacyPolicy string                   `json:"privacy_policy"`
-	SiteName      string                   `json:"site_name"`
-	UserAgreement string                   `json:"user_agreement"`
-	VersionLabel  string                   `json:"version_label"`
+	CustomMenus   []CustomMenuItem `json:"custom_menus"`
+	LogoUrl       string           `json:"logo_url"`
+	PrivacyPolicy string           `json:"privacy_policy"`
+	SiteName      string           `json:"site_name"`
+	UserAgreement string           `json:"user_agreement"`
+	VersionLabel  string           `json:"version_label"`
 }
 
 // SiteConfigResponse defines model for SiteConfigResponse.

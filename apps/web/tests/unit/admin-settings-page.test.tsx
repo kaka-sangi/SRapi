@@ -118,6 +118,32 @@ describe("AdminSettingsPage", () => {
     });
   });
 
+  it("edits custom sidebar links without raw JSON", async () => {
+    const user = userEvent.setup();
+    mocks.searchParams = new URLSearchParams("");
+    mocks.updateSettings.mockImplementation(async (body: AdminSettings) => body);
+    renderPage();
+
+    await user.click(screen.getByRole("button", { name: "添加链接" }));
+    await user.type(screen.getByLabelText("名称"), "Docs");
+    await user.type(screen.getByLabelText("URL"), "https://docs.example.com");
+    await user.type(screen.getByLabelText("ID"), "docs");
+
+    await user.click(screen.getByRole("button", { name: "保存更改" }));
+
+    await waitFor(() => expect(mocks.updateSettings).toHaveBeenCalled());
+    const submitted = mocks.updateSettings.mock.calls[0][0] as AdminSettings;
+    expect(submitted.general.custom_menus).toEqual([
+      {
+        id: "docs",
+        label: "Docs",
+        url: "https://docs.example.com",
+        visibility: "user",
+        sort_order: 0,
+      },
+    ]);
+  });
+
   it("edits security allowlist and non-secret oauth provider configs", async () => {
     const user = userEvent.setup();
     mocks.searchParams = new URLSearchParams("tab=security");
