@@ -52,19 +52,32 @@ import (
 // claudeThinkingSanitizeRawPayload runs the security pipeline over a
 // raw JSON payload destined for a Claude /v1/messages-shaped upstream.
 // Steps:
-//  1. Unmarshal into a generic envelope.
-//  2. If "messages" is an array of objects, sanitize the thinking
+//  1. Family gate. Anthropic-official is the only family that validates
+//     `thinking.signature`; passback-required (DeepSeek, Kimi, GLM,
+//     MiniMax-M, Qwen *-thinking, …) and unknown families MUST receive
+//     the payload unchanged or the upstream rejects with
+//     "thinking must be passed back to the API". The previous
+//     unconditional strip silently broke those upstreams; see
+//     thinking_protocol_family.go.
+//  2. Unmarshal into a generic envelope.
+//  3. If "messages" is an array of objects, sanitize the thinking
 //     blocks in place via StripInvalidClaudeThinkingBlocks. Forged
 //     signatures are dropped; valid ones are preserved and their
 //     (text, signature) pair is recorded in DefaultThinkingCache for
 //     the next outbound turn.
-//  3. Re-marshal and return.
+//  4. Re-marshal and return.
 //
 // On any error path the original payload is returned unchanged —
 // security sanitization is best-effort and must never break a
 // request that was otherwise valid.
 func claudeThinkingSanitizeRawPayload(model string, raw []byte) []byte {
 	if len(raw) == 0 {
+		return raw
+	}
+	if !shouldStripClaudeThinkingForModel(model) {
+		// Passback-required / unknown upstream — strip pass + cache
+		// population are both no-ops on this path. Returning raw
+		// preserves byte-for-byte the request the caller built.
 		return raw
 	}
 	var envelope map[string]any
