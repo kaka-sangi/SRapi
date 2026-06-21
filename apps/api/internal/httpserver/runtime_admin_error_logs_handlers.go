@@ -13,13 +13,11 @@ import (
 
 // handleListAdminErrorLogs serves GET /api/v1/admin/error-logs.
 //
-// Error logs are not a distinct persisted table: this codebase has no
-// status_code column on usage_log, so we run in "degraded mode" and DERIVE the
-// error-log feed from the usage logs where Success == false. The usual admin
-// usage-log filters (user_id/api_key_id/account_id/model/error_class/
-// source_endpoint/start/end) are reused via filterUsageLogs, then we keep only
-// the failed rows, paginate server-side, and map each survivor to the generated
-// ErrorLog DTO.
+// Error logs are derived from the failed usage logs that carry gateway error
+// classification and bounded upstream error context. The usual admin usage-log
+// filters (user_id/api_key_id/account_id/model/error_class/source_endpoint/
+// start/end) are reused via filterUsageLogs, then we keep only the failed rows,
+// paginate server-side, and map each survivor to the generated ErrorLog DTO.
 func (s *Server) handleListAdminErrorLogs(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireAdminSession(r); err != nil {

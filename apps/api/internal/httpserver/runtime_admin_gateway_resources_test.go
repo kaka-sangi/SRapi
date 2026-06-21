@@ -371,6 +371,7 @@ func TestBuildGatewayResourceSummaryReportsRecentTraffic(t *testing.T) {
 	now := time.Date(2026, 6, 20, 12, 0, 0, 0, time.UTC)
 	providerID := 1
 	lastRequestAt := now.Add(-time.Hour)
+	errorClass := "upstream_timeout"
 	summary := buildGatewayResourceSummary(gatewayResourceSummaryInput{
 		Context: context.Background(),
 		Providers: []providercontract.Provider{
@@ -391,17 +392,26 @@ func TestBuildGatewayResourceSummaryReportsRecentTraffic(t *testing.T) {
 		UsageLogs: []usagecontract.UsageLog{
 			{
 				ProviderID:     ptrInt(providerID),
+				RequestID:      "req-old-error",
 				RequestedModel: "model-1000",
 				SourceEndpoint: "/v1/chat/completions",
 				Success:        true,
 				CreatedAt:      now.Add(-2 * time.Hour),
 			},
 			{
-				ProviderID:     ptrInt(providerID),
-				RequestedModel: "model-1000",
-				SourceEndpoint: "/v1beta/models/model-1000:generateContent",
-				Success:        false,
-				CreatedAt:      lastRequestAt,
+				ProviderID:               ptrInt(providerID),
+				RequestID:                "req-latest-error",
+				RequestedModel:           "model-1000",
+				SourceEndpoint:           "/v1beta/models/model-1000:generateContent",
+				Success:                  false,
+				ErrorClass:               &errorClass,
+				ErrorPhase:               "upstream",
+				ErrorOwner:               "provider",
+				StatusCode:               502,
+				UpstreamRequestID:        "upstream-req-1",
+				ProviderErrorMessage:     "upstream timed out",
+				ProviderErrorBodyExcerpt: `{"error":"timeout"}`,
+				CreatedAt:                lastRequestAt,
 			},
 			{
 				ProviderID:     ptrInt(providerID),
@@ -417,6 +427,7 @@ func TestBuildGatewayResourceSummaryReportsRecentTraffic(t *testing.T) {
 
 	providerRow := findGatewayResourceRow(t, summary, "traffic-provider")
 	assertGatewayTraffic(t, providerRow.Traffic, 2, 1, lastRequestAt)
+	assertGatewayTrafficLastError(t, providerRow.Traffic, "req-latest-error", "upstream_timeout", 502, "upstream timed out")
 
 	modelRow := findGatewayModelResourceRow(t, summary, "model-1000")
 	assertGatewayTraffic(t, modelRow.Traffic, 2, 1, lastRequestAt)
@@ -429,6 +440,7 @@ func TestBuildGatewayResourceSummaryReportsRecentTraffic(t *testing.T) {
 
 	geminiEndpoint := findGatewayEndpointSummaryRow(t, summary, apiopenapi.GatewayEndpointResourceSummaryRowKeyGeminiGenerateContent)
 	assertGatewayTraffic(t, geminiEndpoint.Traffic, 1, 1, lastRequestAt)
+	assertGatewayTrafficLastError(t, geminiEndpoint.Traffic, "req-latest-error", "upstream_timeout", 502, "upstream timed out")
 
 	responsesEndpoint := findGatewayEndpointSummaryRow(t, summary, apiopenapi.GatewayEndpointResourceSummaryRowKeyResponses)
 	assertGatewayTraffic(t, responsesEndpoint.Traffic, 0, 0, time.Time{})
@@ -840,6 +852,23 @@ func assertGatewayTraffic(t *testing.T, traffic apiopenapi.GatewayResourceTraffi
 	}
 	if traffic.LastRequestAt == nil || !traffic.LastRequestAt.Equal(lastRequestAt) {
 		t.Fatalf("traffic last request = %v, want %v", traffic.LastRequestAt, lastRequestAt)
+	}
+}
+
+func assertGatewayTrafficLastError(t *testing.T, traffic apiopenapi.GatewayResourceTraffic, requestID string, errorClass string, statusCode int, message string) {
+	t.Helper()
+	if traffic.LastError == nil {
+		t.Fatalf("traffic last error is nil, want request_id=%s", requestID)
+	}
+	err := traffic.LastError
+	if err.RequestId == nil || *err.RequestId != requestID ||
+		err.ErrorClass == nil || *err.ErrorClass != errorClass ||
+		err.StatusCode == nil || *err.StatusCode != statusCode ||
+		err.Message == nil || *err.Message != message ||
+		err.ErrorPhase == nil || *err.ErrorPhase != "upstream" ||
+		err.ErrorOwner == nil || *err.ErrorOwner != "provider" ||
+		err.UpstreamRequestId == nil || *err.UpstreamRequestId != "upstream-req-1" {
+		t.Fatalf("traffic last error = %+v", *err)
 	}
 }
 

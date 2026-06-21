@@ -1739,6 +1739,26 @@ export type GatewayAccountBlockers = {
     proxy: number;
 };
 
+export type GatewayResourceTrafficLastError = {
+    /**
+     * Time of the most recent failed gateway request.
+     */
+    occurred_at: string;
+    request_id?: string | null;
+    error_class?: string | null;
+    error_phase?: string | null;
+    error_owner?: string | null;
+    /**
+     * Final upstream or gateway HTTP status when available.
+     */
+    status_code?: number | null;
+    upstream_request_id?: string | null;
+    /**
+     * Bounded upstream or gateway error message safe for inline operator display.
+     */
+    message?: string | null;
+};
+
 export type GatewayResourceTraffic = {
     /**
      * Rolling runtime usage window used for the traffic counters.
@@ -1760,6 +1780,7 @@ export type GatewayResourceTraffic = {
      * Most recent gateway request observed for this resource.
      */
     last_request_at?: string | null;
+    last_error?: GatewayResourceTrafficLastError;
 };
 
 export type GatewayProviderResourceRow = {

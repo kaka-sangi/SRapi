@@ -132,6 +132,18 @@ type gatewayResourceTrafficAccumulator struct {
 	Requests      int
 	Errors        int
 	LastRequestAt *time.Time
+	LastError     *gatewayResourceTrafficError
+}
+
+type gatewayResourceTrafficError struct {
+	OccurredAt        time.Time
+	RequestID         string
+	ErrorClass        string
+	ErrorPhase        string
+	ErrorOwner        string
+	StatusCode        int
+	UpstreamRequestID string
+	Message           string
 }
 
 func buildGatewayResourceTraffic(logs []usagecontract.UsageLog, now time.Time, window time.Duration) gatewayResourceTraffic {
@@ -200,6 +212,7 @@ func (t gatewayResourceTraffic) row(acc gatewayResourceTrafficAccumulator) apiop
 	return apiopenapi.GatewayResourceTraffic{
 		ErrorCount:    acc.Errors,
 		LastRequestAt: cloneTimePtr(acc.LastRequestAt),
+		LastError:     acc.lastError(),
 		RequestCount:  acc.Requests,
 		SuccessRate:   successRate,
 		WindowSeconds: int(window.Seconds()),
@@ -243,10 +256,59 @@ func (a *gatewayResourceTrafficAccumulator) add(log usagecontract.UsageLog) {
 	a.Requests++
 	if !log.Success {
 		a.Errors++
+		if a.LastError == nil || created.After(a.LastError.OccurredAt) {
+			a.LastError = gatewayResourceTrafficErrorFromLog(log)
+		}
 	}
 	if a.LastRequestAt == nil || created.After(*a.LastRequestAt) {
 		a.LastRequestAt = &created
 	}
+}
+
+func (a gatewayResourceTrafficAccumulator) lastError() *apiopenapi.GatewayResourceTrafficLastError {
+	if a.LastError == nil {
+		return nil
+	}
+	out := apiopenapi.GatewayResourceTrafficLastError{
+		OccurredAt: a.LastError.OccurredAt,
+	}
+	out.RequestId = nonEmptyStringPtr(a.LastError.RequestID)
+	out.ErrorClass = nonEmptyStringPtr(a.LastError.ErrorClass)
+	out.ErrorPhase = nonEmptyStringPtr(a.LastError.ErrorPhase)
+	out.ErrorOwner = nonEmptyStringPtr(a.LastError.ErrorOwner)
+	out.UpstreamRequestId = nonEmptyStringPtr(a.LastError.UpstreamRequestID)
+	out.Message = nonEmptyStringPtr(a.LastError.Message)
+	if a.LastError.StatusCode > 0 {
+		status := a.LastError.StatusCode
+		out.StatusCode = &status
+	}
+	return &out
+}
+
+func gatewayResourceTrafficErrorFromLog(log usagecontract.UsageLog) *gatewayResourceTrafficError {
+	return &gatewayResourceTrafficError{
+		OccurredAt:        log.CreatedAt.UTC(),
+		RequestID:         strings.TrimSpace(log.RequestID),
+		ErrorClass:        optionalStringValue(log.ErrorClass),
+		ErrorPhase:        strings.TrimSpace(log.ErrorPhase),
+		ErrorOwner:        strings.TrimSpace(log.ErrorOwner),
+		StatusCode:        log.StatusCode,
+		UpstreamRequestID: strings.TrimSpace(log.UpstreamRequestID),
+		Message:           gatewayResourceTrafficErrorMessage(log),
+	}
+}
+
+func gatewayResourceTrafficErrorMessage(log usagecontract.UsageLog) string {
+	if message := strings.TrimSpace(log.ProviderErrorMessage); message != "" {
+		return message
+	}
+	if message := strings.TrimSpace(log.ProviderErrorBodyExcerpt); message != "" {
+		return message
+	}
+	if log.ErrorClass != nil {
+		return strings.TrimSpace(*log.ErrorClass)
+	}
+	return ""
 }
 
 func gatewayUsageModelKey(log usagecontract.UsageLog) string {

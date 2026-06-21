@@ -153,6 +153,7 @@ describe("AdminGatewayResourcesPage", () => {
     expect(screen.getAllByText("流量").length).toBeGreaterThan(0);
     expect(screen.getAllByText("12 请求").length).toBeGreaterThan(0);
     expect(screen.getAllByText("2 错误").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("最近 502 upstream_timeout").length).toBeGreaterThan(0);
     expect(screen.getByText("路由明细")).toBeInTheDocument();
     expect(screen.getByText("gpt-4.1-upstream")).toBeInTheDocument();
     expect(screen.getAllByText("就绪").length).toBeGreaterThan(0);
@@ -623,6 +624,19 @@ function traffic(requestCount = 0, errorCount = 0) {
     error_count: errorCount,
     success_rate: requestCount > 0 ? (requestCount - errorCount) / requestCount : 0,
     last_request_at: requestCount > 0 ? "2026-06-20T11:00:00Z" : null,
+    last_error:
+      errorCount > 0
+        ? {
+            occurred_at: "2026-06-20T11:00:00Z",
+            request_id: "req-latest-error",
+            error_class: "upstream_timeout",
+            error_phase: "upstream",
+            error_owner: "provider",
+            status_code: 502,
+            upstream_request_id: "upstream-req-1",
+            message: "upstream timed out",
+          }
+        : undefined,
   };
 }
 

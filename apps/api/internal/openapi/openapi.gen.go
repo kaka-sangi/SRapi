@@ -8345,7 +8345,8 @@ type GatewayResourceSummaryResponse struct {
 // GatewayResourceTraffic defines model for GatewayResourceTraffic.
 type GatewayResourceTraffic struct {
 	// ErrorCount Failed gateway requests observed in the rolling window.
-	ErrorCount int `json:"error_count"`
+	ErrorCount int                              `json:"error_count"`
+	LastError  *GatewayResourceTrafficLastError `json:"last_error,omitempty"`
 
 	// LastRequestAt Most recent gateway request observed for this resource.
 	LastRequestAt *time.Time `json:"last_request_at,omitempty"`
@@ -8358,6 +8359,24 @@ type GatewayResourceTraffic struct {
 
 	// WindowSeconds Rolling runtime usage window used for the traffic counters.
 	WindowSeconds int `json:"window_seconds"`
+}
+
+// GatewayResourceTrafficLastError defines model for GatewayResourceTrafficLastError.
+type GatewayResourceTrafficLastError struct {
+	ErrorClass *string `json:"error_class,omitempty"`
+	ErrorOwner *string `json:"error_owner,omitempty"`
+	ErrorPhase *string `json:"error_phase,omitempty"`
+
+	// Message Bounded upstream or gateway error message safe for inline operator display.
+	Message *string `json:"message,omitempty"`
+
+	// OccurredAt Time of the most recent failed gateway request.
+	OccurredAt time.Time `json:"occurred_at"`
+	RequestId  *string   `json:"request_id,omitempty"`
+
+	// StatusCode Final upstream or gateway HTTP status when available.
+	StatusCode        *int    `json:"status_code,omitempty"`
+	UpstreamRequestId *string `json:"upstream_request_id,omitempty"`
 }
 
 // GatewayRouteResourceRow defines model for GatewayRouteResourceRow.

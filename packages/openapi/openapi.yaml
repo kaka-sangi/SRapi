@@ -21838,6 +21838,39 @@ components:
           minimum: 0
           description: Active accounts blocked by a missing, disabled, expired, or otherwise unavailable proxy binding.
 
+    GatewayResourceTrafficLastError:
+      type: object
+      required:
+        - occurred_at
+      properties:
+        occurred_at:
+          type: string
+          format: date-time
+          description: Time of the most recent failed gateway request.
+        request_id:
+          type: string
+          nullable: true
+        error_class:
+          type: string
+          nullable: true
+        error_phase:
+          type: string
+          nullable: true
+        error_owner:
+          type: string
+          nullable: true
+        status_code:
+          type: integer
+          nullable: true
+          description: Final upstream or gateway HTTP status when available.
+        upstream_request_id:
+          type: string
+          nullable: true
+        message:
+          type: string
+          nullable: true
+          description: Bounded upstream or gateway error message safe for inline operator display.
+
     GatewayResourceTraffic:
       type: object
       required:
@@ -21869,6 +21902,10 @@ components:
           format: date-time
           nullable: true
           description: Most recent gateway request observed for this resource.
+        last_error:
+          $ref: "#/components/schemas/GatewayResourceTrafficLastError"
+          nullable: true
+          description: Most recent failed gateway request observed in the rolling window.
 
     GatewayProviderResourceRow:
       type: object

@@ -1557,6 +1557,7 @@ function GatewayTrafficSummary({
   const errorCount = traffic.error_count ?? 0;
   const hasRequests = requestCount > 0;
   const lastRequest = formatDateTime(traffic.last_request_at);
+  const lastError = traffic.last_error;
   return (
     <div
       className={compact ? "flex flex-wrap gap-1" : "flex min-w-[130px] flex-col items-start gap-1"}
@@ -1580,6 +1581,15 @@ function GatewayTrafficSummary({
           </span>
         ) : null}
       </span>
+      {lastError ? (
+        <span className="border-srapi-error/20 bg-srapi-error/10 text-srapi-error inline-flex max-w-[180px] rounded-md border px-1.5 py-0.5 font-mono text-[10px]">
+          <span className="truncate">
+            {t("adminGatewayResources.trafficLastErrorShort", {
+              error: gatewayTrafficLastErrorLabel(lastError),
+            })}
+          </span>
+        </span>
+      ) : null}
       <span className="text-2xs text-srapi-text-tertiary truncate font-mono">
         {hasRequests ? lastRequest : t("adminGatewayResources.noRecentTraffic")}
       </span>
@@ -1606,7 +1616,41 @@ function gatewayTrafficTitle(
     t("adminGatewayResources.trafficLastRequest", {
       time: formatDateTime(traffic.last_request_at),
     }),
-  ].join("\n");
+    traffic.last_error ? gatewayTrafficLastErrorTitle(traffic.last_error, t) : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function gatewayTrafficLastErrorLabel(error: NonNullable<GatewayResourceTraffic["last_error"]>) {
+  const code = error.status_code ? String(error.status_code) : "";
+  const label = error.error_class || error.error_phase || error.error_owner || "error";
+  return [code, label].filter(Boolean).join(" ");
+}
+
+function gatewayTrafficLastErrorTitle(
+  error: NonNullable<GatewayResourceTraffic["last_error"]>,
+  t: (key: string, params?: Record<string, string | number>) => string,
+) {
+  return [
+    t("adminGatewayResources.trafficLastError", {
+      error: gatewayTrafficLastErrorLabel(error),
+      time: formatDateTime(error.occurred_at),
+    }),
+    error.message
+      ? t("adminGatewayResources.trafficLastErrorMessage", { message: error.message })
+      : "",
+    error.request_id
+      ? t("adminGatewayResources.trafficLastErrorRequest", { request: error.request_id })
+      : "",
+    error.upstream_request_id
+      ? t("adminGatewayResources.trafficLastErrorUpstreamRequest", {
+          request: error.upstream_request_id,
+        })
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 function resourceStatusMeta(
