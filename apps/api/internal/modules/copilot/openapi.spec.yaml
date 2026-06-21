@@ -29114,6 +29114,20 @@ components:
         error_count:
           type: integer
           minimum: 0
+        first_request_at:
+          type: string
+          format: date-time
+          allOf:
+            - $ref: "#/components/schemas/Timestamp"
+          nullable: true
+          description: UTC timestamp of the oldest request included in this rolling window. Null when the window has no traffic.
+        last_request_at:
+          type: string
+          format: date-time
+          allOf:
+            - $ref: "#/components/schemas/Timestamp"
+          nullable: true
+          description: UTC timestamp of the newest request included in this rolling window. Null when the window has no traffic.
 
     AccountUsageWindowsResult:
       type: object

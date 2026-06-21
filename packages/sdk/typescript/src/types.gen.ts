@@ -5007,6 +5007,14 @@ export type AccountUsageWindow = {
     currency: string;
     success_count: number;
     error_count: number;
+    /**
+     * UTC timestamp of the oldest request included in this rolling window. Null when the window has no traffic.
+     */
+    first_request_at?: Timestamp | null;
+    /**
+     * UTC timestamp of the newest request included in this rolling window. Null when the window has no traffic.
+     */
+    last_request_at?: Timestamp | null;
 };
 
 export type AccountUsageWindowsResult = {

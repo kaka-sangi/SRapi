@@ -362,7 +362,7 @@ function AccountCard({
       </div>
 
       {/* Metrics */}
-      <div className="border-srapi-border/50 bg-srapi-border/30 grid grid-cols-2 gap-px border-t">
+      <div className="border-srapi-border/50 bg-srapi-border/30 grid gap-px border-t sm:grid-cols-3">
         <div className="bg-srapi-card px-4 py-2.5">
           <div className="text-srapi-text-tertiary mb-1 font-mono text-[10px] tracking-wide uppercase">
             {t("adminAccounts.healthTitle")}
@@ -375,30 +375,32 @@ function AccountCard({
           </div>
           <AccountQuotaCell health={health} />
         </div>
-      </div>
-      <div className="border-srapi-border/50 border-t px-4 py-2.5">
-        <div className="text-srapi-text-tertiary mb-1 font-mono text-[10px] tracking-wide uppercase">
-          {t("adminAccounts.today")}
-        </div>
-        {hasTodayUsage && today ? (
-          <div className="text-2xs tabular flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-mono">
-            <span className="text-srapi-text-primary">
-              {formatCompactNumber(today.requests)} {t("adminAccounts.usageRequests").toLowerCase()}
-            </span>
-            <span className="text-srapi-text-secondary">
-              {formatCompactNumber(today.total_tokens || today.input_tokens + today.output_tokens)}{" "}
-              {t("adminAccounts.usageTokens").toLowerCase()}
-            </span>
-            <span className="text-srapi-text-secondary">
-              {formatMoney(today.cost, today.currency)}
-            </span>
-            <span className="text-srapi-text-tertiary">{formatPercent(today.success_rate)}</span>
+        <div className="bg-srapi-card px-4 py-2.5">
+          <div className="text-srapi-text-tertiary mb-1 font-mono text-[10px] tracking-wide uppercase">
+            {t("adminAccounts.today")}
           </div>
-        ) : (
-          <span className="text-2xs text-srapi-text-tertiary font-mono">
-            {t("adminAccounts.todayIdle")}
-          </span>
-        )}
+          {hasTodayUsage && today ? (
+            <div className="text-2xs tabular flex min-w-0 flex-col gap-0.5 font-mono">
+              <span className="text-srapi-text-primary truncate">
+                {formatCompactNumber(today.requests)}{" "}
+                {t("adminAccounts.usageRequests").toLowerCase()}
+              </span>
+              <span className="text-srapi-text-secondary truncate">
+                {formatCompactNumber(
+                  today.total_tokens || today.input_tokens + today.output_tokens,
+                )}{" "}
+                {t("adminAccounts.usageTokens").toLowerCase()}
+              </span>
+              <span className="text-srapi-text-tertiary truncate">
+                {formatMoney(today.cost, today.currency)} · {formatPercent(today.success_rate)}
+              </span>
+            </div>
+          ) : (
+            <span className="text-2xs text-srapi-text-tertiary font-mono">
+              {t("adminAccounts.todayIdle")}
+            </span>
+          )}
+        </div>
       </div>
     </article>
   );

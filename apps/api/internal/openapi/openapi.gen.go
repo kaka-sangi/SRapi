@@ -4762,15 +4762,21 @@ type AccountUsageTodayWithID struct {
 
 // AccountUsageWindow defines model for AccountUsageWindow.
 type AccountUsageWindow struct {
-	Cost         string `json:"cost"`
-	Currency     string `json:"currency"`
-	ErrorCount   int    `json:"error_count"`
-	InputTokens  int    `json:"input_tokens"`
-	OutputTokens int    `json:"output_tokens"`
-	Requests     int    `json:"requests"`
-	SuccessCount int    `json:"success_count"`
-	TotalTokens  int    `json:"total_tokens"`
-	Window       string `json:"window"`
+	Cost       string `json:"cost"`
+	Currency   string `json:"currency"`
+	ErrorCount int    `json:"error_count"`
+
+	// FirstRequestAt UTC timestamp of the oldest request included in this rolling window. Null when the window has no traffic.
+	FirstRequestAt *Timestamp `json:"first_request_at,omitempty"`
+	InputTokens    int        `json:"input_tokens"`
+
+	// LastRequestAt UTC timestamp of the newest request included in this rolling window. Null when the window has no traffic.
+	LastRequestAt *Timestamp `json:"last_request_at,omitempty"`
+	OutputTokens  int        `json:"output_tokens"`
+	Requests      int        `json:"requests"`
+	SuccessCount  int        `json:"success_count"`
+	TotalTokens   int        `json:"total_tokens"`
+	Window        string     `json:"window"`
 }
 
 // AccountUsageWindowsResult defines model for AccountUsageWindowsResult.

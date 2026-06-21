@@ -62,6 +62,12 @@ func TestAdminAccountUsageStatsEndpoints(t *testing.T) {
 		if win.Requests != 1 {
 			t.Fatalf("window %q: expected 1 request, got %d", win.Window, win.Requests)
 		}
+		if win.FirstRequestAt == nil || win.LastRequestAt == nil {
+			t.Fatalf("window %q: expected first/last request timestamps, got %+v", win.Window, win)
+		}
+		if !win.FirstRequestAt.Equal(*win.LastRequestAt) {
+			t.Fatalf("window %q: expected first and last request to match for one request, got %v / %v", win.Window, win.FirstRequestAt, win.LastRequestAt)
+		}
 		if win.SuccessCount != 1 || win.ErrorCount != 0 {
 			t.Fatalf("window %q: expected 1 success/0 error, got %d/%d", win.Window, win.SuccessCount, win.ErrorCount)
 		}

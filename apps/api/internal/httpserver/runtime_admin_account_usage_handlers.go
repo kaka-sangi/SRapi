@@ -39,6 +39,8 @@ type usageWindowAccumulator struct {
 	totalTokens  int
 	cost         *big.Rat
 	currency     string
+	firstRequest *time.Time
+	lastRequest  *time.Time
 }
 
 func newUsageWindowAccumulator() *usageWindowAccumulator {
@@ -48,6 +50,15 @@ func newUsageWindowAccumulator() *usageWindowAccumulator {
 // add folds one usage log into the accumulator.
 func (a *usageWindowAccumulator) add(log usagecontract.UsageLog) {
 	a.requests++
+	created := log.CreatedAt.UTC()
+	if a.firstRequest == nil || created.Before(*a.firstRequest) {
+		first := created
+		a.firstRequest = &first
+	}
+	if a.lastRequest == nil || created.After(*a.lastRequest) {
+		last := created
+		a.lastRequest = &last
+	}
 	if log.Success {
 		a.successCount++
 	} else {
@@ -147,15 +158,17 @@ func (s *Server) handleGetAdminAccountUsageWindows(w http.ResponseWriter, r *htt
 // formatted to 2 decimal places as a plain decimal string.
 func usageWindowDTO(label string, acc *usageWindowAccumulator) apiopenapi.AccountUsageWindow {
 	return apiopenapi.AccountUsageWindow{
-		Window:       label,
-		Requests:     acc.requests,
-		SuccessCount: acc.successCount,
-		ErrorCount:   acc.errorCount,
-		InputTokens:  acc.inputTokens,
-		OutputTokens: acc.outputTokens,
-		TotalTokens:  acc.totalTokens,
-		Cost:         money.FormatRatFixed(acc.cost, 2),
-		Currency:     acc.currencyOrDefault(),
+		Window:         label,
+		Requests:       acc.requests,
+		SuccessCount:   acc.successCount,
+		ErrorCount:     acc.errorCount,
+		InputTokens:    acc.inputTokens,
+		OutputTokens:   acc.outputTokens,
+		TotalTokens:    acc.totalTokens,
+		Cost:           money.FormatRatFixed(acc.cost, 2),
+		Currency:       acc.currencyOrDefault(),
+		FirstRequestAt: acc.firstRequest,
+		LastRequestAt:  acc.lastRequest,
 	}
 }
 

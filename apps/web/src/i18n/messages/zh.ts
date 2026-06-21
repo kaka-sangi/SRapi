@@ -723,6 +723,7 @@ export const zh: Messages = {
     allGroups: "全部分组",
     today: "今日",
     todayIdle: "空闲",
+    keyInfo: "关键信息",
     models: "模型",
     profile: "画像",
     modelsAll: "全部模型",

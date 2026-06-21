@@ -229,9 +229,7 @@ describe("AdminAccountsPage", () => {
     expect(
       screen
         .getAllByRole("link", { name: "查看错误日志" })
-        .some((link) =>
-          link.getAttribute("href")?.includes("f_error_class=upstream_401"),
-        ),
+        .some((link) => link.getAttribute("href")?.includes("f_error_class=upstream_401")),
     ).toBe(true);
     expect(screen.getByRole("link", { name: "请求证据" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "选择 1 个账号" })).toBeInTheDocument();
@@ -251,11 +249,7 @@ describe("AdminAccountsPage", () => {
 
     await user.click(screen.getByRole("button", { name: /列表/ }));
 
-    expect(screen.getByRole("columnheader", { name: "模型" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "画像" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "容量" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "代理" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "路由" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "关键信息" })).toBeInTheDocument();
     expect(screen.getAllByText("允许 2 个").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Resp: 强关").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Msg: 强开").length).toBeGreaterThan(0);
@@ -264,8 +258,7 @@ describe("AdminAccountsPage", () => {
     expect(screen.getAllByText(/组织: org-main/).length).toBeGreaterThan(0);
     expect(screen.getAllByText("并发: 4").length).toBeGreaterThan(0);
     expect(screen.getByText("会话: 2")).toBeInTheDocument();
-    expect(screen.getByText("P2")).toBeInTheDocument();
-    expect(screen.getByText("W3")).toBeInTheDocument();
+    expect(screen.getByText("P2 / W3")).toBeInTheDocument();
     expect(screen.queryByText("https://internal-upstream.example/v1")).not.toBeInTheDocument();
   });
 

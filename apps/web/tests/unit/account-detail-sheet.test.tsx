@@ -98,7 +98,34 @@ vi.mock("@/hooks/admin-queries", () => ({
   useAccountUsageWindows: () => ({
     data: {
       account_id: "acct-1",
-      windows: [],
+      windows: [
+        {
+          window: "5h",
+          requests: 1,
+          input_tokens: 10,
+          output_tokens: 5,
+          total_tokens: 15,
+          cost: "0.01",
+          currency: "USD",
+          success_count: 1,
+          error_count: 0,
+          first_request_at: "2026-06-12T08:01:00Z",
+          last_request_at: "2026-06-12T08:03:00Z",
+        },
+        {
+          window: "7d",
+          requests: 4,
+          input_tokens: 40,
+          output_tokens: 8,
+          total_tokens: 48,
+          cost: "0.04",
+          currency: "USD",
+          success_count: 4,
+          error_count: 0,
+          first_request_at: "2026-06-12T08:01:00Z",
+          last_request_at: "2026-06-12T08:03:00Z",
+        },
+      ],
     },
     isLoading: false,
     isError: false,
@@ -177,8 +204,9 @@ describe("AccountDetailSheet", () => {
     expect(screen.getByText("允许 1 个")).toBeInTheDocument();
     expect(screen.getByText("Pooled accounts")).toBeInTheDocument();
     expect(screen.getAllByText("已绑定代理").length).toBeGreaterThan(0);
-    expect(screen.getByText(/最近使用/)).toBeInTheDocument();
+    expect(screen.getAllByText(/最近使用/).length).toBeGreaterThan(0);
     expect(screen.getByText("使用期")).toBeInTheDocument();
+    expect(screen.getAllByText(/08:03|8:03|16:03|4:03/).length).toBeGreaterThan(0);
     expect(screen.getByText("端点覆盖")).toBeInTheDocument();
     expect(screen.getByText("Resp: 强关 Msg: 强开")).toBeInTheDocument();
     expect(screen.getAllByText(/2026年6月12日|Jun 12, 2026/).length).toBeGreaterThan(0);

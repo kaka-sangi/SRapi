@@ -75,7 +75,12 @@ import {
 } from "@/lib/admin-account-form";
 import { AccountImportDialog } from "@/components/admin/account-import-dialog";
 import { BulkAddAccountsDialog } from "./bulk-add-dialog";
-import type { Provider, ProviderAccount, ProviderAccountStatus } from "@/lib/sdk-types";
+import type {
+  AccountUsageToday,
+  Provider,
+  ProviderAccount,
+  ProviderAccountStatus,
+} from "@/lib/sdk-types";
 import {
   accountCapacityFacts,
   accountEndpointCapabilityFacts,
@@ -94,6 +99,8 @@ import { AccountStatusCell } from "./account-status-cell";
 import { TokenExpiryChip } from "./token-expiry-chip";
 import { AutoRefreshButton, ViewModeToggle } from "./accounts-toolbar";
 import { AccountsCardView } from "./account-card";
+
+type AccountUsageTodayWithId = AccountUsageToday & { account_id: string };
 
 function extractAccountTemplate(p: Provider) {
   const schema = p.config_schema as Record<string, unknown> | undefined;
@@ -135,7 +142,15 @@ function AccountsContent() {
   const list = useAdminList();
   const searchParams = useSearchParams();
   const readOnlyHealthView = searchParams.get("view") === "health";
-  const colVis = useColumnVisibility("admin-accounts", ["created_at", "updated_at", "notes"]);
+  const colVis = useColumnVisibility("admin-accounts", [
+    "models",
+    "profile",
+    "capacity",
+    "type",
+    "groups",
+    "proxy",
+    "routing",
+  ]);
 
   const autoRefresh = useAutoRefresh(() => void qc.invalidateQueries({ queryKey: ["admin"] }), {
     storageKey: "admin-accounts",
@@ -195,7 +210,9 @@ function AccountsContent() {
   // when the page shows many accounts. Joined back by account_id below.
   const visibleAccountIds = (accountRows ?? []).map((a) => a.id);
   const usageToday = useAccountsUsageTodayBatch(visibleAccountIds);
-  const todayByAccountId = new Map((usageToday.data ?? []).map((t) => [t.account_id, t] as const));
+  const todayByAccountId = new Map(
+    (usageToday.data ?? []).map((t) => [t.account_id, t as AccountUsageTodayWithId] as const),
+  );
 
   const [formTarget, setFormTarget] = useState<ProviderAccount | "new" | null>(null);
   const [proxyTarget, setProxyTarget] = useState<ProviderAccount | null>(null);
@@ -609,6 +626,108 @@ function AccountsContent() {
           {providerNameById.get(String(a.provider_id)) || a.provider_id}
         </span>
       ),
+    },
+    {
+      key: "key_info",
+      header: t("adminAccounts.keyInfo"),
+      hideOnMobile: true,
+      sortValue: (a) => {
+        const identity = accountIdentitySummary(t, a);
+        const today = todayByAccountId.get(a.id);
+        return [
+          identity.primary,
+          ...identity.secondary,
+          accountModelPolicyLabel(t, a.metadata),
+          ...accountEndpointCapabilityFacts(t, a).map((fact) => fact.value),
+          ...accountCapacityFacts(t, a).map((fact) => fact.value),
+          today?.requests ?? 0,
+        ].join(" ");
+      },
+      render: (a) => {
+        const identity = accountIdentitySummary(t, a);
+        const hasIdentity = identity.primary !== a.name || identity.secondary.length > 0;
+        const endpointFacts = accountEndpointCapabilityFacts(t, a);
+        const capacityFacts = accountCapacityFacts(t, a);
+        const profileFacts = accountProfileFacts(t, a).slice(0, 2);
+        const today = todayByAccountId.get(a.id);
+        const groups = a.group_ids ?? [];
+        const groupLabel =
+          groups.length > 0
+            ? (groupNameById.get(String(groups[0])) ?? `#${groups[0]}`)
+            : t("adminAccounts.ungrouped");
+        const todayLabel =
+          today && today.requests > 0
+            ? `${formatInteger(today.requests)} ${t("adminAccounts.usageRequests").toLowerCase()} · ${formatMoney(today.cost, today.currency)}`
+            : t("adminAccounts.todayIdle");
+        return (
+          <div className="flex max-w-[25rem] min-w-[16rem] flex-col gap-1.5">
+            {hasIdentity ? (
+              <span
+                className="text-2xs text-srapi-text-secondary max-w-[22rem] truncate font-mono"
+                title={[identity.primary, ...identity.secondary].join(" · ")}
+              >
+                {[identity.primary, ...identity.secondary.slice(0, 1)].join(" · ")}
+              </span>
+            ) : null}
+            <div className="flex flex-wrap gap-1">
+              <span className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded-md border px-1.5 py-0.5 font-mono">
+                {accountModelPolicyLabel(t, a.metadata)}
+              </span>
+              {endpointFacts.map((fact) => (
+                <span
+                  key={fact.key}
+                  className={cn(
+                    "text-2xs rounded-md border px-1.5 py-0.5 font-mono",
+                    fact.tone === "enabled"
+                      ? "border-srapi-success/30 bg-srapi-success/10 text-srapi-success"
+                      : "border-srapi-error/30 bg-srapi-error/10 text-srapi-error",
+                  )}
+                  title={`${fact.label}: ${fact.value}`}
+                >
+                  {fact.label}: {fact.value}
+                </span>
+              ))}
+              {capacityFacts.slice(0, 2).map((fact) => (
+                <span
+                  key={fact.key}
+                  className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded-md border px-1.5 py-0.5 font-mono"
+                  title={`${fact.label}: ${fact.value}`}
+                >
+                  {fact.label}: {fact.value}
+                </span>
+              ))}
+              {profileFacts.map((fact) => (
+                <span
+                  key={fact.key}
+                  className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-tertiary max-w-[8.5rem] truncate rounded-md border px-1.5 py-0.5 font-mono"
+                  title={`${fact.label}: ${fact.value}`}
+                >
+                  {fact.label}: {fact.value}
+                </span>
+              ))}
+              <span className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-tertiary max-w-[8rem] truncate rounded-md border px-1.5 py-0.5 font-mono">
+                {groupLabel}
+              </span>
+              <span className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded-md border px-1.5 py-0.5 font-mono">
+                {a.proxy_id ? t("adminAccounts.proxyConfigured") : t("adminAccounts.noProxy")}
+              </span>
+              <span className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded-md border px-1.5 py-0.5 font-mono">
+                P{a.priority ?? 0} / W{a.weight ?? 1}
+              </span>
+              <span
+                className={cn(
+                  "text-2xs rounded-md border px-1.5 py-0.5 font-mono",
+                  today && today.requests > 0
+                    ? "border-srapi-success/30 bg-srapi-success/10 text-srapi-success"
+                    : "border-srapi-border bg-srapi-card-muted text-srapi-text-tertiary",
+                )}
+              >
+                {todayLabel}
+              </span>
+            </div>
+          </div>
+        );
+      },
     },
     {
       key: "models",

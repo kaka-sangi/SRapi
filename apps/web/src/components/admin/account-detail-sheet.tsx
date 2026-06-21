@@ -133,6 +133,34 @@ function usageDateRangeLabel(
   return `${formatDate(first)} - ${formatDate(last)}`;
 }
 
+function latestUsageWindowRequestAt(result: AccountUsageWindowsResult | undefined): string {
+  if (!result) return "";
+  return (
+    result.windows
+      .map((window) => window.last_request_at)
+      .filter((value): value is string => Boolean(value))
+      .sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? ""
+  );
+}
+
+function usageWindowDateRangeLabel(
+  result: AccountUsageWindowsResult | undefined,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): string {
+  if (!result) return t("adminAccounts.neverUsed");
+  const dates = result.windows.flatMap((window) =>
+    [window.first_request_at, window.last_request_at].filter((value): value is string =>
+      Boolean(value),
+    ),
+  );
+  if (dates.length === 0) return t("adminAccounts.neverUsed");
+  dates.sort((a, b) => Date.parse(a) - Date.parse(b));
+  const first = dates[0];
+  const last = dates[dates.length - 1];
+  if (!first || !last || first === last) return formatDateTime(last || first);
+  return `${formatDateTime(first)} - ${formatDateTime(last)}`;
+}
+
 function AccountHealthEvidenceLinks({ links }: { links: AccountHealthInvestigationLinks }) {
   const { t } = useLanguage();
   const items = [
@@ -245,6 +273,11 @@ function UsageWindowCard({
           {t("adminAccounts.usageErrors")} {window.error_count}
         </span>
       </div>
+      {window.last_request_at ? (
+        <div className="text-2xs text-srapi-text-tertiary truncate font-mono">
+          {t("adminAccounts.lastUsedAt")} {formatDateTime(window.last_request_at)}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -417,7 +450,8 @@ export function AccountDetailSheet({
   const identity = account ? accountIdentitySummary(t, account) : null;
   const endpointFacts = account ? accountEndpointCapabilityFacts(t, account) : [];
   const activeUsagePoints = activeDailyUsagePoints(usageDaily.data ?? []);
-  const lastUsageDate = [...activeUsagePoints].reverse()[0]?.date ?? "";
+  const latestRequestAt = latestUsageWindowRequestAt(usageWindows.data);
+  const lastUsageDate = latestRequestAt || [...activeUsagePoints].reverse()[0]?.date || "";
 
   async function refreshQuota() {
     if (!id) return;
@@ -509,26 +543,30 @@ export function AccountDetailSheet({
               value={`P${account.priority ?? 0} / W${account.weight ?? 1}`}
             />
             <DetailMetric
-              label={t("adminAccounts.createdAt")}
-              value={formatDateTime(account.created_at)}
-            />
-            <DetailMetric
               label={t("adminAccounts.lastUsedAt")}
               value={
-                usageDaily.isLoading
+                usageWindows.isLoading || usageDaily.isLoading
                   ? t("adminAccounts.detailLoading")
-                  : lastUsageDate
-                    ? formatDate(lastUsageDate)
-                    : t("adminAccounts.neverUsed")
+                  : latestRequestAt
+                    ? formatDateTime(latestRequestAt)
+                    : lastUsageDate
+                      ? formatDate(lastUsageDate)
+                      : t("adminAccounts.neverUsed")
               }
             />
             <DetailMetric
               label={t("adminAccounts.usagePeriod")}
               value={
-                usageDaily.isLoading
+                usageWindows.isLoading || usageDaily.isLoading
                   ? t("adminAccounts.detailLoading")
-                  : usageDateRangeLabel(usageDaily.data ?? [], t)
+                  : latestRequestAt
+                    ? usageWindowDateRangeLabel(usageWindows.data, t)
+                    : usageDateRangeLabel(usageDaily.data ?? [], t)
               }
+            />
+            <DetailMetric
+              label={t("adminAccounts.createdAt")}
+              value={formatDateTime(account.created_at)}
             />
             <DetailMetric
               label={t("adminAccounts.endpointOverrides")}

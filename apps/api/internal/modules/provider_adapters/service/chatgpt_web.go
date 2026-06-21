@@ -765,6 +765,7 @@ func chatGPTWebPoWRunCheck(start time.Time, seed string, difficulty string, conf
 	if len(config) < 10 {
 		return "", nil
 	}
+	config = append([]any(nil), config...)
 	config[3] = nonce
 	config[9] = int64(math.Round(float64(time.Since(start)) / float64(time.Millisecond)))
 	encoded, err := chatGPTWebPoWEncodeFingerprint(config)

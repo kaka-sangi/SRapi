@@ -735,6 +735,7 @@ export const en = {
     allGroups: "All groups",
     today: "Today",
     todayIdle: "Idle",
+    keyInfo: "Key info",
     models: "Models",
     profile: "Profile",
     modelsAll: "All models",
