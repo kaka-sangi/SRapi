@@ -14,6 +14,7 @@ import (
 	platformcrypto "github.com/srapi/srapi/apps/api/internal/platform/crypto"
 	platformotel "github.com/srapi/srapi/apps/api/internal/platform/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"golang.org/x/sync/singleflight"
 )
 
 const credentialVersionV1 = "v1"
@@ -40,6 +41,10 @@ type Service struct {
 	// manual /admin/accounts/{id}/refresh endpoint can't race on the same
 	// account row. Keyed by account id; values are *sync.Mutex.
 	refreshLocks sync.Map
+	// decryptGroup coalesces concurrent DecryptCredential calls for the same
+	// account ID so the DB lookup + AES-GCM decrypt runs at most once per
+	// in-flight window. Ported from sub2api's singleflight pattern.
+	decryptGroup singleflight.Group
 }
 
 func New(store contract.Store, masterKey string, clock Clock) (*Service, error) {
@@ -1603,10 +1608,26 @@ func dedupePositiveIDs(ids []int) []int {
 	return out
 }
 
+// DecryptCredential returns the decrypted credential map for the given account
+// ID. Concurrent calls for the same ID are coalesced via singleflight so the
+// DB lookup + AES-GCM decrypt runs at most once per in-flight window.
 func (s *Service) DecryptCredential(ctx context.Context, id int) (map[string]any, error) {
 	if id <= 0 {
 		return nil, ErrInvalidInput
 	}
+	key := strconv.Itoa(id)
+	result, err, _ := s.decryptGroup.Do(key, func() (any, error) {
+		return s.decryptCredentialByID(ctx, id)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result.(map[string]any), nil
+}
+
+// decryptCredentialByID is the inner implementation of DecryptCredential:
+// fetch the account row and AES-GCM decrypt its credential ciphertext.
+func (s *Service) decryptCredentialByID(ctx context.Context, id int) (map[string]any, error) {
 	account, err := s.store.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
