@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"regexp"
 	"sort"
 	"strconv"
@@ -332,7 +333,7 @@ func sanitizeUpstreamErrors(events []contract.UpstreamErrorEvent) []contract.Ups
 			AccountName:        truncate(strings.TrimSpace(event.AccountName), 128),
 			UpstreamStatusCode: validUpstreamStatus(event.UpstreamStatusCode),
 			UpstreamRequestID:  truncate(strings.TrimSpace(event.UpstreamRequestID), 128),
-			UpstreamURL:        truncate(redactSecretText(event.UpstreamURL), 256),
+			UpstreamURL:        truncate(redactSecretText(redactQueryParams(event.UpstreamURL)), 256),
 			Kind:               truncate(defaultString(event.Kind, "request_error"), 64),
 			Message:            truncate(sanitizeMessage(event.Message), MaxMessageBytes),
 			BodyExcerpt:        redactExcerpt(event.BodyExcerpt, MaxBodyExcerptBytes),
@@ -593,6 +594,48 @@ func redactSecretText(value string) string {
 	value = openAIKeyPattern.ReplaceAllString(value, "sk-[REDACTED]")
 	value = srapiKeyPattern.ReplaceAllString(value, "${1}_[REDACTED]")
 	return strings.TrimSpace(value)
+}
+
+// redactQueryParams performs structured URL-aware query parameter redaction.
+// Unlike the regex-based secretQueryPattern (which operates on free text),
+// this parses the URL properly and catches sensitive parameters that the
+// regex misses — e.g. "auth", "credential", "apikey" (no underscore), and
+// partial-match params like "auth_token" or "my_secret_key". Ported from
+// CLIProxyAPI's URL-masking pattern.
+func redactQueryParams(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil || u.RawQuery == "" {
+		return rawURL
+	}
+	q := u.Query()
+	redacted := false
+	for key := range q {
+		if isSensitiveQueryParam(strings.ToLower(key)) {
+			q.Set(key, "[REDACTED]")
+			redacted = true
+		}
+	}
+	if !redacted {
+		return rawURL
+	}
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+// isSensitiveQueryParam returns true when a lower-cased query parameter name
+// contains any substring that commonly carries credentials. The set is a
+// superset of secretQueryPattern's exact matches, adding the partial-match
+// markers from CLIProxyAPI's URL masking (auth, credential, apikey, etc.).
+func isSensitiveQueryParam(key string) bool {
+	for _, s := range []string{
+		"key", "token", "secret", "password", "credential",
+		"auth", "api_key", "apikey", "access_token",
+	} {
+		if strings.Contains(key, s) {
+			return true
+		}
+	}
+	return false
 }
 
 func cleanLogText(value string) string {
