@@ -306,3 +306,42 @@ type WindowReader interface {
 type RequestReader interface {
 	ListByRequestID(ctx context.Context, requestID string) ([]UsageLog, error)
 }
+
+// ListFilter narrows a usage-log page read at the store level. Empty fields are
+// no-ops. Model and SourceEndpoint match case-insensitively as a substring;
+// other string fields use case-insensitive equality. Pointer ID fields filter
+// when non-nil. Time bounds are half-open [Start, End).
+type ListFilter struct {
+	UserID         *int
+	APIKeyID       *int
+	AccountID      *int
+	ProviderID     *int
+	Model          string
+	SourceEndpoint string
+	BillingMode    string
+	ErrorClass     string
+	Success        *bool
+	Start          *time.Time
+	End            *time.Time
+	// Q is a free-text needle matched (case-insensitive substring) against the
+	// gateway request_id, the upstream request id, and the provider error
+	// message. Empty means no narrowing. Backs the admin error-log search box.
+	Q string
+}
+
+// ListPageResult is the typed return of PageReader.ListPage: the page slice
+// plus the unbounded match total used by paginators.
+type ListPageResult struct {
+	Items []UsageLog
+	Total int
+}
+
+// PageReader is an optional Store capability that pushes filtering, ordering
+// (newest-first by id), and LIMIT/OFFSET pagination down to the database so
+// admin/console reads do not materialize the entire table just to page through
+// the most recent slice. Stores that do not implement it cause callers to fall
+// back to List + in-memory filter+slice. Limit <= 0 means "no limit" — only
+// useful for small per-user pages; the caller is expected to clamp.
+type PageReader interface {
+	ListPage(ctx context.Context, filter ListFilter, limit, offset int) (ListPageResult, error)
+}

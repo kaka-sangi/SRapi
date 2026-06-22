@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/srapi/srapi/apps/api/ent"
 	entdomaineventsinbox "github.com/srapi/srapi/apps/api/ent/domaineventsinbox"
 	entdomaineventsoutbox "github.com/srapi/srapi/apps/api/ent/domaineventsoutbox"
+	"github.com/srapi/srapi/apps/api/ent/predicate"
 	"github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 )
 
@@ -76,6 +78,42 @@ func (s *Store) ListOutbox(ctx context.Context) ([]contract.OutboxEvent, error) 
 		out = append(out, toOutbox(row))
 	}
 	return out, nil
+}
+
+// ListOutboxPage implements contract.OutboxPageReader: filter + count + slice
+// in SQL with ORDER BY id DESC.
+func (s *Store) ListOutboxPage(ctx context.Context, filter contract.OutboxListFilter, limit, offset int) (contract.OutboxListPageResult, error) {
+	predicates := make([]predicate.DomainEventsOutbox, 0, 2)
+	if status := strings.TrimSpace(string(filter.Status)); status != "" {
+		predicates = append(predicates, entdomaineventsoutbox.StatusEQ(status))
+	}
+	if eventType := strings.TrimSpace(filter.EventType); eventType != "" {
+		predicates = append(predicates, entdomaineventsoutbox.EventTypeEQ(eventType))
+	}
+	base := s.client.DomainEventsOutbox.Query()
+	if len(predicates) > 0 {
+		base = base.Where(predicates...)
+	}
+	total, err := base.Clone().Count(ctx)
+	if err != nil {
+		return contract.OutboxListPageResult{}, err
+	}
+	query := base.Order(ent.Desc(entdomaineventsoutbox.FieldID))
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	rows, err := query.All(ctx)
+	if err != nil {
+		return contract.OutboxListPageResult{}, err
+	}
+	out := make([]contract.OutboxEvent, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toOutbox(row))
+	}
+	return contract.OutboxListPageResult{Items: out, Total: total}, nil
 }
 
 func (s *Store) ListDispatchableOutbox(ctx context.Context, now time.Time, limit int) ([]contract.OutboxEvent, error) {

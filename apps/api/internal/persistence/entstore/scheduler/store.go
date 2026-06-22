@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -168,6 +169,65 @@ func (s *Store) ListDecisions(ctx context.Context) ([]contract.Decision, error) 
 		out = append(out, toDecision(row))
 	}
 	return out, nil
+}
+
+// ListDecisionsPage implements contract.DecisionPageReader: applies the
+// straightforward filters in SQL (request_id / model substring / source
+// endpoint substring / selected_provider_id / time bounds), orders newest-
+// first by id, and slices via LIMIT/OFFSET. AccountID lives only on the
+// handler side because matching it also requires walking Scores /
+// RejectReasons JSON evidence maps — there is no general SQL predicate for
+// that today, so the handler falls back to the legacy whole-table path when
+// account_id is set.
+func (s *Store) ListDecisionsPage(ctx context.Context, filter contract.DecisionListFilter, limit, offset int) (contract.DecisionListPageResult, error) {
+	predicates := schedulerDecisionPagePredicates(filter)
+	base := s.client.SchedulerDecision.Query()
+	if len(predicates) > 0 {
+		base = base.Where(predicates...)
+	}
+	total, err := base.Clone().Count(ctx)
+	if err != nil {
+		return contract.DecisionListPageResult{}, err
+	}
+	query := base.Order(ent.Desc(entschedulerdecision.FieldID))
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	rows, err := query.All(ctx)
+	if err != nil {
+		return contract.DecisionListPageResult{}, err
+	}
+	out := make([]contract.Decision, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toDecision(row))
+	}
+	return contract.DecisionListPageResult{Items: out, Total: total}, nil
+}
+
+func schedulerDecisionPagePredicates(filter contract.DecisionListFilter) []predicate.SchedulerDecision {
+	predicates := make([]predicate.SchedulerDecision, 0, 6)
+	if requestID := strings.TrimSpace(filter.RequestID); requestID != "" {
+		predicates = append(predicates, entschedulerdecision.RequestIDEQ(requestID))
+	}
+	if model := strings.TrimSpace(filter.Model); model != "" {
+		predicates = append(predicates, entschedulerdecision.ModelContainsFold(model))
+	}
+	if endpoint := strings.TrimSpace(filter.SourceEndpoint); endpoint != "" {
+		predicates = append(predicates, entschedulerdecision.SourceEndpointContainsFold(endpoint))
+	}
+	if filter.ProviderID != nil {
+		predicates = append(predicates, entschedulerdecision.SelectedProviderIDEQ(*filter.ProviderID))
+	}
+	if filter.Start != nil {
+		predicates = append(predicates, entschedulerdecision.CreatedAtGTE(filter.Start.UTC()))
+	}
+	if filter.End != nil {
+		predicates = append(predicates, entschedulerdecision.CreatedAtLT(filter.End.UTC()))
+	}
+	return predicates
 }
 
 func (s *Store) ListRequestSnapshots(ctx context.Context) ([]contract.RequestSnapshot, error) {

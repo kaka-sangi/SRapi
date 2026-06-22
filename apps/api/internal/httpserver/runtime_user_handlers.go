@@ -24,6 +24,7 @@ import (
 	captchacontract "github.com/srapi/srapi/apps/api/internal/modules/captcha/contract"
 	captchaservice "github.com/srapi/srapi/apps/api/internal/modules/captcha/service"
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
+	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
 	usersservice "github.com/srapi/srapi/apps/api/internal/modules/users/service"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
@@ -1128,6 +1129,14 @@ func generatedAffiliateInviteCode(userID int) string {
 	return string(out)
 }
 
+// currentUserUsageDefaultCap bounds the no-page_size /me/usage response. The
+// console renders aggregate stats client-side from the returned slice, so it
+// genuinely needs more than one page; we still cap the worst case so a user
+// with months of history does not stall the table fetch (and the API process)
+// for tens of seconds. Tuned generously enough that anyone hitting the cap has
+// far more rows than the stat band can render usefully anyway.
+const currentUserUsageDefaultCap = 1000
+
 func (s *Server) handleCurrentUserUsage(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	session, err := s.requireConsoleSession(r)
@@ -1135,16 +1144,30 @@ func (s *Server) handleCurrentUserUsage(w http.ResponseWriter, r *http.Request) 
 		writeStandardError(w, http.StatusUnauthorized, apiopenapi.UNAUTHORIZED, "unauthorized", requestID)
 		return
 	}
-	items, err := s.runtime.usage.ListByUser(r.Context(), session.User.ID)
+	userID := session.User.ID
+	filter := usagecontract.ListFilter{UserID: &userID}
+	limit, offset, page, pageSize := paginationParams(r)
+	if pageSize == 0 {
+		// No client-side pagination requested. Return the most recent N records
+		// newest-first so the table renders the same direction admins see.
+		limit = currentUserUsageDefaultCap
+		offset = 0
+	}
+	result, err := s.runtime.usage.ListPage(r.Context(), filter, limit, offset)
 	if err != nil {
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list usage logs", requestID)
 		return
 	}
-	data := make([]apiopenapi.UsageLog, 0, len(items))
-	for _, item := range items {
+	data := make([]apiopenapi.UsageLog, 0, len(result.Items))
+	for _, item := range result.Items {
 		data = append(data, toAPIUsageLog(item))
 	}
-	data, pg := paginate(r, data)
+	var pg apiopenapi.Pagination
+	if pageSize == 0 {
+		pg = apiopenapi.Pagination{Page: 1, PageSize: len(data), Total: result.Total, HasNext: false}
+	} else {
+		pg = paginationFromTotal(result.Total, page, pageSize)
+	}
 	writeJSONAny(w, http.StatusOK, apiopenapi.UsageLogListResponse{
 		Data:       data,
 		Pagination: pg,

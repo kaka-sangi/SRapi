@@ -506,6 +506,45 @@ func (s *Service) ListOrders(ctx context.Context) ([]contract.PaymentOrder, erro
 	return s.store.ListOrders(ctx)
 }
 
+// ListOrdersPage delegates to OrderPageReader when supported so admin/payment-
+// order reads avoid the legacy whole-table load. Falls back to ListOrders + in-
+// memory filter+slice when the store omits the capability.
+func (s *Service) ListOrdersPage(ctx context.Context, filter contract.OrderListFilter, limit, offset int) (contract.OrderListPageResult, error) {
+	if reader, ok := s.store.(contract.OrderPageReader); ok {
+		return reader.ListOrdersPage(ctx, filter, limit, offset)
+	}
+	all, err := s.store.ListOrders(ctx)
+	if err != nil {
+		return contract.OrderListPageResult{}, err
+	}
+	wantStatus := strings.TrimSpace(filter.Status)
+	matched := make([]contract.PaymentOrder, 0, len(all))
+	for _, order := range all {
+		if filter.UserID != nil && order.UserID != *filter.UserID {
+			continue
+		}
+		if wantStatus != "" && string(order.Status) != wantStatus {
+			continue
+		}
+		matched = append(matched, order)
+	}
+	for i, j := 0, len(matched)-1; i < j; i, j = i+1, j-1 {
+		matched[i], matched[j] = matched[j], matched[i]
+	}
+	total := len(matched)
+	if offset < 0 {
+		offset = 0
+	}
+	if offset >= total {
+		return contract.OrderListPageResult{Items: []contract.PaymentOrder{}, Total: total}, nil
+	}
+	end := total
+	if limit > 0 && offset+limit < end {
+		end = offset + limit
+	}
+	return contract.OrderListPageResult{Items: matched[offset:end], Total: total}, nil
+}
+
 // AggregatePaymentDashboard computes the totals + payment-method breakdown + top
 // spenders for paid orders inside the last `days` days. days <= 0 falls back to 30,
 // values > 365 clamp to 365.

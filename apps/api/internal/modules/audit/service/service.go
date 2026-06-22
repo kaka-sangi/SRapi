@@ -56,6 +56,60 @@ func (s *Service) List(ctx context.Context) ([]contract.Log, error) {
 	return s.store.List(ctx)
 }
 
+// ListPage delegates to PageReader when supported so admin/audit reads do
+// not materialize the entire table. Falls back to List + in-memory filter for
+// store implementations (mostly test doubles) that omit the capability.
+func (s *Service) ListPage(ctx context.Context, filter contract.ListFilter, limit, offset int) (contract.ListPageResult, error) {
+	if reader, ok := s.store.(contract.PageReader); ok {
+		return reader.ListPage(ctx, filter, limit, offset)
+	}
+	all, err := s.store.List(ctx)
+	if err != nil {
+		return contract.ListPageResult{}, err
+	}
+	matched := make([]contract.Log, 0, len(all))
+	for _, log := range all {
+		if !auditPageMatchesFallback(log, filter) {
+			continue
+		}
+		matched = append(matched, log)
+	}
+	// Newest-first by id.
+	for i, j := 0, len(matched)-1; i < j; i, j = i+1, j-1 {
+		matched[i], matched[j] = matched[j], matched[i]
+	}
+	total := len(matched)
+	if offset < 0 {
+		offset = 0
+	}
+	if offset >= total {
+		return contract.ListPageResult{Items: []contract.Log{}, Total: total}, nil
+	}
+	end := total
+	if limit > 0 && offset+limit < end {
+		end = offset + limit
+	}
+	return contract.ListPageResult{Items: matched[offset:end], Total: total}, nil
+}
+
+func auditPageMatchesFallback(log contract.Log, filter contract.ListFilter) bool {
+	if action := strings.TrimSpace(filter.Action); action != "" && log.Action != action {
+		return false
+	}
+	if resourceType := strings.TrimSpace(filter.ResourceType); resourceType != "" && log.ResourceType != resourceType {
+		return false
+	}
+	if filter.ActorUserID != nil {
+		if log.ActorUserID == nil || *log.ActorUserID != *filter.ActorUserID {
+			return false
+		}
+	}
+	if filter.Since != nil && log.CreatedAt.Before(filter.Since.UTC()) {
+		return false
+	}
+	return true
+}
+
 func cloneMap(value map[string]any) map[string]any {
 	if value == nil {
 		return map[string]any{}

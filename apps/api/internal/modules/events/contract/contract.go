@@ -91,3 +91,21 @@ type Store interface {
 	MarkInboxProcessed(ctx context.Context, id int, processedAt time.Time) (InboxRecord, error)
 	MarkInboxFailed(ctx context.Context, id int, attemptCount int, lastError string) (InboxRecord, error)
 }
+
+// OutboxListFilter narrows a paginated outbox read at the store level.
+type OutboxListFilter struct {
+	Status    OutboxStatus
+	EventType string
+}
+
+// OutboxListPageResult is the typed return of OutboxPageReader.ListOutboxPage.
+type OutboxListPageResult struct {
+	Items []OutboxEvent
+	Total int
+}
+
+// OutboxPageReader is an optional Store capability that pushes filter, order
+// (newest-first by id), and LIMIT/OFFSET pagination down to SQL.
+type OutboxPageReader interface {
+	ListOutboxPage(ctx context.Context, filter OutboxListFilter, limit, offset int) (OutboxListPageResult, error)
+}

@@ -265,6 +265,38 @@ func (s *Store) ListOrders(_ context.Context) ([]contract.PaymentOrder, error) {
 	return out, nil
 }
 
+// ListOrdersPage mirrors the SQL store with newest-first ordering and
+// offset/limit slicing — keeps the memory store and ent store interchangeable
+// for tests against the OrderPageReader capability.
+func (s *Store) ListOrdersPage(_ context.Context, filter contract.OrderListFilter, limit, offset int) (contract.OrderListPageResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	wantStatus := strings.TrimSpace(filter.Status)
+	matched := make([]contract.PaymentOrder, 0)
+	for _, order := range s.orders {
+		if filter.UserID != nil && order.UserID != *filter.UserID {
+			continue
+		}
+		if wantStatus != "" && string(order.Status) != wantStatus {
+			continue
+		}
+		matched = append(matched, cloneOrder(order))
+	}
+	sort.Slice(matched, func(i, j int) bool { return matched[i].ID > matched[j].ID })
+	total := len(matched)
+	if offset < 0 {
+		offset = 0
+	}
+	if offset >= total {
+		return contract.OrderListPageResult{Items: []contract.PaymentOrder{}, Total: total}, nil
+	}
+	end := total
+	if limit > 0 && offset+limit < end {
+		end = offset + limit
+	}
+	return contract.OrderListPageResult{Items: matched[offset:end], Total: total}, nil
+}
+
 func (s *Store) ListPendingOrders(_ context.Context, now time.Time) ([]contract.PaymentOrder, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

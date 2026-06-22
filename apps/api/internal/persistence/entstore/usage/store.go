@@ -109,6 +109,79 @@ func (s *Store) ListWindow(ctx context.Context, filter contract.QueryFilter, lim
 	return out, nil
 }
 
+// ListPage implements contract.PageReader: filter, count, and slice in SQL
+// with ORDER BY id DESC so the newest matching rows come back first. Avoids
+// the prior pattern of loading every usage row before paginating in Go memory,
+// which was the main contributor to slow /usage and /admin/usage page loads
+// on busy gateways. A non-positive limit returns every matching row.
+func (s *Store) ListPage(ctx context.Context, filter contract.ListFilter, limit, offset int) (contract.ListPageResult, error) {
+	predicates := listPagePredicates(filter)
+	base := s.client.UsageLog.Query()
+	if len(predicates) > 0 {
+		base = base.Where(predicates...)
+	}
+	total, err := base.Clone().Count(ctx)
+	if err != nil {
+		return contract.ListPageResult{}, err
+	}
+	query := base.Order(ent.Desc(entusagelog.FieldID))
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	rows, err := query.All(ctx)
+	if err != nil {
+		return contract.ListPageResult{}, err
+	}
+	return contract.ListPageResult{Items: toUsageLogs(rows), Total: total}, nil
+}
+
+func listPagePredicates(filter contract.ListFilter) []predicate.UsageLog {
+	predicates := make([]predicate.UsageLog, 0, 8)
+	if filter.UserID != nil {
+		predicates = append(predicates, entusagelog.UserIDEQ(*filter.UserID))
+	}
+	if filter.APIKeyID != nil {
+		predicates = append(predicates, entusagelog.APIKeyIDEQ(*filter.APIKeyID))
+	}
+	if filter.AccountID != nil {
+		predicates = append(predicates, entusagelog.AccountIDEQ(*filter.AccountID))
+	}
+	if filter.ProviderID != nil {
+		predicates = append(predicates, entusagelog.ProviderIDEQ(*filter.ProviderID))
+	}
+	if model := strings.TrimSpace(filter.Model); model != "" {
+		predicates = append(predicates, entusagelog.ModelContainsFold(model))
+	}
+	if endpoint := strings.TrimSpace(filter.SourceEndpoint); endpoint != "" {
+		predicates = append(predicates, entusagelog.SourceEndpointContainsFold(endpoint))
+	}
+	if mode := strings.TrimSpace(filter.BillingMode); mode != "" {
+		predicates = append(predicates, entusagelog.BillingModeEqualFold(mode))
+	}
+	if class := strings.TrimSpace(filter.ErrorClass); class != "" {
+		predicates = append(predicates, entusagelog.ErrorClassEqualFold(class))
+	}
+	if filter.Success != nil {
+		predicates = append(predicates, entusagelog.SuccessEQ(*filter.Success))
+	}
+	if filter.Start != nil {
+		predicates = append(predicates, entusagelog.CreatedAtGTE(filter.Start.UTC()))
+	}
+	if filter.End != nil {
+		predicates = append(predicates, entusagelog.CreatedAtLT(filter.End.UTC()))
+	}
+	if needle := strings.TrimSpace(filter.Q); needle != "" {
+		// Only request_id is persisted in the ent schema today — upstream and
+		// provider error message live on the Go struct but never reach the DB,
+		// so SQL search is naturally limited to gateway request_id substrings.
+		predicates = append(predicates, entusagelog.RequestIDContainsFold(needle))
+	}
+	return predicates
+}
+
 // ListByRequestID lists all usage attempts for one exact gateway request id.
 // Implements contract.RequestReader for operator drilldowns.
 func (s *Store) ListByRequestID(ctx context.Context, requestID string) ([]contract.UsageLog, error) {

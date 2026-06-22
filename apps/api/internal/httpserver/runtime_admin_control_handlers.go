@@ -12,7 +12,9 @@ import (
 	"strings"
 	"time"
 
+	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
+	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
@@ -104,36 +106,39 @@ var builtInPricingPresets = []pricingPreset{
 	{Family: "grok-latest", Input: "3.00000000", Output: "15.00000000", CacheRead: "0.75000000", CacheWrite: "3.00000000", Source: pricingPresetSourceLiteLLMFallback},
 }
 
+// handleListAdminUsageLogs serves GET /api/v1/admin/usage-logs. Filtering,
+// ordering (newest-first by id), and LIMIT/OFFSET pagination all run in the
+// database via usage.ListPage — the prior path loaded every usage row before
+// filtering and paginating in Go memory, which dominated wall-clock once the
+// table grew past a few thousand rows.
 func (s *Server) handleListAdminUsageLogs(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireAdminSession(r); err != nil {
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
 		return
 	}
-	items, err := s.runtime.usage.List(r.Context())
+	filter, ok := usageListFilterFromRequest(r)
+	if !ok {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid usage log filter", requestID)
+		return
+	}
+	opts := listOptionsFromRequest(r)
+	offset := (opts.Page - 1) * opts.PageSize
+	if offset < 0 {
+		offset = 0
+	}
+	page, err := s.runtime.usage.ListPage(r.Context(), filter, opts.PageSize, offset)
 	if err != nil {
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list usage logs", requestID)
 		return
 	}
-	items = filterUsageLogs(items, r)
-	total := len(items)
-	opts := listOptionsFromRequest(r)
-	start := (opts.Page - 1) * opts.PageSize
-	if start > total {
-		start = total
-	}
-	end := start + opts.PageSize
-	if end > total {
-		end = total
-	}
-	paged := items[start:end]
-	data := make([]apiopenapi.UsageLog, 0, len(paged))
-	for _, item := range paged {
+	data := make([]apiopenapi.UsageLog, 0, len(page.Items))
+	for _, item := range page.Items {
 		data = append(data, toAPIUsageLog(item))
 	}
 	writeJSONAny(w, http.StatusOK, apiopenapi.UsageLogListResponse{
 		Data:       data,
-		Pagination: paginationWithRequest(r, total),
+		Pagination: paginationFromTotal(page.Total, opts.Page, opts.PageSize),
 		RequestId:  requestID,
 	})
 }
@@ -144,27 +149,39 @@ func (s *Server) handleListAdminAuditLogs(w http.ResponseWriter, r *http.Request
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
 		return
 	}
-	items, err := s.runtime.audit.List(r.Context())
-	if err != nil {
-		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list audit logs", requestID)
-		return
+	q := r.URL.Query()
+	filter := auditcontract.ListFilter{
+		Action:       strings.TrimSpace(q.Get("action")),
+		ResourceType: strings.TrimSpace(q.Get("resource_type")),
 	}
-	var actorUserIDPtr *int
-	if raw := strings.TrimSpace(r.URL.Query().Get("actor_user_id")); raw != "" {
+	if raw := strings.TrimSpace(q.Get("actor_user_id")); raw != "" {
 		uid, err := strconv.Atoi(raw)
 		if err != nil || uid <= 0 {
 			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid actor user id", requestID)
 			return
 		}
-		actorUserIDPtr = &uid
+		filter.ActorUserID = &uid
 	}
-	since := parseUsageFilterTime(r.URL.Query().Get("since"))
-	items = filterAuditLogs(items, r.URL.Query().Get("action"), r.URL.Query().Get("resource_type"), actorUserIDPtr, since)
-	data := make([]apiopenapi.AuditLog, 0, len(items))
-	for _, item := range items {
+	if since := parseUsageFilterTime(q.Get("since")); !since.IsZero() {
+		t := since
+		filter.Since = &t
+	}
+	limit, offset, page, pageSize := paginationParams(r)
+	result, err := s.runtime.audit.ListPage(r.Context(), filter, limit, offset)
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list audit logs", requestID)
+		return
+	}
+	data := make([]apiopenapi.AuditLog, 0, len(result.Items))
+	for _, item := range result.Items {
 		data = append(data, toAPIAuditLog(item))
 	}
-	data, pg := paginate(r, data)
+	var pg apiopenapi.Pagination
+	if pageSize == 0 {
+		pg = apiopenapi.Pagination{Page: 1, PageSize: len(data), Total: result.Total, HasNext: false}
+	} else {
+		pg = paginationFromTotal(result.Total, page, pageSize)
+	}
 	writeJSONAny(w, http.StatusOK, apiopenapi.AuditLogListResponse{
 		Data:       data,
 		Pagination: pg,
@@ -453,30 +470,33 @@ func (s *Server) handleListAdminPaymentOrders(w http.ResponseWriter, r *http.Req
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "permission required", requestID)
 		return
 	}
-	var (
-		items []paymentcontract.PaymentOrder
-		err   error
-	)
+	filter := paymentcontract.OrderListFilter{
+		Status: strings.TrimSpace(r.URL.Query().Get("status")),
+	}
 	if userIDRaw := strings.TrimSpace(r.URL.Query().Get("user_id")); userIDRaw != "" {
 		userID, parseErr := strconv.Atoi(userIDRaw)
 		if parseErr != nil || userID <= 0 {
 			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid user id", requestID)
 			return
 		}
-		items, err = s.runtime.payments.ListOrdersByUser(r.Context(), userID)
-	} else {
-		items, err = s.runtime.payments.ListOrders(r.Context())
+		filter.UserID = &userID
 	}
+	limit, offset, page, pageSize := paginationParams(r)
+	result, err := s.runtime.payments.ListOrdersPage(r.Context(), filter, limit, offset)
 	if err != nil {
 		writePaymentServiceError(w, err, requestID)
 		return
 	}
-	items = filterPaymentOrders(items, r.URL.Query().Get("status"))
-	data := make([]apiopenapi.PaymentOrder, 0, len(items))
-	for _, item := range items {
+	data := make([]apiopenapi.PaymentOrder, 0, len(result.Items))
+	for _, item := range result.Items {
 		data = append(data, toAPIPaymentOrder(item))
 	}
-	data, pg := paginate(r, data)
+	var pg apiopenapi.Pagination
+	if pageSize == 0 {
+		pg = apiopenapi.Pagination{Page: 1, PageSize: len(data), Total: result.Total, HasNext: false}
+	} else {
+		pg = paginationFromTotal(result.Total, page, pageSize)
+	}
 	writeJSONAny(w, http.StatusOK, apiopenapi.PaymentOrderListResponse{
 		Data:       data,
 		Pagination: pg,
@@ -1486,17 +1506,27 @@ func (s *Server) handleListAdminOutboxEvents(w http.ResponseWriter, r *http.Requ
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
 		return
 	}
-	items, err := s.runtime.events.ListOutbox(r.Context())
+	q := r.URL.Query()
+	filter := eventscontract.OutboxListFilter{
+		Status:    eventscontract.OutboxStatus(strings.TrimSpace(q.Get("status"))),
+		EventType: strings.TrimSpace(q.Get("event_type")),
+	}
+	limit, offset, page, pageSize := paginationParams(r)
+	result, err := s.runtime.events.ListOutboxPage(r.Context(), filter, limit, offset)
 	if err != nil {
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list outbox events", requestID)
 		return
 	}
-	items = filterOutboxEvents(items, r.URL.Query().Get("status"), r.URL.Query().Get("event_type"))
-	data := make([]apiopenapi.DomainEventOutbox, 0, len(items))
-	for _, item := range items {
+	data := make([]apiopenapi.DomainEventOutbox, 0, len(result.Items))
+	for _, item := range result.Items {
 		data = append(data, toAPIDomainEventOutbox(item))
 	}
-	data, pg := paginate(r, data)
+	var pg apiopenapi.Pagination
+	if pageSize == 0 {
+		pg = apiopenapi.Pagination{Page: 1, PageSize: len(data), Total: result.Total, HasNext: false}
+	} else {
+		pg = paginationFromTotal(result.Total, page, pageSize)
+	}
 	writeJSONAny(w, http.StatusOK, apiopenapi.DomainEventOutboxListResponse{
 		Data:       data,
 		Pagination: pg,
@@ -1760,31 +1790,92 @@ func (s *Server) handleListAdminSchedulerDecisions(w http.ResponseWriter, r *htt
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
 		return
 	}
-	items, err := s.runtime.scheduler.ListDecisions(r.Context())
-	if err != nil {
-		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list scheduler decisions", requestID)
-		return
-	}
 	start, end, err := schedulerDecisionWindowFromRequest(r)
 	if err != nil {
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, err.Error(), requestID)
 		return
 	}
-	items = filterSchedulerDecisions(
-		items,
-		r.URL.Query().Get("request_id"),
-		r.URL.Query().Get("model"),
-		r.URL.Query().Get("source_endpoint"),
-		r.URL.Query().Get("account_id"),
-		r.URL.Query().Get("provider_id"),
-		start,
-		end,
-	)
-	data := make([]apiopenapi.SchedulerDecision, 0, len(items))
-	for _, item := range items {
+	q := r.URL.Query()
+	accountIDRaw := strings.TrimSpace(q.Get("account_id"))
+	providerIDValue, hasProviderID, validProviderID := positiveIDFilter(q.Get("provider_id"))
+	accountIDValue, hasAccountID, validAccountID := positiveIDFilter(accountIDRaw)
+	if !validAccountID || !validProviderID {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid id filter", requestID)
+		return
+	}
+	limit, offset, page, pageSize := paginationParams(r)
+	// AccountID matches not just SelectedAccountID but any account_<id> key
+	// inside the Scores / RejectReasons JSON evidence maps, which the SQL
+	// store cannot express today. Fall back to the legacy whole-table path
+	// when AccountID is set so semantics stay identical.
+	if hasAccountID {
+		items, err := s.runtime.scheduler.ListDecisions(r.Context())
+		if err != nil {
+			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list scheduler decisions", requestID)
+			return
+		}
+		items = filterSchedulerDecisions(items, q.Get("request_id"), q.Get("model"), q.Get("source_endpoint"), accountIDRaw, q.Get("provider_id"), start, end)
+		data := make([]apiopenapi.SchedulerDecision, 0, len(items))
+		for _, item := range items {
+			data = append(data, toAPISchedulerDecision(item))
+		}
+		data, pg := paginate(r, data)
+		writeJSONAny(w, http.StatusOK, apiopenapi.SchedulerDecisionListResponse{
+			Data:       data,
+			Pagination: pg,
+			RequestId:  requestID,
+		})
+		return
+	}
+	_ = accountIDValue
+	filter := schedulercontract.DecisionListFilter{
+		RequestID:      strings.TrimSpace(q.Get("request_id")),
+		Model:          strings.TrimSpace(q.Get("model")),
+		SourceEndpoint: strings.TrimSpace(q.Get("source_endpoint")),
+		Start:          start,
+		End:            end,
+	}
+	if hasProviderID {
+		v := providerIDValue
+		filter.ProviderID = &v
+	}
+	result, supported, err := s.runtime.scheduler.ListDecisionsPage(r.Context(), filter, limit, offset)
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list scheduler decisions", requestID)
+		return
+	}
+	if !supported {
+		// Store doesn't implement the page reader (e.g. memory store used in
+		// tests). Fall back to the legacy whole-table path so behavior stays
+		// consistent across store implementations.
+		items, listErr := s.runtime.scheduler.ListDecisions(r.Context())
+		if listErr != nil {
+			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list scheduler decisions", requestID)
+			return
+		}
+		items = filterSchedulerDecisions(items, q.Get("request_id"), q.Get("model"), q.Get("source_endpoint"), "", q.Get("provider_id"), start, end)
+		data := make([]apiopenapi.SchedulerDecision, 0, len(items))
+		for _, item := range items {
+			data = append(data, toAPISchedulerDecision(item))
+		}
+		data, pg := paginate(r, data)
+		writeJSONAny(w, http.StatusOK, apiopenapi.SchedulerDecisionListResponse{
+			Data:       data,
+			Pagination: pg,
+			RequestId:  requestID,
+		})
+		return
+	}
+	data := make([]apiopenapi.SchedulerDecision, 0, len(result.Items))
+	for _, item := range result.Items {
 		data = append(data, toAPISchedulerDecision(item))
 	}
-	data, pg := paginate(r, data)
+	var pg apiopenapi.Pagination
+	if pageSize == 0 {
+		pg = apiopenapi.Pagination{Page: 1, PageSize: len(data), Total: result.Total, HasNext: false}
+	} else {
+		pg = paginationFromTotal(result.Total, page, pageSize)
+	}
 	writeJSONAny(w, http.StatusOK, apiopenapi.SchedulerDecisionListResponse{
 		Data:       data,
 		Pagination: pg,

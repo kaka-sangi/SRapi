@@ -101,6 +101,84 @@ func (s *Store) ListWindow(_ context.Context, filter contract.QueryFilter, limit
 	return out, nil
 }
 
+// ListPage implements contract.PageReader: filter, count, sort newest-first
+// (id descending), then slice — all in-process, but mirrors the SQL store
+// semantics so tests against the memory store exercise the same shape.
+func (s *Store) ListPage(_ context.Context, filter contract.ListFilter, limit, offset int) (contract.ListPageResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	matched := make([]contract.UsageLog, 0)
+	for _, log := range s.byID {
+		if !listPageMatches(log, filter) {
+			continue
+		}
+		matched = append(matched, cloneLog(log))
+	}
+	sort.Slice(matched, func(i, j int) bool { return matched[i].ID > matched[j].ID })
+	total := len(matched)
+	if offset < 0 {
+		offset = 0
+	}
+	if offset >= total {
+		return contract.ListPageResult{Items: []contract.UsageLog{}, Total: total}, nil
+	}
+	end := total
+	if limit > 0 && offset+limit < end {
+		end = offset + limit
+	}
+	return contract.ListPageResult{Items: matched[offset:end], Total: total}, nil
+}
+
+func listPageMatches(log contract.UsageLog, filter contract.ListFilter) bool {
+	if filter.UserID != nil && log.UserID != *filter.UserID {
+		return false
+	}
+	if filter.APIKeyID != nil && log.APIKeyID != *filter.APIKeyID {
+		return false
+	}
+	if filter.AccountID != nil && (log.AccountID == nil || *log.AccountID != *filter.AccountID) {
+		return false
+	}
+	if filter.ProviderID != nil && (log.ProviderID == nil || *log.ProviderID != *filter.ProviderID) {
+		return false
+	}
+	if model := strings.TrimSpace(filter.Model); model != "" {
+		if !strings.Contains(strings.ToLower(log.Model), strings.ToLower(model)) {
+			return false
+		}
+	}
+	if endpoint := strings.TrimSpace(filter.SourceEndpoint); endpoint != "" {
+		if !strings.Contains(strings.ToLower(log.SourceEndpoint), strings.ToLower(endpoint)) {
+			return false
+		}
+	}
+	if mode := strings.TrimSpace(filter.BillingMode); mode != "" && !strings.EqualFold(log.BillingMode, mode) {
+		return false
+	}
+	if class := strings.TrimSpace(filter.ErrorClass); class != "" {
+		if log.ErrorClass == nil || !strings.EqualFold(*log.ErrorClass, class) {
+			return false
+		}
+	}
+	if filter.Success != nil && log.Success != *filter.Success {
+		return false
+	}
+	if filter.Start != nil && log.CreatedAt.Before(filter.Start.UTC()) {
+		return false
+	}
+	if filter.End != nil && !log.CreatedAt.Before(filter.End.UTC()) {
+		return false
+	}
+	if needle := strings.ToLower(strings.TrimSpace(filter.Q)); needle != "" {
+		if !strings.Contains(strings.ToLower(log.RequestID), needle) &&
+			!strings.Contains(strings.ToLower(log.UpstreamRequestID), needle) &&
+			!strings.Contains(strings.ToLower(log.ProviderErrorMessage), needle) {
+			return false
+		}
+	}
+	return true
+}
+
 // ListByRequestID implements contract.RequestReader.
 func (s *Store) ListByRequestID(_ context.Context, requestID string) ([]contract.UsageLog, error) {
 	s.mu.Lock()

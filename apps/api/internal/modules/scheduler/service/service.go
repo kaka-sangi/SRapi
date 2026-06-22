@@ -272,6 +272,24 @@ func (s *Service) ListDecisions(ctx context.Context) ([]contract.Decision, error
 	return s.store.ListDecisions(ctx)
 }
 
+// ListDecisionsPage uses the store's DecisionPageReader when available so admin
+// reads avoid the legacy whole-table load. The second return reports whether
+// the store actually supports the capability — callers fall back to the
+// in-memory filter+paginate path when it's false (for example, the memory
+// store used in tests, or when AccountID filtering needs JSON evidence map
+// scanning the store cannot express in SQL).
+func (s *Service) ListDecisionsPage(ctx context.Context, filter contract.DecisionListFilter, limit, offset int) (contract.DecisionListPageResult, bool, error) {
+	reader, ok := s.store.(contract.DecisionPageReader)
+	if !ok {
+		return contract.DecisionListPageResult{}, false, nil
+	}
+	result, err := reader.ListDecisionsPage(ctx, filter, limit, offset)
+	if err != nil {
+		return contract.DecisionListPageResult{}, true, err
+	}
+	return result, true, nil
+}
+
 func (s *Service) createDecisionWithSnapshot(ctx context.Context, req contract.ScheduleRequest, strategy contract.StrategyDescriptor, decision contract.Decision, ranked []contract.Candidate) (contract.Decision, contract.RequestSnapshot, error) {
 	snapshot := s.buildRequestSnapshot(req, strategy, decision, ranked)
 	return s.store.CreateDecisionWithSnapshot(ctx, decision, snapshot)

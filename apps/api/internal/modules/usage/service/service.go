@@ -168,6 +168,90 @@ func (s *Service) ListByUser(ctx context.Context, userID int) ([]contract.UsageL
 	return s.store.ListByUser(ctx, userID)
 }
 
+// ListPage delegates to the store's PageReader when available so the slice and
+// total come back already filtered, ordered newest-first, and bounded by
+// limit/offset at the database. Falls back to List + in-memory filter+slice
+// for stores (notably ones used by ad-hoc tests) that do not implement the
+// capability — preserves the legacy code path without leaking it to callers.
+func (s *Service) ListPage(ctx context.Context, filter contract.ListFilter, limit, offset int) (contract.ListPageResult, error) {
+	if reader, ok := s.store.(contract.PageReader); ok {
+		return reader.ListPage(ctx, filter, limit, offset)
+	}
+	all, err := s.store.List(ctx)
+	if err != nil {
+		return contract.ListPageResult{}, err
+	}
+	matched := make([]contract.UsageLog, 0, len(all))
+	for _, log := range all {
+		if listPageMatchesFallback(log, filter) {
+			matched = append(matched, log)
+		}
+	}
+	sort.Slice(matched, func(i, j int) bool { return matched[i].ID > matched[j].ID })
+	total := len(matched)
+	if offset < 0 {
+		offset = 0
+	}
+	if offset >= total {
+		return contract.ListPageResult{Items: []contract.UsageLog{}, Total: total}, nil
+	}
+	end := total
+	if limit > 0 && offset+limit < end {
+		end = offset + limit
+	}
+	return contract.ListPageResult{Items: matched[offset:end], Total: total}, nil
+}
+
+func listPageMatchesFallback(log contract.UsageLog, filter contract.ListFilter) bool {
+	if filter.UserID != nil && log.UserID != *filter.UserID {
+		return false
+	}
+	if filter.APIKeyID != nil && log.APIKeyID != *filter.APIKeyID {
+		return false
+	}
+	if filter.AccountID != nil && (log.AccountID == nil || *log.AccountID != *filter.AccountID) {
+		return false
+	}
+	if filter.ProviderID != nil && (log.ProviderID == nil || *log.ProviderID != *filter.ProviderID) {
+		return false
+	}
+	if model := strings.TrimSpace(filter.Model); model != "" {
+		if !strings.Contains(strings.ToLower(log.Model), strings.ToLower(model)) {
+			return false
+		}
+	}
+	if endpoint := strings.TrimSpace(filter.SourceEndpoint); endpoint != "" {
+		if !strings.Contains(strings.ToLower(log.SourceEndpoint), strings.ToLower(endpoint)) {
+			return false
+		}
+	}
+	if mode := strings.TrimSpace(filter.BillingMode); mode != "" && !strings.EqualFold(log.BillingMode, mode) {
+		return false
+	}
+	if class := strings.TrimSpace(filter.ErrorClass); class != "" {
+		if log.ErrorClass == nil || !strings.EqualFold(*log.ErrorClass, class) {
+			return false
+		}
+	}
+	if filter.Success != nil && log.Success != *filter.Success {
+		return false
+	}
+	if filter.Start != nil && log.CreatedAt.Before(filter.Start.UTC()) {
+		return false
+	}
+	if filter.End != nil && !log.CreatedAt.Before(filter.End.UTC()) {
+		return false
+	}
+	if needle := strings.ToLower(strings.TrimSpace(filter.Q)); needle != "" {
+		if !strings.Contains(strings.ToLower(log.RequestID), needle) &&
+			!strings.Contains(strings.ToLower(log.UpstreamRequestID), needle) &&
+			!strings.Contains(strings.ToLower(log.ProviderErrorMessage), needle) {
+			return false
+		}
+	}
+	return true
+}
+
 func (s *Service) ListByAccountWindow(ctx context.Context, filter contract.AccountWindowFilter) ([]contract.UsageLog, error) {
 	if filter.AccountID <= 0 || filter.Start.IsZero() || filter.End.IsZero() || !filter.End.After(filter.Start) {
 		return nil, ErrInvalidInput

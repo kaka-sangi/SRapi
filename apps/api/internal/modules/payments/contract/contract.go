@@ -300,3 +300,21 @@ type Store interface {
 	CreateAuditLog(ctx context.Context, input PaymentAuditLog) (PaymentAuditLog, bool, error)
 	ListAuditLogsByOrder(ctx context.Context, orderID int) ([]PaymentAuditLog, error)
 }
+
+// OrderListFilter narrows a paginated payment-order read at the store level.
+type OrderListFilter struct {
+	UserID *int
+	Status string
+}
+
+// OrderListPageResult is the typed return of OrderPageReader.ListOrdersPage.
+type OrderListPageResult struct {
+	Items []PaymentOrder
+	Total int
+}
+
+// OrderPageReader is an optional Store capability that pushes filter, order
+// (newest-first by id), and LIMIT/OFFSET pagination down to SQL.
+type OrderPageReader interface {
+	ListOrdersPage(ctx context.Context, filter OrderListFilter, limit, offset int) (OrderListPageResult, error)
+}

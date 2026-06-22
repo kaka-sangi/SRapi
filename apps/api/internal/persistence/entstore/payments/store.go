@@ -12,6 +12,7 @@ import (
 	entpaymentauditlog "github.com/srapi/srapi/apps/api/ent/paymentauditlog"
 	entpaymentorder "github.com/srapi/srapi/apps/api/ent/paymentorder"
 	entpaymentproviderinstance "github.com/srapi/srapi/apps/api/ent/paymentproviderinstance"
+	"github.com/srapi/srapi/apps/api/ent/predicate"
 	admincontrolcontract "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
 	admincontrolstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/admincontrol"
@@ -284,6 +285,42 @@ func (s *Store) ListOrders(ctx context.Context) ([]contract.PaymentOrder, error)
 		out = append(out, toOrder(row))
 	}
 	return out, nil
+}
+
+// ListOrdersPage implements contract.OrderPageReader: filter, count, slice in
+// SQL with ORDER BY id DESC.
+func (s *Store) ListOrdersPage(ctx context.Context, filter contract.OrderListFilter, limit, offset int) (contract.OrderListPageResult, error) {
+	predicates := make([]predicate.PaymentOrder, 0, 2)
+	if filter.UserID != nil {
+		predicates = append(predicates, entpaymentorder.UserIDEQ(*filter.UserID))
+	}
+	if status := strings.TrimSpace(filter.Status); status != "" {
+		predicates = append(predicates, entpaymentorder.StatusEQ(status))
+	}
+	base := s.client.PaymentOrder.Query()
+	if len(predicates) > 0 {
+		base = base.Where(predicates...)
+	}
+	total, err := base.Clone().Count(ctx)
+	if err != nil {
+		return contract.OrderListPageResult{}, err
+	}
+	query := base.Order(ent.Desc(entpaymentorder.FieldID))
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	rows, err := query.All(ctx)
+	if err != nil {
+		return contract.OrderListPageResult{}, err
+	}
+	out := make([]contract.PaymentOrder, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toOrder(row))
+	}
+	return contract.OrderListPageResult{Items: out, Total: total}, nil
 }
 
 func (s *Store) ListPendingOrders(ctx context.Context, now time.Time) ([]contract.PaymentOrder, error) {

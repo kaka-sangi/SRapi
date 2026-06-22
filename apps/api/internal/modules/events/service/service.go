@@ -89,6 +89,46 @@ func (s *Service) ListOutbox(ctx context.Context) ([]contract.OutboxEvent, error
 	return s.store.ListOutbox(ctx)
 }
 
+// ListOutboxPage delegates to OutboxPageReader when supported so admin/outbox
+// reads do not load the entire table. Falls back to ListOutbox + in-memory
+// filter+slice when the store omits the capability.
+func (s *Service) ListOutboxPage(ctx context.Context, filter contract.OutboxListFilter, limit, offset int) (contract.OutboxListPageResult, error) {
+	if reader, ok := s.store.(contract.OutboxPageReader); ok {
+		return reader.ListOutboxPage(ctx, filter, limit, offset)
+	}
+	all, err := s.store.ListOutbox(ctx)
+	if err != nil {
+		return contract.OutboxListPageResult{}, err
+	}
+	wantStatus := strings.TrimSpace(string(filter.Status))
+	wantType := strings.TrimSpace(filter.EventType)
+	matched := make([]contract.OutboxEvent, 0, len(all))
+	for _, event := range all {
+		if wantStatus != "" && string(event.Status) != wantStatus {
+			continue
+		}
+		if wantType != "" && event.EventType != wantType {
+			continue
+		}
+		matched = append(matched, event)
+	}
+	for i, j := 0, len(matched)-1; i < j; i, j = i+1, j-1 {
+		matched[i], matched[j] = matched[j], matched[i]
+	}
+	total := len(matched)
+	if offset < 0 {
+		offset = 0
+	}
+	if offset >= total {
+		return contract.OutboxListPageResult{Items: []contract.OutboxEvent{}, Total: total}, nil
+	}
+	end := total
+	if limit > 0 && offset+limit < end {
+		end = offset + limit
+	}
+	return contract.OutboxListPageResult{Items: matched[offset:end], Total: total}, nil
+}
+
 func (s *Service) DispatchPending(ctx context.Context, handler OutboxHandler, options DispatchOptions) (DispatchResult, error) {
 	if handler == nil {
 		return DispatchResult{}, ErrInvalidInput

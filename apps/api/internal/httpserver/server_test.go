@@ -6056,8 +6056,16 @@ func TestGatewayResponsesInputItemsAliasReplaysRawUpstreamJSON(t *testing.T) {
 	if len(usageResp.Data) != 2 {
 		t.Fatalf("expected zero-usage input_items evidence, got %+v", usageResp.Data)
 	}
-	firstUsage := usageResp.Data[0]
-	secondUsage := usageResp.Data[1]
+	// Admin usage logs come back newest-first; pick by AttemptNo.
+	var firstUsage, secondUsage apiopenapi.UsageLog
+	for _, item := range usageResp.Data {
+		switch item.AttemptNo {
+		case 1:
+			firstUsage = item
+		case 2:
+			secondUsage = item
+		}
+	}
 	if firstUsage.AttemptNo != 1 ||
 		firstUsage.Success ||
 		firstUsage.ErrorClass == nil ||
@@ -6226,8 +6234,17 @@ func TestGatewayChatCompletionFailoverRecordsAttemptEvidence(t *testing.T) {
 	if len(usageResp.Data) != 2 {
 		t.Fatalf("expected failed and successful usage attempts, got %+v", usageResp.Data)
 	}
-	firstUsage := usageResp.Data[0]
-	secondUsage := usageResp.Data[1]
+	// Admin usage logs come back newest-first by id, so pick attempts by their
+	// AttemptNo rather than relying on slice position.
+	var firstUsage, secondUsage apiopenapi.UsageLog
+	for _, item := range usageResp.Data {
+		switch item.AttemptNo {
+		case 1:
+			firstUsage = item
+		case 2:
+			secondUsage = item
+		}
+	}
 	if firstUsage.AttemptNo != 1 || firstUsage.Success || firstUsage.ProviderId == nil || *firstUsage.ProviderId != string(primaryProvider.Data.Id) || firstUsage.AccountId == nil || *firstUsage.AccountId != string(primaryAccount.Data.Id) || firstUsage.ErrorClass == nil {
 		t.Fatalf("unexpected first usage attempt: %+v", firstUsage)
 	}
@@ -6728,8 +6745,15 @@ func TestGatewayChatCompletionStreamFailoverBeforeDownstreamWrite(t *testing.T) 
 	if len(usageResp.Data) != 2 {
 		t.Fatalf("expected failed and successful stream usage attempts, got %+v", usageResp.Data)
 	}
-	firstUsage := usageResp.Data[0]
-	secondUsage := usageResp.Data[1]
+	var firstUsage, secondUsage apiopenapi.UsageLog
+	for _, item := range usageResp.Data {
+		switch item.AttemptNo {
+		case 1:
+			firstUsage = item
+		case 2:
+			secondUsage = item
+		}
+	}
 	if firstUsage.AttemptNo != 1 || firstUsage.Success || firstUsage.ProviderId == nil || *firstUsage.ProviderId != string(primaryProvider.Data.Id) || firstUsage.AccountId == nil || *firstUsage.AccountId != string(primaryAccount.Data.Id) {
 		t.Fatalf("unexpected first stream usage attempt: %+v", firstUsage)
 	}
@@ -7929,8 +7953,15 @@ func TestGatewayImageGenerationPoolModeRetriesThenFailsOver(t *testing.T) {
 	if len(usageResp.Data) != 2 {
 		t.Fatalf("expected failed and successful image usage attempts, got %+v", usageResp.Data)
 	}
-	firstUsage := usageResp.Data[0]
-	secondUsage := usageResp.Data[1]
+	var firstUsage, secondUsage apiopenapi.UsageLog
+	for _, item := range usageResp.Data {
+		switch item.AttemptNo {
+		case 1:
+			firstUsage = item
+		case 2:
+			secondUsage = item
+		}
+	}
 	if firstUsage.AttemptNo != 1 || firstUsage.Success || firstUsage.AccountId == nil || *firstUsage.AccountId != string(primaryAccount.Data.Id) || firstUsage.ErrorClass == nil || *firstUsage.ErrorClass != "provider_5xx" {
 		t.Fatalf("unexpected first image usage attempt: %+v", firstUsage)
 	}
@@ -9705,8 +9736,20 @@ func TestGatewayRateLimitFeedbackAppliesAccountCooldown(t *testing.T) {
 	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
 		t.Fatalf("decode usage logs: %v", err)
 	}
-	if len(usageResp.Data) != 2 || usageResp.Data[0].ErrorClass == nil || *usageResp.Data[0].ErrorClass != "rate_limit" {
+	if len(usageResp.Data) != 2 {
 		t.Fatalf("expected rate_limit usage followed by cooldown failure, got %+v", usageResp.Data)
+	}
+	// Admin usage logs come back newest-first; locate the rate_limit attempt
+	// by ErrorClass rather than slice position.
+	var rateLimitSeen bool
+	for _, item := range usageResp.Data {
+		if item.ErrorClass != nil && *item.ErrorClass == "rate_limit" {
+			rateLimitSeen = true
+			break
+		}
+	}
+	if !rateLimitSeen {
+		t.Fatalf("expected one usage log with rate_limit error class, got %+v", usageResp.Data)
 	}
 }
 
@@ -11997,9 +12040,12 @@ func auditContractLogHasAction(items []auditcontract.Log, action string) bool {
 
 func mustFindAuditLog(t *testing.T, items []apiopenapi.AuditLog, action string) apiopenapi.AuditLog {
 	t.Helper()
-	for _, item := range items {
-		if item.Action == action {
-			return item
+	// Admin audit logs come back newest-first. Tests that look up a named
+	// action typically want the EARLIEST occurrence (e.g. the original create
+	// or the first update under that name), so scan from the tail.
+	for i := len(items) - 1; i >= 0; i-- {
+		if items[i].Action == action {
+			return items[i]
 		}
 	}
 	t.Fatalf("audit action %s not found in %+v", action, items)

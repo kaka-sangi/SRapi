@@ -13,45 +13,43 @@ import (
 
 // handleListAdminErrorLogs serves GET /api/v1/admin/error-logs.
 //
-// Error logs are derived from the failed usage logs that carry gateway error
-// classification and bounded upstream error context. The usual admin usage-log
-// filters (user_id/api_key_id/account_id/model/error_class/source_endpoint/
-// start/end) are reused via filterUsageLogs, then we keep only the failed rows,
-// paginate server-side, and map each survivor to the generated ErrorLog DTO.
+// Error logs are the failed slice of usage logs (success=false). Filters
+// (user_id/api_key_id/account_id/model/error_class/source_endpoint/start/end +
+// free-text q on request_id), ordering newest-first by id, and LIMIT/OFFSET
+// pagination all run in SQL via usage.ListPage — the prior path loaded every
+// usage row then filtered, sliced, and reduced to errors in Go memory, which
+// dominated wall-clock once the table grew.
 func (s *Server) handleListAdminErrorLogs(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireAdminSession(r); err != nil {
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
 		return
 	}
-	items, err := s.runtime.usage.List(r.Context())
+	filter, ok := usageListFilterFromRequest(r)
+	if !ok {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid error log filter", requestID)
+		return
+	}
+	failed := false
+	filter.Success = &failed
+	filter.Q = strings.TrimSpace(r.URL.Query().Get("q"))
+	opts := listOptionsFromRequest(r)
+	offset := (opts.Page - 1) * opts.PageSize
+	if offset < 0 {
+		offset = 0
+	}
+	page, err := s.runtime.usage.ListPage(r.Context(), filter, opts.PageSize, offset)
 	if err != nil {
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list error logs", requestID)
 		return
 	}
-	items = filterUsageLogs(items, r)
-	items = errorLogsFromUsageLogs(items)
-	if q := strings.TrimSpace(r.URL.Query().Get("q")); q != "" {
-		items = filterErrorLogsByQuery(items, q)
-	}
-	total := len(items)
-	opts := listOptionsFromRequest(r)
-	start := (opts.Page - 1) * opts.PageSize
-	if start > total {
-		start = total
-	}
-	end := start + opts.PageSize
-	if end > total {
-		end = total
-	}
-	paged := items[start:end]
-	data := make([]apiopenapi.ErrorLog, 0, len(paged))
-	for _, item := range paged {
+	data := make([]apiopenapi.ErrorLog, 0, len(page.Items))
+	for _, item := range page.Items {
 		data = append(data, toAPIErrorLog(item))
 	}
 	writeJSONAny(w, http.StatusOK, apiopenapi.ErrorLogListResponse{
 		Data:       data,
-		Pagination: paginationWithRequest(r, total),
+		Pagination: paginationFromTotal(page.Total, opts.Page, opts.PageSize),
 		RequestId:  requestID,
 	})
 }
@@ -84,18 +82,6 @@ func (s *Server) handleGetAdminErrorLog(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 	writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "error log not found", requestID)
-}
-
-// errorLogsFromUsageLogs keeps only the failed usage logs (Success == false),
-// which is the degraded-mode definition of an error log in this codebase.
-func errorLogsFromUsageLogs(items []usagecontract.UsageLog) []usagecontract.UsageLog {
-	out := make([]usagecontract.UsageLog, 0, len(items))
-	for _, item := range items {
-		if !item.Success {
-			out = append(out, item)
-		}
-	}
-	return out
 }
 
 // toAPIErrorLog maps a (failed) usage log onto the generated ErrorLog DTO. It is
@@ -156,25 +142,6 @@ func toAPIErrorLog(log usagecontract.UsageLog) apiopenapi.ErrorLog {
 			events = append(events, ev)
 		}
 		out.UpstreamErrors = &events
-	}
-	return out
-}
-
-// filterErrorLogsByQuery applies the free-text q filter against
-// error_message + request_id (case-insensitive substring match), mirroring
-// sub2api's ops_error_logs search box. Falls through unchanged when q is empty.
-func filterErrorLogsByQuery(items []usagecontract.UsageLog, q string) []usagecontract.UsageLog {
-	needle := strings.ToLower(strings.TrimSpace(q))
-	if needle == "" {
-		return items
-	}
-	out := make([]usagecontract.UsageLog, 0, len(items))
-	for _, item := range items {
-		if strings.Contains(strings.ToLower(item.ProviderErrorMessage), needle) ||
-			strings.Contains(strings.ToLower(item.RequestID), needle) ||
-			strings.Contains(strings.ToLower(item.UpstreamRequestID), needle) {
-			out = append(out, item)
-		}
 	}
 	return out
 }

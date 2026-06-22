@@ -12,13 +12,10 @@ import (
 	"time"
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
-	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
-	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	gatewayservice "github.com/srapi/srapi/apps/api/internal/modules/gateway/service"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
-	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
@@ -196,6 +193,79 @@ func filterAccounts(accounts []accountcontract.ProviderAccount, status, provider
 	return out
 }
 
+// usageListFilterFromRequest parses the admin/console usage-log query string
+// into the store-level ListFilter. Same keys as the legacy in-memory filter
+// (user_id/api_key_id/account_id/provider_id/model/source_endpoint/billing_mode/
+// error_class/success/start/end), so the wire contract is unchanged — only the
+// execution moves from "load everything, filter in Go" down to "filter in SQL".
+// Returns ok=false when any numeric or boolean field is malformed so the caller
+// can short-circuit with a 400.
+func usageListFilterFromRequest(r *http.Request) (usagecontract.ListFilter, bool) {
+	q := r.URL.Query()
+	filter := usagecontract.ListFilter{
+		Model:          strings.TrimSpace(q.Get("model")),
+		SourceEndpoint: strings.TrimSpace(q.Get("source_endpoint")),
+		BillingMode:    strings.TrimSpace(q.Get("billing_mode")),
+		ErrorClass:     strings.TrimSpace(q.Get("error_class")),
+	}
+	if start := parseUsageFilterTime(q.Get("start")); !start.IsZero() {
+		t := start
+		filter.Start = &t
+	}
+	if end := parseUsageFilterTime(q.Get("end")); !end.IsZero() {
+		t := end
+		filter.End = &t
+	}
+	if ptr, ok := optionalIDFilter(q.Get("user_id")); ok {
+		filter.UserID = ptr
+	} else {
+		return usagecontract.ListFilter{}, false
+	}
+	if ptr, ok := optionalIDFilter(q.Get("api_key_id")); ok {
+		filter.APIKeyID = ptr
+	} else {
+		return usagecontract.ListFilter{}, false
+	}
+	if ptr, ok := optionalIDFilter(q.Get("account_id")); ok {
+		filter.AccountID = ptr
+	} else {
+		return usagecontract.ListFilter{}, false
+	}
+	if ptr, ok := optionalIDFilter(q.Get("provider_id")); ok {
+		filter.ProviderID = ptr
+	} else {
+		return usagecontract.ListFilter{}, false
+	}
+	switch strings.TrimSpace(q.Get("success")) {
+	case "true":
+		v := true
+		filter.Success = &v
+	case "false":
+		v := false
+		filter.Success = &v
+	case "", "all":
+		// unset — match either
+	default:
+		return usagecontract.ListFilter{}, false
+	}
+	return filter, true
+}
+
+// optionalIDFilter parses a query-string positive integer. An empty string
+// returns (nil, true) meaning "no filter". A malformed or non-positive value
+// returns (nil, false) so the caller can return a 400 Invalid Request.
+func optionalIDFilter(raw string) (*int, bool) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return nil, true
+	}
+	id, err := strconv.Atoi(value)
+	if err != nil || id <= 0 {
+		return nil, false
+	}
+	return &id, true
+}
+
 // filterUsageLogs applies the admin usage-log query filters in memory over the
 // already-loaded slice. It supports user/model plus account, api-key, provider,
 // source-endpoint, billing-mode, error-class, success and a created-at date
@@ -272,62 +342,6 @@ func parseUsageFilterTime(value string) time.Time {
 	return time.Time{}
 }
 
-func filterAuditLogs(items []auditcontract.Log, action, resourceType string, actorUserID *int, since time.Time) []auditcontract.Log {
-	action = strings.TrimSpace(action)
-	resourceType = strings.TrimSpace(resourceType)
-	out := make([]auditcontract.Log, 0, len(items))
-	for _, item := range items {
-		if action != "" && item.Action != action {
-			continue
-		}
-		if resourceType != "" && item.ResourceType != resourceType {
-			continue
-		}
-		if actorUserID != nil {
-			// A nil ActorUserID is "system action" — only match when the caller
-			// explicitly asks for the same id, which they can't (the filter is
-			// scoped to real users). So skip the row if the actor is unset.
-			if item.ActorUserID == nil || *item.ActorUserID != *actorUserID {
-				continue
-			}
-		}
-		if !since.IsZero() && item.CreatedAt.Before(since) {
-			continue
-		}
-		out = append(out, item)
-	}
-	return out
-}
-
-func filterPaymentOrders(items []paymentcontract.PaymentOrder, status string) []paymentcontract.PaymentOrder {
-	status = strings.TrimSpace(status)
-	if status == "" {
-		return items
-	}
-	out := make([]paymentcontract.PaymentOrder, 0, len(items))
-	for _, item := range items {
-		if string(item.Status) == status {
-			out = append(out, item)
-		}
-	}
-	return out
-}
-
-func filterOutboxEvents(items []eventscontract.OutboxEvent, status, eventType string) []eventscontract.OutboxEvent {
-	status = strings.TrimSpace(status)
-	eventType = strings.TrimSpace(eventType)
-	out := make([]eventscontract.OutboxEvent, 0, len(items))
-	for _, item := range items {
-		if status != "" && string(item.Status) != status {
-			continue
-		}
-		if eventType != "" && item.EventType != eventType {
-			continue
-		}
-		out = append(out, item)
-	}
-	return out
-}
 
 func filterOpsAlerts(items []operationscontract.AlertEvent, status, severity string) []operationscontract.AlertEvent {
 	status = strings.TrimSpace(status)

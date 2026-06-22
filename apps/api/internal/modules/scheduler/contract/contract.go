@@ -475,6 +475,34 @@ type ActiveLeaseCounter interface {
 	CountActiveLeases(ctx context.Context) (int, error)
 }
 
+// DecisionListFilter narrows a paginated scheduler-decision read at the store
+// level. Empty strings / nil pointers are no-ops. Model and SourceEndpoint
+// match case-insensitively as a substring; RequestID matches exactly.
+type DecisionListFilter struct {
+	RequestID      string
+	Model          string
+	SourceEndpoint string
+	AccountID      *int
+	ProviderID     *int
+	Start          *time.Time
+	End            *time.Time
+}
+
+// DecisionListPageResult bundles a page slice with the unbounded match total
+// the caller exposes through Pagination.Total.
+type DecisionListPageResult struct {
+	Items []Decision
+	Total int
+}
+
+// DecisionPageReader is an optional Store capability that pushes filtering,
+// ordering (newest-first by id), and LIMIT/OFFSET pagination down to SQL.
+// Stores that omit it cause callers to fall back to ListDecisions + in-memory
+// filter+slice; the admin scheduler-decisions list switches automatically.
+type DecisionPageReader interface {
+	ListDecisionsPage(ctx context.Context, filter DecisionListFilter, limit, offset int) (DecisionListPageResult, error)
+}
+
 type Store interface {
 	CreateDecision(ctx context.Context, input Decision) (Decision, error)
 	CreateDecisionWithSnapshot(ctx context.Context, decision Decision, snapshot RequestSnapshot) (Decision, RequestSnapshot, error)

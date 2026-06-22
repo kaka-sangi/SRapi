@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -65,6 +66,39 @@ func (s *Store) ListOutbox(_ context.Context) ([]contract.OutboxEvent, error) {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out, nil
+}
+
+// ListOutboxPage mirrors the SQL store with newest-first ordering and offset/
+// limit slicing — supports the OutboxPageReader capability so memory-store
+// tests exercise the same shape as the production ent store.
+func (s *Store) ListOutboxPage(_ context.Context, filter contract.OutboxListFilter, limit, offset int) (contract.OutboxListPageResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	wantStatus := strings.TrimSpace(string(filter.Status))
+	wantType := strings.TrimSpace(filter.EventType)
+	matched := make([]contract.OutboxEvent, 0)
+	for _, event := range s.outboxByID {
+		if wantStatus != "" && string(event.Status) != wantStatus {
+			continue
+		}
+		if wantType != "" && event.EventType != wantType {
+			continue
+		}
+		matched = append(matched, cloneOutbox(event))
+	}
+	sort.Slice(matched, func(i, j int) bool { return matched[i].ID > matched[j].ID })
+	total := len(matched)
+	if offset < 0 {
+		offset = 0
+	}
+	if offset >= total {
+		return contract.OutboxListPageResult{Items: []contract.OutboxEvent{}, Total: total}, nil
+	}
+	end := total
+	if limit > 0 && offset+limit < end {
+		end = offset + limit
+	}
+	return contract.OutboxListPageResult{Items: matched[offset:end], Total: total}, nil
 }
 
 func (s *Store) ListDispatchableOutbox(_ context.Context, now time.Time, limit int) ([]contract.OutboxEvent, error) {
