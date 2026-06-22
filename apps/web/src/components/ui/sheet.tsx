@@ -27,11 +27,13 @@ export const SheetContent = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { side?: Side }
 >(({ className, children, side = "left", ...props }, ref) => (
   <DialogPrimitive.Portal>
-    <DialogPrimitive.Overlay className="srapi-anim-fade fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
+    {/* Frosted aurora overlay — dark scrim with primary-tinted radial highlight
+        so dialogs feel «lit from behind», not just dim. */}
+    <DialogPrimitive.Overlay className="srapi-anim-fade fixed inset-0 z-50 bg-[radial-gradient(ellipse_at_top,_color-mix(in_oklab,_var(--color-srapi-primary)_18%,_transparent),_rgba(0,0,0,0.55)_60%)] backdrop-blur-[6px]" />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed z-50 flex flex-col border-srapi-border bg-srapi-card shadow-[0_24px_64px_-24px_rgba(28,24,20,0.28),0_8px_24px_-8px_rgba(28,24,20,0.12)]",
+        "glass-frosted-strong fixed z-50 flex flex-col border-srapi-border shadow-[0_24px_64px_-24px_rgba(28,24,20,0.32),0_12px_32px_-10px_rgba(28,24,20,0.18)]",
         SIDE_CLASSES[side],
         className,
       )}

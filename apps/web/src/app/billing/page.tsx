@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { ShoppingCart, CreditCard, Receipt } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
-import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, type Column } from "@/components/admin/admin-list-view";
+import { SectionHero } from "@/components/visual/section-hero";
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { CheckoutRedirect } from "@/components/features/checkout-redirect";
@@ -62,8 +62,8 @@ function BillingContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionAccount")}
+      <SectionHero
+        eyebrow="Account · Billing"
         title={t("billing.title")}
         description={t("billing.subtitle")}
       />

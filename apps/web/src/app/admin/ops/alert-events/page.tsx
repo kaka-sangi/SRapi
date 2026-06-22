@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { BellRing } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
-import { PageHeader } from "@/components/layout/page-header";
+import { SectionHero } from "@/components/visual/section-hero";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
@@ -129,10 +129,16 @@ function AlertEventsContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionAdminOps")}
+      <SectionHero
+        eyebrow="Ops · Alerts"
         title={t("adminOpsAlertEvents.title")}
         description={t("adminOpsAlertEvents.subtitle")}
+        metrics={(() => {
+          const unack = (events.data?.data ?? []).filter(
+            (e) => e.status === "firing" && !e.acknowledged_at,
+          ).length;
+          return [{ label: "未确认告警", value: formatInteger(unack), tone: unack > 0 ? "warning" : "default" }];
+        })()}
         actions={
           <div className="flex items-center gap-3">
             {events.data ? (

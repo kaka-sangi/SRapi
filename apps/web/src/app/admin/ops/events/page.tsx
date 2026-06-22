@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Webhook } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
-import { PageHeader } from "@/components/layout/page-header";
+import { SectionHero } from "@/components/visual/section-hero";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
@@ -111,10 +111,19 @@ function OutboxContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionAdmin")}
+      <SectionHero
+        eyebrow="Ops · Events"
         title={t("adminOutbox.title")}
         description={t("adminOutbox.subtitle")}
+        metrics={(() => {
+          const rows = events.data?.data ?? [];
+          const failed = rows.filter((e) => e.status === "failed").length;
+          const pending = rows.filter((e) => e.status === "pending").length;
+          return [
+            { label: "失败", value: String(failed), tone: failed > 0 ? "error" : "default" },
+            { label: "待发布", value: String(pending), tone: pending > 0 ? "warning" : "default" },
+          ];
+        })()}
         actions={
           <div className="flex items-center gap-3">
             {events.data ? (

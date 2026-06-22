@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
-import { PageHeader } from "@/components/layout/page-header";
 import { useRedeemCode } from "@/hooks/queries";
+import { SectionHero } from "@/components/visual/section-hero";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -58,8 +58,8 @@ function RedeemContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionAccount")}
+      <SectionHero
+        eyebrow="Account · Redeem"
         title={t("redeem.title")}
         description={t("redeem.subtitle")}
       />

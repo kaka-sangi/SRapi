@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ExternalLink, Link2 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { BrandMark } from "@/components/visual/brand-mark";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAdminSettings } from "@/hooks/admin-queries";
 import { useSiteConfig } from "@/hooks/queries";
@@ -95,11 +96,13 @@ export function SidebarNav({
                   aria-current={active ? "page" : undefined}
                   data-tour={tourTag}
                   className={cn(
-                    // Modern card-style nav: full-width rounded fill, soft accent
-                    // wash when active, gentle hover wash otherwise.
+                    // Modern card-style nav with vertical aurora glow stripe on
+                    // active items — replaces the inset 2px terracotta bar with
+                    // a softer, gradient halo that matches the new visual
+                    // language.
                     "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 transition-[background-color,color,transform] duration-150 ease-[var(--ease-out-quint)]",
                     active
-                      ? "bg-srapi-accent-soft font-medium text-srapi-primary"
+                      ? "nav-active-glow bg-srapi-accent-soft font-medium text-srapi-primary"
                       : "text-srapi-text-secondary hover:bg-srapi-card/80 hover:text-srapi-text-primary",
                   )}
                 >
@@ -160,18 +163,8 @@ export function SidebarNav({
 export function SidebarBrand() {
   const { t } = useLanguage();
   return (
-    <div className="flex items-center gap-3 px-2 pb-1 pt-1">
-      <div className="relative grid size-10 place-items-center overflow-hidden rounded-xl bg-gradient-to-br from-srapi-primary to-srapi-primary-hover text-base font-semibold text-white shadow-[0_4px_10px_-4px_rgba(194,85,59,0.45)]">
-        <span className="relative z-[1]">S</span>
-        <span
-          className="pointer-events-none absolute inset-0 opacity-60 mix-blend-overlay"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 30% 25%, rgba(255,255,255,0.6), transparent 55%)",
-          }}
-          aria-hidden
-        />
-      </div>
+    <div className="group flex items-center gap-3 px-2 pb-1 pt-1">
+      <BrandMark size={38} className="magnetic-icon" />
       <div className="min-w-0 leading-tight">
         <div className="text-base font-semibold tracking-tight text-srapi-text-primary">
           {t("common.appName")}

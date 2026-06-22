@@ -94,6 +94,13 @@
   --text-hero--line-height: 1.04;
   --text-hero--letter-spacing: -0.028em;
 
+  /* —— Aurora 渐变色调（landing / dashboard hero、empty state 装饰、
+     spotlight 卡片的 mouse-following 高光、活动态侧栏垂直光带）—— */
+  --aurora-primary: color-mix(in oklab, var(--color-srapi-primary) 35%, transparent);
+  --aurora-warm:    color-mix(in oklab, var(--color-srapi-warning) 28%, transparent);
+  --aurora-cool:    color-mix(in oklab, var(--color-srapi-success) 22%, transparent);
+  --aurora-ivory:   color-mix(in oklab, #f8e1c8 26%, transparent);
+
   /* 高度阶梯（elevation）—— 从浅到深的统一阴影语言，配合 .card-interactive */
   --shadow-e1: 0 1px 2px rgba(28, 26, 23, 0.04);
   --shadow-e2: 0 2px 6px -2px rgba(28, 26, 23, 0.06), 0 8px 24px -10px rgba(28, 26, 23, 0.1);
@@ -673,6 +680,180 @@ textarea:focus-visible,
 }
 
 /* ============================================================
+   §7 Aurora 视觉语汇（2026·06 重塑·B 阶段）
+   ----------------------------------------------------------------
+   把 SRapi 从「干净 SaaS 模板」推到「有设计机敏度」——
+   Aurora 多色径向渐变 blob、spotlight 鼠标追光、glass 磨砂、
+   渐变文字、活动态垂直光带、滚动渐变接缝。
+   所有动效尊重 prefers-reduced-motion（见 §9.2）。
+   ============================================================ */
+
+/* §7.1 Aurora 漂移 —— blob 缓慢翻转，模拟极光层流 */
+@keyframes srapi-aurora-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  33%      { transform: translate3d(3%, -5%, 0) scale(1.06); }
+  66%      { transform: translate3d(-4%, 4%, 0) scale(0.94); }
+}
+@keyframes srapi-aurora-pulse {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 0.85; }
+}
+.aurora-drift {
+  animation: srapi-aurora-drift 28s ease-in-out infinite;
+  will-change: transform;
+}
+.aurora-drift-slow {
+  animation: srapi-aurora-drift 42s ease-in-out infinite reverse;
+  will-change: transform;
+}
+.aurora-pulse {
+  animation: srapi-aurora-pulse 14s ease-in-out infinite;
+}
+
+/* §7.2 渐变文字 —— hero 数字 / 大标题口音色。Webkit 全家通用。 */
+.text-aurora {
+  background-image: linear-gradient(
+    100deg,
+    var(--color-srapi-text-primary) 0%,
+    var(--color-srapi-primary) 55%,
+    var(--color-srapi-warning) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.dark .text-aurora {
+  background-image: linear-gradient(
+    100deg,
+    var(--color-srapi-text-primary) 0%,
+    var(--color-srapi-primary) 55%,
+    #ffd9a8 100%
+  );
+}
+
+/* §7.3 Spotlight 卡片 —— 鼠标追踪径向高光，配合 SpotlightCard 组件 */
+.card-spotlight {
+  position: relative;
+  isolation: isolate;
+}
+.card-spotlight::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 320ms var(--ease-out-quint);
+  background: radial-gradient(
+    420px circle at var(--spot-x, 50%) var(--spot-y, 50%),
+    color-mix(in oklab, var(--color-srapi-primary) 16%, transparent),
+    transparent 58%
+  );
+  z-index: 1;
+  border-radius: inherit;
+}
+.card-spotlight:hover::before { opacity: 1; }
+.card-spotlight > * { position: relative; z-index: 2; }
+
+/* §7.4 玻璃磨砂层 —— 给 dialog 背景 / 抽屉头 / 浮层用 */
+.glass-frosted {
+  background: color-mix(in oklab, var(--color-srapi-card) 78%, transparent);
+  backdrop-filter: saturate(140%) blur(14px);
+  -webkit-backdrop-filter: saturate(140%) blur(14px);
+}
+.glass-frosted-strong {
+  background: color-mix(in oklab, var(--color-srapi-card) 88%, transparent);
+  backdrop-filter: saturate(160%) blur(22px);
+  -webkit-backdrop-filter: saturate(160%) blur(22px);
+}
+
+/* §7.5 侧栏活动项垂直光带 —— 在活动 nav 链接的左缘画一段渐变高光 */
+.nav-active-glow {
+  position: relative;
+}
+.nav-active-glow::before {
+  content: "";
+  position: absolute;
+  left: -2px;
+  top: 22%;
+  bottom: 22%;
+  width: 3px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    var(--color-srapi-primary) 35%,
+    var(--color-srapi-warning) 75%,
+    transparent
+  );
+  box-shadow: 0 0 12px 0 color-mix(in oklab, var(--color-srapi-primary) 50%, transparent);
+}
+
+/* §7.6 TopNav 渐变接缝 —— 滚动时给顶栏底部加一道极细的暖色渐变线 */
+.topnav-seam {
+  position: relative;
+}
+.topnav-seam::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--color-srapi-primary) 38%, transparent) 30%,
+    color-mix(in oklab, var(--color-srapi-warning) 30%, transparent) 70%,
+    transparent
+  );
+  opacity: 0;
+  transition: opacity 240ms ease;
+}
+.topnav-seam[data-scrolled="true"]::after { opacity: 1; }
+
+/* §7.7 Bento 网格 —— Tailwind 难以表达的「12 单位 + 命名跨度」 */
+.bento {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+.bento > .bento-hero  { grid-column: span 8; grid-row: span 2; }
+.bento > .bento-tall  { grid-column: span 4; grid-row: span 2; }
+.bento > .bento-wide  { grid-column: span 8; }
+.bento > .bento-half  { grid-column: span 6; }
+.bento > .bento-third { grid-column: span 4; }
+.bento > .bento-quarter { grid-column: span 3; }
+@media (max-width: 1024px) {
+  .bento { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .bento > .bento-hero, .bento > .bento-wide { grid-column: span 6; grid-row: auto; }
+  .bento > .bento-tall { grid-column: span 6; grid-row: auto; }
+  .bento > .bento-half { grid-column: span 6; }
+  .bento > .bento-third { grid-column: span 3; }
+  .bento > .bento-quarter { grid-column: span 3; }
+}
+@media (max-width: 640px) {
+  .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bento > * { grid-column: span 2; }
+}
+
+/* §7.8 Magnetic icon —— icon-bubble hover 时被父元素轻微「吸住」抬升 */
+.magnetic-icon {
+  transition: transform 220ms var(--ease-spring);
+}
+.group:hover .magnetic-icon { transform: translateY(-2px) scale(1.06); }
+
+/* §7.9 Decorative dot grid —— admin hero band 角落留白处的细节装饰 */
+.dot-grid-overlay {
+  background-image: radial-gradient(
+    color-mix(in oklab, var(--color-srapi-primary) 22%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 14px 14px;
+  background-position: 0 0;
+  mask-image: linear-gradient(135deg, black, transparent 65%);
+  -webkit-mask-image: linear-gradient(135deg, black, transparent 65%);
+}
+
+/* ============================================================
    §9.2 Reduced Motion
    ============================================================ */
 @media (prefers-reduced-motion: reduce) {
@@ -692,6 +873,14 @@ textarea:focus-visible,
   .btn-raise:active:not(:disabled) {
     transform: none;
   }
+  .aurora-drift,
+  .aurora-drift-slow,
+  .aurora-pulse,
+  .magnetic-icon {
+    animation: none !important;
+    transform: none !important;
+  }
+  .group:hover .magnetic-icon { transform: none; }
   .stream-cursor {
     animation: none;
     opacity: 0.6;

@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Bug, ExternalLink, FileText, Link2 } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
-import { PageHeader } from "@/components/layout/page-header";
+import { SectionHero } from "@/components/visual/section-hero";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { ListToolbar, SearchInput, FilterSelect } from "@/components/admin/list-toolbar";
 import { OpsLogCleanupDialog } from "@/components/admin/ops-log-cleanup-dialog";
@@ -102,10 +102,22 @@ function Content() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionAdmin")}
+      <SectionHero
+        eyebrow="Ops · System Logs"
         title={t("adminOpsSystemLogs.title")}
         description={t("adminOpsSystemLogs.subtitle")}
+        metrics={[
+          {
+            label: "error",
+            value: formatInteger(health.data?.level_counts?.error ?? 0),
+            tone: (health.data?.level_counts?.error ?? 0) > 0 ? "error" : "default",
+          },
+          {
+            label: "warn",
+            value: formatInteger(health.data?.level_counts?.warn ?? 0),
+            tone: (health.data?.level_counts?.warn ?? 0) > 0 ? "warning" : "default",
+          },
+        ]}
         actions={
           <div className="flex items-center gap-2">
             {logs.data ? (

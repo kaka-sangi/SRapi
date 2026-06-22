@@ -25,13 +25,15 @@ import {
   useUserUsageCacheMetrics,
 } from "@/hooks/use-user-dashboard";
 import { useUsageTotals } from "@/hooks/use-usage-totals";
-import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { StatCard, StatCardSkeleton } from "@/components/ui/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SectionHero } from "@/components/visual/section-hero";
+import { SpotlightCard } from "@/components/visual/spotlight-card";
+import { HeroNumeric } from "@/components/visual/hero-numeric";
 import { TrendChart } from "@/components/charts/trend-chart";
 import { ChartEmpty } from "@/components/charts/chart-empty";
 import { DialogListSkeleton, TrendChartSkeleton, BarChartSkeleton } from "@/components/charts/chart-skeleton";
@@ -124,14 +126,24 @@ export function GatewayOverview() {
   const quotaRows = platformQuotas.data?.data ?? [];
   const enabledQuotas = quotaRows.filter((q) => q.enabled);
 
+  const balanceData = balance.data;
+  const balanceNumeric = balanceData ? Number(balanceData.balance) : null;
+
   return (
     <>
       <div className="anim-rise-sm" style={rise(0)}>
-        <PageHeader
+        <SectionHero
           eyebrow={t("dashboard.eyebrow")}
           title={t("dashboard.title")}
+          description={t("login.subhead")}
+          metrics={[
+            {
+              label: t("dashboard.quotaPlatforms"),
+              value: enabledQuotas.length,
+            },
+          ]}
           actions={
-            <Button asChild variant="primary">
+            <Button asChild variant="accent">
               <Link href="/api-keys">＋ {t("apiKeys.create")}</Link>
             </Button>
           }
@@ -139,28 +151,31 @@ export function GatewayOverview() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2 lg:gap-5">
-        {/* Balance — entire card is the billing link (tactile hover via card-interactive). */}
+        {/* Balance — hero card with mouse-following spotlight + aurora numerals. */}
         <Link
           href="/billing"
           className="anim-rise-sm group block focus-visible:outline-none"
           style={rise(1)}
         >
-          <Card className="card-interactive h-full">
+          <SpotlightCard className="card-interactive h-full">
             <CardContent className="flex h-full items-center justify-between gap-4 p-6">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-srapi-text-tertiary">
-                  <span className="grid size-8 place-items-center rounded-xl bg-srapi-accent-soft text-srapi-primary">
+                  <span className="magnetic-icon grid size-9 place-items-center rounded-xl bg-srapi-accent-soft text-srapi-primary shadow-[0_4px_12px_-4px_rgba(194,85,59,0.35)]">
                     <Wallet className="size-4" />
                   </span>
                   {t("dashboard.balance")}
                 </div>
                 <PageQueryState
                   query={balance}
-                  skeleton={<Skeleton className="mt-3 h-9 w-36" />}
+                  skeleton={<Skeleton className="mt-4 h-12 w-44" />}
                 >
                   {(data) => (
-                    <div className="mt-3 truncate text-3xl font-semibold tracking-tight text-srapi-text-primary tabular sm:text-[2rem]">
-                      {formatMoney(data.balance, data.currency)}
+                    <div className="mt-3 truncate">
+                      <HeroNumeric
+                        value={balanceNumeric ?? 0}
+                        format={(n) => formatMoney(n, data.currency)}
+                      />
                     </div>
                   )}
                 </PageQueryState>
@@ -170,10 +185,10 @@ export function GatewayOverview() {
                 <ArrowUpRight className="size-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
               </div>
             </CardContent>
-          </Card>
+          </SpotlightCard>
         </Link>
 
-        <Card className="anim-rise-sm h-full" style={rise(2)}>
+        <SpotlightCard className="anim-rise-sm h-full" style={rise(2)}>
           <CardContent className="flex h-full min-w-0 flex-col gap-3.5 p-6">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-srapi-text-tertiary">
@@ -244,7 +259,7 @@ export function GatewayOverview() {
               }
             </PageQueryState>
           </CardContent>
-        </Card>
+        </SpotlightCard>
       </div>
 
       {/* Header KPIs — live throughput (RPM/TPM) + prompt-cache hit rate. */}

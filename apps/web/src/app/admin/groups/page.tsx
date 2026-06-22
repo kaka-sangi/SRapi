@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Boxes } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
-import { PageHeader } from "@/components/layout/page-header";
+import { SectionHero } from "@/components/visual/section-hero";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { ADMIN_ROUTES } from "@/lib/routes";
 import { RowActionsMenu } from "@/components/admin/row-actions";
@@ -173,10 +173,15 @@ function GroupsContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionAdmin")}
+      <SectionHero
+        eyebrow="Gateway · Groups"
         title={t("adminGroups.title")}
         description={t("adminGroups.subtitle")}
+        metrics={
+          all.data
+            ? [{ label: t("adminCommon.total"), value: String(total) }]
+            : undefined
+        }
         actions={
           <div className="flex items-center gap-3">
             {all.data ? <ListCount total={total} /> : null}

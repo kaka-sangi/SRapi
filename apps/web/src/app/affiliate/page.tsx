@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { Coins, Link2, UserPlus, WalletCards, Wallet, TrendingUp } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
-import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, type Column } from "@/components/admin/admin-list-view";
+import { SectionHero } from "@/components/visual/section-hero";
 import {
   useAffiliate,
   useAffiliateInviteCodes,
@@ -131,10 +131,25 @@ function AffiliateContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionAccount")}
+      <SectionHero
+        eyebrow="Account · Affiliate"
         title={t("affiliate.title")}
         description={t("affiliate.subtitle")}
+        metrics={
+          primary
+            ? [
+                {
+                  label: t("affiliate.available"),
+                  value: formatMoney(primary.available_balance, primary.currency),
+                  tone: "success",
+                },
+                {
+                  label: t("affiliate.accrued"),
+                  value: formatMoney(primary.accrued_amount, primary.currency),
+                },
+              ]
+            : undefined
+        }
       />
 
       <div className="grid gap-4 lg:grid-cols-2">

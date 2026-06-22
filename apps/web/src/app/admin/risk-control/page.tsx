@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { AlertTriangle, ShieldAlert } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
-import { PageHeader } from "@/components/layout/page-header";
+import { SectionHero } from "@/components/visual/section-hero";
 import { AdminListView, type Column } from "@/components/admin/admin-list-view";
 import { ResourceFormDialog, type FieldConfig } from "@/components/admin/resource-form-dialog";
 import {
@@ -203,10 +203,25 @@ function RiskContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionAdmin")}
+      <SectionHero
+        eyebrow="Ops · Risk Control"
         title={t("adminRisk.title")}
         description={t("adminRisk.subtitle")}
+        metrics={
+          status.data
+            ? [
+                {
+                  label: t("adminRisk.activeBlocks"),
+                  value: formatInteger(status.data.active_blocks),
+                  tone: status.data.active_blocks > 0 ? "warning" : "default",
+                },
+                {
+                  label: t("adminRisk.recentEvents"),
+                  value: formatInteger(status.data.recent_events),
+                },
+              ]
+            : undefined
+        }
         actions={
           <div className="flex items-center gap-3">
             <ColumnToggle

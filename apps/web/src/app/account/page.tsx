@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
-import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
+import { SectionHero } from "@/components/visual/section-hero";
 import {
   useProfile,
   useUpdateProfile,
@@ -47,8 +47,8 @@ function AccountContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionAccount")}
+      <SectionHero
+        eyebrow="Account · Profile"
         title={t("account.title")}
         description={t("account.subtitle")}
       />

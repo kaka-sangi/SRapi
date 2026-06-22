@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Users } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
-import { PageHeader } from "@/components/layout/page-header";
+import { SectionHero } from "@/components/visual/section-hero";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
@@ -125,6 +125,15 @@ function UsersContent() {
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
 
   const isFiltered = Boolean(list.search || statusFilter || roleFilter);
+
+  // 顶部 hero KPI — total comes straight from the server-side pagination total,
+  // 今日新增 is approximated from the current page's created_at (the list isn't
+  // filtered by date by default, so page 1 is the freshest cohort).
+  const totalUsers = users.data?.pagination?.total ?? users.data?.data.length ?? 0;
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const newToday = (users.data?.data ?? []).filter(
+    (u) => typeof u.created_at === "string" && u.created_at.slice(0, 10) === todayKey,
+  ).length;
 
   async function toggleEnabled(u: User) {
     try {
@@ -323,10 +332,14 @@ function UsersContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionAdmin")}
+      <SectionHero
+        eyebrow={`System · ${t("nav.sectionAdmin")}`}
         title={t("adminUsers.title")}
         description={t("adminUsers.subtitle")}
+        metrics={[
+          { label: "总用户", value: formatInteger(totalUsers) },
+          { label: "今日新增", value: `+${formatInteger(newToday)}`, tone: newToday > 0 ? "success" : "default" },
+        ]}
         actions={
           <div className="flex items-center gap-3">
             {users.data ? (

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Network } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
-import { PageHeader } from "@/components/layout/page-header";
+import { SectionHero } from "@/components/visual/section-hero";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
@@ -410,10 +410,20 @@ function ProxiesContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionAdmin")}
+      <SectionHero
+        eyebrow="Gateway · Proxies"
         title={t("adminProxies.title")}
         description={t("adminProxies.subtitle")}
+        metrics={
+          proxies.data
+            ? [
+                {
+                  label: t("adminCommon.total"),
+                  value: String(proxies.data.pagination?.total ?? proxies.data.data.length),
+                },
+              ]
+            : undefined
+        }
         actions={
           <div className="flex items-center gap-3">
             {proxies.data ? (

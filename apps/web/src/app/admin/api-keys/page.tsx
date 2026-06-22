@@ -4,9 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { KeyRound } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
-import { PageHeader } from "@/components/layout/page-header";
+import { SectionHero } from "@/components/visual/section-hero";
 import { Button } from "@/components/ui/button";
-import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
+import { AdminListView, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
@@ -156,19 +156,24 @@ function ApiKeysContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionAdmin")}
+      <SectionHero
+        eyebrow="Gateway · API Keys"
         title={t("adminApiKeys.title")}
         description={t("adminApiKeys.subtitle")}
+        metrics={
+          keys.data
+            ? [
+                {
+                  label: t("adminApiKeys.title"),
+                  value: String(keys.data.pagination?.total ?? keys.data.data.length),
+                },
+              ]
+            : undefined
+        }
         actions={
-          <div className="flex items-center gap-2">
-            {keys.data ? (
-              <ListCount total={keys.data.pagination?.total ?? keys.data.data.length} />
-            ) : null}
-            <Button asChild size="sm" variant="outline">
-              <Link href="/api-keys">{t("adminApiKeys.createCta")}</Link>
-            </Button>
-          </div>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/api-keys">{t("adminApiKeys.createCta")}</Link>
+          </Button>
         }
       />
       <AdminListView

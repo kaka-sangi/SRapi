@@ -3,8 +3,8 @@
 import { useState, useMemo } from "react";
 import { Search } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
-import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
+import { SectionHero } from "@/components/visual/section-hero";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -41,10 +41,21 @@ function AvailableChannelsContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionWorkspace")}
+      <SectionHero
+        eyebrow="Workspace · Channels"
         title={t("availableChannels.title")}
         description={t("availableChannels.subtitle")}
+        metrics={
+          availableModels.data && availableModels.data.length > 0
+            ? [
+                { label: "Models", value: availableModels.data.length },
+                {
+                  label: "Channels",
+                  value: availableModels.data.reduce((n, m) => n + m.channels.length, 0),
+                },
+              ]
+            : undefined
+        }
       />
       <PageQueryState query={availableModels} skeleton={<DialogListSkeleton rows={6} />}>
         {(models) =>

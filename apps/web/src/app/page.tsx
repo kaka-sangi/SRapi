@@ -1,8 +1,11 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import { ShieldCheck, Zap, Sparkles } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
-import { AmbientCanvas } from "@/components/visual/ambient-canvas";
+import { AuroraBackdrop } from "@/components/visual/aurora-backdrop";
+import { SpotlightCard } from "@/components/visual/spotlight-card";
+import { BrandMark } from "@/components/visual/brand-mark";
 import { FirstRunRedirect } from "@/components/auth/first-run-redirect";
 import { LoginForm } from "@/components/auth/login-form";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
@@ -23,21 +26,30 @@ export default function LandingPage() {
   const versionLabel = site?.version_label?.trim() || t("common.version");
 
   return (
-    <div className="relative flex min-h-dvh flex-col">
+    <div className="relative flex min-h-dvh flex-col overflow-hidden">
       <FirstRunRedirect />
-      <AmbientCanvas />
+      {/* Aurora ambient field — slow-drifting blobs build a «breathing» light
+          environment on top of the cream canvas. Replaces the previous
+          one-vignette restraint. */}
+      <AuroraBackdrop tone="hero" className="-z-10" />
+      {/* A diagonal dot grid in the upper-right adds a hint of editorial
+          mesh without competing with the aurora. */}
+      <div
+        className="dot-grid-overlay pointer-events-none absolute right-0 top-0 -z-10 h-72 w-72 opacity-50"
+        aria-hidden
+      />
 
-      {/* top bar — chrome stays static so the toggles are instantly usable */}
+      {/* top bar */}
       <header className="relative z-10 mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
-        <div className="flex items-center gap-3">
-          <div className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-srapi-primary to-srapi-primary-hover text-sm font-semibold text-white shadow-[0_4px_12px_-4px_rgba(194,85,59,0.45)]">
-            {siteName.charAt(0)}
-          </div>
+        <div className="group flex items-center gap-3">
+          <BrandMark size={36} className="magnetic-icon" />
           <div className="flex items-baseline gap-2">
             <span className="text-lg font-semibold tracking-tight text-srapi-text-primary">
               {siteName}
             </span>
-            <span className="text-[11px] font-medium text-srapi-text-tertiary">{versionLabel}</span>
+            <span className="rounded-full bg-srapi-card/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary backdrop-blur-sm">
+              {versionLabel}
+            </span>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -46,48 +58,49 @@ export default function LandingPage() {
         </div>
       </header>
 
-      {/* centered split: modern hero + sign-in card */}
+      {/* hero split: editorial left + spotlight login card right */}
       <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 items-center px-6 py-10">
         <div className="grid w-full items-center gap-x-16 gap-y-14 lg:grid-cols-[1.05fr_1fr]">
           {/* left — identity + value props */}
           <div className="max-w-xl">
             <div
-              className="anim-rise mb-5 inline-flex items-center gap-2 rounded-full bg-srapi-accent-soft px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-primary"
+              className="anim-rise mb-5 inline-flex items-center gap-2 rounded-full border border-srapi-border bg-srapi-card/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-srapi-primary backdrop-blur-sm"
               style={rise(0)}
             >
-              <span className="size-1.5 rounded-full bg-srapi-primary" />
+              <Sparkles className="size-3" aria-hidden />
               {t("login.eyebrow")}
             </div>
+
             <h1
-              className="anim-rise text-balance text-4xl font-semibold leading-[1.08] tracking-tight text-srapi-text-primary sm:text-5xl lg:text-[3.5rem]"
+              className="anim-rise text-balance text-4xl leading-[1.05] tracking-tight sm:text-5xl lg:text-[3.75rem]"
               style={rise(1)}
             >
-              {t("login.headlineA")}
+              <span className="font-semibold text-srapi-text-primary">
+                {t("login.headlineA")}
+              </span>
               <br />
-              <span className="text-srapi-primary">{t("login.headlineB")}</span>
+              <span className="text-aurora font-semibold">{t("login.headlineB")}</span>
             </h1>
+
             <p
               className="anim-rise mt-6 max-w-lg text-base leading-relaxed text-srapi-text-secondary"
               style={rise(2)}
             >
               {siteSubtitle}
             </p>
-            <div
-              className="anim-rise mt-8 flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px] font-medium text-srapi-text-tertiary"
-              style={rise(3)}
-            >
-              <span className="inline-flex items-center gap-1.5">
-                <span className="size-1.5 rounded-full bg-srapi-success" />
-                {t("login.providersLine")}
-              </span>
+
+            {/* Trust badges row — soft chips with icons */}
+            <div className="anim-rise mt-8 flex flex-wrap gap-2.5" style={rise(3)}>
+              <TrustChip icon={<ShieldCheck className="size-3.5" />} label={t("login.providersLine")} />
+              <TrustChip icon={<Zap className="size-3.5" />} label="OpenAI · Claude · Gemini" />
             </div>
           </div>
 
-          {/* right — the one job of this page, wrapped in a strong soft card */}
+          {/* right — login card with mouse-following spotlight */}
           <div className="anim-rise w-full lg:justify-self-end" style={rise(2)}>
-            <div className="card-raised mx-auto w-full max-w-md rounded-2xl border border-srapi-border bg-srapi-card p-7 sm:p-8">
+            <SpotlightCard className="card-raised mx-auto w-full max-w-md rounded-2xl border border-srapi-border bg-srapi-card/95 p-7 backdrop-blur-md sm:p-8">
               <LoginForm />
-            </div>
+            </SpotlightCard>
           </div>
         </div>
       </main>
@@ -110,5 +123,14 @@ export default function LandingPage() {
         </div>
       </footer>
     </div>
+  );
+}
+
+function TrustChip({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-srapi-border bg-srapi-card/85 px-2.5 py-1 text-[11px] font-medium text-srapi-text-secondary backdrop-blur-sm">
+      <span className="text-srapi-primary">{icon}</span>
+      {label}
+    </span>
   );
 }

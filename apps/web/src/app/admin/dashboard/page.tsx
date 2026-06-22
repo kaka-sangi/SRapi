@@ -5,11 +5,12 @@ import type { CSSProperties } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { LineChart, Server, Radio } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
-import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { StatCard, StatCardSkeleton } from "@/components/ui/stat-card";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SectionHero } from "@/components/visual/section-hero";
+import { SpotlightCard } from "@/components/visual/spotlight-card";
 import { BarSeries } from "@/components/charts/bar-series";
 import { TrendChart } from "@/components/charts/trend-chart";
 import { TokenBreakdown } from "@/components/charts/token-breakdown";
@@ -83,12 +84,13 @@ function DashboardContent() {
 
   return (
     <>
-      <PageHeader
+      <SectionHero
         eyebrow={t("nav.sectionAdmin")}
         title={t("dashboard.title")}
+        description="Gateway 全局态势 · 流量、Token、收入、上游健康一屏可览"
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-0.5 rounded-xl border border-srapi-border bg-srapi-card/80 p-1">
+            <div className="flex items-center gap-0.5 rounded-xl border border-srapi-border bg-srapi-card/85 p-1 backdrop-blur-sm">
               {RANGE_PRESETS.map((p) => (
                 <button
                   key={p.key}
@@ -369,7 +371,7 @@ function SnapshotSummary({
   const windowText = `${formatDateTime(window.start)} - ${formatDateTime(window.end)}`;
 
   return (
-    <Card className="anim-rise-sm relative overflow-hidden" style={rise(0)}>
+    <SpotlightCard className="anim-rise-sm relative overflow-hidden" style={rise(0)}>
       {/* A whisper-thin terracotta seam runs along the top to anchor the
           snapshot band visually without adding chrome. */}
       <div
@@ -414,7 +416,7 @@ function SnapshotSummary({
           </span>
         </div>
       </CardContent>
-    </Card>
+    </SpotlightCard>
   );
 }
 

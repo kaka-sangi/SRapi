@@ -5,7 +5,7 @@ import { BarChart3, Download, Trash2, LineChart, Layers } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { Button } from "@/components/ui/button";
 import { UsageCleanupDialog } from "@/components/admin/usage-cleanup-dialog";
-import { PageHeader } from "@/components/layout/page-header";
+import { SectionHero } from "@/components/visual/section-hero";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
@@ -214,6 +214,14 @@ function UsageContent() {
   });
   const daily = useAdminUsageDaily();
   const dailyData = daily.data?.data ?? [];
+
+  // 顶部 hero KPI — 本月请求 sums daily request counts whose aggregate_id (date
+  // string, YYYY-MM-DD) falls in the current month. dailyData arrives keyed by
+  // day so the filter is essentially free.
+  const monthKey = new Date().toISOString().slice(0, 7);
+  const monthRequests = dailyData
+    .filter((d) => typeof d.aggregate_id === "string" && d.aggregate_id.startsWith(monthKey))
+    .reduce((acc, d) => acc + (d.request_count ?? 0), 0);
 
   // Filter option sources: catalog models + users (by email).
   const models = useAdminModels({ page: 1, page_size: 100 });
@@ -478,10 +486,13 @@ function UsageContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionAdmin")}
+      <SectionHero
+        eyebrow={`Ops · ${t("nav.sectionAdmin")}`}
         title={t("adminUsage.title")}
         description={t("adminUsage.subtitle")}
+        metrics={[
+          { label: "本月请求", value: formatInteger(monthRequests) },
+        ]}
         actions={
           <div className="flex items-center gap-3">
             {usage.data ? <ListCount total={total} /> : null}

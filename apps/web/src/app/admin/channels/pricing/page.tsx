@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Tag } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
-import { PageHeader } from "@/components/layout/page-header";
+import { SectionHero } from "@/components/visual/section-hero";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-toolbar";
 import { ResourceFormDialog, type FieldConfig } from "@/components/admin/resource-form-dialog";
@@ -326,10 +326,20 @@ function PricingContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionAdmin")}
+      <SectionHero
+        eyebrow="Gateway · Pricing"
         title={t("adminPricing.title")}
         description={t("adminPricing.subtitle")}
+        metrics={
+          rules.data
+            ? [
+                {
+                  label: t("adminCommon.total"),
+                  value: formatInteger(rules.data.pagination?.total ?? rules.data.data.length),
+                },
+              ]
+            : undefined
+        }
         actions={
           <div className="flex items-center gap-3">
             {rules.data ? (

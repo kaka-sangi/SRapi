@@ -4,8 +4,8 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, CircleAlert, Loader2 } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
-import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
+import { SectionHero } from "@/components/visual/section-hero";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { useAdminSettings, useUpdateSettings, useAdminModels } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
@@ -53,10 +53,10 @@ function SettingsContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionAdmin")}
+      <SectionHero
+        eyebrow="System · Settings"
         title={t("adminSettings.title")}
-        description={t("adminSettings.subtitle")}
+        description="站点 / 安全 / 限速 / 集成"
       />
       <PageQueryState query={settings} skeleton={<FormSkeleton rows={6} className="p-5" />}>
         {(data) => <SettingsEditor initial={data} />}

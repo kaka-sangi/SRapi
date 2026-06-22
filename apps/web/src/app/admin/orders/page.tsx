@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { ShoppingCart } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
-import { PageHeader } from "@/components/layout/page-header";
+import { SectionHero } from "@/components/visual/section-hero";
 import { AutoRefreshControl } from "@/components/ui/auto-refresh";
 import { CopyButton } from "@/components/ui/copy-button";
 import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
@@ -161,8 +161,8 @@ function OrdersContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionAdmin")}
+      <SectionHero
+        eyebrow="Commerce · Orders"
         title={t("adminOrders.title")}
         description={t("adminOrders.subtitle")}
         actions={

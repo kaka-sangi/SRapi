@@ -14,7 +14,7 @@ import {
   Tag,
 } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
-import { PageHeader } from "@/components/layout/page-header";
+import { SectionHero } from "@/components/visual/section-hero";
 import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-toolbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { QuietBadge } from "@/components/ui/quiet-badge";
@@ -146,10 +146,28 @@ function GatewayResourcesContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionAdminGateway")}
+      <SectionHero
+        eyebrow="Gateway · Resources"
         title={t("adminGatewayResources.title")}
-        description={t("adminGatewayResources.subtitle")}
+        description="一屏总览 gateway 资源拓扑：provider、模型、账号、代理、密钥的健康度。"
+        metrics={
+          summary
+            ? [
+                {
+                  label: t("adminGatewayResources.activeProviders"),
+                  value: `${summary.active_providers}/${summary.providers}`,
+                },
+                {
+                  label: t("adminGatewayResources.routableAccounts"),
+                  value: `${summary.routable_accounts}/${summary.active_accounts}`,
+                },
+                {
+                  label: t("adminGatewayResources.activeModels"),
+                  value: String(summary.active_models),
+                },
+              ]
+            : undefined
+        }
         actions={
           <div className="flex items-center gap-2">
             <Button asChild variant="outline" size="sm">

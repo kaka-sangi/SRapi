@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Ticket } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
-import { PageHeader } from "@/components/layout/page-header";
+import { SectionHero } from "@/components/visual/section-hero";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-toolbar";
@@ -156,10 +156,22 @@ function PromoContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionAdmin")}
+      <SectionHero
+        eyebrow="Commerce · Promo Codes"
         title={t("adminPromos.promoTitle")}
         description={t("adminPromos.promoSubtitle")}
+        metrics={
+          promos.data
+            ? [
+                {
+                  label: "在用",
+                  value: String(
+                    promos.data.data.filter((p) => p.status === "active").length,
+                  ),
+                },
+              ]
+            : undefined
+        }
         actions={
           <div className="flex items-center gap-3">
             {promos.data ? (

@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { Plug } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
-import { PageHeader } from "@/components/layout/page-header";
-import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
+import { SectionHero } from "@/components/visual/section-hero";
+import { AdminListView, type Column } from "@/components/admin/admin-list-view";
 import { ADMIN_ROUTES } from "@/lib/routes";
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
@@ -310,15 +310,22 @@ function ProvidersContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionAdmin")}
+      <SectionHero
+        eyebrow="Gateway · Providers"
         title={t("adminProviders.title")}
         description={t("adminProviders.subtitle")}
+        metrics={
+          providers.data
+            ? [
+                {
+                  label: t("adminProviders.title"),
+                  value: String(providers.data.pagination?.total ?? providers.data.data.length),
+                },
+              ]
+            : undefined
+        }
         actions={
-          <div className="flex items-center gap-3">
-            {providers.data ? (
-              <ListCount total={providers.data.pagination?.total ?? providers.data.data.length} />
-            ) : null}
+          <>
             <Button
               variant="outline"
               size="sm"
@@ -332,7 +339,7 @@ function ProvidersContent() {
             <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
               ＋ {t("adminProviders.create")}
             </Button>
-          </div>
+          </>
         }
       />
       <AdminListView

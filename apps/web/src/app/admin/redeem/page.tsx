@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Gift, Copy, Check } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
-import { PageHeader } from "@/components/layout/page-header";
+import { SectionHero } from "@/components/visual/section-hero";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-toolbar";
@@ -293,10 +293,18 @@ function RedeemContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionAdmin")}
+      <SectionHero
+        eyebrow="Commerce · Redeem Codes"
         title={t("adminPromos.redeemTitle")}
         description={t("adminPromos.redeemSubtitle")}
+        metrics={
+          stats.data
+            ? [
+                { label: t("adminPromos.statsActive"), value: String(stats.data.active) },
+                { label: t("adminPromos.statsRedeemed"), value: String(stats.data.redeemed) },
+              ]
+            : undefined
+        }
         actions={
           <div className="flex items-center gap-3">
             {codes.data ? (

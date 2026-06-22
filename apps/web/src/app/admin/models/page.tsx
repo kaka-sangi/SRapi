@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { Cpu } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
-import { PageHeader } from "@/components/layout/page-header";
-import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
+import { SectionHero } from "@/components/visual/section-hero";
+import { AdminListView, type Column } from "@/components/admin/admin-list-view";
 import { ADMIN_ROUTES } from "@/lib/routes";
 import { PRESET_MODEL_NAMES } from "@/app/admin/quick-setup/presets";
 import { RowActionsMenu } from "@/components/admin/row-actions";
@@ -307,19 +307,24 @@ function ModelsContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionAdmin")}
+      <SectionHero
+        eyebrow="Gateway · Models"
         title={t("adminModels.title")}
         description={t("adminModels.subtitle")}
+        metrics={
+          models.data
+            ? [
+                {
+                  label: t("adminModels.title"),
+                  value: String(models.data.pagination?.total ?? models.data.data.length),
+                },
+              ]
+            : undefined
+        }
         actions={
-          <div className="flex items-center gap-3">
-            {models.data ? (
-              <ListCount total={models.data.pagination?.total ?? models.data.data.length} />
-            ) : null}
-            <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
-              ＋ {t("adminModels.create")}
-            </Button>
-          </div>
+          <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
+            ＋ {t("adminModels.create")}
+          </Button>
         }
       />
       <AdminListView

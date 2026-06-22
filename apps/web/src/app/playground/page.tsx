@@ -1,8 +1,8 @@
 "use client";
 
 import { AppShell } from "@/components/layout/app-shell";
-import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
+import { SectionHero } from "@/components/visual/section-hero";
 import { PlaygroundChat } from "@/components/playground/playground-chat";
 import { ChatSkeleton } from "@/components/charts/chart-skeleton";
 import { usePlaygroundModels } from "@/hooks/queries";
@@ -21,7 +21,11 @@ function PlaygroundContent() {
   const models = usePlaygroundModels();
   return (
     <>
-      <PageHeader title={t("nav.playground")} />
+      <SectionHero
+        eyebrow="Workspace · Playground"
+        title={t("nav.playground")}
+        description="对话调试你的接入"
+      />
       <PageQueryState query={models} skeleton={<ChatSkeleton />}>
         {(data) => {
           const names = data.map((m) => m.id);

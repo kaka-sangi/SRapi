@@ -6,8 +6,8 @@ import { useSearchParams } from "next/navigation";
 import { RefreshCw, Server } from "lucide-react";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import { AdminShell } from "@/components/layout/admin-shell";
-import { PageHeader } from "@/components/layout/page-header";
-import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
+import { SectionHero } from "@/components/visual/section-hero";
+import { AdminListView, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu, type RowAction } from "@/components/admin/row-actions";
 import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-toolbar";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
@@ -1283,17 +1283,34 @@ function AccountsContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionAdmin")}
+      <SectionHero
+        eyebrow="Gateway · Accounts"
         title={t("adminAccounts.title")}
         description={
           readOnlyHealthView ? t("adminAccounts.healthViewSubtitle") : t("adminAccounts.subtitle")
         }
+        metrics={
+          accounts.data
+            ? (() => {
+                const total = accounts.data.pagination?.total ?? accounts.data.data.length;
+                const healthRows = healthSummary.data ?? [];
+                const activeCount = healthRows.filter((h) => h.status === "active").length;
+                const metrics: { label: string; value: string; tone?: "success" | "warning" }[] = [
+                  { label: t("adminAccounts.title"), value: String(total) },
+                ];
+                if (healthRows.length > 0) {
+                  metrics.push({
+                    label: t("common.active"),
+                    value: String(activeCount),
+                    tone: "success",
+                  });
+                }
+                return metrics;
+              })()
+            : undefined
+        }
         actions={
-          <div className="flex items-center gap-3">
-            {accounts.data ? (
-              <ListCount total={accounts.data.pagination?.total ?? accounts.data.data.length} />
-            ) : null}
+          <div className="flex flex-wrap items-center gap-2">
             {accounts.isFetching ? (
               <RefreshCw className="text-srapi-text-tertiary size-3 animate-spin" />
             ) : null}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Menu, Search, LogOut, User as UserIcon } from "lucide-react";
 import { apiService } from "@/lib/api";
@@ -33,6 +34,18 @@ export function TopNav({
   const router = useRouter();
   const { t } = useLanguage();
   const { open: openCommand } = useCommandPalette();
+  // Reveal a soft aurora seam under the topnav border once the page has
+  // scrolled past the hero — small touch that turns the chrome from «static
+  // strip» into «responsive surface».
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    function onScroll() {
+      setScrolled(window.scrollY > 8);
+    }
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   async function handleSignOut() {
     await apiService.logout();
@@ -40,7 +53,10 @@ export function TopNav({
   }
 
   return (
-    <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-srapi-border bg-srapi-bg/85 px-4 py-3.5 backdrop-blur-md sm:px-7">
+    <header
+      data-scrolled={scrolled ? "true" : "false"}
+      className="topnav-seam sticky top-0 z-20 flex items-center gap-3 border-b border-srapi-border bg-srapi-bg/85 px-4 py-3.5 backdrop-blur-md sm:px-7"
+    >
       <Button
         variant="outline"
         size="icon"

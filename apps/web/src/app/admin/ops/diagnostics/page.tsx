@@ -2,7 +2,7 @@
 
 import { Activity, AlertTriangle, RefreshCw, RotateCcw, Database, Wifi, WifiOff } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
-import { PageHeader } from "@/components/layout/page-header";
+import { SectionHero } from "@/components/visual/section-hero";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
@@ -81,9 +81,18 @@ function DiagnosticsContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionAdmin")}
+      <SectionHero
+        eyebrow="Ops · Diagnostics"
         title={t("diagnostics.title")}
+        description="实时熔断器与缓存命中诊断，定位故障源头。"
+        metrics={[
+          {
+            label: "最近运行",
+            value: breakers.dataUpdatedAt
+              ? new Date(breakers.dataUpdatedAt).toLocaleTimeString()
+              : "—",
+          },
+        ]}
         actions={
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1.5 text-[11px] text-srapi-text-tertiary">

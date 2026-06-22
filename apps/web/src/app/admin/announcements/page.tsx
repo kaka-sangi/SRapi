@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Megaphone } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
-import { PageHeader } from "@/components/layout/page-header";
+import { SectionHero } from "@/components/visual/section-hero";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
@@ -149,10 +149,15 @@ function AnnouncementsContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionAdmin")}
+      <SectionHero
+        eyebrow="Ops · Announcements"
         title={t("adminAnnouncements.title")}
         description={t("adminAnnouncements.subtitle")}
+        metrics={(() => {
+          const rows = items.data?.data ?? [];
+          const published = rows.filter((a) => a.status === "published").length;
+          return [{ label: "已发布", value: String(published) }];
+        })()}
         actions={
           <div className="flex items-center gap-3">
             {items.data ? (

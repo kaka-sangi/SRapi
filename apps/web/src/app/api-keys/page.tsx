@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { KeyRound, MoreHorizontal, Copy, Check } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
-import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
+import { SectionHero } from "@/components/visual/section-hero";
 import { useApiKeys, useToggleApiKey, useDeleteApiKey } from "@/hooks/queries";
 import type { ApiKeySummary } from "@/lib/srapi-types";
 import { useLanguage } from "@/context/LanguageContext";
@@ -72,10 +72,22 @@ function ApiKeysContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionWorkspace")}
+      <SectionHero
+        eyebrow="Workspace · API Keys"
         title={t("apiKeys.title")}
         description={t("apiKeys.subtitle")}
+        metrics={
+          apiKeys.data && apiKeys.data.length > 0
+            ? [
+                { label: "Keys", value: apiKeys.data.length },
+                {
+                  label: t("common.active"),
+                  value: apiKeys.data.filter((k) => k.status === "active").length,
+                  tone: "success",
+                },
+              ]
+            : undefined
+        }
         actions={<ApiKeyCreateDialog />}
       />
 

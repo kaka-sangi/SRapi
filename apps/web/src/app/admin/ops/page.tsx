@@ -14,7 +14,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
-import { PageHeader } from "@/components/layout/page-header";
+import { SectionHero } from "@/components/visual/section-hero";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { SloFormDialog } from "@/components/admin/slo-form-dialog";
 import { AlertRuleFormDialog } from "@/components/admin/alert-rule-form-dialog";
@@ -239,10 +239,19 @@ function OpsOverviewContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionAdmin")}
+      <SectionHero
+        eyebrow="Ops · Overview"
         title={t("adminOps.title")}
         description={t("adminOps.subtitle")}
+        metrics={[
+          {
+            label: "在线 channel",
+            value: formatInteger(
+              (notificationChannels.data?.data ?? []).filter((c) => c.status === "active").length,
+            ),
+          },
+          { label: "活跃告警", value: formatInteger(activeAlerts.length), tone: activeAlerts.length > 0 ? "warning" : "default" },
+        ]}
         actions={
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={toggleFullscreen}>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { AdminShell } from "@/components/layout/admin-shell";
-import { PageHeader } from "@/components/layout/page-header";
+import { SectionHero } from "@/components/visual/section-hero";
 import {
   useAdminProviders,
   useCreateAccount,
@@ -224,8 +224,8 @@ function QuickSetupContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionAdmin")}
+      <SectionHero
+        eyebrow="Gateway · Quick Setup"
         title={t("adminQuickSetup.title")}
         description={t("adminQuickSetup.subtitle")}
       />

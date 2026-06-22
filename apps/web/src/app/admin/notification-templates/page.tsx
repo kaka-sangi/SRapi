@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { Mail } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
-import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
+import { SectionHero } from "@/components/visual/section-hero";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -64,10 +64,21 @@ function NotificationTemplatesContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionAdmin")}
+      <SectionHero
+        eyebrow="System · Notifications"
         title={t("adminNotificationTemplates.title")}
         description={t("adminNotificationTemplates.subtitle")}
+        metrics={
+          query.data
+            ? [
+                { label: t("adminNotificationTemplates.event"), value: String(query.data.events.length) },
+                {
+                  label: t("adminNotificationTemplates.custom"),
+                  value: String(query.data.templates.filter((tpl) => tpl.is_custom).length),
+                },
+              ]
+            : undefined
+        }
       />
       <PageQueryState query={query} skeleton={<TemplatesSkeleton />}>
         {(list) => {

@@ -4,8 +4,8 @@ import { useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Download, Inbox, SearchX } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
-import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
+import { SectionHero } from "@/components/visual/section-hero";
 import { useAvailableModels, useUsageLogs } from "@/hooks/queries";
 import { useUsageTotals } from "@/hooks/use-usage-totals";
 import { useLanguage } from "@/context/LanguageContext";
@@ -66,10 +66,17 @@ function UsageContent() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("nav.sectionWorkspace")}
+      <SectionHero
+        eyebrow="Workspace · Usage"
         title={t("usage.title")}
         description={t("usage.subtitle")}
+        metrics={
+          hasLogs
+            ? [
+                { label: "Requests", value: usage.data?.length ?? 0 },
+              ]
+            : undefined
+        }
         actions={
           <Button
             variant="outline"
