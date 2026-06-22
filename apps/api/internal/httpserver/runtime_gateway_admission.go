@@ -438,6 +438,13 @@ func (rt *runtimeState) prepareProviderDispatch(ctx context.Context, account *ac
 	} else if ok {
 		credential = refreshed
 	}
+	// Validate credential has a usable authentication field before routing
+	// upstream. Empty or corrupt credentials (e.g. after a failed rotation)
+	// would otherwise produce cryptic upstream errors; catching early lets
+	// the failover loop skip to the next candidate immediately.
+	if !credentialHasAuth(credential) {
+		return providerDispatchState{}, provideradaptercontract.ProviderError{Class: "credential_error", StatusCode: http.StatusBadGateway, Message: "provider credential empty or missing authentication fields"}
+	}
 	releaseOnError = false
 	return providerDispatchState{credential: credential, concurrencyLeases: leases}, nil
 }
@@ -704,4 +711,25 @@ func gatewayModelReferences(canonical gatewaycontract.CanonicalRequest, resoluti
 		refs = append(refs, resolution.Alias.FallbackModels...)
 	}
 	return uniqueNonEmptyStrings(refs)
+}
+
+// credentialHasAuth returns true when the decrypted credential map contains at
+// least one non-empty string value in a known authentication field. This catches
+// empty or corrupt credentials (e.g. after a failed rotation) before they reach
+// the upstream provider, letting the failover loop skip to the next candidate
+// instead of producing a cryptic upstream error.
+func credentialHasAuth(cred map[string]any) bool {
+	if len(cred) == 0 {
+		return false
+	}
+	for _, key := range []string{
+		"api_key", "access_token", "token",
+		"aws_access_key_id", "service_account_json",
+		"session_cookie", "cookie", "cli_client_token",
+	} {
+		if v, ok := cred[key].(string); ok && strings.TrimSpace(v) != "" {
+			return true
+		}
+	}
+	return false
 }

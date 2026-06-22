@@ -1201,10 +1201,39 @@ func healthScore(candidate contract.Candidate) float64 {
 	if candidate.RuntimeState.CircuitOpen || candidate.RuntimeState.CooldownActive {
 		return 0
 	}
+	score := 0.70
 	if candidate.RuntimeState.HealthScore != nil {
-		return clamp01(*candidate.RuntimeState.HealthScore)
+		score = clamp01(*candidate.RuntimeState.HealthScore)
 	}
-	return 0.70
+
+	// Penalize high latency using sigmoid decay: latency beyond 5000ms
+	// degrades the score progressively; at 10000ms the penalty is ~0.99.
+	if candidate.RuntimeState.LatencyP95MS != nil && *candidate.RuntimeState.LatencyP95MS > 0 {
+		latency := float64(*candidate.RuntimeState.LatencyP95MS)
+		// sigmoid: 1 / (1 + exp((latency - 5000) / 1000))
+		penalty := 1.0 / (1.0 + math.Exp((latency-5000)/1000))
+		score *= penalty
+	}
+
+	// Exponential decay on consecutive probe failures stored in account
+	// metadata by the health-probe worker.
+	if failures, ok := metacoerce.Int(candidate.Account.Metadata["consecutive_probe_failures"]); ok && failures > 0 {
+		score *= math.Exp(-float64(failures) / 3.0)
+	}
+
+	// Penalize stale health data: if the last probe is older than 24 hours
+	// the score is reduced by 20%.
+	if raw, exists := candidate.Account.Metadata["last_probe_at"]; exists {
+		if ts, ok := raw.(string); ok {
+			if probeTime, err := time.Parse(time.RFC3339, ts); err == nil {
+				if time.Since(probeTime) > 24*time.Hour {
+					score *= 0.80
+				}
+			}
+		}
+	}
+
+	return clamp01(score)
 }
 
 func quotaScore(candidate contract.Candidate) float64 {

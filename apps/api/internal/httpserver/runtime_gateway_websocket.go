@@ -1023,6 +1023,13 @@ func (rt *runtimeState) prepareProviderRealtime(ctx context.Context, req provide
 	} else if ok {
 		credential = refreshed
 	}
+	// Validate credential has a usable authentication field before routing
+	// upstream. Empty or corrupt credentials (e.g. after a failed rotation)
+	// would otherwise produce cryptic upstream errors; catching early lets
+	// the failover loop skip to the next candidate immediately.
+	if !credentialHasAuth(credential) {
+		return providerRealtimeSession{}, nil, provideradaptercontract.ProviderError{Class: "credential_error", StatusCode: http.StatusBadGateway, Message: "provider credential empty or missing authentication fields"}
+	}
 	req.Credential = credential
 	session, err := rt.adapters.PrepareRealtime(ctx, req)
 	if err != nil {
