@@ -883,74 +883,76 @@ func (s *Server) handleUpdateAdminModelMapping(w http.ResponseWriter, r *http.Re
 	})
 }
 
+// handleListAdminAccounts serves GET /api/v1/admin/accounts. Filtering
+// (status / provider_id / runtime_class / search / group_id), ORDER BY id
+// DESC, and LIMIT/OFFSET all run in the database via accounts.ListPage — the
+// prior path loaded every provider_account row before filtering and slicing in
+// Go memory, which dominated wall-clock once the fleet grew past a few
+// hundred accounts.
 func (s *Server) handleListAdminAccounts(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireAdminSession(r); err != nil {
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
 		return
 	}
-	accounts, err := s.runtime.accounts.List(r.Context())
+	filter, ok := accountListFilterFromRequest(r, requestID, w)
+	if !ok {
+		return
+	}
+	limit, offset, page, pageSize := paginationParams(r)
+	result, err := s.runtime.accounts.ListPage(r.Context(), filter, limit, offset)
 	if err != nil {
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list accounts", requestID)
 		return
 	}
-	accounts = filterAccounts(accounts, r.URL.Query().Get("status"), r.URL.Query().Get("provider_id"))
-	if runtimeClass := strings.TrimSpace(r.URL.Query().Get("runtime_class")); runtimeClass != "" {
-		filtered := make([]accountcontract.ProviderAccount, 0, len(accounts))
-		for _, account := range accounts {
-			if string(account.RuntimeClass) == runtimeClass {
-				filtered = append(filtered, account)
-			}
-		}
-		accounts = filtered
-	}
-	if search := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("search"))); search != "" {
-		// Case-insensitive substring match across name / upstream client / id.
-		// Keeps the contract narrow: operators see "type in part of a name
-		// and the row appears", which is what the upstream sub2api UI does.
-		filtered := make([]accountcontract.ProviderAccount, 0, len(accounts))
-		for _, account := range accounts {
-			if accountMatchesSearch(account, search) {
-				filtered = append(filtered, account)
-			}
-		}
-		accounts = filtered
-	}
-	if groupIDRaw := strings.TrimSpace(r.URL.Query().Get("group_id")); groupIDRaw != "" {
-		groupID, parseErr := strconv.Atoi(groupIDRaw)
-		if parseErr != nil || groupID <= 0 {
-			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid group id", requestID)
-			return
-		}
-		members, memberErr := s.runtime.accounts.ListGroupMembers(r.Context(), groupID)
-		if memberErr != nil {
-			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list group members", requestID)
-			return
-		}
-		// Fetching members is one round-trip; membership is then an O(1) set lookup
-		// per account row. Keeps the list-by-group hot path fast even at moderate fleet sizes.
-		inGroup := make(map[int]struct{}, len(members))
-		for _, m := range members {
-			inGroup[m.AccountID] = struct{}{}
-		}
-		filtered := make([]accountcontract.ProviderAccount, 0, len(accounts))
-		for _, a := range accounts {
-			if _, ok := inGroup[a.ID]; ok {
-				filtered = append(filtered, a)
-			}
-		}
-		accounts = filtered
-	}
-	data := make([]apiopenapi.ProviderAccount, 0, len(accounts))
-	for _, account := range accounts {
+	data := make([]apiopenapi.ProviderAccount, 0, len(result.Items))
+	for _, account := range result.Items {
 		data = append(data, s.apiAccount(r.Context(), account))
 	}
-	data, pg := paginate(r, data)
+	var pg apiopenapi.Pagination
+	if pageSize == 0 {
+		// No page_size sent — the legacy "give me everything" shape. Total ==
+		// returned len so callers that want the full list (e.g. dropdowns)
+		// keep working without paging metadata changes.
+		pg = apiopenapi.Pagination{Page: 1, PageSize: len(data), Total: result.Total, HasNext: false}
+	} else {
+		pg = paginationFromTotal(result.Total, page, pageSize)
+	}
 	writeJSONAny(w, http.StatusOK, apiopenapi.ProviderAccountListResponse{
 		Data:       data,
 		Pagination: pg,
 		RequestId:  requestID,
 	})
+}
+
+// accountListFilterFromRequest parses ?status, ?provider_id, ?runtime_class,
+// ?search, ?group_id into the typed contract filter. Returns (_, false) and
+// writes a 400 when a numeric field is malformed so the caller can short
+// circuit.
+func accountListFilterFromRequest(r *http.Request, requestID string, w http.ResponseWriter) (accountcontract.ListFilter, bool) {
+	q := r.URL.Query()
+	filter := accountcontract.ListFilter{
+		Status:       accountcontract.Status(strings.TrimSpace(q.Get("status"))),
+		RuntimeClass: accountcontract.RuntimeClass(strings.TrimSpace(q.Get("runtime_class"))),
+		Search:       strings.TrimSpace(q.Get("search")),
+	}
+	if raw := strings.TrimSpace(q.Get("provider_id")); raw != "" {
+		pid, err := strconv.Atoi(raw)
+		if err != nil || pid <= 0 {
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid provider id", requestID)
+			return accountcontract.ListFilter{}, false
+		}
+		filter.ProviderID = &pid
+	}
+	if raw := strings.TrimSpace(q.Get("group_id")); raw != "" {
+		gid, err := strconv.Atoi(raw)
+		if err != nil || gid <= 0 {
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid group id", requestID)
+			return accountcontract.ListFilter{}, false
+		}
+		filter.GroupID = &gid
+	}
+	return filter, true
 }
 
 func (s *Server) handleGetAdminAccount(w http.ResponseWriter, r *http.Request) {

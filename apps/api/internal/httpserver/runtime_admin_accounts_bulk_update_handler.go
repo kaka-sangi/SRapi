@@ -128,11 +128,13 @@ func (s *Server) handleBulkUpdateAdminAccounts(w http.ResponseWriter, r *http.Re
 }
 
 // resolveBulkUpdateTargets returns the account IDs the bulk-edit should
-// hit. Explicit `account_ids` wins (matches sub2api). Otherwise filters
-// are resolved through filterAccounts + the group-membership lookup so
-// the resolved set matches what the admin table renders for the same
-// query string. An empty filter object is rejected by the caller — see
-// the empty-result guard in handleBulkUpdateAdminAccounts.
+// hit. Explicit `account_ids` wins (matches sub2api). Otherwise filters are
+// translated into a contract.ListFilter and resolved through accounts.ListPage
+// so the selection matches what the admin table renders for the same query
+// string AND the resolution runs as a single SQL query instead of loading the
+// full provider_accounts table to filter in Go. An empty filter object is
+// rejected by the caller — see the empty-result guard in
+// handleBulkUpdateAdminAccounts.
 func (s *Server) resolveBulkUpdateTargets(r *http.Request, body apiopenapi.BulkUpdateProviderAccountsRequest) ([]int, error) {
 	if body.AccountIds != nil && len(*body.AccountIds) > 0 {
 		ids, err := apiIDsValueToInts(*body.AccountIds)
@@ -147,54 +149,34 @@ func (s *Server) resolveBulkUpdateTargets(r *http.Request, body apiopenapi.BulkU
 	if !bulkUpdateFiltersHaveContent(*body.Filters) {
 		return nil, errBulkUpdateEmptyFilters
 	}
-	accounts, err := s.runtime.accounts.List(r.Context())
+	filter := accountcontract.ListFilter{
+		Status:       accountcontract.Status(optionalStringValue(body.Filters.Status)),
+		RuntimeClass: accountcontract.RuntimeClass(optionalStringValue(body.Filters.RuntimeClass)),
+		Search:       strings.TrimSpace(optionalStringValue(body.Filters.Search)),
+	}
+	if raw := strings.TrimSpace(optionalStringValue(body.Filters.ProviderId)); raw != "" {
+		pid, err := strconv.Atoi(raw)
+		if err != nil || pid <= 0 {
+			return nil, errBulkUpdateInvalidGroupID
+		}
+		filter.ProviderID = &pid
+	}
+	if raw := strings.TrimSpace(optionalStringValue(body.Filters.GroupId)); raw != "" {
+		gid, err := strconv.Atoi(raw)
+		if err != nil || gid <= 0 {
+			return nil, errBulkUpdateInvalidGroupID
+		}
+		filter.GroupID = &gid
+	}
+	// limit=0 + offset=0 means "no LIMIT/OFFSET" in the PageReader contract;
+	// returns every row matching the filter, which is what the bulk selection
+	// needs.
+	result, err := s.runtime.accounts.ListPage(r.Context(), filter, 0, 0)
 	if err != nil {
 		return nil, errBulkUpdateListFailed
 	}
-	statusFilter := optionalStringValue(body.Filters.Status)
-	providerFilter := optionalStringValue(body.Filters.ProviderId)
-	accounts = filterAccounts(accounts, statusFilter, providerFilter)
-	if runtimeClass := optionalStringValue(body.Filters.RuntimeClass); runtimeClass != "" {
-		filtered := make([]accountcontract.ProviderAccount, 0, len(accounts))
-		for _, account := range accounts {
-			if string(account.RuntimeClass) == runtimeClass {
-				filtered = append(filtered, account)
-			}
-		}
-		accounts = filtered
-	}
-	if search := strings.ToLower(strings.TrimSpace(optionalStringValue(body.Filters.Search))); search != "" {
-		filtered := make([]accountcontract.ProviderAccount, 0, len(accounts))
-		for _, account := range accounts {
-			if strings.Contains(strings.ToLower(account.Name), search) {
-				filtered = append(filtered, account)
-			}
-		}
-		accounts = filtered
-	}
-	if groupRaw := strings.TrimSpace(optionalStringValue(body.Filters.GroupId)); groupRaw != "" {
-		groupID, parseErr := strconv.Atoi(groupRaw)
-		if parseErr != nil || groupID <= 0 {
-			return nil, errBulkUpdateInvalidGroupID
-		}
-		members, memberErr := s.runtime.accounts.ListGroupMembers(r.Context(), groupID)
-		if memberErr != nil {
-			return nil, errBulkUpdateListFailed
-		}
-		inGroup := make(map[int]struct{}, len(members))
-		for _, m := range members {
-			inGroup[m.AccountID] = struct{}{}
-		}
-		filtered := make([]accountcontract.ProviderAccount, 0, len(accounts))
-		for _, account := range accounts {
-			if _, ok := inGroup[account.ID]; ok {
-				filtered = append(filtered, account)
-			}
-		}
-		accounts = filtered
-	}
-	ids := make([]int, 0, len(accounts))
-	for _, account := range accounts {
+	ids := make([]int, 0, len(result.Items))
+	for _, account := range result.Items {
 		ids = append(ids, account.ID)
 	}
 	return ids, nil

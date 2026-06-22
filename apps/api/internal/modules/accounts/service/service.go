@@ -551,6 +551,117 @@ func (s *Service) List(ctx context.Context) ([]contract.ProviderAccount, error) 
 	return out, nil
 }
 
+// ListPage delegates the admin-list read to the store's PageReader so the
+// (filter, count, slice) trio executes against SQL instead of pulling every
+// row into Go memory. Stores that omit PageReader (mostly test doubles) get a
+// full-table fallback with the same predicates applied in-process, so the
+// service contract stays uniform.
+func (s *Service) ListPage(ctx context.Context, filter contract.ListFilter, limit, offset int) (contract.ListPageResult, error) {
+	if offset < 0 {
+		offset = 0
+	}
+	if reader, ok := s.store.(contract.PageReader); ok {
+		return reader.ListPage(ctx, filter, limit, offset)
+	}
+
+	all, err := s.store.List(ctx)
+	if err != nil {
+		return contract.ListPageResult{}, err
+	}
+
+	var inGroup map[int]struct{}
+	if filter.GroupID != nil && *filter.GroupID > 0 {
+		members, mErr := s.store.ListGroupMembers(ctx, *filter.GroupID)
+		if mErr != nil {
+			return contract.ListPageResult{}, mErr
+		}
+		inGroup = make(map[int]struct{}, len(members))
+		for _, m := range members {
+			inGroup[m.AccountID] = struct{}{}
+		}
+	}
+
+	matched := make([]contract.ProviderAccount, 0, len(all))
+	for _, account := range all {
+		if !accountFilterFallbackMatches(account, filter) {
+			continue
+		}
+		if inGroup != nil {
+			if _, ok := inGroup[account.ID]; !ok {
+				continue
+			}
+		}
+		matched = append(matched, account)
+	}
+	// Store.List returns ascending by id; flip to newest-first to mirror the
+	// PageReader contract.
+	for i, j := 0, len(matched)-1; i < j; i, j = i+1, j-1 {
+		matched[i], matched[j] = matched[j], matched[i]
+	}
+	total := len(matched)
+	if offset >= total {
+		return contract.ListPageResult{Items: []contract.ProviderAccount{}, Total: total}, nil
+	}
+	end := total
+	if limit > 0 && offset+limit < end {
+		end = offset + limit
+	}
+	return contract.ListPageResult{Items: matched[offset:end], Total: total}, nil
+}
+
+// accountFilterFallbackMatches mirrors the SQL/memory predicates for stores
+// that lack PageReader. Kept here rather than in the contract so it does not
+// add a runtime-data dependency to the public interface.
+func accountFilterFallbackMatches(account contract.ProviderAccount, filter contract.ListFilter) bool {
+	if account.DeletedAt != nil {
+		return false
+	}
+	if filter.Status == "" {
+		if !filter.IncludeArchived && account.Status == contract.StatusArchived {
+			return false
+		}
+	} else if account.Status != filter.Status {
+		return false
+	}
+	if filter.ProviderID != nil && account.ProviderID != *filter.ProviderID {
+		return false
+	}
+	if filter.RuntimeClass != "" && account.RuntimeClass != filter.RuntimeClass {
+		return false
+	}
+	if search := strings.ToLower(strings.TrimSpace(filter.Search)); search != "" {
+		if !accountFilterFallbackMatchesSearch(account, search) {
+			return false
+		}
+	}
+	return true
+}
+
+func accountFilterFallbackMatchesSearch(account contract.ProviderAccount, search string) bool {
+	if strings.Contains(strings.ToLower(account.Name), search) {
+		return true
+	}
+	if account.UpstreamClient != nil && strings.Contains(strings.ToLower(strings.TrimSpace(*account.UpstreamClient)), search) {
+		return true
+	}
+	if isAllDigitsFallback(search) && search == strconv.Itoa(account.ID) {
+		return true
+	}
+	return false
+}
+
+func isAllDigitsFallback(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, r := range value {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
 func (s *Service) ListActiveByProviderIDs(ctx context.Context, providerIDs []int) ([]contract.ProviderAccount, error) {
 	ids := normalizePositiveIDs(providerIDs)
 	if len(ids) == 0 {

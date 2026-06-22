@@ -152,47 +152,6 @@ func rowTextLower(values ...string) string {
 	return strings.ToLower(strings.Join(values, " "))
 }
 
-// accountMatchesSearch reports whether `search` (already lower-cased and
-// trimmed) is a substring of the account name, upstream client, or
-// stringified numeric ID. Empty search yields no narrowing — the caller
-// is expected to short-circuit before invoking the helper.
-func accountMatchesSearch(account accountcontract.ProviderAccount, search string) bool {
-	if search == "" {
-		return true
-	}
-	if strings.Contains(strings.ToLower(account.Name), search) {
-		return true
-	}
-	if account.UpstreamClient != nil && strings.Contains(strings.ToLower(strings.TrimSpace(*account.UpstreamClient)), search) {
-		return true
-	}
-	if strings.Contains(strconv.Itoa(account.ID), search) {
-		return true
-	}
-	return false
-}
-
-func filterAccounts(accounts []accountcontract.ProviderAccount, status, providerID string) []accountcontract.ProviderAccount {
-	status = strings.TrimSpace(status)
-	providerID = strings.TrimSpace(providerID)
-	out := make([]accountcontract.ProviderAccount, 0, len(accounts))
-	for _, account := range accounts {
-		// Archived accounts are soft-deleted: hidden from the default list, shown
-		// only when explicitly requested via ?status=archived (e.g. a restore view).
-		if status == "" && account.Status == accountcontract.StatusArchived {
-			continue
-		}
-		if status != "" && string(account.Status) != status {
-			continue
-		}
-		if providerID != "" && strconv.Itoa(account.ProviderID) != providerID {
-			continue
-		}
-		out = append(out, account)
-	}
-	return out
-}
-
 // usageListFilterFromRequest parses the admin/console usage-log query string
 // into the store-level ListFilter. Same keys as the legacy in-memory filter
 // (user_id/api_key_id/account_id/provider_id/model/source_endpoint/billing_mode/

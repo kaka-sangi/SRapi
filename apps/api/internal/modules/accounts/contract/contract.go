@@ -726,6 +726,45 @@ type CreateStoredAccountGroup struct {
 	Status         GroupStatus
 }
 
+// ListFilter narrows a paginated provider-account read at the store level.
+// Empty strings and nil pointers are no-ops. Mirrors the query knobs the admin
+// list page exposes (status / provider_id / runtime_class / search / group_id);
+// stores implementing PageReader push this filtering, ORDER BY id DESC, and
+// LIMIT/OFFSET down to SQL.
+type ListFilter struct {
+	// Status, when non-empty, narrows to that exact account status. When
+	// empty, archived rows are excluded by default (operator-facing list
+	// hides soft-deleted rows); set IncludeArchived to override.
+	Status Status
+	// ProviderID, when non-nil, narrows to that provider id.
+	ProviderID *int
+	// RuntimeClass, when non-empty, narrows to that runtime class.
+	RuntimeClass RuntimeClass
+	// Search, when non-empty, matches a case-insensitive substring on name
+	// or upstream_client. If the value is all-digits, the account id is also
+	// matched as an exact equality so an operator can paste a row id directly.
+	Search string
+	// GroupID, when non-nil and positive, narrows to accounts that are
+	// members of that account group.
+	GroupID *int
+	// IncludeArchived surfaces archived rows even when Status is empty.
+	IncludeArchived bool
+}
+
+// ListPageResult is the typed return of PageReader.ListPage.
+type ListPageResult struct {
+	Items []ProviderAccount
+	Total int
+}
+
+// PageReader is an optional Store capability that pushes filtering, ordering
+// (newest-first by id), and LIMIT/OFFSET pagination down to SQL — replaces
+// the admin handler that loaded the entire provider_accounts table to filter
+// and paginate in Go memory.
+type PageReader interface {
+	ListPage(ctx context.Context, filter ListFilter, limit, offset int) (ListPageResult, error)
+}
+
 type Store interface {
 	Create(ctx context.Context, input CreateStoredAccount) (ProviderAccount, error)
 	Update(ctx context.Context, account ProviderAccount) (ProviderAccount, error)

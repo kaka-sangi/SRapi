@@ -112,6 +112,115 @@ func (s *Store) List(_ context.Context) ([]contract.ProviderAccount, error) {
 	return out, nil
 }
 
+// ListPage implements contract.PageReader: mirrors the SQL store with
+// newest-first ordering and offset/limit slicing. Holds the store lock for one
+// pass so the (filter, count, slice) trio is consistent.
+func (s *Store) ListPage(_ context.Context, filter contract.ListFilter, limit, offset int) (contract.ListPageResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var inGroup map[int]struct{}
+	if filter.GroupID != nil && *filter.GroupID > 0 {
+		groupID := *filter.GroupID
+		inGroup = make(map[int]struct{})
+		for _, member := range s.groupMembersByID {
+			if member.AccountGroupID == groupID {
+				inGroup[member.AccountID] = struct{}{}
+			}
+		}
+	}
+
+	matched := make([]contract.ProviderAccount, 0)
+	for _, account := range s.byID {
+		if !accountPageMatches(account, filter) {
+			continue
+		}
+		if inGroup != nil {
+			if _, ok := inGroup[account.ID]; !ok {
+				continue
+			}
+		}
+		matched = append(matched, cloneAccount(account))
+	}
+	sort.Slice(matched, func(i, j int) bool { return matched[i].ID > matched[j].ID })
+
+	total := len(matched)
+	if offset < 0 {
+		offset = 0
+	}
+	if offset >= total {
+		return contract.ListPageResult{Items: []contract.ProviderAccount{}, Total: total}, nil
+	}
+	end := total
+	if limit > 0 && offset+limit < end {
+		end = offset + limit
+	}
+	return contract.ListPageResult{Items: matched[offset:end], Total: total}, nil
+}
+
+// accountPageMatches applies the in-process filter predicates that the SQL
+// store mirrors. Kept package-local so the memory and ent stores stay in lock
+// step. Archived rows are hidden when no Status filter is set unless the
+// caller opts in via IncludeArchived — the operator-facing admin list relies
+// on this behavior so a restore-only view can surface them on demand.
+func accountPageMatches(account contract.ProviderAccount, filter contract.ListFilter) bool {
+	if account.DeletedAt != nil {
+		return false
+	}
+	if filter.Status == "" {
+		if !filter.IncludeArchived && account.Status == contract.StatusArchived {
+			return false
+		}
+	} else if account.Status != filter.Status {
+		return false
+	}
+	if filter.ProviderID != nil && account.ProviderID != *filter.ProviderID {
+		return false
+	}
+	if filter.RuntimeClass != "" && account.RuntimeClass != filter.RuntimeClass {
+		return false
+	}
+	if search := strings.ToLower(strings.TrimSpace(filter.Search)); search != "" {
+		if !accountMatchesSearch(account, search) {
+			return false
+		}
+	}
+	return true
+}
+
+// accountMatchesSearch reports whether `search` (already lower-cased and
+// trimmed) is a substring of the account name or upstream client, or — when
+// the search is all-digits — exactly equals the stringified account id. Keeps
+// "type a row id and the row appears" working without scanning every
+// substring of every integer column.
+func accountMatchesSearch(account contract.ProviderAccount, search string) bool {
+	if search == "" {
+		return true
+	}
+	if strings.Contains(strings.ToLower(account.Name), search) {
+		return true
+	}
+	if account.UpstreamClient != nil && strings.Contains(strings.ToLower(strings.TrimSpace(*account.UpstreamClient)), search) {
+		return true
+	}
+	if isAllDigits(search) && search == strconv.Itoa(account.ID) {
+		return true
+	}
+	return false
+}
+
+func isAllDigits(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, r := range value {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
 func (s *Store) ListActiveByProviderIDs(_ context.Context, providerIDs []int) ([]contract.ProviderAccount, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

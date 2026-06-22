@@ -12,6 +12,7 @@ import (
 	entaccountgroupmember "github.com/srapi/srapi/apps/api/ent/accountgroupmember"
 	entaccounthealthsnapshot "github.com/srapi/srapi/apps/api/ent/accounthealthsnapshot"
 	entaccountquotasnapshot "github.com/srapi/srapi/apps/api/ent/accountquotasnapshot"
+	"github.com/srapi/srapi/apps/api/ent/predicate"
 	entaccount "github.com/srapi/srapi/apps/api/ent/provideraccount"
 	entproxy "github.com/srapi/srapi/apps/api/ent/proxy"
 	"github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
@@ -124,6 +125,108 @@ func (s *Store) List(ctx context.Context) ([]contract.ProviderAccount, error) {
 		out = append(out, toAccount(row))
 	}
 	return out, nil
+}
+
+// ListPage implements contract.PageReader: filter, count, and slice in SQL
+// with ORDER BY id DESC so the newest accounts come back first. Pushes the
+// status / provider / runtime_class / search / group filters down to SQL —
+// the prior admin handler loaded the full provider_accounts table just to
+// filter it in Go memory.
+func (s *Store) ListPage(ctx context.Context, filter contract.ListFilter, limit, offset int) (contract.ListPageResult, error) {
+	predicates, err := s.accountPagePredicates(ctx, filter)
+	if err != nil {
+		return contract.ListPageResult{}, err
+	}
+	base := s.client.ProviderAccount.Query().Where(predicates...)
+	total, err := base.Clone().Count(ctx)
+	if err != nil {
+		return contract.ListPageResult{}, err
+	}
+	query := base.Order(ent.Desc(entaccount.FieldID))
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	rows, err := query.All(ctx)
+	if err != nil {
+		return contract.ListPageResult{}, err
+	}
+	out := make([]contract.ProviderAccount, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toAccount(row))
+	}
+	return contract.ListPageResult{Items: out, Total: total}, nil
+}
+
+func (s *Store) accountPagePredicates(ctx context.Context, filter contract.ListFilter) ([]predicate.ProviderAccount, error) {
+	preds := []predicate.ProviderAccount{entaccount.DeletedAtIsNil()}
+
+	// Status: when unset, hide archived rows unless caller opts in. When set,
+	// match exactly. Mirrors filterAccounts behavior the old handler used.
+	if filter.Status == "" {
+		if !filter.IncludeArchived {
+			preds = append(preds, entaccount.StatusNEQ(string(contract.StatusArchived)))
+		}
+	} else {
+		preds = append(preds, entaccount.StatusEQ(string(filter.Status)))
+	}
+	if filter.ProviderID != nil {
+		preds = append(preds, entaccount.ProviderIDEQ(*filter.ProviderID))
+	}
+	if filter.RuntimeClass != "" {
+		preds = append(preds, entaccount.RuntimeClassEQ(string(filter.RuntimeClass)))
+	}
+	if search := strings.TrimSpace(filter.Search); search != "" {
+		searchPreds := []predicate.ProviderAccount{
+			entaccount.NameContainsFold(search),
+			entaccount.UpstreamClientContainsFold(search),
+		}
+		if id, ok := atoiIfDigits(search); ok {
+			searchPreds = append(searchPreds, entaccount.IDEQ(id))
+		}
+		preds = append(preds, entaccount.Or(searchPreds...))
+	}
+	// Group membership lives on a separate edge table; resolve member ids in
+	// one query so the page can stay a single IDIn predicate. The Limit(1)
+	// cheap-path catches the "no members" case before composing a wide IN().
+	if filter.GroupID != nil && *filter.GroupID > 0 {
+		ids, err := s.client.AccountGroupMember.Query().
+			Where(entaccountgroupmember.AccountGroupIDEQ(*filter.GroupID)).
+			Select(entaccountgroupmember.FieldAccountID).
+			Ints(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if len(ids) == 0 {
+			// Force a no-row predicate so the count and listing both return 0.
+			preds = append(preds, entaccount.IDIn())
+		} else {
+			preds = append(preds, entaccount.IDIn(ids...))
+		}
+	}
+	return preds, nil
+}
+
+// atoiIfDigits returns (value, true) only when `s` is a non-empty positive
+// integer literal. Caller uses this to extend a name/upstream search with an
+// exact id match without leaking "name contains 4" into "id equals 4" false
+// positives.
+func atoiIfDigits(s string) (int, bool) {
+	if s == "" {
+		return 0, false
+	}
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return 0, false
+		}
+	}
+	id, err := strconv.Atoi(s)
+	if err != nil || id <= 0 {
+		return 0, false
+	}
+	return id, true
 }
 
 func (s *Store) ListActiveByProviderIDs(ctx context.Context, providerIDs []int) ([]contract.ProviderAccount, error) {

@@ -2281,3 +2281,183 @@ func TestBatchUpdateAccountCredentialsRejectsEmptyAndOversize(t *testing.T) {
 		t.Fatalf("expected ErrInvalidInput on oversize, got %v", err)
 	}
 }
+
+// TestListPageCombinedFilters exercises the SQL/memory predicate parity by
+// seeding a mix of providers, runtime classes, statuses, and group
+// memberships, then verifying every filter knob narrows the page the same way
+// the admin handler would. Catches drift between the memory and ent
+// implementations of contract.PageReader before the wire contract is hit.
+func TestListPageCombinedFilters(t *testing.T) {
+	ctx := context.Background()
+	store := accountmemory.New()
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	// Seed: two providers, three runtime classes, mixed statuses, plus an
+	// archived row that the default list must hide.
+	seed := []struct {
+		name         string
+		providerID   int
+		runtimeClass contract.RuntimeClass
+		status       contract.Status
+	}{
+		{"alpha-api-key", 1, contract.RuntimeClassAPIKey, contract.StatusActive},
+		{"alpha-oauth", 1, contract.RuntimeClassOauthRefresh, contract.StatusActive},
+		{"alpha-needs-reauth", 1, contract.RuntimeClassOauthRefresh, contract.StatusNeedsReauth},
+		{"beta-api-key", 2, contract.RuntimeClassAPIKey, contract.StatusActive},
+		{"beta-cookie", 2, contract.RuntimeClassWebSessionCookie, contract.StatusDisabled},
+		{"beta-archived", 2, contract.RuntimeClassAPIKey, contract.StatusArchived},
+	}
+	createdByName := make(map[string]int, len(seed))
+	for _, item := range seed {
+		statusCopy := item.status
+		created, createErr := svc.Create(ctx, contract.CreateRequest{
+			ProviderID:   item.providerID,
+			Name:         item.name,
+			RuntimeClass: item.runtimeClass,
+			Credential:   map[string]any{"api_key": "k"},
+			Status:       &statusCopy,
+		})
+		if createErr != nil {
+			t.Fatalf("seed %s: %v", item.name, createErr)
+		}
+		createdByName[item.name] = created.ID
+	}
+
+	// Build a group and bind two beta-side accounts so group_id narrowing
+	// has something to assert against.
+	group, err := svc.CreateGroup(ctx, contract.CreateGroupRequest{Name: "beta-pool"})
+	if err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	for _, name := range []string{"beta-api-key", "beta-cookie"} {
+		if _, err := svc.AddAccountToGroup(ctx, createdByName[name], group.ID); err != nil {
+			t.Fatalf("add %s to group: %v", name, err)
+		}
+	}
+
+	cases := []struct {
+		label     string
+		filter    contract.ListFilter
+		wantNames []string
+		wantTotal int
+	}{
+		{
+			label:     "default hides archived",
+			filter:    contract.ListFilter{},
+			wantNames: []string{"alpha-api-key", "alpha-oauth", "alpha-needs-reauth", "beta-api-key", "beta-cookie"},
+			wantTotal: 5,
+		},
+		{
+			label:     "status narrows exact",
+			filter:    contract.ListFilter{Status: contract.StatusNeedsReauth},
+			wantNames: []string{"alpha-needs-reauth"},
+			wantTotal: 1,
+		},
+		{
+			label:     "provider + runtime class",
+			filter:    contract.ListFilter{ProviderID: intPtr(1), RuntimeClass: contract.RuntimeClassOauthRefresh},
+			wantNames: []string{"alpha-oauth", "alpha-needs-reauth"},
+			wantTotal: 2,
+		},
+		{
+			label:     "search by name substring",
+			filter:    contract.ListFilter{Search: "needs-reauth"},
+			wantNames: []string{"alpha-needs-reauth"},
+			wantTotal: 1,
+		},
+		{
+			label:     "group narrows membership",
+			filter:    contract.ListFilter{GroupID: intPtr(group.ID)},
+			wantNames: []string{"beta-api-key", "beta-cookie"},
+			wantTotal: 2,
+		},
+		{
+			label:     "group + status + provider together",
+			filter:    contract.ListFilter{ProviderID: intPtr(2), GroupID: intPtr(group.ID), Status: contract.StatusActive},
+			wantNames: []string{"beta-api-key"},
+			wantTotal: 1,
+		},
+		{
+			label:     "include archived surfaces them",
+			filter:    contract.ListFilter{IncludeArchived: true},
+			wantNames: []string{"alpha-api-key", "alpha-oauth", "alpha-needs-reauth", "beta-api-key", "beta-cookie", "beta-archived"},
+			wantTotal: 6,
+		},
+		{
+			label:     "search by exact id",
+			filter:    contract.ListFilter{Search: strconv.Itoa(createdByName["alpha-oauth"])},
+			wantNames: []string{"alpha-oauth"},
+			wantTotal: 1,
+		},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.label, func(t *testing.T) {
+			result, err := svc.ListPage(ctx, tc.filter, 0, 0)
+			if err != nil {
+				t.Fatalf("list page: %v", err)
+			}
+			if result.Total != tc.wantTotal {
+				t.Errorf("total: got %d want %d", result.Total, tc.wantTotal)
+			}
+			got := make([]string, 0, len(result.Items))
+			for _, item := range result.Items {
+				got = append(got, item.Name)
+			}
+			if !sameStringSet(got, tc.wantNames) {
+				t.Errorf("names: got %v want %v", got, tc.wantNames)
+			}
+		})
+	}
+
+	// Pagination: with limit=2 the page is exactly two items, total reports
+	// the unbounded match count, and the second page picks up where the
+	// first left off.
+	page1, err := svc.ListPage(ctx, contract.ListFilter{}, 2, 0)
+	if err != nil {
+		t.Fatalf("page1: %v", err)
+	}
+	if page1.Total != 5 {
+		t.Errorf("page1 total: got %d want 5", page1.Total)
+	}
+	if len(page1.Items) != 2 {
+		t.Errorf("page1 items: got %d want 2", len(page1.Items))
+	}
+	page2, err := svc.ListPage(ctx, contract.ListFilter{}, 2, 2)
+	if err != nil {
+		t.Fatalf("page2: %v", err)
+	}
+	if len(page2.Items) != 2 {
+		t.Errorf("page2 items: got %d want 2", len(page2.Items))
+	}
+	if page1.Items[0].ID <= page1.Items[1].ID {
+		t.Errorf("page1 not newest-first: %v", []int{page1.Items[0].ID, page1.Items[1].ID})
+	}
+	if page2.Items[0].ID >= page1.Items[1].ID {
+		t.Errorf("page2 must continue after page1: page1[1]=%d page2[0]=%d", page1.Items[1].ID, page2.Items[0].ID)
+	}
+}
+
+func intPtr(v int) *int { return &v }
+
+func sameStringSet(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	seen := make(map[string]int, len(a))
+	for _, item := range a {
+		seen[item]++
+	}
+	for _, item := range b {
+		seen[item]--
+	}
+	for _, count := range seen {
+		if count != 0 {
+			return false
+		}
+	}
+	return true
+}

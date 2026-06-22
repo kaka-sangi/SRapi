@@ -3,6 +3,7 @@ package accounts
 import (
 	"context"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -232,3 +233,138 @@ func sqliteDSN(t *testing.T) string {
 	t.Helper()
 	return "file:" + filepath.Join(t.TempDir(), "accounts.db") + "?_fk=1"
 }
+
+// TestStoreListPagePushesFiltersToSQL anchors the ent.ListPage behaviour
+// against the memory implementation: same predicates, same archived hiding,
+// same DESC-by-id ordering, same group membership join. Without this anchor a
+// drift between the two stores would only surface as a wire-contract bug seen
+// in production (the admin handler talks to whichever Store the runtime is
+// configured with).
+func TestStoreListPagePushesFiltersToSQL(t *testing.T) {
+	client := enttest.Open(t, dialect.SQLite, sqliteDSN(t))
+	defer client.Close()
+	store, err := New(client)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	ctx := context.Background()
+
+	mk := func(name string, providerID int, runtime contract.RuntimeClass, status contract.Status) contract.ProviderAccount {
+		t.Helper()
+		acct, err := store.Create(ctx, contract.CreateStoredAccount{
+			ProviderID:           providerID,
+			Name:                 name,
+			RuntimeClass:         runtime,
+			CredentialCiphertext: "ct",
+			CredentialVersion:    "v1",
+			Status:               status,
+			Priority:             0,
+			Weight:               1,
+		})
+		if err != nil {
+			t.Fatalf("create %s: %v", name, err)
+		}
+		return acct
+	}
+
+	a := mk("alpha-api-key", 1, contract.RuntimeClassAPIKey, contract.StatusActive)
+	b := mk("alpha-oauth", 1, contract.RuntimeClassOauthRefresh, contract.StatusActive)
+	c := mk("alpha-needs-reauth", 1, contract.RuntimeClassOauthRefresh, contract.StatusNeedsReauth)
+	d := mk("beta-api-key", 2, contract.RuntimeClassAPIKey, contract.StatusActive)
+	e := mk("beta-cookie", 2, contract.RuntimeClassWebSessionCookie, contract.StatusDisabled)
+	f := mk("beta-archived", 2, contract.RuntimeClassAPIKey, contract.StatusArchived)
+
+	group, err := store.CreateGroup(ctx, contract.CreateStoredAccountGroup{Name: "beta-pool", Status: contract.GroupStatusActive})
+	if err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	if _, err := store.AddAccountToGroup(ctx, d.ID, group.ID); err != nil {
+		t.Fatalf("add d to group: %v", err)
+	}
+	if _, err := store.AddAccountToGroup(ctx, e.ID, group.ID); err != nil {
+		t.Fatalf("add e to group: %v", err)
+	}
+
+	check := func(label string, filter contract.ListFilter, wantTotal int, wantIDs []int) {
+		t.Helper()
+		result, err := store.ListPage(ctx, filter, 0, 0)
+		if err != nil {
+			t.Fatalf("%s: %v", label, err)
+		}
+		if result.Total != wantTotal {
+			t.Errorf("%s total: got %d want %d", label, result.Total, wantTotal)
+		}
+		got := make([]int, 0, len(result.Items))
+		for _, item := range result.Items {
+			got = append(got, item.ID)
+		}
+		if !sameIntSet(got, wantIDs) {
+			t.Errorf("%s ids: got %v want %v", label, got, wantIDs)
+		}
+	}
+
+	check("default hides archived", contract.ListFilter{}, 5, []int{a.ID, b.ID, c.ID, d.ID, e.ID})
+	check("include archived surfaces them", contract.ListFilter{IncludeArchived: true}, 6, []int{a.ID, b.ID, c.ID, d.ID, e.ID, f.ID})
+	check("status narrows exact", contract.ListFilter{Status: contract.StatusNeedsReauth}, 1, []int{c.ID})
+	pid := 2
+	check("provider id", contract.ListFilter{ProviderID: &pid}, 2, []int{d.ID, e.ID})
+	check("runtime class", contract.ListFilter{RuntimeClass: contract.RuntimeClassWebSessionCookie}, 1, []int{e.ID})
+	check("search by name substring", contract.ListFilter{Search: "needs-reauth"}, 1, []int{c.ID})
+	check("search by exact id", contract.ListFilter{Search: strconv.Itoa(c.ID)}, 1, []int{c.ID})
+	gid := group.ID
+	check("group narrows", contract.ListFilter{GroupID: &gid}, 2, []int{d.ID, e.ID})
+	check("group + status + provider", contract.ListFilter{GroupID: &gid, Status: contract.StatusActive, ProviderID: &pid}, 1, []int{d.ID})
+
+	// Pagination: limit + offset slice the result set newest-first.
+	page1, err := store.ListPage(ctx, contract.ListFilter{}, 2, 0)
+	if err != nil {
+		t.Fatalf("page1: %v", err)
+	}
+	if page1.Total != 5 || len(page1.Items) != 2 {
+		t.Fatalf("page1 metadata: total=%d items=%d", page1.Total, len(page1.Items))
+	}
+	if page1.Items[0].ID <= page1.Items[1].ID {
+		t.Fatalf("page1 not newest-first: %v", []int{page1.Items[0].ID, page1.Items[1].ID})
+	}
+	page2, err := store.ListPage(ctx, contract.ListFilter{}, 2, 2)
+	if err != nil {
+		t.Fatalf("page2: %v", err)
+	}
+	if len(page2.Items) != 2 || page2.Items[0].ID >= page1.Items[1].ID {
+		t.Fatalf("page2 continuity: page1[1]=%d page2[0]=%d", page1.Items[1].ID, page2.Items[0].ID)
+	}
+
+	// Group with no members: predicate must short-circuit to "no rows".
+	emptyGroup, err := store.CreateGroup(ctx, contract.CreateStoredAccountGroup{Name: "empty-pool", Status: contract.GroupStatusActive})
+	if err != nil {
+		t.Fatalf("create empty group: %v", err)
+	}
+	emptyID := emptyGroup.ID
+	emptyResult, err := store.ListPage(ctx, contract.ListFilter{GroupID: &emptyID}, 0, 0)
+	if err != nil {
+		t.Fatalf("empty group: %v", err)
+	}
+	if emptyResult.Total != 0 || len(emptyResult.Items) != 0 {
+		t.Fatalf("empty group must produce zero rows, got total=%d items=%d", emptyResult.Total, len(emptyResult.Items))
+	}
+}
+
+func sameIntSet(a, b []int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	seen := make(map[int]int, len(a))
+	for _, v := range a {
+		seen[v]++
+	}
+	for _, v := range b {
+		seen[v]--
+	}
+	for _, count := range seen {
+		if count != 0 {
+			return false
+		}
+	}
+	return true
+}
+
