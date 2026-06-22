@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, ShieldAlert } from "lucide-react";
+import { ShieldAlert } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { SectionHero } from "@/components/visual/section-hero";
 import { AdminListView, type Column } from "@/components/admin/admin-list-view";
@@ -20,8 +20,10 @@ import { useLanguage } from "@/context/LanguageContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
+import { IllustratedEmptyState } from "@/components/ui/illustrated-empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { InlineDetailGrid } from "@/components/ui/inline-detail-grid";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import { formatDateTime, formatInteger } from "@/lib/admin-format";
@@ -44,6 +46,21 @@ export default function AdminRiskControlPage() {
       <RiskContent />
     </AdminShell>
   );
+}
+
+function riskLevelSeverity(
+  level: RiskControlLog["level"],
+): "info" | "success" | "warning" | "error" | "critical" | undefined {
+  switch (level) {
+    case "block":
+      return "error";
+    case "warn":
+      return "warning";
+    case "info":
+      return "info";
+    default:
+      return undefined;
+  }
 }
 
 function RiskContent() {
@@ -119,7 +136,22 @@ function RiskContent() {
     {
       key: "severity",
       header: t("adminRisk.severity"),
-      render: (r) => <QuietBadge status={quietStatusFor(r.level)} label={statusLabel(t, r.level)} />,
+      sortValue: (r) => r.level,
+      render: (r) => (
+        <DataTooltip
+          title={t("adminRisk.severity")}
+          primary={statusLabel(t, r.level)}
+          rows={[
+            { label: t("adminRisk.event"), value: r.action || "—", tone: "muted" },
+            ...(r.subject
+              ? [{ label: t("adminRisk.detail"), value: r.subject, tone: "muted" as const }]
+              : []),
+            { label: t("adminRisk.time"), value: formatDateTime(r.created_at), tone: "muted" },
+          ]}
+        >
+          <QuietBadge status={quietStatusFor(r.level)} label={statusLabel(t, r.level)} />
+        </DataTooltip>
+      ),
     },
   ];
 
@@ -264,7 +296,12 @@ function RiskContent() {
               <div className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                 {t("adminRisk.activeBlocks")}
               </div>
-              <div className="mt-1 text-3xl font-semibold tracking-tight tabular text-srapi-text-primary">
+              <div
+                className={
+                  "mt-1 tabular " +
+                  (status.data.active_blocks > 0 ? "metric-primary metric-strong-warn" : "metric-primary")
+                }
+              >
                 {formatInteger(status.data.active_blocks)}
               </div>
             </div>
@@ -272,7 +309,7 @@ function RiskContent() {
               <div className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                 {t("adminRisk.recentEvents")}
               </div>
-              <div className="mt-1 text-3xl font-semibold tracking-tight tabular text-srapi-text-primary">
+              <div className="mt-1 metric-secondary tabular">
                 {formatInteger(status.data.recent_events)}
               </div>
             </div>
@@ -288,8 +325,8 @@ function RiskContent() {
         </Card>
       ) : status.isError ? (
         <Card>
-          <EmptyState
-            icon={AlertTriangle}
+          <IllustratedEmptyState
+            illust="cog"
             title={t("common.error")}
             description={t("common.errorBody")}
             action={
@@ -338,7 +375,7 @@ function RiskContent() {
               <div className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                 {t("adminRisk.customKeywordCount")}
               </div>
-              <div className="mt-1 text-3xl font-semibold tracking-tight tabular text-srapi-text-primary">
+              <div className="mt-1 metric-secondary tabular">
                 {formatInteger(contentSafety.data.custom_keywords.length)}
               </div>
             </div>
@@ -346,7 +383,7 @@ function RiskContent() {
               <div className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                 {t("adminRisk.modelScopeCount")}
               </div>
-              <div className="mt-1 text-3xl font-semibold tracking-tight tabular text-srapi-text-primary">
+              <div className="mt-1 metric-tertiary tabular">
                 {formatInteger(contentSafety.data.model_scopes.length)}
               </div>
             </div>
@@ -362,8 +399,8 @@ function RiskContent() {
         </Card>
       ) : contentSafety.isError ? (
         <Card>
-          <EmptyState
-            icon={AlertTriangle}
+          <IllustratedEmptyState
+            illust="cog"
             title={t("common.error")}
             description={t("common.errorBody")}
             action={
@@ -384,6 +421,8 @@ function RiskContent() {
         emptyTitle={t("adminRisk.emptyTitle")}
         emptyBody={t("adminRisk.emptyBody")}
         minWidth={640}
+        rowSeverity={(r) => riskLevelSeverity(r.level)}
+        expandRow={(r) => <RiskLogExpandDetail log={r} configMode={config.data?.mode} t={t} />}
       />
 
       {editing && config.data ? (
@@ -414,5 +453,70 @@ function RiskContent() {
         />
       ) : null}
     </>
+  );
+}
+
+/**
+ * Inline risk-log expansion: shows the trigger rule expression (action),
+ * full reason text, subject, the active enforcement mode, and any metadata
+ * keys the recorder attached. Operators can correlate without reaching for
+ * the JSON.
+ */
+function RiskLogExpandDetail({
+  log,
+  configMode,
+  t,
+}: {
+  log: RiskControlLog;
+  configMode: string | undefined;
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
+  const metaEntries = Object.entries(log.metadata ?? {}).slice(0, 12);
+
+  const triggerRows: Array<{ label: string; value: string; mono?: boolean; tone?: "default" | "muted" }> = [
+    { label: t("adminRisk.event"), value: log.action || "—", mono: true },
+    { label: t("adminRisk.severity"), value: statusLabel(t, log.level), mono: true },
+  ];
+  if (log.subject) triggerRows.push({ label: t("adminRisk.detail"), value: log.subject, mono: true });
+  if (configMode) triggerRows.push({ label: t("adminRisk.mode"), value: configMode, mono: true, tone: "muted" });
+  triggerRows.push({
+    label: t("adminRisk.time"),
+    value: formatDateTime(log.created_at),
+    tone: "muted",
+  });
+
+  return (
+    <div>
+      <InlineDetailGrid
+        sections={[
+          { title: t("adminRisk.event"), rows: triggerRows },
+          ...(metaEntries.length > 0
+            ? [
+                {
+                  title: t("adminCommon.metadata") || "Metadata",
+                  rows: metaEntries.map(([k, v]) => ({
+                    label: k,
+                    value:
+                      typeof v === "string" || typeof v === "number" || typeof v === "boolean"
+                        ? String(v)
+                        : JSON.stringify(v),
+                    mono: true,
+                  })),
+                },
+              ]
+            : []),
+        ]}
+      />
+      {log.reason ? (
+        <div className="border-t border-srapi-border/60 bg-srapi-card-muted/30 px-6 py-4">
+          <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
+            {t("adminRisk.detail")}
+          </div>
+          <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-srapi-border bg-srapi-card-muted/60 p-3 text-[12px] text-srapi-text-secondary">
+            {log.reason}
+          </pre>
+        </div>
+      ) : null}
+    </div>
   );
 }

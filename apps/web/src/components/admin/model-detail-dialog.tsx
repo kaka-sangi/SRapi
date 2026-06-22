@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2, Tags, Network, AlertTriangle, ServerCog } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { CopyButton } from "@/components/ui/copy-button";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { DataPill } from "@/components/ui/data-pill";
+import { IllustratedEmptyState } from "@/components/ui/illustrated-empty-state";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   useModelAliases,
   useModelMappings,
@@ -60,6 +64,7 @@ export function ModelDetailDialog({
   const deleteMapping = useDeleteModelMapping();
   // The row pending inline-confirm, keyed as "alias:<id>" / "mapping:<id>".
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
+  const [tab, setTab] = useState<"aliases" | "mappings">("aliases");
 
   // Refetch accounts on mount to ensure fresh data when dialog reopens
   useEffect(() => {
@@ -82,6 +87,13 @@ export function ModelDetailDialog({
     const providerKey = String(account.provider_id);
     activeAccountsByProvider.set(providerKey, (activeAccountsByProvider.get(providerKey) ?? 0) + 1);
   }
+
+  // Roll-up: how many mappings can be served right now? Drives the header
+  // DataTooltip so the operator sees coverage at a glance.
+  const mappingsServed = mappingRows.filter(
+    (m) => (activeAccountsByProvider.get(String(m.provider_id)) ?? 0) > 0,
+  ).length;
+  const mappingsUnserved = mappingRows.length - mappingsServed;
 
   async function removeAlias(aliasId: string) {
     try {
@@ -111,17 +123,93 @@ export function ModelDetailDialog({
         <DialogHeader>
           <DialogTitle>{t("adminModels.manageTitle")}</DialogTitle>
         </DialogHeader>
-        <p className="-mt-1 flex items-center gap-1.5 text-xs text-srapi-text-tertiary">
-          <span className="font-mono">{model.canonical_name}</span>
-          <CopyButton value={model.canonical_name} size="inline" />
-        </p>
+        <div className="-mt-1 flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 text-xs text-srapi-text-tertiary">
+            <span className="font-mono">{model.canonical_name}</span>
+            <CopyButton value={model.canonical_name} size="inline" />
+          </span>
+          <DataTooltip
+            title={t("adminModels.aliasesSection")}
+            primary={<span className="tabular">{aliasRows.length}</span>}
+            rows={[
+              {
+                label: t("adminModels.aliasesSection"),
+                value: String(aliasRows.length),
+              },
+              {
+                label: t("adminModels.mappingsSection"),
+                value: String(mappingRows.length),
+              },
+            ]}
+          >
+            <DataPill tone="accent" size="sm" className="metric-tertiary cursor-help">
+              <Tags className="size-3" /> {aliasRows.length}
+            </DataPill>
+          </DataTooltip>
+          <DataTooltip
+            title={t("adminModels.mappingsSection")}
+            primary={
+              <span className="tabular">
+                {mappingsServed}
+                <span className="ml-1 text-xs font-normal text-srapi-text-tertiary">
+                  / {mappingRows.length}
+                </span>
+              </span>
+            }
+            rows={[
+              {
+                label: t("adminModels.servingAccounts", { count: mappingsServed }).replace(
+                  /\(\d+\)|\d+/,
+                  "",
+                ).trim() || "served",
+                value: String(mappingsServed),
+                tone: "success",
+              },
+              ...(mappingsUnserved > 0
+                ? [
+                    {
+                      label: t("adminModels.noServingAccount"),
+                      value: String(mappingsUnserved),
+                      tone: "error" as const,
+                    },
+                  ]
+                : []),
+            ]}
+          >
+            <DataPill
+              tone={mappingsUnserved > 0 ? "warning" : "success"}
+              size="sm"
+              className="metric-tertiary cursor-help"
+            >
+              <Network className="size-3" /> {mappingsServed}/{mappingRows.length}
+            </DataPill>
+          </DataTooltip>
+        </div>
 
-        <div className="mt-5 max-h-[60vh] space-y-6 overflow-y-auto pr-1">
-          <section>
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
-                {t("adminModels.aliasesSection")}
-              </h3>
+        <Tabs
+          value={tab}
+          onValueChange={(v) => setTab(v as "aliases" | "mappings")}
+          className="mt-5"
+        >
+          <TabsList>
+            <TabsTrigger value="aliases">
+              <Tags className="mr-1.5 size-3.5" />
+              {t("adminModels.aliasesSection")}
+              <span className="ml-1.5 text-[11px] text-srapi-text-tertiary tabular">
+                {aliasRows.length}
+              </span>
+            </TabsTrigger>
+            <TabsTrigger value="mappings">
+              <Network className="mr-1.5 size-3.5" />
+              {t("adminModels.mappingsSection")}
+              <span className="ml-1.5 text-[11px] text-srapi-text-tertiary tabular">
+                {mappingRows.length}
+              </span>
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="aliases" className="max-h-[55vh] overflow-y-auto pr-1">
+            <div className="mb-2 flex items-center justify-end">
               <Button variant="ghost" size="sm" onClick={onAddAlias}>
                 <Plus className="size-3.5" /> {t("adminModels.addAlias")}
               </Button>
@@ -129,14 +217,27 @@ export function ModelDetailDialog({
             {aliases.isLoading ? (
               <p className="py-3 text-xs text-srapi-text-tertiary">{t("common.loading")}</p>
             ) : aliasRows.length === 0 ? (
-              <p className="py-3 text-xs text-srapi-text-tertiary">{t("adminModels.aliasesEmpty")}</p>
+              <IllustratedEmptyState
+                illust="search"
+                title={t("adminModels.aliasesEmpty")}
+                action={
+                  <Button variant="primary" size="sm" onClick={onAddAlias}>
+                    <Plus className="size-3.5" /> {t("adminModels.addAlias")}
+                  </Button>
+                }
+              />
             ) : (
               <ul className="divide-y divide-srapi-border/70">
                 {aliasRows.map((a) => {
                   const key = `alias:${a.id}`;
                   return (
                     <li key={a.id} className="flex items-center justify-between gap-3 py-3">
-                      <span className="truncate font-mono text-xs text-srapi-text-primary">{a.alias}</span>
+                      <div className="min-w-0 flex flex-1 items-center gap-2">
+                        <span className="truncate font-mono text-xs text-srapi-text-primary">
+                          {a.alias}
+                        </span>
+                        <CopyButton value={a.alias} size="inline" />
+                      </div>
                       <div className="flex shrink-0 items-center gap-2">
                         <QuietBadge status={quietStatusFor(a.status)} label={statusLabel(t, a.status)} />
                         {onEditAlias && confirmKey !== key ? (
@@ -163,13 +264,10 @@ export function ModelDetailDialog({
                 })}
               </ul>
             )}
-          </section>
+          </TabsContent>
 
-          <section>
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
-                {t("adminModels.mappingsSection")}
-              </h3>
+          <TabsContent value="mappings" className="max-h-[55vh] overflow-y-auto pr-1">
+            <div className="mb-2 flex items-center justify-end">
               <Button variant="ghost" size="sm" onClick={onAddMapping}>
                 <Plus className="size-3.5" /> {t("adminModels.addMapping")}
               </Button>
@@ -177,7 +275,15 @@ export function ModelDetailDialog({
             {mappings.isLoading ? (
               <p className="py-3 text-xs text-srapi-text-tertiary">{t("common.loading")}</p>
             ) : mappingRows.length === 0 ? (
-              <p className="py-3 text-xs text-srapi-text-tertiary">{t("adminModels.mappingsEmpty")}</p>
+              <IllustratedEmptyState
+                illust="accounts"
+                title={t("adminModels.mappingsEmpty")}
+                action={
+                  <Button variant="primary" size="sm" onClick={onAddMapping}>
+                    <Plus className="size-3.5" /> {t("adminModels.addMapping")}
+                  </Button>
+                }
+              />
             ) : (
               <ul className="divide-y divide-srapi-border/70">
                 {mappingRows.map((m) => {
@@ -186,24 +292,52 @@ export function ModelDetailDialog({
                   const serving = activeAccountsByProvider.get(String(m.provider_id)) ?? 0;
                   return (
                     <li key={m.id} className="flex items-center justify-between gap-3 py-3">
-                      <span className="min-w-0 truncate text-xs text-srapi-text-primary">
-                        <span className="font-medium text-srapi-text-secondary">{provider}</span>
-                        <span className="text-srapi-text-tertiary"> · </span>
-                        <span className="font-mono">{m.upstream_model_name}</span>
+                      <div className="min-w-0 flex-1 text-xs text-srapi-text-primary">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-medium text-srapi-text-secondary">{provider}</span>
+                          <span className="text-srapi-text-tertiary">·</span>
+                          <span className="truncate font-mono">{m.upstream_model_name}</span>
+                        </div>
                         {!accounts.isLoading ? (
-                          serving > 0 ? (
-                            <span className="text-srapi-text-tertiary">
-                              {" · "}
-                              {t("adminModels.servingAccounts", { count: serving })}
-                            </span>
-                          ) : (
-                            <span className="text-srapi-error">
-                              {" · "}
-                              {t("adminModels.noServingAccount")}
-                            </span>
-                          )
+                          <div className="mt-1">
+                            <DataTooltip
+                              title={t("adminModels.mappingsSection")}
+                              primary={
+                                <span className="tabular">
+                                  {serving} {provider}
+                                </span>
+                              }
+                              rows={[
+                                {
+                                  label: t("adminModels.servingAccounts", { count: serving }),
+                                  value: String(serving),
+                                  tone: serving > 0 ? "success" : "error",
+                                },
+                                {
+                                  label: t("adminCommon.status"),
+                                  value: statusLabel(t, m.status),
+                                  tone: "muted",
+                                },
+                              ]}
+                              footer={
+                                serving === 0 ? t("adminModels.noServingAccount") : undefined
+                              }
+                            >
+                              {serving > 0 ? (
+                                <DataPill tone="success" size="sm" className="cursor-help">
+                                  <ServerCog className="size-3" />
+                                  {t("adminModels.servingAccounts", { count: serving })}
+                                </DataPill>
+                              ) : (
+                                <DataPill tone="error" size="sm" className="cursor-help">
+                                  <AlertTriangle className="size-3" />
+                                  {t("adminModels.noServingAccount")}
+                                </DataPill>
+                              )}
+                            </DataTooltip>
+                          </div>
                         ) : null}
-                      </span>
+                      </div>
                       <div className="flex shrink-0 items-center gap-2">
                         <QuietBadge status={quietStatusFor(m.status)} label={statusLabel(t, m.status)} />
                         {onEditMapping && confirmKey !== key ? (
@@ -230,8 +364,8 @@ export function ModelDetailDialog({
                 })}
               </ul>
             )}
-          </section>
-        </div>
+          </TabsContent>
+        </Tabs>
 
         <DialogFooter className="mt-6">
           <Button variant="ghost" onClick={onClose}>

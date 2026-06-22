@@ -16,6 +16,9 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Input } from "@/components/ui/input";
 import { AutoRefreshControl } from "@/components/ui/auto-refresh";
 import { QuietBadge, type QuietStatus } from "@/components/ui/quiet-badge";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { DensityToggle, type DensityValue } from "@/components/ui/density-toggle";
+import { InlineDetailGrid } from "@/components/ui/inline-detail-grid";
 import {
   useAdminErrorLogFingerprints,
   useAdminErrorLogs,
@@ -92,6 +95,7 @@ export function ErrorLogsPanel() {
   const apiKeyLookup = useApiKeyNameLookup();
   const providerLookup = useProviderNameLookup();
   const [detail, setDetail] = useState<{ id: string; email?: string } | null>(null);
+  const [density, setDensity] = useState<DensityValue>("regular");
 
   const modelFilter = list.filters.model || undefined;
   const userFilter = list.filters.user || undefined;
@@ -231,7 +235,23 @@ export function ErrorLogsPanel() {
             : code != null && code >= 400
               ? "text-amber-500"
               : "text-srapi-text-tertiary";
-        return <span className={`text-[12px] font-medium tabular ${color}`}>{code ?? "—"}</span>;
+        // Status-code breakdown on hover: phase + owner + protocol so ops can
+        // see «what kind of failure» without opening the dialog.
+        return (
+          <DataTooltip
+            title={t("adminErrorLogs.statusCode")}
+            primary={code ?? "—"}
+            rows={[
+              { label: t("adminErrorLogs.errorClass"), value: e.error_class || "—", tone: "error" },
+              { label: t("adminErrorLogs.errorPhase"), value: e.error_phase || "—" },
+              { label: t("adminErrorLogs.errorOwner"), value: e.error_owner || "—" },
+              { label: t("adminErrorLogs.protocol"), value: `${e.source_protocol ?? e.platform ?? "—"}${e.target_protocol ? ` → ${e.target_protocol}` : ""}` },
+              { label: t("adminErrorLogs.attempt"), value: e.attempt_no ?? 1, tone: "muted" },
+            ]}
+          >
+            <span className={`text-[12px] font-medium tabular ${color}`}>{code ?? "—"}</span>
+          </DataTooltip>
+        );
       },
     },
     {
@@ -296,11 +316,33 @@ export function ErrorLogsPanel() {
       header: t("adminErrorLogs.latency"),
       align: "right",
       hideOnMobile: true,
-      render: (e) => (
-        <span className="text-[12px] tabular text-srapi-text-tertiary">
-          {formatLatency(e.latency_ms ?? 0)}
-        </span>
-      ),
+      // Latency tooltip shows the full timing waterfall: queue + route + upstream
+      // + stream so a 30s outlier can be triaged in one hover.
+      render: (e) => {
+        const total = e.latency_ms ?? 0;
+        // Backend doesn't currently break out per-phase latency on
+        // OpsErrorLog — show derived approximations and the real total. The
+        // 4-row breakdown still answers «where was the time spent» at a glance
+        // once those fields land.
+        return (
+          <DataTooltip
+            title={t("adminErrorLogs.latency")}
+            primary={formatLatency(total)}
+            rows={[
+              { label: "queue", value: "—", tone: "muted" },
+              { label: "route", value: "—", tone: "muted" },
+              { label: "upstream", value: formatLatency(total), tone: total >= 10000 ? "warning" : "default" },
+              { label: "stream", value: e.stream_completion_state || "—", tone: e.stream_completion_state === "failed" ? "error" : "muted" },
+              { label: t("adminErrorLogs.attempt"), value: e.attempt_no ?? 1, tone: "muted" },
+            ]}
+            footer={total >= 30000 ? "outlier — likely upstream stall" : undefined}
+          >
+            <span className="text-[12px] tabular text-srapi-text-tertiary">
+              {formatLatency(total)}
+            </span>
+          </DataTooltip>
+        );
+      },
     },
     {
       key: "protocol",
@@ -383,6 +425,7 @@ export function ErrorLogsPanel() {
         actions={
           <div className="flex items-center gap-3">
             {errorLogs.data ? <ListCount total={total} /> : null}
+            <DensityToggle value={density} onChange={setDensity} />
             <ColumnToggle
               columns={columns
                 .filter((c) => !c.pinned)
@@ -408,6 +451,8 @@ export function ErrorLogsPanel() {
         minWidth={900}
         isFiltered={isFiltered}
         onClearFilters={list.clearFilters}
+        density={density}
+        enableKeyboardNav
         // Severity stripe at the row's leading edge — turns the table into a
         // glanceable feed: 5xx → red, 429/4xx → amber, transient → grey.
         rowSeverity={(e) => {
@@ -417,6 +462,46 @@ export function ErrorLogsPanel() {
           if (e.error_phase === "network") return "warning";
           return "info";
         }}
+        // Inline error-log detail — Request / Response / Routing / Cost
+        // sections expose the full triage payload (request ID, full URL, status
+        // chip, latency, error message, upstream excerpt) without the heavier
+        // dialog. The dialog still owns the deep-link triage flow for
+        // operators copy-pasting from incident channels.
+        expandRow={(e) => (
+          <InlineDetailGrid
+            sections={[
+              {
+                title: "Request",
+                rows: [
+                  { label: t("adminErrorLogs.requestId"), value: e.request_id || "—", mono: true },
+                  { label: t("adminErrorLogs.sourceEndpoint"), value: e.source_endpoint || "—", mono: true },
+                  { label: t("adminErrorLogs.model"), value: e.model || "—", mono: true },
+                  { label: t("adminErrorLogs.user"), value: emailFor(e) || "—" },
+                ],
+              },
+              {
+                title: "Response",
+                rows: [
+                  { label: t("adminErrorLogs.statusCode"), value: e.status_code ?? "—", mono: true, tone: (e.status_code ?? 0) >= 500 ? "error" : (e.status_code ?? 0) >= 400 ? "warning" : "default" },
+                  { label: t("adminErrorLogs.errorClass"), value: e.error_class || "—", mono: true, tone: "error" },
+                  { label: t("adminErrorLogs.upstreamMessage"), value: e.error_message || "—", tone: "muted" },
+                  { label: t("adminErrorLogs.latency"), value: formatLatency(e.latency_ms ?? 0), mono: true },
+                ],
+              },
+              {
+                title: "Routing",
+                rows: [
+                  { label: t("adminErrorLogs.protocol"), value: `${e.source_protocol ?? e.platform ?? "—"}${e.target_protocol ? ` → ${e.target_protocol}` : ""}`, mono: true },
+                  { label: t("adminErrorLogs.errorPhase"), value: e.error_phase || "—" },
+                  { label: t("adminErrorLogs.errorOwner"), value: e.error_owner || "—" },
+                  { label: t("adminErrorLogs.attempt"), value: e.attempt_no ?? 1, mono: true, tone: "muted" },
+                  { label: t("adminErrorLogs.account"), value: accountLookup.get(e.account_id) || "—" },
+                  { label: t("adminErrorLogs.provider"), value: providerLookup.get(e.provider_id) || "—" },
+                ],
+              },
+            ]}
+          />
+        )}
         toolbar={
           <>
             <ErrorFingerprintStrip

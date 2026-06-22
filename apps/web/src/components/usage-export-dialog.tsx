@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { IconBubble } from "@/components/ui/icon-bubble";
+import { Kbd } from "@/components/ui/kbd";
 import { useToast } from "@/context/ToastContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useUsageExport } from "@/hooks/use-usage-export";
@@ -91,8 +93,19 @@ export function UsageExportDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-            <Download className="size-4 text-srapi-text-secondary" aria-hidden />
+          <DialogTitle className="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
+            <IconBubble
+              tone={
+                progress.phase === "error"
+                  ? "error"
+                  : progress.phase === "done"
+                    ? "success"
+                    : "accent"
+              }
+              size="sm"
+            >
+              <Download aria-hidden />
+            </IconBubble>
             {t("usage.exportTitle")}
           </DialogTitle>
           <DialogDescription>{t("usage.exportSubtitle")}</DialogDescription>
@@ -111,7 +124,7 @@ export function UsageExportDialog({
                   : t("usage.exportPreparing")}
               </span>
             </span>
-            <span className="text-sm font-semibold tabular text-srapi-text-primary">{percent}%</span>
+            <span className="metric-primary tabular tracking-tight">{percent}%</span>
           </div>
 
           <div className="h-2 w-full overflow-hidden rounded-full bg-srapi-card-muted">
@@ -140,9 +153,15 @@ export function UsageExportDialog({
 
         <DialogFooter>
           {isExporting ? (
-            <Button variant="outline" size="sm" onClick={cancel}>
-              {t("usage.exportCancel")}
-            </Button>
+            <div className="flex items-center gap-2">
+              <span className="hidden items-center gap-1.5 text-[11px] text-srapi-text-tertiary sm:inline-flex">
+                <Kbd>Esc</Kbd>
+                <span>{t("usage.exportCancel")}</span>
+              </span>
+              <Button variant="outline" size="sm" onClick={cancel}>
+                {t("usage.exportCancel")}
+              </Button>
+            </div>
           ) : (
             <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
               {t("common.close")}

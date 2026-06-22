@@ -1,17 +1,20 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { apiService } from "@/lib/api";
 import { useLanguage } from "@/context/LanguageContext";
+import { cn } from "@/lib/cn";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FloatingInput } from "@/components/ui/floating-input";
 import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { LanguageToggle } from "@/components/layout/language-toggle";
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * Password reset, both halves of the flow on one route:
@@ -61,11 +64,22 @@ function ResetForm() {
   const isConfirm = token.length > 0;
 
   const [email, setEmail] = useState("");
+  const [emailTouched, setEmailTouched] = useState(false);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+
+  const emailLooksValid = EMAIL_RE.test(email.trim());
+  const emailError = emailTouched && email.length > 0 && !emailLooksValid
+    ? t("login.errRequired")
+    : undefined;
+
+  const passwordLongEnough = password.length >= 8;
+  const passwordError = password.length > 0 && !passwordLongEnough
+    ? t("authReset.weakPassword")
+    : undefined;
 
   async function onRequest(event: React.FormEvent) {
     event.preventDefault();
@@ -132,28 +146,30 @@ function ResetForm() {
         <p className="mt-1.5 text-sm text-srapi-text-secondary">{t("authReset.confirmSubtitle")}</p>
         <form onSubmit={onConfirm} noValidate className="mt-7 space-y-5">
           <div>
-            <Label htmlFor="new-password">{t("authReset.newPassword")}</Label>
             <div className="relative">
-              <Input
+              <FloatingInput
                 id="new-password"
+                label={t("authReset.newPassword")}
                 type={showPassword ? "text" : "password"}
                 autoComplete="new-password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="pr-10"
+                onChange={setPassword}
+                error={passwordError}
+                className="[&_input]:pr-12"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
                 aria-label={t(showPassword ? "login.hidePassword" : "login.showPassword")}
-                className="absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-xl text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
+                className="absolute right-0 top-0 flex h-14 w-12 items-center justify-center rounded-r-2xl text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
               >
                 {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
             </div>
+            {password.length > 0 ? <PasswordStrength password={password} /> : null}
           </div>
           {error && (
-            <p role="alert" className="rounded-xl bg-srapi-error/10 px-3 py-2 text-sm text-srapi-error">
+            <p role="alert" className="anim-shake rounded-xl bg-srapi-error/10 px-3 py-2 text-sm text-srapi-error">
               {error}
             </p>
           )}
@@ -165,7 +181,12 @@ function ResetForm() {
             loading={submitting}
             disabled={submitting || password.length < 8}
           >
-            {submitting ? t("authReset.submitting") : t("authReset.confirmCta")}
+            <span className="inline-flex items-center gap-2">
+              {submitting ? t("authReset.submitting") : t("authReset.confirmCta")}
+              {passwordLongEnough && !submitting ? (
+                <Kbd className="border-white/20 bg-white/10 text-white/90 shadow-none">↵</Kbd>
+              ) : null}
+            </span>
           </Button>
         </form>
       </Card>
@@ -178,15 +199,15 @@ function ResetForm() {
       <h1 className="text-2xl font-semibold tracking-tight text-srapi-text-primary">{t("authReset.requestTitle")}</h1>
       <p className="mt-1.5 text-sm text-srapi-text-secondary">{t("authReset.requestSubtitle")}</p>
       <form onSubmit={onRequest} noValidate className="mt-7 space-y-5">
-        <div>
-          <Label htmlFor="reset-email">{t("login.email")}</Label>
-          <Input
+        <div onBlur={() => setEmailTouched(true)}>
+          <FloatingInput
             id="reset-email"
+            label={t("login.email")}
             type="email"
             autoComplete="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
+            onChange={setEmail}
+            error={emailError}
           />
         </div>
         <Button
@@ -195,14 +216,52 @@ function ResetForm() {
           size="lg"
           className="h-11 w-full rounded-xl btn-raise"
           loading={submitting}
-          disabled={submitting || !email}
+          disabled={submitting || !emailLooksValid}
         >
-          {submitting ? t("authReset.submitting") : t("authReset.requestCta")}
+          <span className="inline-flex items-center gap-2">
+            {submitting ? t("authReset.submitting") : t("authReset.requestCta")}
+            {emailLooksValid && !submitting ? (
+              <Kbd className="border-white/20 bg-white/10 text-white/90 shadow-none">↵</Kbd>
+            ) : null}
+          </span>
         </Button>
         <Button asChild variant="ghost" className="h-11 w-full rounded-xl">
           <Link href="/">{t("authReset.backToSignIn")}</Link>
         </Button>
       </form>
     </Card>
+  );
+}
+
+function PasswordStrength({ password }: { password: string }) {
+  const strength = useMemo(() => {
+    let score = 0;
+    if (password.length >= 8) score++;
+    if (password.length >= 12) score++;
+    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
+    if (/\d/.test(password)) score++;
+    if (/[^a-zA-Z0-9]/.test(password)) score++;
+    return Math.min(score, 4);
+  }, [password]);
+
+  const color =
+    strength <= 1
+      ? "bg-srapi-error"
+      : strength === 2
+        ? "bg-srapi-warning"
+        : "bg-srapi-success";
+
+  return (
+    <div className="mt-2 flex gap-1" aria-hidden>
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div
+          key={i}
+          className={cn(
+            "h-1 flex-1 rounded-full transition-colors",
+            i < strength ? color : "bg-srapi-border",
+          )}
+        />
+      ))}
+    </div>
   );
 }

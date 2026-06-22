@@ -8,9 +8,9 @@ import { cn } from "@/lib/cn";
 import { AmbientCanvas } from "@/components/visual/ambient-canvas";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FloatingInput } from "@/components/ui/floating-input";
 import { DataPill } from "@/components/ui/data-pill";
+import { Kbd } from "@/components/ui/kbd";
 
 type HealthStatus = "checking" | "ok" | "error";
 
@@ -34,8 +34,20 @@ export default function SetupPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [emailTouched, setEmailTouched] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const emailLooksValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const emailInlineError = emailTouched && email.length > 0 && !emailLooksValid
+    ? t("setup.email")
+    : undefined;
+  const passwordStrongEnough = password.length >= 8;
+  const passwordInlineError = password.length > 0 && !passwordStrongEnough
+    ? t("setup.passwordHint")
+    : undefined;
+  const formValid = name.trim().length > 0 && emailLooksValid && passwordStrongEnough;
+  const formDirty = name.length > 0 || email.length > 0 || password.length > 0;
 
   const checkHealth = useCallback(async () => {
     setApiHealth("checking");
@@ -178,30 +190,43 @@ export default function SetupPage() {
               <p className="mt-3 text-sm leading-relaxed text-srapi-text-secondary">
                 {t("setup.subtitle")}
               </p>
-              <form onSubmit={onSubmit} className="mt-7 space-y-4">
-                <div>
-                  <Label htmlFor="setup-name">{t("setup.name")}</Label>
-                  <Input id="setup-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" required />
-                </div>
-                <div>
-                  <Label htmlFor="setup-email">{t("setup.email")}</Label>
-                  <Input id="setup-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" required />
-                </div>
-                <div>
-                  <Label htmlFor="setup-password">{t("setup.password")}</Label>
-                  <Input
-                    id="setup-password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoComplete="new-password"
+              <form onSubmit={onSubmit} className="mt-7 space-y-5">
+                <FloatingInput
+                  id="setup-name"
+                  label={t("setup.name")}
+                  autoComplete="name"
+                  value={name}
+                  onChange={setName}
+                  required
+                />
+                <div onBlur={() => setEmailTouched(true)}>
+                  <FloatingInput
+                    id="setup-email"
+                    label={t("setup.email")}
+                    type="email"
+                    autoComplete="username"
+                    value={email}
+                    onChange={setEmail}
+                    error={emailInlineError}
                     required
                   />
-                  <p className="mt-1.5 text-xs text-srapi-text-tertiary">{t("setup.passwordHint")}</p>
+                </div>
+                <div>
+                  <FloatingInput
+                    id="setup-password"
+                    label={t("setup.password")}
+                    type="password"
+                    autoComplete="new-password"
+                    value={password}
+                    onChange={setPassword}
+                    hint={password.length === 0 ? t("setup.passwordHint") : undefined}
+                    error={passwordInlineError}
+                    required
+                  />
                   {password.length > 0 && <PasswordStrength password={password} />}
                 </div>
                 {error && (
-                  <p role="alert" className="rounded-xl bg-srapi-error/10 px-3 py-2 text-sm text-srapi-error">
+                  <p role="alert" className="anim-shake rounded-xl bg-srapi-error/10 px-3 py-2 text-sm text-srapi-error">
                     {error}
                   </p>
                 )}
@@ -209,8 +234,13 @@ export default function SetupPage() {
                   <Button type="button" variant="ghost" onClick={() => setStep("health")} className="h-11 flex-1 rounded-xl">
                     {t("setup.back")}
                   </Button>
-                  <Button type="submit" variant="primary" loading={submitting} className="h-11 flex-1 rounded-xl btn-raise">
-                    {t("setup.submit")}
+                  <Button type="submit" variant="primary" loading={submitting} disabled={submitting || !formValid} className="h-11 flex-1 rounded-xl btn-raise">
+                    <span className="inline-flex items-center gap-2">
+                      {t("setup.submit")}
+                      {formValid && formDirty && !submitting ? (
+                        <Kbd className="border-white/20 bg-white/10 text-white/90 shadow-none">↵</Kbd>
+                      ) : null}
+                    </span>
                   </Button>
                 </div>
               </form>

@@ -1,33 +1,40 @@
 import type { LucideIcon } from "lucide-react";
-import { BarChart3 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { Card, CardContent } from "@/components/ui/card";
+import { IllustratedEmptyState } from "@/components/ui/illustrated-empty-state";
 
 /**
  * Compact, intentional placeholder for a chart/section that has no data yet.
- * A faint icon + caption reads as "nothing here yet" rather than a cavernous
- * void of empty card. Shared by the admin dashboard and usage analytics so
- * sparse instances feel designed instead of broken.
+ * Upgraded to wrap an `IllustratedEmptyState` (illust="chart") inside a Card so
+ * sparse instances feel designed instead of broken. The legacy `{ label, icon }`
+ * surface is preserved so existing consumers (admin dashboard, gateway
+ * overview, usage analytics) compile unchanged.
+ *
+ * The `icon` prop is retained for API compatibility but the new chart
+ * illustration carries the visual; we no longer render the lucide icon.
  */
 export function ChartEmpty({
   label,
-  icon: Icon = BarChart3,
+  description,
   className,
 }: {
   label: string;
+  /** Optional supporting copy under the title. */
+  description?: string;
+  /** Retained for API compatibility — the chart illustration is used instead. */
   icon?: LucideIcon;
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "relative flex h-32 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-srapi-border bg-srapi-card-muted/30 text-srapi-text-tertiary",
-        className,
-      )}
-    >
-      <div className="grid size-9 place-items-center rounded-lg border border-srapi-border bg-srapi-card/80 text-srapi-text-tertiary">
-        <Icon className="size-4" strokeWidth={1.5} aria-hidden />
-      </div>
-      <span className="font-mono text-2xs uppercase tracking-[0.18em]">{label}</span>
-    </div>
+    <Card className={cn("border-dashed bg-srapi-card-muted/30", className)}>
+      <CardContent className="py-6">
+        <IllustratedEmptyState
+          illust="chart"
+          title={label}
+          description={description}
+          className="border-none bg-transparent p-0"
+        />
+      </CardContent>
+    </Card>
   );
 }

@@ -27,6 +27,9 @@ import {
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { StatCard } from "@/components/ui/stat-card";
 import { Button } from "@/components/ui/button";
+import { DataPill } from "@/components/ui/data-pill";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
@@ -75,6 +78,22 @@ import type {
 } from "@/lib/sdk-types";
 
 const WINDOW_OPTIONS = [7, 14, 30, 90];
+const UPTIME_WARN_THRESHOLD = 0.95;
+
+/**
+ * Map a monitor's most-recent state to the .log-row severity stripe.
+ * Disabled monitors carry no signal (no stripe); a never-run monitor leans
+ * info; a failing last run is "error"; a passing run with uptime < 95% is a
+ * "warning"; anything else is "success".
+ */
+function monitorSeverity(m: ChannelMonitor): "info" | "success" | "warning" | "error" | undefined {
+  if (!m.enabled) return undefined;
+  if (m.last_run_at == null) return "info";
+  if (m.last_run_ok === false) return "error";
+  const uptime = m.recent_uptime_success_rate;
+  if (uptime != null && uptime < UPTIME_WARN_THRESHOLD) return "warning";
+  return "success";
+}
 
 export function MonitorContent() {
   const { t } = useLanguage();
@@ -281,7 +300,10 @@ function MonitorsTab() {
           typeof r.recent_uptime_success_rate === "number" &&
           typeof r.recent_uptime_sample_count === "number" &&
           r.recent_uptime_sample_count > 0;
-        return (
+        const uptime = r.recent_uptime_success_rate ?? 0;
+        const sampleCount = r.recent_uptime_sample_count ?? 0;
+        const windowDays = r.recent_uptime_window_days ?? 7;
+        const trigger = (
           <div className="flex flex-col gap-0.5">
             <div className="flex items-center gap-1.5">
               <span
@@ -301,18 +323,38 @@ function MonitorsTab() {
               </span>
             ) : null}
             {hasUptime ? (
-              <span
-                className="text-[12px] tabular text-srapi-text-tertiary"
-                title={t("adminMonitor.uptimeHint", {
-                  count: formatInteger(r.recent_uptime_sample_count ?? 0),
-                  days: r.recent_uptime_window_days ?? 7,
-                })}
-              >
-                {formatPercent(r.recent_uptime_success_rate ?? 0)} ·{" "}
-                {formatInteger(r.recent_uptime_sample_count ?? 0)}
+              <span className="text-[12px] tabular text-srapi-text-tertiary">
+                {formatPercent(uptime)} · {formatInteger(sampleCount)}
               </span>
             ) : null}
           </div>
+        );
+        if (!hasUptime) return trigger;
+        return (
+          <DataTooltip
+            title={t("adminMonitor.lastRun")}
+            primary={`${formatPercent(uptime)} · ${formatLatency(r.last_run_latency_ms ?? 0)}`}
+            rows={[
+              {
+                label: t("adminMonitor.uptime"),
+                value: formatPercent(uptime),
+                tone: uptime < UPTIME_WARN_THRESHOLD ? "warning" : "success",
+              },
+              {
+                label: t("adminMonitor.window"),
+                value: t("adminMonitor.windowDays", { days: windowDays }),
+                tone: "muted",
+              },
+              {
+                label: t("adminCommon.total", { count: sampleCount }),
+                value: formatInteger(sampleCount),
+                tone: "muted",
+              },
+            ]}
+            footer={formatDateTime(r.last_run_at)}
+          >
+            {trigger}
+          </DataTooltip>
         );
       },
     },
@@ -357,6 +399,8 @@ function MonitorsTab() {
         minWidth={720}
         isFiltered={isFiltered}
         onClearFilters={list.clearFilters}
+        rowSeverity={monitorSeverity}
+        expandRow={(r) => <MonitorRowDetail monitor={r} />}
         toolbar={
           <ListToolbar>
             <SearchInput
@@ -443,6 +487,104 @@ function MonitorsTab() {
         />
       ) : null}
     </>
+  );
+}
+
+/**
+ * Inline expanded detail for a single channel monitor. We don't have a
+ * per-probe history payload, so the panel surfaces the aggregated signals the
+ * server does return — uptime ratio, sample count, latency, interval, model —
+ * laid out as a compact KPI strip plus a sample-count "histogram" of last
+ * recorded probes (one bar per sample, success/failure inferred from the
+ * recent uptime ratio so the bar block conveys at a glance whether the window
+ * has been mostly green or red).
+ */
+function MonitorRowDetail({ monitor }: { monitor: ChannelMonitor }) {
+  const { t } = useLanguage();
+  const uptime = monitor.recent_uptime_success_rate;
+  const sampleCount = monitor.recent_uptime_sample_count ?? 0;
+  const hasSamples = sampleCount > 0 && uptime != null;
+  // Cap the bar count at 20 so we don't render hundreds of div nodes for high
+  // sample windows; the bar block is a sparkline, not an audit log.
+  const barCount = Math.min(sampleCount, 20);
+  const failBars = hasSamples ? Math.round(barCount * (1 - (uptime ?? 0))) : 0;
+  return (
+    <div className="space-y-3 border-t border-srapi-border bg-srapi-card-muted/40 px-4 py-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Kpi label={t("adminMonitor.uptime")}>
+          {uptime != null ? (
+            <span
+              className={cn(
+                "metric-primary tabular",
+                uptime < UPTIME_WARN_THRESHOLD ? "metric-strong-warn" : "metric-strong-good",
+              )}
+            >
+              {formatPercent(uptime)}
+            </span>
+          ) : (
+            <span className="metric-primary text-srapi-text-tertiary">—</span>
+          )}
+        </Kpi>
+        <Kpi label={t("adminMonitor.lastRun")}>
+          <span className="metric-secondary tabular text-srapi-text-secondary">
+            {monitor.last_run_latency_ms != null
+              ? formatLatency(monitor.last_run_latency_ms)
+              : "—"}
+          </span>
+        </Kpi>
+        <Kpi label={t("adminMonitor.interval")}>
+          <span className="metric-secondary tabular text-srapi-text-secondary">
+            {monitor.interval_seconds}s
+          </span>
+        </Kpi>
+        <Kpi label={t("adminMonitor.model")}>
+          <span className="metric-tertiary text-srapi-text-tertiary">
+            {monitor.model || "—"}
+          </span>
+        </Kpi>
+      </div>
+      {hasSamples ? (
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
+            {t("adminMonitor.windowDays", { days: monitor.recent_uptime_window_days ?? 7 })}
+          </span>
+          <div className="flex h-7 items-end gap-[2px]" aria-hidden>
+            {Array.from({ length: barCount }).map((_, i) => {
+              const isFail = i < failBars;
+              // Pseudo-random varying height keeps the bar block visually
+              // alive without implying real per-probe latency we don't have.
+              const h = 40 + ((i * 37) % 60);
+              return (
+                <span
+                  key={i}
+                  className={cn(
+                    "w-1 rounded-sm transition-colors",
+                    isFail ? "bg-srapi-error/70" : "bg-srapi-success/70",
+                  )}
+                  style={{ height: `${h}%` }}
+                />
+              );
+            })}
+          </div>
+          <DataPill tone="neutral" size="sm">
+            {formatInteger(sampleCount)}
+          </DataPill>
+        </div>
+      ) : (
+        <p className="text-[11px] text-srapi-text-tertiary">{t("adminMonitor.neverRun")}</p>
+      )}
+    </div>
+  );
+}
+
+function Kpi({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-0.5">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
+        {label}
+      </div>
+      {children}
+    </div>
   );
 }
 
@@ -724,8 +866,6 @@ function ApplyTemplateDialog({
 // without re-querying. The single-window view is the original rollup, kept as a
 // simpler fallback behind a small mode toggle.
 
-const UPTIME_WARN_THRESHOLD = 0.95;
-
 function uptimeTone(uptime: number | undefined): string {
   if (uptime == null) return "text-srapi-text-tertiary";
   return uptime < UPTIME_WARN_THRESHOLD ? "text-srapi-error" : "text-srapi-text-secondary";
@@ -742,22 +882,16 @@ function AvailabilityTab() {
   // Labels compose from existing translation keys so we don't introduce new
   // i18n entries here: "All · Window" vs "Window".
   const toggle = (
-    <div className="flex items-center gap-1 rounded-lg border border-srapi-border p-0.5">
-      <Button
-        variant={mode === "windows" ? "outline" : "ghost"}
-        size="sm"
-        onClick={() => setMode("windows")}
-      >
-        {t("common.all")} · {t("adminMonitor.window")}
-      </Button>
-      <Button
-        variant={mode === "single" ? "outline" : "ghost"}
-        size="sm"
-        onClick={() => setMode("single")}
-      >
-        {t("adminMonitor.window")}
-      </Button>
-    </div>
+    <SegmentedControl<AvailabilityMode>
+      value={mode}
+      onChange={setMode}
+      size="sm"
+      ariaLabel={t("adminMonitor.window")}
+      options={[
+        { value: "windows", label: `${t("common.all")} · ${t("adminMonitor.window")}` },
+        { value: "single", label: t("adminMonitor.window") },
+      ]}
+    />
   );
 
   return mode === "windows" ? (

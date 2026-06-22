@@ -15,6 +15,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { FormSkeleton } from "@/components/charts/chart-skeleton";
 import { type MultiSelectOption } from "@/components/ui/multi-select";
+import { KbdShortcut } from "@/components/ui/kbd";
+import { DataPill } from "@/components/ui/data-pill";
 import { adminErrorMessage } from "@/lib/admin-api";
 import { ADMIN_ROUTES } from "@/lib/routes";
 import {
@@ -101,6 +103,25 @@ function SettingsEditor({ initial }: { initial: Parameters<typeof createSettings
     [draft, savedDraft],
   );
 
+  // Count changed top-level keys within the active section so we can surface
+  // a precise «N changed» badge on the sticky save bar.
+  const dirtyFieldCount = useMemo(() => {
+    if (!isDirty) return 0;
+    const cur = (draft.value[activeTab] as Record<string, unknown>) ?? {};
+    const saved = (savedDraft.value[activeTab] as Record<string, unknown>) ?? {};
+    const keys = new Set([...Object.keys(cur), ...Object.keys(saved)]);
+    let n = 0;
+    keys.forEach((k) => {
+      if (JSON.stringify(cur[k]) !== JSON.stringify(saved[k])) n++;
+    });
+    // Also factor in any special / top-level draft fields that diverged.
+    (Object.keys(draft) as (keyof AdminSettingsDraft)[]).forEach((k) => {
+      if (k === "value") return;
+      if (JSON.stringify(draft[k]) !== JSON.stringify(savedDraft[k])) n++;
+    });
+    return n;
+  }, [draft, savedDraft, activeTab, isDirty]);
+
   function setSectionField(section: SettingsTab, key: string, value: unknown) {
     setDraft((d) => ({
       ...d,
@@ -146,6 +167,24 @@ function SettingsEditor({ initial }: { initial: Parameters<typeof createSettings
     router.replace(`${ADMIN_ROUTES.settings}${qs ? `?${qs}` : ""}`, { scroll: false });
   }
 
+  // ⌘S / Ctrl+S → trigger the same save flow as the section button, so the
+  // sticky save bar's Kbd hint is wired to a real shortcut. We intentionally
+  // do not intercept when no diff exists (avoids fighting browser defaults).
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      const isSave =
+        (event.metaKey || event.ctrlKey) && (event.key === "s" || event.key === "S");
+      if (!isSave) return;
+      if (!isDirty || updateMut.isPending) return;
+      event.preventDefault();
+      requestSave(activeTab);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // requestSave is stable enough — re-bind only when dirty/active changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDirty, updateMut.isPending, activeTab]);
+
   return (
     <Tabs value={activeTab} onValueChange={setTab}>
       <TabsList className="flex-wrap">
@@ -155,7 +194,12 @@ function SettingsEditor({ initial }: { initial: Parameters<typeof createSettings
           </TabsTrigger>
         ))}
       </TabsList>
-      <SettingsSaveState dirty={isDirty} pending={updateMut.isPending} />
+      <SettingsSaveState
+        dirty={isDirty}
+        pending={updateMut.isPending}
+        dirtyCount={dirtyFieldCount}
+        onSave={isDirty && !updateMut.isPending ? () => requestSave(activeTab) : undefined}
+      />
 
       {SETTINGS_TABS.map((tab) => (
         <TabsContent key={tab.id} value={tab.id}>
@@ -229,7 +273,17 @@ function SettingsEditor({ initial }: { initial: Parameters<typeof createSettings
   );
 }
 
-function SettingsSaveState({ dirty, pending }: { dirty: boolean; pending: boolean }) {
+function SettingsSaveState({
+  dirty,
+  pending,
+  dirtyCount,
+  onSave,
+}: {
+  dirty: boolean;
+  pending: boolean;
+  dirtyCount: number;
+  onSave?: () => void;
+}) {
   const { t } = useLanguage();
   const icon = pending ? (
     <Loader2 className="size-3.5 animate-spin" aria-hidden />
@@ -245,11 +299,36 @@ function SettingsSaveState({ dirty, pending }: { dirty: boolean; pending: boolea
       : t("adminSettings.saveState.saved");
 
   return (
-    <div className="mt-3 flex items-center justify-end">
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-srapi-card-muted px-2.5 py-1 text-[11px] font-medium text-srapi-text-secondary">
+    // Sticky so it never scrolls out of view inside long settings tabs. The
+    // pill stays right-aligned; the save shortcut chip floats next to it
+    // whenever there's a real diff to flush.
+    <div className="sticky top-2 z-20 mt-3 flex items-center justify-end gap-2 backdrop-blur-sm">
+      {dirty ? (
+        <DataPill tone="warning" size="sm" className="tabular">
+          {dirtyCount} {dirtyCount === 1 ? "field" : "fields"}
+        </DataPill>
+      ) : null}
+      <span
+        className={
+          "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium shadow-sm ring-1 " +
+          (dirty
+            ? "bg-srapi-warning/10 text-srapi-warning ring-srapi-warning/30"
+            : "bg-srapi-card-muted text-srapi-text-secondary ring-srapi-border/60")
+        }
+      >
         {icon}
         {label}
       </span>
+      {onSave ? (
+        <button
+          type="button"
+          onClick={onSave}
+          className="inline-flex items-center gap-2 rounded-full bg-srapi-primary px-3 py-1 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-srapi-primary-hover"
+        >
+          {t("common.save")}
+          <KbdShortcut keys={["⌘", "S"]} />
+        </button>
+      ) : null}
     </div>
   );
 }

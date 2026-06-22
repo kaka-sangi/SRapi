@@ -22,6 +22,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { QuietBadge, type QuietStatus } from "@/components/ui/quiet-badge";
 import { DataPill } from "@/components/ui/data-pill";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { FloatingInput } from "@/components/ui/floating-input";
+import { cn } from "@/lib/cn";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableScroll } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -201,12 +204,53 @@ export function StrategyContent() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label={t("adminOps.totalDecisions")} value={String(overview.data?.total_decisions ?? 0)} />
-        <StatCard label={t("adminOps.selectedDecisions")} value={String(overview.data?.selected_decisions ?? 0)} />
-        <StatCard label={t("adminOps.failedDecisions")} value={String(overview.data?.failed_decisions ?? 0)} />
+        <StatCard
+          label={t("adminOps.totalDecisions")}
+          value={overview.data?.total_decisions ?? 0}
+          tooltip={{
+            title: t("adminOps.totalDecisions"),
+            rows: [
+              {
+                label: t("adminOps.selectedDecisions"),
+                value: String(overview.data?.selected_decisions ?? 0),
+                tone: "success",
+              },
+              {
+                label: t("adminOps.failedDecisions"),
+                value: String(overview.data?.failed_decisions ?? 0),
+                tone: "error",
+              },
+            ],
+          }}
+        />
+        <StatCard
+          label={t("adminOps.selectedDecisions")}
+          value={overview.data?.selected_decisions ?? 0}
+        />
+        <StatCard
+          label={t("adminOps.failedDecisions")}
+          value={overview.data?.failed_decisions ?? 0}
+          className={overview.data?.failed_decisions ? "ring-1 ring-srapi-error/20" : undefined}
+        />
         <StatCard
           label={t("adminOps.successRate")}
           value={`${Math.round((overview.data?.success_rate ?? 0) * 100)}%`}
+          tooltip={{
+            title: t("adminOps.successRate"),
+            primary: `${((overview.data?.success_rate ?? 0) * 100).toFixed(2)}%`,
+            rows: [
+              {
+                label: t("adminOps.selectedDecisions"),
+                value: String(overview.data?.selected_decisions ?? 0),
+                tone: "success",
+              },
+              {
+                label: t("adminOps.failedDecisions"),
+                value: String(overview.data?.failed_decisions ?? 0),
+                tone: "error",
+              },
+            ],
+          }}
         />
       </div>
 
@@ -433,6 +477,10 @@ function StrategyEditor({
   onSubmit: (value: StrategyEditorState) => void;
 }) {
   const { t } = useLanguage();
+  const weightTotal = WEIGHT_KEYS.reduce(
+    (acc, k) => acc + (Number(value.weights[k] ?? "0") || 0),
+    0,
+  );
   return (
     <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
       <DialogContent className="max-w-3xl">
@@ -441,27 +489,55 @@ function StrategyEditor({
         </DialogHeader>
         <div className="grid gap-4 sm:grid-cols-2">
           <StrategySelect label={t("adminOps.strategy")} value={value.name} onValueChange={(name) => onChange({ ...value, name: name as SchedulerStrategyName })} strategies={strategyNames} />
-          <TextInput id="strategy-version" label={t("adminOps.version")} value={value.version} onChange={(version) => onChange({ ...value, version })} />
+          <FloatingInput
+            id="strategy-version"
+            label={t("adminOps.version")}
+            value={value.version}
+            onChange={(version) => onChange({ ...value, version })}
+          />
           <EnumSelect label={t("adminOps.status")} value={value.status} values={["active", "draft", "deprecated"]} onValueChange={(status) => onChange({ ...value, status: status as SchedulerStrategyStatus })} />
           <EnumSelect label={t("adminOps.scope")} value={value.scopeType} values={["global", "api_key", "account_group", "user"]} onValueChange={(scopeType) => onChange({ ...value, scopeType: scopeType as SchedulerStrategyScopeType, scopeId: scopeType === "global" ? "" : value.scopeId })} />
           {value.scopeType !== "global" ? (
-            <TextInput id="strategy-scope-id" label={t("adminOps.scopeId")} value={value.scopeId} onChange={(scopeId) => onChange({ ...value, scopeId })} />
+            <FloatingInput
+              id="strategy-scope-id"
+              label={t("adminOps.scopeId")}
+              value={value.scopeId}
+              onChange={(scopeId) => onChange({ ...value, scopeId })}
+            />
           ) : null}
           <div className="sm:col-span-2">
             <Label htmlFor="strategy-description">{t("adminOps.description")}</Label>
             <Textarea id="strategy-description" value={value.description} onChange={(e) => onChange({ ...value, description: e.target.value })} />
           </div>
-          <div className="grid gap-3 sm:col-span-2 sm:grid-cols-4">
-            {WEIGHT_KEYS.map((key) => (
-              <TextInput
-                key={key}
-                id={`weight-${key}`}
-                label={key}
-                type="number"
-                value={value.weights[key] ?? "0"}
-                onChange={(next) => onChange({ ...value, weights: { ...value.weights, [key]: next } })}
-              />
-            ))}
+          <div className="sm:col-span-2 space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="!mb-0">{t("adminOps.weights")}</Label>
+              <DataTooltip
+                title={t("adminOps.weights")}
+                primary={weightTotal.toFixed(2)}
+                rows={WEIGHT_KEYS.map((k) => ({
+                  label: k,
+                  value: Number(value.weights[k] ?? "0").toFixed(2),
+                  tone: Number(value.weights[k] ?? "0") > 0 ? "default" : "muted",
+                }))}
+              >
+                <DataPill tone="accent" size="sm" className={cn("cursor-help tabular")}>
+                  Σ {weightTotal.toFixed(2)}
+                </DataPill>
+              </DataTooltip>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-4">
+              {WEIGHT_KEYS.map((key) => (
+                <TextInput
+                  key={key}
+                  id={`weight-${key}`}
+                  label={key}
+                  type="number"
+                  value={value.weights[key] ?? "0"}
+                  onChange={(next) => onChange({ ...value, weights: { ...value.weights, [key]: next } })}
+                />
+              ))}
+            </div>
           </div>
         </div>
         <DialogFooter>

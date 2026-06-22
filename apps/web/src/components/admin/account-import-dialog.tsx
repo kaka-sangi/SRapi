@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { KeyRound, Eye, EyeOff } from "lucide-react";
+import { AlertTriangle, KeyRound, Eye, EyeOff } from "lucide-react";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { IllustratedEmptyState } from "@/components/ui/illustrated-empty-state";
+import { cn } from "@/lib/cn";
 import {
   AccountOAuthAuthorizeDialog,
   type AccountOAuthFlowMode,
@@ -439,13 +442,43 @@ export function AccountImportDialog({
               {batchResult ? (
                 <div className="space-y-3 rounded-2xl border border-srapi-border bg-srapi-card-muted p-3.5">
                   <div className="grid grid-cols-2 gap-2 text-center">
-                    <ImportStat label={t("codexImport.created")} value={batchResult.created} tone="success" />
-                    <ImportStat label={t("codexImport.failed")} value={batchResult.failed} tone="error" />
+                    <ImportStat
+                      label={t("codexImport.created")}
+                      value={batchResult.created}
+                      tone="success"
+                      tier="primary"
+                      tooltip={{
+                        rows: [
+                          { label: t("codexImport.failed"), value: batchResult.failed },
+                          {
+                            label: t("codexImport.total") ?? "Total",
+                            value: batchResult.created + batchResult.failed,
+                          },
+                        ],
+                      }}
+                    />
+                    <ImportStat
+                      label={t("codexImport.failed")}
+                      value={batchResult.failed}
+                      tone="error"
+                      tooltip={{
+                        rows: [{ label: t("codexImport.created"), value: batchResult.created }],
+                      }}
+                    />
                   </div>
                   {batchResult.errors.length > 0 ? (
-                    <ul className="list-disc space-y-0.5 pl-4 text-[11px] text-srapi-error">
+                    <ul className="space-y-1.5">
                       {batchResult.errors.map((msg, idx) => (
-                        <li key={idx}>{msg}</li>
+                        <li
+                          key={idx}
+                          className="log-row rounded-md text-[11px] text-srapi-error"
+                          data-sev="error"
+                        >
+                          <span className="flex items-start gap-1.5 px-2 py-1.5">
+                            <AlertTriangle className="mt-0.5 size-3 shrink-0" />
+                            <span className="min-w-0 break-words">{msg}</span>
+                          </span>
+                        </li>
                       ))}
                     </ul>
                   ) : null}
@@ -500,25 +533,52 @@ export function AccountImportDialog({
                         <button type="button" className="text-srapi-text-tertiary hover:text-srapi-text-secondary" onClick={() => setCrsSelected(new Set())}>{t("adminQuickSetup.selectNone")}</button>
                       </div>
                     </div>
-                    {crsPreview.new_accounts.map((a) => (
-                      <label key={a.crs_account_id} className="flex items-center gap-2 rounded-md border border-srapi-border px-3 py-2 text-sm cursor-pointer hover:bg-srapi-card-muted">
-                        <input type="checkbox" checked={crsSelected.has(a.crs_account_id)} onChange={() => {
-                          setCrsSelected(prev => {
-                            const next = new Set(prev);
-                            if (next.has(a.crs_account_id)) next.delete(a.crs_account_id); else next.add(a.crs_account_id);
-                            return next;
-                          });
-                        }} />
-                        <span className="text-srapi-text-primary">{a.name}</span>
-                        <span className="ml-auto font-mono text-[11px] text-srapi-text-tertiary">{a.platform} · {a.type}</span>
-                      </label>
-                    ))}
+                    {crsPreview.new_accounts.length === 0 ? (
+                      <IllustratedEmptyState
+                        illust="accounts"
+                        title={t("crsSync.newAccounts")}
+                        description={t("adminAccounts.detailNoData")}
+                      />
+                    ) : null}
+                    {crsPreview.new_accounts.map((a) => {
+                      const checked = crsSelected.has(a.crs_account_id);
+                      return (
+                        <label
+                          key={a.crs_account_id}
+                          className={cn(
+                            "log-row flex items-center gap-2 rounded-md border border-srapi-border px-3 py-2 text-sm cursor-pointer hover:bg-srapi-card-muted",
+                          )}
+                          data-sev={checked ? "success" : "info"}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => {
+                              setCrsSelected((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(a.crs_account_id)) next.delete(a.crs_account_id);
+                                else next.add(a.crs_account_id);
+                                return next;
+                              });
+                            }}
+                          />
+                          <span className="text-srapi-text-primary">{a.name}</span>
+                          <span className="ml-auto font-mono text-[11px] text-srapi-text-tertiary">
+                            {a.platform} · {a.type}
+                          </span>
+                        </label>
+                      );
+                    })}
                     {crsPreview.existing_accounts.length > 0 && (
                       <div className="mt-3">
                         <span className="text-sm text-srapi-text-secondary">{t("crsSync.existingAccounts")} ({crsPreview.existing_accounts.length})</span>
                         <div className="mt-1 space-y-1">
                           {crsPreview.existing_accounts.map((a) => (
-                            <div key={a.crs_account_id} className="flex items-center gap-2 rounded-md border border-srapi-border/50 bg-srapi-card-muted px-3 py-2 text-sm opacity-60">
+                            <div
+                              key={a.crs_account_id}
+                              className="log-row flex items-center gap-2 rounded-md border border-srapi-border/50 bg-srapi-card-muted px-3 py-2 text-sm opacity-60"
+                              data-sev="info"
+                            >
                               <span>{a.name}</span>
                               <span className="ml-auto font-mono text-[11px] text-srapi-text-tertiary">{a.platform}</span>
                             </div>
@@ -532,9 +592,21 @@ export function AccountImportDialog({
               {crsStep === "result" && crsResult && (
                 <div className="space-y-3 rounded-2xl border border-srapi-border bg-srapi-card-muted p-3.5">
                   <div className="grid grid-cols-4 gap-2 text-center">
-                    <ImportStat label={t("codexImport.created")} value={crsResult.created} tone="success" />
+                    <ImportStat
+                      label={t("codexImport.created")}
+                      value={crsResult.created}
+                      tone="success"
+                      tier="primary"
+                      tooltip={{
+                        rows: [
+                          { label: t("codexImport.updated"), value: crsResult.updated },
+                          { label: t("codexImport.skipped"), value: crsResult.skipped },
+                          { label: t("codexImport.failed"), value: crsResult.failed },
+                        ],
+                      }}
+                    />
                     <ImportStat label={t("codexImport.updated")} value={crsResult.updated} />
-                    <ImportStat label={t("codexImport.skipped")} value={crsResult.skipped} />
+                    <ImportStat label={t("codexImport.skipped")} value={crsResult.skipped} tier="tertiary" />
                     <ImportStat label={t("codexImport.failed")} value={crsResult.failed} tone="error" />
                   </div>
                 </div>
@@ -832,12 +904,27 @@ export function AccountImportDialog({
 
 function ProviderImportResultPanel({ result }: { result: ProviderAccountImportResult }) {
   const { t } = useLanguage();
+  const total =
+    result.created_count + result.updated_count + result.skipped_count + result.failed_count;
   return (
     <div className="space-y-3 rounded-2xl border border-srapi-border bg-srapi-card-muted p-3.5">
       <div className="grid grid-cols-4 gap-2 text-center">
-        <ImportStat label={t("codexImport.created")} value={result.created_count} tone="success" />
+        <ImportStat
+          label={t("codexImport.created")}
+          value={result.created_count}
+          tone="success"
+          tier="primary"
+          tooltip={{
+            rows: [
+              { label: t("codexImport.updated"), value: result.updated_count },
+              { label: t("codexImport.skipped"), value: result.skipped_count },
+              { label: t("codexImport.failed"), value: result.failed_count },
+              { label: t("codexImport.total") ?? "Total", value: total },
+            ],
+          }}
+        />
         <ImportStat label={t("codexImport.updated")} value={result.updated_count} />
-        <ImportStat label={t("codexImport.skipped")} value={result.skipped_count} />
+        <ImportStat label={t("codexImport.skipped")} value={result.skipped_count} tier="tertiary" />
         <ImportStat label={t("codexImport.failed")} value={result.failed_count} tone="error" />
       </div>
       {result.errors.length > 0 ? (
@@ -845,19 +932,34 @@ function ProviderImportResultPanel({ result }: { result: ProviderAccountImportRe
           <p className="text-[11px] font-medium text-srapi-text-secondary">
             {t("adminAccounts.importErrorsTitle")}
           </p>
-          <ul className="mt-1 list-disc space-y-0.5 pl-4 text-[11px] text-srapi-error">
+          <ul className="mt-1 space-y-1.5">
             {result.errors.map((message, idx) => (
-              <li key={idx}>{message}</li>
+              <li
+                key={idx}
+                className="log-row rounded-md text-[11px] text-srapi-error"
+                data-sev="error"
+              >
+                <span className="flex items-start gap-1.5 px-2 py-1.5">
+                  <AlertTriangle className="mt-0.5 size-3 shrink-0" />
+                  <span className="min-w-0 break-words">{message}</span>
+                </span>
+              </li>
             ))}
           </ul>
         </div>
       ) : null}
       {result.warnings.length > 0 ? (
-        <ul className="space-y-1 text-xs text-srapi-text-tertiary">
+        <ul className="space-y-1.5">
           {result.warnings.map((msg, idx) => (
-            <li key={`warn-${idx}`}>
-              #{msg.index}
-              {msg.name ? ` ${msg.name}` : ""}: {msg.message}
+            <li
+              key={`warn-${idx}`}
+              className="log-row rounded-md text-xs text-srapi-text-tertiary"
+              data-sev="warning"
+            >
+              <span className="block px-2 py-1.5">
+                #{msg.index}
+                {msg.name ? ` ${msg.name}` : ""}: {msg.message}
+              </span>
             </li>
           ))}
         </ul>
@@ -870,20 +972,40 @@ function ImportStat({
   label,
   value,
   tone,
+  tier = "secondary",
+  tooltip,
 }: {
   label: string;
   value: number;
   tone?: "success" | "error";
+  /** Metric hierarchy — primary for the headline number, secondary for siblings. */
+  tier?: "primary" | "secondary" | "tertiary";
+  tooltip?: { title?: string; rows?: { label: string; value: React.ReactNode }[] };
 }) {
   const toneClass =
     tone === "success"
-      ? "text-srapi-success"
+      ? "metric-strong-good"
       : tone === "error"
-        ? "text-srapi-error"
-        : "text-srapi-text-primary";
+        ? value > 0
+          ? "metric-strong-bad"
+          : "text-srapi-text-tertiary"
+        : tier === "primary"
+          ? "metric-primary"
+          : tier === "tertiary"
+            ? "metric-tertiary"
+            : "metric-secondary";
+  const numberEl = (
+    <div className={cn("tabular cursor-help", toneClass)}>{value}</div>
+  );
   return (
     <div className="rounded-xl bg-srapi-card px-2 py-2">
-      <div className={`text-2xl font-semibold tracking-tight tabular ${toneClass}`}>{value}</div>
+      {tooltip ? (
+        <DataTooltip title={tooltip.title ?? label} primary={value} rows={tooltip.rows}>
+          {numberEl}
+        </DataTooltip>
+      ) : (
+        numberEl
+      )}
       <div className="mt-0.5 text-[11px] font-medium uppercase tracking-[0.08em] text-srapi-text-tertiary">
         {label}
       </div>

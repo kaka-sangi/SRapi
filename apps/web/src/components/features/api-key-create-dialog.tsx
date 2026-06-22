@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Copy, Check } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Copy, Check, KeyRound, Sparkles } from "lucide-react";
 import {
   createApiKeySchema,
   updateApiKeySchema,
@@ -26,6 +26,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TagInput } from "@/components/ui/tag-input";
 import { MultiSelect } from "@/components/ui/multi-select";
+import { FloatingInput } from "@/components/ui/floating-input";
+import { Kbd } from "@/components/ui/kbd";
+import { IconBubble } from "@/components/ui/icon-bubble";
+import { SpotlightCard } from "@/components/visual/spotlight-card";
 import { formatMoney } from "@/lib/admin-format";
 import { ApiKeyOnboarding } from "@/components/features/api-key-onboarding";
 import type { ApiKeySummary } from "@/lib/srapi-types";
@@ -195,6 +199,24 @@ export function ApiKeyFormDialog({
     }
   }
 
+  // ⌘/Ctrl + C while the success card is visible copies the plaintext key.
+  // Disabled when the user has actively selected text (so they can copy a
+  // subset themselves) and tied to the success state so it's only live in
+  // the moment the key is shown.
+  useEffect(() => {
+    if (!plaintext) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== "c" || !(event.metaKey || event.ctrlKey)) return;
+      const selection = typeof window !== "undefined" ? window.getSelection?.()?.toString() : "";
+      if (selection && selection.length > 0) return;
+      void copyKey();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // copyKey reads plaintext via closure; re-bind whenever plaintext changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plaintext]);
+
   function setOpen(next: boolean) {
     if (controlled) onOpenChange?.(next);
     else setInternalOpen(next);
@@ -232,15 +254,30 @@ export function ApiKeyFormDialog({
         {plaintext ? (
           <>
             <DialogHeader>
-              <DialogTitle className="text-lg font-semibold tracking-tight">{t("apiKeys.createdToast")}</DialogTitle>
+              <DialogTitle className="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
+                <IconBubble tone="success" size="sm">
+                  <Sparkles aria-hidden />
+                </IconBubble>
+                {t("apiKeys.createdToast")}
+              </DialogTitle>
               <DialogDescription>{t("apiKeys.revealOnce")}</DialogDescription>
             </DialogHeader>
-            <div className="flex items-center gap-2 rounded-xl border border-srapi-border bg-srapi-card-muted px-3 py-2.5">
-              <code className="flex-1 truncate font-mono text-sm">{plaintext}</code>
-              <Button variant="outline" size="icon" onClick={copyKey} aria-label={t("apiKeys.copyKey")}>
-                {copied ? <Check className="size-4 text-srapi-success" /> : <Copy className="size-4" />}
-              </Button>
-            </div>
+            <SpotlightCard className="border-srapi-border bg-srapi-card p-4">
+              <div className="flex items-center gap-2">
+                <code className="flex-1 truncate font-mono text-sm text-srapi-text-primary">{plaintext}</code>
+                <Button variant="outline" size="icon" onClick={copyKey} aria-label={t("apiKeys.copyKey")}>
+                  {copied ? <Check className="size-4 text-srapi-success" /> : <Copy className="size-4" />}
+                </Button>
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-2 text-[11px] text-srapi-text-tertiary">
+                <span>{t("apiKeys.revealOnce")}</span>
+                <span className="inline-flex items-center gap-1.5">
+                  <Kbd>⌘</Kbd>
+                  <span aria-hidden>+</span>
+                  <Kbd>C</Kbd>
+                </span>
+              </div>
+            </SpotlightCard>
             <ApiKeyOnboarding
               apiKey={plaintext}
               defaultModel={allowedModels[0] ?? availableModels.data?.[0]?.id}
@@ -254,14 +291,23 @@ export function ApiKeyFormDialog({
         ) : (
           <form onSubmit={onSubmit}>
             <DialogHeader>
-              <DialogTitle className="text-lg font-semibold tracking-tight">{isEdit ? t("apiKeys.edit") : t("apiKeys.create")}</DialogTitle>
+              <DialogTitle className="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
+                <IconBubble tone="accent" size="sm">
+                  <KeyRound aria-hidden />
+                </IconBubble>
+                {isEdit ? t("apiKeys.edit") : t("apiKeys.create")}
+              </DialogTitle>
               <DialogDescription>{t("apiKeys.subtitle")}</DialogDescription>
             </DialogHeader>
             <div className="mt-4 space-y-4">
-              <div>
-                <Label htmlFor="key-name">{t("apiKeys.name")}</Label>
-                <Input id="key-name" value={name} onChange={(e) => setName(e.target.value)} disabled={pending} />
-              </div>
+              <FloatingInput
+                id="key-name"
+                label={t("apiKeys.name")}
+                value={name}
+                onChange={setName}
+                disabled={pending}
+                autoComplete="off"
+              />
               <div>
                 <Label htmlFor="key-models">{t("apiKeys.allowedModels")}</Label>
                 <TagInput

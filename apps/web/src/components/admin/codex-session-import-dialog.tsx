@@ -1,6 +1,9 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { AlertTriangle } from "lucide-react";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { cn } from "@/lib/cn";
 import {
   Dialog,
   DialogContent,
@@ -196,9 +199,9 @@ export function CodexSessionImportDialog({
           {result ? <CodexImportResultPanel result={result} /> : null}
 
           {error ? (
-            <p role="alert" className="text-sm text-srapi-error">
-              {error}
-            </p>
+            <div role="alert" className="log-row rounded-lg" data-sev="error">
+              <p className="px-3 py-2 text-sm text-srapi-error">{error}</p>
+            </div>
           ) : null}
         </div>
 
@@ -227,30 +230,59 @@ export function CodexSessionImportDialog({
 
 export function CodexImportResultPanel({ result }: { result: CodexSessionImportResult }) {
   const { t } = useLanguage();
+  const total = result.created + result.updated + result.skipped + result.failed;
   return (
     <div className="space-y-3 rounded-2xl border border-srapi-border bg-srapi-card-muted p-3.5">
       <div className="grid grid-cols-4 gap-2 text-center">
-        <CodexStat label={t("codexImport.created")} value={result.created} tone="success" />
+        <CodexStat
+          label={t("codexImport.created")}
+          value={result.created}
+          tone="success"
+          tier="primary"
+          tooltip={{
+            rows: [
+              { label: t("codexImport.updated"), value: result.updated },
+              { label: t("codexImport.skipped"), value: result.skipped },
+              { label: t("codexImport.failed"), value: result.failed },
+              { label: t("codexImport.total") ?? "Total", value: total },
+            ],
+          }}
+        />
         <CodexStat label={t("codexImport.updated")} value={result.updated} />
-        <CodexStat label={t("codexImport.skipped")} value={result.skipped} />
+        <CodexStat label={t("codexImport.skipped")} value={result.skipped} tier="tertiary" />
         <CodexStat label={t("codexImport.failed")} value={result.failed} tone="error" />
       </div>
       {result.errors.length > 0 ? (
-        <ul className="space-y-1 text-xs text-srapi-error">
+        <ul className="space-y-1.5">
           {result.errors.map((msg, idx) => (
-            <li key={`err-${idx}`}>
-              #{msg.index}
-              {msg.name ? ` ${msg.name}` : ""}: {msg.message}
+            <li
+              key={`err-${idx}`}
+              className="log-row rounded-md text-xs text-srapi-error"
+              data-sev="error"
+            >
+              <span className="flex items-start gap-1.5 px-2 py-1.5">
+                <AlertTriangle className="mt-0.5 size-3 shrink-0" />
+                <span className="min-w-0 break-words">
+                  #{msg.index}
+                  {msg.name ? ` ${msg.name}` : ""}: {msg.message}
+                </span>
+              </span>
             </li>
           ))}
         </ul>
       ) : null}
       {result.warnings.length > 0 ? (
-        <ul className="space-y-1 text-xs text-srapi-text-tertiary">
+        <ul className="space-y-1.5">
           {result.warnings.map((msg, idx) => (
-            <li key={`warn-${idx}`}>
-              #{msg.index}
-              {msg.name ? ` ${msg.name}` : ""}: {msg.message}
+            <li
+              key={`warn-${idx}`}
+              className="log-row rounded-md text-xs text-srapi-text-tertiary"
+              data-sev="warning"
+            >
+              <span className="block px-2 py-1.5">
+                #{msg.index}
+                {msg.name ? ` ${msg.name}` : ""}: {msg.message}
+              </span>
             </li>
           ))}
         </ul>
@@ -263,20 +295,37 @@ function CodexStat({
   label,
   value,
   tone,
+  tier = "secondary",
+  tooltip,
 }: {
   label: string;
   value: number;
   tone?: "success" | "error";
+  tier?: "primary" | "secondary" | "tertiary";
+  tooltip?: { title?: string; rows?: { label: string; value: React.ReactNode }[] };
 }) {
   const toneClass =
     tone === "success"
-      ? "text-srapi-success"
+      ? "metric-strong-good"
       : tone === "error"
-        ? "text-srapi-error"
-        : "text-srapi-text-primary";
+        ? value > 0
+          ? "metric-strong-bad"
+          : "text-srapi-text-tertiary"
+        : tier === "primary"
+          ? "metric-primary"
+          : tier === "tertiary"
+            ? "metric-tertiary"
+            : "metric-secondary";
+  const numberEl = <div className={cn("tabular cursor-help", toneClass)}>{value}</div>;
   return (
     <div className="rounded-xl bg-srapi-card px-2 py-2">
-      <div className={`text-2xl font-semibold tracking-tight tabular ${toneClass}`}>{value}</div>
+      {tooltip ? (
+        <DataTooltip title={tooltip.title ?? label} primary={value} rows={tooltip.rows}>
+          {numberEl}
+        </DataTooltip>
+      ) : (
+        numberEl
+      )}
       <div className="mt-0.5 text-[11px] font-medium uppercase tracking-[0.08em] text-srapi-text-tertiary">
         {label}
       </div>

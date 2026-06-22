@@ -14,6 +14,13 @@ import { Button } from "@/components/ui/button";
 import { QuietBadge, type QuietStatus } from "@/components/ui/quiet-badge";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Textarea } from "@/components/ui/textarea";
+import { DataPill } from "@/components/ui/data-pill";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  InlineDetailGrid,
+  type InlineDetailRow,
+  type InlineDetailSection,
+} from "@/components/ui/inline-detail-grid";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { RequestDumpSummaryGrid } from "@/components/admin/request-log-dump-summary-panel";
@@ -56,6 +63,8 @@ import type { OpsErrorLog, OpsSystemLog, RequestLogFileDescriptor } from "@/lib/
 const RESOLUTION_OPTIONS = ["open", "investigating", "resolved", "muted"] as const;
 type ResolutionValue = (typeof RESOLUTION_OPTIONS)[number];
 type UpstreamErrorEvent = NonNullable<OpsErrorLog["upstream_errors"]>[number];
+
+type DetailTab = "request" | "response" | "diagnosis" | "related";
 
 export interface ErrorLogDetailDialogProps {
   errorLogId: string | null;
@@ -100,6 +109,7 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
   const apiKeyLookup = useApiKeyNameLookup();
   const providerLookup = useProviderNameLookup();
   const userLookup = useUserEmailLookup();
+  const [tab, setTab] = useState<DetailTab>("request");
   const requestLogQuery = useAdminRequestLogFiles(
     { request_id: detail.request_id || undefined, limit: 3 },
     Boolean(detail.request_id),
@@ -124,9 +134,84 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
       });
   const triage = useMemo(() => buildErrorLogTriage(detail), [detail]);
 
+  const requestSections: InlineDetailSection[] = [
+    {
+      title: t("adminErrorLogs.requestId"),
+      rows: [
+        rowText(t("adminErrorLogs.requestId"), detail.request_id || "—", { mono: true }),
+        rowText(t("adminErrorLogs.traceId"), detail.trace_id || "—", { mono: true }),
+        rowText(t("adminErrorLogs.upstreamRequestId"), detail.upstream_request_id || "—", { mono: true }),
+      ],
+    },
+    {
+      title: t("adminErrorLogs.sourceEndpoint"),
+      rows: [
+        rowText(t("adminErrorLogs.sourceEndpoint"), detail.source_endpoint || "—", { mono: true }),
+        rowText(t("adminErrorLogs.protocol"), protocol, { mono: true }),
+        rowText(t("adminErrorLogs.model"), detail.model || "—"),
+      ],
+    },
+    {
+      title: t("adminErrorLogs.user"),
+      rows: [
+        rowText(t("adminErrorLogs.user"), userLookup.get(detail.user_id)),
+        rowText(t("adminErrorLogs.apiKey"), apiKeyLookup.get(detail.api_key_id)),
+        rowText(t("adminErrorLogs.apiKeyPrefix"), detail.api_key_prefix || "—", { mono: true }),
+        rowText(t("adminErrorLogs.account"), accountLookup.get(detail.account_id)),
+        rowText(t("adminErrorLogs.provider"), providerLookup.get(detail.provider_id)),
+      ],
+    },
+  ];
+
+  const responseSections: InlineDetailSection[] = [
+    {
+      title: t("adminErrorLogs.statusCode"),
+      rows: [
+        {
+          label: t("adminErrorLogs.statusCode"),
+          value: detail.status_code != null ? String(detail.status_code) : "—",
+          mono: true,
+          tone:
+            detail.status_code != null && detail.status_code >= 500
+              ? "error"
+              : detail.status_code != null && detail.status_code >= 400
+                ? "warning"
+                : "default",
+        },
+        rowText(t("adminErrorLogs.latency"), formatLatency(detail.latency_ms ?? 0), { mono: true }),
+        rowText(t("adminErrorLogs.attempt"), formatInteger(detail.attempt_no ?? 1), { mono: true }),
+        rowText(t("adminErrorLogs.streamCompletionState"), detail.stream_completion_state || "—", { mono: true }),
+      ],
+    },
+    {
+      title: t("adminErrorLogs.errorClass"),
+      rows: [
+        rowText(t("adminErrorLogs.errorClass"), detail.error_class || "—", { mono: true }),
+        rowText(t("adminErrorLogs.errorPhase"), detail.error_phase || "—", { mono: true }),
+        rowText(t("adminErrorLogs.errorOwner"), detail.error_owner || "—", { mono: true }),
+        rowText(t("adminErrorLogs.errorSource"), detail.error_source || "—", { mono: true }),
+      ],
+    },
+    {
+      title: t("adminErrorLogs.inputTokens"),
+      rows: [
+        rowText(t("adminErrorLogs.inputTokens"), formatInteger(detail.input_tokens ?? 0), { mono: true }),
+        rowText(t("adminErrorLogs.outputTokens"), formatInteger(detail.output_tokens ?? 0), { mono: true }),
+        rowText(
+          t("adminErrorLogs.usageEstimated"),
+          detail.usage_estimated ? t("adminErrorLogs.estimated") : t("adminErrorLogs.exact"),
+          { tone: "muted" },
+        ),
+        rowText(t("adminErrorLogs.time"), formatDateTime(detail.occurred_at), { mono: true }),
+        rowText(t("adminErrorLogs.updatedAt"), formatDateTime(detail.updated_at), { mono: true }),
+      ],
+    },
+  ];
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3 rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
+      {/* Hero: error class + resolution chip */}
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-srapi-border bg-srapi-card-muted p-4">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
             {t("adminErrorLogs.errorClass")}
@@ -137,6 +222,17 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
             </p>
             {detail.error_class ? <CopyButton value={detail.error_class} size="inline" /> : null}
           </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {detail.error_owner ? (
+              <QuietBadge status={ownerTone(detail.error_owner)} label={detail.error_owner} />
+            ) : null}
+            {detail.error_phase ? (
+              <QuietBadge status="disabled" label={detail.error_phase} />
+            ) : null}
+            {detail.status_code != null ? (
+              <QuietBadge status={statusTone(detail.status_code)} label={String(detail.status_code)} />
+            ) : null}
+          </div>
         </div>
         <QuietBadge
           status={resolutionTone(detail.resolution)}
@@ -144,200 +240,238 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
         />
       </div>
 
-      {detail.error_message ? (
-        <EvidenceBlock
-          label={t("adminErrorLogs.upstreamMessage")}
-          value={detail.error_message}
-        />
-      ) : null}
+      {/* Sticky tabs */}
+      <Tabs value={tab} onValueChange={(v) => setTab(v as DetailTab)}>
+        <div className="sticky top-0 z-10 -mx-1 bg-srapi-card/95 px-1 py-1 backdrop-blur supports-[backdrop-filter]:bg-srapi-card/80">
+          <TabsList className="flex flex-wrap">
+            <TabsTrigger value="request">{t("adminErrorLogs.requestTab") || "Request"}</TabsTrigger>
+            <TabsTrigger value="response">{t("adminErrorLogs.responseTab") || "Response"}</TabsTrigger>
+            <TabsTrigger value="diagnosis">{t("adminErrorLogs.diagnosisTab") || "Diagnosis"}</TabsTrigger>
+            <TabsTrigger value="related">
+              {t("adminErrorLogs.relatedTab") || "Related"}
+              {events.length > 0 ? (
+                <DataPill tone="neutral" size="sm" className="ml-2">
+                  <span className="tabular">{events.length}</span>
+                </DataPill>
+              ) : null}
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-      {schedulerDiagnostic ? (
-        <SchedulerDiagnosticSummary diagnostic={schedulerDiagnostic} requestID={detail.request_id} />
-      ) : null}
+        <TabsContent value="request">
+          <div className="overflow-hidden rounded-2xl border border-srapi-border bg-srapi-card">
+            <InlineDetailGrid sections={requestSections} />
+          </div>
+        </TabsContent>
 
-      {upstreamDiagnostic ? <UpstreamErrorDiagnosticSummary diagnostic={upstreamDiagnostic} /> : null}
+        <TabsContent value="response">
+          <div className="space-y-3">
+            {detail.error_message ? (
+              <EvidenceBlock
+                label={t("adminErrorLogs.upstreamMessage")}
+                value={detail.error_message}
+              />
+            ) : null}
+            {detail.error_body_excerpt ? (
+              <EvidenceBlock
+                label={t("adminErrorLogs.upstreamBodyExcerpt")}
+                value={detail.error_body_excerpt}
+                mono
+              />
+            ) : null}
+            <div className="overflow-hidden rounded-2xl border border-srapi-border bg-srapi-card">
+              <InlineDetailGrid sections={responseSections} />
+            </div>
+          </div>
+        </TabsContent>
 
-      <ErrorLogTriageSummary detail={detail} triage={triage} />
+        <TabsContent value="diagnosis">
+          <div className="space-y-3">
+            {schedulerDiagnostic ? (
+              <SchedulerDiagnosticSummary
+                diagnostic={schedulerDiagnostic}
+                requestID={detail.request_id}
+              />
+            ) : null}
+            {upstreamDiagnostic ? (
+              <UpstreamErrorDiagnosticSummary diagnostic={upstreamDiagnostic} />
+            ) : null}
+            <ErrorLogTriageSummary detail={detail} triage={triage} />
+            <ResolutionEditorShell
+              key={`${detail.id ?? ""}:${detail.resolution ?? "open"}:${detail.resolution_note ?? ""}`}
+              current={detail.resolution ?? "open"}
+              note={detail.resolution_note ?? ""}
+              pending={resolutionMutation.isPending || !detail.id}
+              onSubmit={(resolution, note) => {
+                if (!detail.id) return;
+                resolutionMutation.mutate({
+                  id: detail.id,
+                  resolution,
+                  note: note.trim() || undefined,
+                });
+              }}
+            />
+            {detail.resolved_at || detail.resolved_by_user_id ? (
+              <div className="rounded-2xl border border-srapi-border bg-srapi-card p-4">
+                <InlineDetailGrid
+                  sections={[
+                    {
+                      title: t("adminErrorLogs.resolved"),
+                      rows: [
+                        ...(detail.resolved_at
+                          ? [rowText(t("adminErrorLogs.resolvedAt"), formatDateTime(detail.resolved_at), { mono: true })]
+                          : []),
+                        ...(detail.resolved_by_user_id
+                          ? [rowText(t("adminErrorLogs.resolvedBy"), userLookup.get(detail.resolved_by_user_id))]
+                          : []),
+                      ],
+                    },
+                  ]}
+                />
+              </div>
+            ) : null}
+          </div>
+        </TabsContent>
 
-      {detail.error_body_excerpt ? (
-        <EvidenceBlock
-          label={t("adminErrorLogs.upstreamBodyExcerpt")}
-          value={detail.error_body_excerpt}
-          mono
-        />
-      ) : null}
+        <TabsContent value="related">
+          <div className="space-y-3">
+            <SystemLogEvidence
+              logs={systemLogQuery.data?.data ?? []}
+              loading={systemLogQuery.isFetching}
+              requestID={detail.request_id}
+              traceID={detail.trace_id}
+              total={systemLogQuery.data?.pagination?.total}
+              requestEvidenceHref={triage.links.find((link) => link.kind === "requestEvidence")?.href}
+            />
+            <RequestLogEvidence
+              files={requestLogQuery.data?.data ?? []}
+              loading={requestLogQuery.isFetching}
+              requestID={detail.request_id}
+              total={requestLogQuery.data?.pagination?.total}
+            />
+            {events.length > 0 ? (
+              <AttemptHistory
+                events={events}
+                firstAt={firstAt}
+                attemptSummary={attemptSummary}
+              />
+            ) : null}
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
 
-      <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-        <Field label={t("adminErrorLogs.requestId")} value={detail.request_id || "—"} mono copyable />
-        <Field label={t("adminErrorLogs.traceId")} value={detail.trace_id || "—"} mono copyable />
-        <Field label={t("adminErrorLogs.model")} value={detail.model || "—"} />
-        <Field label={t("adminErrorLogs.sourceEndpoint")} value={detail.source_endpoint || "—"} mono copyable />
-        <Field label={t("adminErrorLogs.protocol")} value={protocol} mono />
-        <Field label={t("adminErrorLogs.latency")} value={formatLatency(detail.latency_ms ?? 0)} mono />
-        <Field label={t("adminErrorLogs.attempt")} value={formatInteger(detail.attempt_no ?? 1)} mono />
-        <Field
-          label={t("adminErrorLogs.statusCode")}
-          value={detail.status_code != null ? String(detail.status_code) : "—"}
-          mono
-        />
-        <Field label={t("adminErrorLogs.upstreamRequestId")} value={detail.upstream_request_id || "—"} mono copyable />
-        <Field label={t("adminErrorLogs.errorPhase")} value={detail.error_phase || "—"} mono />
-        <Field label={t("adminErrorLogs.errorOwner")} value={detail.error_owner || "—"} mono />
-        <Field label={t("adminErrorLogs.errorSource")} value={detail.error_source || "—"} mono />
-        <Field
-          label={t("adminErrorLogs.streamCompletionState")}
-          value={detail.stream_completion_state || "—"}
-          mono
-        />
-        <Field label={t("adminErrorLogs.inputTokens")} value={formatInteger(detail.input_tokens ?? 0)} mono />
-        <Field label={t("adminErrorLogs.outputTokens")} value={formatInteger(detail.output_tokens ?? 0)} mono />
-        <Field
-          label={t("adminErrorLogs.usageEstimated")}
-          value={detail.usage_estimated ? t("adminErrorLogs.estimated") : t("adminErrorLogs.exact")}
-        />
-        <Field label={t("adminErrorLogs.user")} value={userLookup.get(detail.user_id)} />
-        <Field label={t("adminErrorLogs.apiKey")} value={apiKeyLookup.get(detail.api_key_id)} />
-        <Field label={t("adminErrorLogs.apiKeyPrefix")} value={detail.api_key_prefix || "—"} mono copyable />
-        <Field label={t("adminErrorLogs.account")} value={accountLookup.get(detail.account_id)} />
-        <Field label={t("adminErrorLogs.provider")} value={providerLookup.get(detail.provider_id)} />
-        <Field label={t("adminErrorLogs.time")} value={formatDateTime(detail.occurred_at)} mono />
-        <Field label={t("adminErrorLogs.updatedAt")} value={formatDateTime(detail.updated_at)} mono />
-        {detail.resolved_at ? (
-          <Field label={t("adminErrorLogs.resolvedAt")} value={formatDateTime(detail.resolved_at)} mono />
+function rowText(
+  label: string,
+  value: string,
+  opts?: { mono?: boolean; tone?: InlineDetailRow["tone"] },
+): InlineDetailRow {
+  return { label, value, mono: opts?.mono, tone: opts?.tone };
+}
+
+function AttemptHistory({
+  events,
+  firstAt,
+  attemptSummary,
+}: {
+  events: UpstreamErrorEvent[];
+  firstAt: number;
+  attemptSummary: ReturnType<typeof summarizeUpstreamAttempts>;
+}) {
+  const { t } = useLanguage();
+  return (
+    <div className="rounded-2xl border border-srapi-border bg-srapi-card-muted p-4">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
+          {t("adminErrorLogs.attemptHistory")}
+        </p>
+        <DataPill tone="neutral" size="sm">
+          <span className="tabular">{formatInteger(attemptSummary.attempts)}</span>{" "}
+          {t("adminErrorLogs.attempt").toLowerCase()}
+        </DataPill>
+        {attemptSummary.statuses ? (
+          <DataPill tone="warning" size="sm">
+            <span className="tabular">{attemptSummary.statuses}</span>
+          </DataPill>
         ) : null}
-        {detail.resolved_by_user_id ? (
-          <Field label={t("adminErrorLogs.resolvedBy")} value={userLookup.get(detail.resolved_by_user_id)} />
+        {attemptSummary.targetCount > 0 ? (
+          <DataPill tone="neutral" size="sm">
+            <span className="tabular">{formatInteger(attemptSummary.targetCount)}</span>{" "}
+            {t("adminErrorLogs.upstreamTargetCount").toLowerCase()}
+          </DataPill>
         ) : null}
       </div>
 
-      <SystemLogEvidence
-        logs={systemLogQuery.data?.data ?? []}
-        loading={systemLogQuery.isFetching}
-        requestID={detail.request_id}
-        traceID={detail.trace_id}
-        total={systemLogQuery.data?.pagination?.total}
-        requestEvidenceHref={triage.links.find((link) => link.kind === "requestEvidence")?.href}
-      />
-
-      <RequestLogEvidence
-        files={requestLogQuery.data?.data ?? []}
-        loading={requestLogQuery.isFetching}
-        requestID={detail.request_id}
-        total={requestLogQuery.data?.pagination?.total}
-      />
-
-      <ResolutionEditorShell
-        key={`${detail.id ?? ""}:${detail.resolution ?? "open"}:${detail.resolution_note ?? ""}`}
-        current={detail.resolution ?? "open"}
-        note={detail.resolution_note ?? ""}
-        pending={resolutionMutation.isPending || !detail.id}
-        onSubmit={(resolution, note) => {
-          if (!detail.id) return;
-          resolutionMutation.mutate({
-            id: detail.id,
-            resolution,
-            note: note.trim() || undefined,
-          });
-        }}
-      />
-
-      {events.length > 0 ? (
-        <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
-            {t("adminErrorLogs.attemptHistory")}
-          </p>
-          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Field
-              label={t("adminErrorLogs.attempt")}
-              value={formatInteger(attemptSummary.attempts)}
-              mono
-            />
-            <Field
-              label={t("adminErrorLogs.statusCode")}
-              value={attemptSummary.statuses || "—"}
-              mono
-            />
-            <Field
-              label={t("adminErrorLogs.account")}
-              value={attemptSummary.accounts || "—"}
-            />
-            <Field
-              label={t("adminErrorLogs.upstreamTargetCount")}
-              value={
-                attemptSummary.targetCount > 0
-                  ? formatInteger(attemptSummary.targetCount)
-                  : "—"
-              }
-              mono
-            />
-          </div>
-          <ol className="mt-2 space-y-2">
-            {events.map((ev, idx) => {
-              const offsetMs =
-                firstAt > 0 && (ev.at_unix_ms ?? 0) > 0 ? (ev.at_unix_ms ?? 0) - firstAt : 0;
-              const eventDiagnostic = parseUpstreamErrorDiagnostic(ev.body_excerpt);
-              const upstreamTarget = formatUpstreamTarget(ev.upstream_url);
-              return (
-                <li
-                  key={`${ev.attempt_no ?? idx}-${idx}`}
-                  className="rounded-md border border-srapi-border bg-srapi-card p-3"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[11px] font-semibold text-srapi-text-primary">
-                      {t("adminErrorLogs.attemptN", { n: ev.attempt_no ?? idx + 1 })}
-                    </span>
-                    {ev.kind ? (
-                      <span className="rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-tertiary">
-                        {ev.kind}
-                      </span>
-                    ) : null}
-                    {ev.upstream_status_code != null && ev.upstream_status_code > 0 ? (
-                      <span className="text-[11px] font-medium text-srapi-error">
-                        {ev.upstream_status_code}
-                      </span>
-                    ) : null}
-                    {offsetMs > 0 ? (
-                      <span className="text-[11px] text-srapi-text-tertiary">
-                        +{offsetMs}ms
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="mt-1 text-xs text-srapi-text-secondary">
-                    {ev.account_name || "—"}
-                    {ev.upstream_request_id ? (
-                      <span className="ml-2 text-[11px] text-srapi-text-tertiary">
-                        · {ev.upstream_request_id}
-                      </span>
-                    ) : null}
-                  </div>
-                  {upstreamTarget ? (
-                    <div className="mt-1 flex items-start gap-1.5 text-xs text-srapi-text-secondary">
-                      <span className="shrink-0 font-medium">
-                        {t("adminErrorLogs.upstreamTarget")}:
-                      </span>
-                      <span className="min-w-0 break-all text-[11px] text-srapi-text-tertiary">
-                        {upstreamTarget}
-                      </span>
-                      <CopyButton value={upstreamTarget} size="inline" />
-                    </div>
-                  ) : null}
-                  {ev.message ? (
-                    <p className="mt-1 break-words text-xs text-srapi-text-primary">
-                      {ev.message}
-                    </p>
-                  ) : null}
-                  {eventDiagnostic ? <UpstreamDiagnosticPills diagnostic={eventDiagnostic} /> : null}
-                  {ev.body_excerpt ? (
-                    <p className="mt-1 break-words text-[11px] text-srapi-text-tertiary">
-                      {ev.body_excerpt}
-                    </p>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ol>
-        </div>
-      ) : null}
+      <ol className="mt-3 space-y-2">
+        {events.map((ev, idx) => {
+          const offsetMs =
+            firstAt > 0 && (ev.at_unix_ms ?? 0) > 0 ? (ev.at_unix_ms ?? 0) - firstAt : 0;
+          const eventDiagnostic = parseUpstreamErrorDiagnostic(ev.body_excerpt);
+          const upstreamTarget = formatUpstreamTarget(ev.upstream_url);
+          const sev: "error" | "warning" | "info" =
+            ev.upstream_status_code != null && ev.upstream_status_code >= 500
+              ? "error"
+              : ev.upstream_status_code != null && ev.upstream_status_code >= 400
+                ? "warning"
+                : "info";
+          return (
+            <li
+              key={`${ev.attempt_no ?? idx}-${idx}`}
+              className="log-row rounded-md border border-srapi-border bg-srapi-card p-3"
+              data-sev={sev}
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-semibold text-srapi-text-primary">
+                  {t("adminErrorLogs.attemptN", { n: ev.attempt_no ?? idx + 1 })}
+                </span>
+                {ev.kind ? (
+                  <DataPill tone="neutral" size="sm">{ev.kind}</DataPill>
+                ) : null}
+                {ev.upstream_status_code != null && ev.upstream_status_code > 0 ? (
+                  <DataPill tone="error" size="sm">
+                    <span className="tabular">{ev.upstream_status_code}</span>
+                  </DataPill>
+                ) : null}
+                {offsetMs > 0 ? (
+                  <span className="font-mono text-[11px] tabular text-srapi-text-tertiary">
+                    +{offsetMs}ms
+                  </span>
+                ) : null}
+              </div>
+              <div className="mt-1 text-xs text-srapi-text-secondary">
+                {ev.account_name || "—"}
+                {ev.upstream_request_id ? (
+                  <span className="ml-2 font-mono text-[11px] text-srapi-text-tertiary">
+                    · {ev.upstream_request_id}
+                  </span>
+                ) : null}
+              </div>
+              {upstreamTarget ? (
+                <div className="mt-1 flex items-start gap-1.5 text-xs text-srapi-text-secondary">
+                  <span className="shrink-0 font-medium">
+                    {t("adminErrorLogs.upstreamTarget")}:
+                  </span>
+                  <span className="min-w-0 break-all font-mono text-[11px] text-srapi-text-tertiary">
+                    {upstreamTarget}
+                  </span>
+                  <CopyButton value={upstreamTarget} size="inline" />
+                </div>
+              ) : null}
+              {ev.message ? (
+                <p className="mt-1 break-words text-xs text-srapi-text-primary">{ev.message}</p>
+              ) : null}
+              {eventDiagnostic ? <UpstreamDiagnosticPills diagnostic={eventDiagnostic} /> : null}
+              {ev.body_excerpt ? (
+                <p className="mt-1 break-words font-mono text-[11px] text-srapi-text-tertiary">
+                  {ev.body_excerpt}
+                </p>
+              ) : null}
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }
@@ -353,7 +487,7 @@ function ErrorLogTriageSummary({
   if (triage.steps.length === 0 && triage.links.length === 0) return null;
 
   return (
-    <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
+    <div className="rounded-2xl border border-srapi-border bg-srapi-card-muted p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
@@ -389,7 +523,9 @@ function ErrorLogTriageSummary({
         <ol className="mt-3 grid gap-1.5">
           {triage.steps.slice(0, 4).map((step, index) => (
             <li key={step} className="flex gap-2 text-xs text-srapi-text-secondary">
-              <span className="text-[11px] text-srapi-text-tertiary">{index + 1}</span>
+              <span className="font-mono text-[11px] tabular text-srapi-text-tertiary">
+                {index + 1}
+              </span>
               <span>{t(`adminOps.runbook.steps.${step}`)}</span>
             </li>
           ))}
@@ -424,7 +560,7 @@ function SystemLogEvidence({
   if (!systemLogHref && !requestEvidenceHref) return null;
 
   return (
-    <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
+    <div className="rounded-2xl border border-srapi-border bg-srapi-card-muted p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
@@ -463,16 +599,15 @@ function SystemLogEvidence({
           {logs.map((log) => (
             <li
               key={log.id}
-              className="rounded-md border border-srapi-border bg-srapi-card px-3 py-2"
+              className="log-row rounded-md border border-srapi-border bg-srapi-card px-3 py-2"
+              data-sev={systemLogSeverity(log.level)}
             >
               <div className="flex flex-wrap items-center gap-2">
                 <QuietBadge status={systemLogTone(log.level)} label={log.level} />
-                <span className="text-[11px] text-srapi-text-tertiary">
+                <span className="font-mono text-[11px] tabular text-srapi-text-tertiary">
                   {formatDateTime(log.created_at)}
                 </span>
-                <span className="text-[11px] text-srapi-text-tertiary">
-                  {log.source || "—"}
-                </span>
+                <span className="text-[11px] text-srapi-text-tertiary">{log.source || "—"}</span>
               </div>
               <p className="mt-1 break-words text-xs text-srapi-text-primary">{log.message}</p>
             </li>
@@ -563,7 +698,7 @@ function RequestLogEvidence({
   }, []);
 
   return (
-    <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
+    <div className="rounded-2xl border border-srapi-border bg-srapi-card-muted p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
@@ -613,7 +748,7 @@ function RequestLogEvidence({
       {selected ? (
         <div className="mt-3 rounded-md border border-srapi-border bg-srapi-card p-3">
           <div className="mb-2 flex items-center justify-between gap-3">
-            <p className="min-w-0 break-all text-[11px] text-srapi-text-tertiary">
+            <p className="min-w-0 break-all font-mono text-[11px] text-srapi-text-tertiary">
               {selected.name}
             </p>
             <Button type="button" variant="ghost" size="sm" onClick={() => setSelected(null)}>
@@ -670,7 +805,7 @@ function ResolutionEditor({
   );
 
   return (
-    <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
+    <div className="rounded-2xl border border-srapi-border bg-srapi-card-muted p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <QuietBadge status={resolutionTone(value)} label={resolutionLabel(t, value)} />
         <div className="flex flex-wrap items-center gap-2">
@@ -739,7 +874,7 @@ function EvidenceBlock({
   mono?: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
+    <div className="rounded-2xl border border-srapi-border bg-srapi-card-muted p-4">
       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{label}</p>
       <div className="mt-1 flex items-start gap-1.5">
         <p
@@ -766,8 +901,37 @@ function SchedulerDiagnosticSummary({
   const { t } = useLanguage();
   const topReasons = diagnostic.reasonCounts.slice(0, 4);
   const schedulerHref = adminSchedulerDecisionsHref({ request_id: requestID });
+
+  const sections: InlineDetailSection[] = [
+    {
+      title: t("adminErrorLogs.schedulerDiagnostic"),
+      rows: [
+        rowText(
+          t("adminErrorLogs.schedulerDecisionId"),
+          diagnostic.decisionId != null ? formatInteger(diagnostic.decisionId) : "—",
+          { mono: true },
+        ),
+        rowText(
+          t("adminErrorLogs.schedulerCandidates"),
+          diagnostic.candidateCount != null ? formatInteger(diagnostic.candidateCount) : "—",
+          { mono: true },
+        ),
+        rowText(
+          t("adminErrorLogs.schedulerRejected"),
+          diagnostic.rejectedCount != null ? formatInteger(diagnostic.rejectedCount) : "—",
+          { mono: true },
+        ),
+        rowText(
+          t("adminErrorLogs.responseStatus"),
+          diagnostic.responseStatus != null ? String(diagnostic.responseStatus) : "—",
+          { mono: true },
+        ),
+      ],
+    },
+  ];
+
   return (
-    <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
+    <div className="rounded-2xl border border-srapi-border bg-srapi-card-muted p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
@@ -776,7 +940,7 @@ function SchedulerDiagnosticSummary({
           <p className="mt-1 text-sm text-srapi-text-primary">
             {diagnostic.primaryReason || "—"}
             {diagnostic.primaryCount != null ? (
-              <span className="ml-2 text-[11px] text-srapi-text-tertiary">
+              <span className="ml-2 font-mono text-[11px] tabular text-srapi-text-tertiary">
                 ×{formatInteger(diagnostic.primaryCount)}
               </span>
             ) : null}
@@ -797,39 +961,19 @@ function SchedulerDiagnosticSummary({
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Field
-          label={t("adminErrorLogs.schedulerDecisionId")}
-          value={diagnostic.decisionId != null ? formatInteger(diagnostic.decisionId) : "—"}
-          mono
-          copyable={diagnostic.decisionId != null}
-        />
-        <Field
-          label={t("adminErrorLogs.schedulerCandidates")}
-          value={diagnostic.candidateCount != null ? formatInteger(diagnostic.candidateCount) : "—"}
-          mono
-        />
-        <Field
-          label={t("adminErrorLogs.schedulerRejected")}
-          value={diagnostic.rejectedCount != null ? formatInteger(diagnostic.rejectedCount) : "—"}
-          mono
-        />
-        <Field
-          label={t("adminErrorLogs.responseStatus")}
-          value={diagnostic.responseStatus != null ? String(diagnostic.responseStatus) : "—"}
-          mono
-        />
+      <div className="mt-3 overflow-hidden rounded-xl border border-srapi-border bg-srapi-card">
+        <InlineDetailGrid sections={sections} />
       </div>
 
       {topReasons.length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-1.5">
           {topReasons.map((item) => (
-            <span
-              key={item.reason}
-              className="rounded-full bg-srapi-card px-2 py-0.5 text-[11px] font-medium text-srapi-text-secondary"
-            >
-              {item.reason}({formatInteger(item.count)})
-            </span>
+            <DataPill key={item.reason} tone="neutral" size="sm">
+              <span>{item.reason}</span>
+              <span className="font-mono tabular text-srapi-text-tertiary">
+                ({formatInteger(item.count)})
+              </span>
+            </DataPill>
           ))}
         </div>
       ) : null}
@@ -846,16 +990,14 @@ function SchedulerDiagnosticSummary({
 function UpstreamErrorDiagnosticSummary({ diagnostic }: { diagnostic: UpstreamErrorDiagnostic }) {
   const { t } = useLanguage();
   return (
-    <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
+    <div className="rounded-2xl border border-srapi-border bg-srapi-card-muted p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
             {t("adminErrorLogs.upstreamDiagnostic")}
           </p>
           {diagnostic.message ? (
-            <p className="mt-1 break-words text-sm text-srapi-text-primary">
-              {diagnostic.message}
-            </p>
+            <p className="mt-1 break-words text-sm text-srapi-text-primary">{diagnostic.message}</p>
           ) : null}
         </div>
         {diagnostic.source === "attempt" ? (
@@ -873,42 +1015,10 @@ function UpstreamDiagnosticPills({ diagnostic }: { diagnostic: UpstreamErrorDiag
   return (
     <div className="mt-2 flex flex-wrap gap-1.5">
       {parts.map((part) => (
-        <span
-          key={part}
-          className="rounded-full bg-srapi-card px-2 py-0.5 text-[11px] font-medium text-srapi-text-secondary"
-        >
+        <DataPill key={part} tone="neutral" size="sm">
           {part}
-        </span>
+        </DataPill>
       ))}
-    </div>
-  );
-}
-
-function Field({
-  label,
-  value,
-  mono,
-  copyable,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-  copyable?: boolean;
-}) {
-  return (
-    <div className="min-w-0">
-      <span className="font-medium text-srapi-text-tertiary">{label}</span>
-      <div className="mt-0.5 flex items-start gap-1.5">
-        <p
-          className={
-            "min-w-0 break-all text-srapi-text-primary" +
-            (mono ? " font-mono text-[11px] tabular" : " text-sm")
-          }
-        >
-          {value}
-        </p>
-        {copyable && value && value !== "—" ? <CopyButton value={value} size="inline" /> : null}
-      </div>
     </div>
   );
 }
@@ -936,6 +1046,19 @@ function systemLogTone(level: OpsSystemLog["level"]): QuietStatus {
       return "active";
     default:
       return "disabled";
+  }
+}
+
+function systemLogSeverity(level: OpsSystemLog["level"]): "error" | "warning" | "info" | "success" {
+  switch (level) {
+    case "error":
+      return "error";
+    case "warn":
+      return "warning";
+    case "info":
+      return "info";
+    default:
+      return "info";
   }
 }
 

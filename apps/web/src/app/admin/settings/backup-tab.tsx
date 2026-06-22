@@ -1,5 +1,14 @@
 import { useState } from "react";
-import { Copy, Check, Download, Trash2, RefreshCw } from "lucide-react";
+import {
+  Copy,
+  Check,
+  Download,
+  Trash2,
+  RefreshCw,
+  Database,
+  Upload,
+  ArchiveRestore,
+} from "lucide-react";
 import {
   useAdminBackupSnapshots,
   useConfigSnapshot,
@@ -16,6 +25,11 @@ import { writeClipboard } from "@/components/ui/copy-button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { SectionTitle } from "@/components/ui/section-title";
+import { IllustratedEmptyState } from "@/components/ui/illustrated-empty-state";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { DataPill } from "@/components/ui/data-pill";
+import { Kbd } from "@/components/ui/kbd";
 import { adminApi, adminErrorMessage } from "@/lib/admin-api";
 import type { BackupSnapshot } from "../../../../../../packages/sdk/typescript/src/types.gen";
 
@@ -59,25 +73,33 @@ export function BackupTab() {
     }
   }
 
+  // Mark the import textarea as «dirty» whenever it diverges from empty —
+  // mirrors the SectionFields convention so operators see at a glance which
+  // panel has unsaved changes.
+  const importDirty = importText.trim().length > 0;
+
   return (
     <div className="space-y-6">
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardContent className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold tracking-tight text-srapi-text-primary">{t("adminSettings.export")}</h3>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => snapshot.refetch()} loading={snapshot.isFetching}>
-                  {t("adminSettings.fetchSnapshot")}
-                </Button>
-                {snapshotJson ? (
-                  <Button variant="outline" size="sm" onClick={copySnapshot}>
-                    {copied ? <Check className="size-4 text-srapi-success" /> : <Copy className="size-4" />}
-                    {t("common.copy")}
+            <SectionTitle
+              icon={<ArchiveRestore />}
+              label={t("adminSettings.export")}
+              action={
+                <>
+                  <Button variant="outline" size="sm" onClick={() => snapshot.refetch()} loading={snapshot.isFetching}>
+                    {t("adminSettings.fetchSnapshot")}
                   </Button>
-                ) : null}
-              </div>
-            </div>
+                  {snapshotJson ? (
+                    <Button variant="outline" size="sm" onClick={copySnapshot}>
+                      {copied ? <Check className="size-4 text-srapi-success" /> : <Copy className="size-4" />}
+                      {t("common.copy")}
+                    </Button>
+                  ) : null}
+                </>
+              }
+            />
             <p className="text-xs text-srapi-text-tertiary">{t("adminSettings.exportHint")}</p>
             <Textarea
               readOnly
@@ -85,12 +107,32 @@ export function BackupTab() {
               value={snapshotJson}
               placeholder={t("adminSettings.fetchSnapshot")}
             />
+            {snapshotJson ? (
+              <p className="flex items-center gap-1.5 text-[11px] text-srapi-text-tertiary">
+                <Kbd>⌘</Kbd>
+                <Kbd>C</Kbd>
+                <span>to copy after selecting</span>
+              </p>
+            ) : null}
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="space-y-3">
-            <h3 className="text-lg font-semibold tracking-tight text-srapi-text-primary">{t("adminSettings.import")}</h3>
+            <SectionTitle
+              icon={<Upload />}
+              label={t("adminSettings.import")}
+              action={
+                importDirty ? (
+                  // 2.5px-style severity hint reused as a tiny dirty pill on
+                  // the import panel; subtle enough not to compete with the
+                  // sticky top save bar on sibling tabs.
+                  <DataPill tone="warning" size="sm">
+                    ●&nbsp;dirty
+                  </DataPill>
+                ) : undefined
+              }
+            />
             <p className="text-xs text-srapi-text-tertiary">{t("adminSettings.importHint")}</p>
             <Textarea
               className="min-h-48 font-mono text-xs"
@@ -171,38 +213,72 @@ function DatabaseBackupsSection() {
 
   const rows = list.data?.data ?? [];
 
+  // Roll-up counts for the SectionTitle DataTooltip — at-a-glance breakdown
+  // of snapshot health without forcing operators to scan the full table.
+  const successCount = rows.filter((r) => r.status === "success").length;
+  const failedCount = rows.filter((r) => r.status === "failed").length;
+  const runningCount = rows.filter((r) => r.status === "running").length;
+  const supersededCount = rows.filter((r) => r.status === "superseded").length;
+
   return (
     <Card>
       <CardContent className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold tracking-tight text-srapi-text-primary">
-            {t("adminSettings.databaseBackups")}
-          </h3>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => list.refetch()}
-              loading={list.isFetching}
+        <SectionTitle
+          icon={<Database />}
+          label={
+            <DataTooltip
+              title={t("adminSettings.databaseBackups")}
+              primary={`${rows.length} snapshot${rows.length === 1 ? "" : "s"}`}
+              rows={[
+                { label: t("adminSettings.snapshotStatus") + " · success", value: successCount, tone: "success" },
+                { label: t("adminSettings.snapshotStatus") + " · failed", value: failedCount, tone: "error" },
+                { label: t("adminSettings.snapshotStatus") + " · running", value: runningCount, tone: "warning" },
+                { label: t("adminSettings.snapshotStatus") + " · superseded", value: supersededCount, tone: "muted" },
+              ]}
             >
-              <RefreshCw className="size-4" />
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={onSnapshotNow}
-              loading={triggerMut.isPending}
-            >
-              {t("adminSettings.snapshotNow")}
-            </Button>
-          </div>
-        </div>
+              <span className="cursor-help underline decoration-srapi-border decoration-dotted underline-offset-4">
+                {t("adminSettings.databaseBackups")}
+              </span>
+            </DataTooltip>
+          }
+          action={
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => list.refetch()}
+                loading={list.isFetching}
+              >
+                <RefreshCw className="size-4" />
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={onSnapshotNow}
+                loading={triggerMut.isPending}
+              >
+                {t("adminSettings.snapshotNow")}
+              </Button>
+            </>
+          }
+        />
 
         {rows.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-srapi-border/70 bg-srapi-card-muted/40 p-6 text-center text-sm text-srapi-text-tertiary">
-            <p className="font-semibold tracking-tight text-srapi-text-primary">{t("adminSettings.snapshotEmpty")}</p>
-            <p className="mt-1 text-xs leading-relaxed">{t("adminSettings.snapshotEmptyBody")}</p>
-          </div>
+          <IllustratedEmptyState
+            illust="cog"
+            title={t("adminSettings.snapshotEmpty")}
+            description={t("adminSettings.snapshotEmptyBody")}
+            action={
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={onSnapshotNow}
+                loading={triggerMut.isPending}
+              >
+                {t("adminSettings.snapshotNow")}
+              </Button>
+            }
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-sm">
@@ -264,17 +340,54 @@ function BackupRow({
     }
   }
 
+  // Severity drives the 2.5px left stripe via .log-row — error/warn/info map
+  // directly from status; «superseded» is treated as info (historical) so it
+  // doesn't compete visually with active failures.
+  const severity: "success" | "error" | "warning" | "info" =
+    row.status === "success"
+      ? "success"
+      : row.status === "failed"
+        ? "error"
+        : row.status === "running"
+          ? "warning"
+          : "info";
+
   return (
-    <tr className="border-b border-srapi-border/70 transition-colors hover:bg-srapi-card-muted/50">
+    <tr
+      className="log-row border-b border-srapi-border/70 transition-colors hover:bg-srapi-card-muted/50"
+      data-sev={severity}
+    >
       <td className="py-3 pr-3 text-[12px] tabular text-srapi-text-secondary">
-        {startedAt ? startedAt.toLocaleString() : "—"}
+        {startedAt ? (
+          <DataTooltip
+            title={t("adminSettings.snapshotStarted")}
+            primary={startedAt.toLocaleString()}
+            rows={[
+              { label: "ISO", value: startedAt.toISOString() },
+              { label: "Kind", value: kindLabel },
+            ]}
+          >
+            <span className="cursor-help">{startedAt.toLocaleString()}</span>
+          </DataTooltip>
+        ) : (
+          "—"
+        )}
       </td>
       <td className="py-3 pr-3">
         <StatusBadge status={row.status} />
       </td>
       <td className="py-3 pr-3 text-xs text-srapi-text-secondary">{kindLabel}</td>
       <td className="py-3 pr-3 text-[12px] tabular text-srapi-text-secondary">
-        {formatBytes(row.size_bytes)}
+        <DataTooltip
+          title={t("adminSettings.snapshotSize")}
+          primary={formatBytes(row.size_bytes)}
+          rows={[
+            { label: "bytes", value: row.size_bytes ?? 0 },
+            { label: "kind", value: kindLabel },
+          ]}
+        >
+          <span className="cursor-help">{formatBytes(row.size_bytes)}</span>
+        </DataTooltip>
       </td>
       <td className="py-3 pr-3">
         {row.sha256 ? (

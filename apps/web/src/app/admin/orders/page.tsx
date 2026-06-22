@@ -33,6 +33,9 @@ import {
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { QuietBadge } from "@/components/ui/quiet-badge";
+import { DataTooltip, type DataTooltipRow } from "@/components/ui/data-tooltip";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { InlineDetailGrid } from "@/components/ui/inline-detail-grid";
 import { quietStatusFor } from "@/lib/status-badge";
 import { formatDateTime, formatMoney, safeJson } from "@/lib/admin-format";
 import { adminErrorMessage } from "@/lib/admin-api";
@@ -73,6 +76,59 @@ const ORDER_STATUSES: PaymentOrder["status"][] = [
 
 const orderCompare = (a: PaymentOrder, b: PaymentOrder) =>
   (b.created_at ?? "").localeCompare(a.created_at ?? "");
+
+// Approximate FX rates against USD for hover-to-reveal context only — used to
+// render an "≈ USD" line in money tooltips when the order currency is non-USD.
+const FX_TO_USD: Record<string, number> = {
+  USD: 1,
+  CNY: 0.14,
+  EUR: 1.08,
+  JPY: 0.0066,
+  GBP: 1.27,
+  HKD: 0.13,
+  TWD: 0.031,
+  KRW: 0.00075,
+};
+
+function moneyTooltipRows(
+  value: string | number | null | undefined,
+  currency: string,
+): DataTooltipRow[] {
+  const rows: DataTooltipRow[] = [];
+  const numeric = typeof value === "number" ? value : Number(value);
+  rows.push({ label: "Currency", value: currency.toUpperCase() });
+  if (Number.isFinite(numeric)) {
+    const decimals = String(value).split(".")[1]?.length ?? 0;
+    rows.push({ label: "Precision", value: `${decimals} dp` });
+    const fx = FX_TO_USD[currency.toUpperCase()];
+    if (fx !== undefined && currency.toUpperCase() !== "USD") {
+      rows.push({ label: "≈ USD", value: formatMoney(numeric * fx, "USD") });
+    }
+  }
+  return rows;
+}
+
+function orderSeverity(
+  s: PaymentOrder["status"],
+): "info" | "success" | "warning" | "error" | undefined {
+  switch (s) {
+    case "paid":
+    case "fulfilled":
+      return "success";
+    case "refunded":
+    case "partially_refunded":
+    case "refunding":
+      return "warning";
+    case "failed":
+    case "refund_failed":
+      return "error";
+    case "expired":
+    case "canceled":
+      return "info";
+    default:
+      return undefined;
+  }
+}
 
 function OrdersContent() {
   const { t } = useLanguage();
@@ -147,9 +203,25 @@ function OrdersContent() {
       align: "right",
       sortValue: (o) => Number(o.amount),
       render: (o) => (
-        <span className="text-sm font-medium tabular text-srapi-text-primary">
-          {formatMoney(o.amount, o.currency)}
-        </span>
+        <DataTooltip
+          title={t("adminOrders.amount")}
+          primary={formatMoney(o.amount, o.currency)}
+          rows={[
+            ...moneyTooltipRows(o.amount, o.currency),
+            { label: "Original", value: formatMoney(o.original_amount, o.currency), tone: "muted" },
+            ...(Number(o.discount_amount) > 0
+              ? [{ label: "Discount", value: `-${formatMoney(o.discount_amount, o.currency)}`, tone: "success" as const }]
+              : []),
+            ...(Number(o.fee_amount) > 0
+              ? [{ label: "Fee", value: formatMoney(o.fee_amount, o.currency), tone: "muted" as const }]
+              : []),
+          ]}
+          footer={o.order_no}
+        >
+          <span className="text-sm font-medium tabular text-srapi-text-primary">
+            {formatMoney(o.amount, o.currency)}
+          </span>
+        </DataTooltip>
       ),
     },
     {
@@ -190,6 +262,8 @@ function OrdersContent() {
         onClearFilters={list.clearFilters}
         sort={list.sort}
         onSort={list.toggleSort}
+        rowSeverity={(o) => orderSeverity(o.status)}
+        expandRow={(o) => <OrderExpandDetail order={o} userEmail={userLookup.get(o.user_id)} t={t} />}
         toolbar={
           <ListToolbar>
             <SearchInput
@@ -197,11 +271,15 @@ function OrdersContent() {
               onChange={list.setSearchInput}
               placeholder={t("adminOrders.searchPlaceholder")}
             />
-            <FilterSelect
-              value={statusFilter}
-              onChange={(v) => list.setFilter("status", v)}
-              options={statusOptions}
-              allLabel={t("adminCommon.allStatuses")}
+            <SegmentedControl<string>
+              value={(statusFilter as string) ?? "all"}
+              onChange={(v) => list.setFilter("status", v === "all" ? "" : v)}
+              ariaLabel={t("adminCommon.allStatuses")}
+              size="sm"
+              options={[
+                { value: "all", label: t("adminCommon.allStatuses") },
+                ...statusOptions,
+              ]}
             />
             <FilterSelect
               value={list.filters.window}
@@ -246,6 +324,98 @@ function OrdersContent() {
         <AuditDialog order={auditTarget} onClose={() => setAuditTarget(null)} />
       ) : null}
     </>
+  );
+}
+
+// Inline detail panel rendered under each expanded row. Surfaces the
+// line-item breakdown, payment-provider context, the user link, and a quick
+// timeline (created / paid / closed). Inline > modal for cognitive load on
+// list rows — the operator scrubs without losing scroll position.
+function OrderExpandDetail({
+  order,
+  userEmail,
+  t,
+}: {
+  order: PaymentOrder;
+  userEmail: string;
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
+  const provider = order.provider_snapshot as Record<string, unknown> | undefined;
+  const providerName =
+    provider && typeof provider === "object" && "name" in provider
+      ? String((provider as Record<string, unknown>).name ?? "")
+      : "";
+  const providerMethod =
+    provider && typeof provider === "object" && "method" in provider
+      ? String((provider as Record<string, unknown>).method ?? "")
+      : "";
+  const lineItems: Array<{ label: string; value: React.ReactNode; tone?: "muted" | "success" }> = [
+    { label: t("adminOrders.amount"), value: formatMoney(order.original_amount, order.currency) },
+  ];
+  if (Number(order.discount_amount) > 0) {
+    lineItems.push({
+      label: "Discount",
+      value: `-${formatMoney(order.discount_amount, order.currency)}`,
+      tone: "success",
+    });
+  }
+  if (Number(order.fee_amount) > 0) {
+    lineItems.push({
+      label: "Fee",
+      value: formatMoney(order.fee_amount, order.currency),
+      tone: "muted",
+    });
+  }
+  lineItems.push({
+    label: "Payable",
+    value: formatMoney(order.payable_amount || order.amount, order.currency),
+  });
+
+  return (
+    <InlineDetailGrid
+      sections={[
+        {
+          title: t("adminOrders.lineItems") || "Line items",
+          rows: lineItems,
+        },
+        {
+          title: t("adminOrders.providerSection") || "Payment provider",
+          rows: [
+            { label: t("adminPayments.name"), value: providerName || "—" },
+            { label: "Method", value: providerMethod || "—", mono: true },
+            {
+              label: "Provider txn",
+              value: order.provider_transaction_id || "—",
+              mono: true,
+            },
+            { label: "Instance", value: order.provider_instance_id, mono: true },
+          ],
+        },
+        {
+          title: t("adminOrders.userSection") || "User",
+          rows: [
+            { label: "User", value: userEmail || `#${order.user_id}` },
+            { label: "Product", value: order.product_type, mono: true },
+            { label: "Product id", value: order.product_id || "—", mono: true },
+          ],
+        },
+        {
+          title: t("adminOrders.timelineSection") || "Timeline",
+          rows: [
+            { label: t("adminCommon.created"), value: formatDateTime(order.created_at) },
+            ...(order.paid_at
+              ? [{ label: "Paid", value: formatDateTime(order.paid_at), tone: "success" as const }]
+              : []),
+            ...(order.closed_at
+              ? [{ label: "Closed", value: formatDateTime(order.closed_at), tone: "muted" as const }]
+              : []),
+            ...(order.expires_at
+              ? [{ label: "Expires", value: formatDateTime(order.expires_at), tone: "muted" as const }]
+              : []),
+          ],
+        },
+      ]}
+    />
   );
 }
 

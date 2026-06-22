@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { KeyRound, MoreHorizontal, Copy, Check } from "lucide-react";
+import { MoreHorizontal, Copy, Check } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { SectionHero } from "@/components/visual/section-hero";
@@ -21,7 +21,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { QuietBadge } from "@/components/ui/quiet-badge";
-import { EmptyState } from "@/components/ui/empty-state";
+import { IllustratedEmptyState } from "@/components/ui/illustrated-empty-state";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import {
   DropdownMenu,
@@ -99,8 +99,8 @@ function ApiKeysContent() {
         >
           {(data) =>
             data.length === 0 ? (
-              <EmptyState
-                icon={KeyRound}
+              <IllustratedEmptyState
+                illust="cog"
                 title={t("apiKeys.emptyTitle")}
                 description={t("apiKeys.emptyBody")}
               />

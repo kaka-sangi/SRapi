@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Download, Inbox, SearchX } from "lucide-react";
+import { Download } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { SectionHero } from "@/components/visual/section-hero";
@@ -11,7 +11,7 @@ import { useUsageTotals } from "@/hooks/use-usage-totals";
 import { useLanguage } from "@/context/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
+import { IllustratedEmptyState } from "@/components/ui/illustrated-empty-state";
 import { StatCard, StatCardSkeleton } from "@/components/ui/stat-card";
 import {
   Table,
@@ -175,10 +175,10 @@ function UsageBody({
 
         {filtered.length === 0 ? (
           logs.length === 0 ? (
-            <EmptyState icon={Inbox} title={t("usage.emptyTitle")} description={t("usage.emptyBody")} />
+            <IllustratedEmptyState illust="inbox" title={t("usage.emptyTitle")} description={t("usage.emptyBody")} />
           ) : (
-            <EmptyState
-              icon={SearchX}
+            <IllustratedEmptyState
+              illust="search"
               title={t("adminCommon.noResults")}
               description={t("adminCommon.noResultsBody")}
               action={

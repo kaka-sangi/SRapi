@@ -51,8 +51,10 @@ import { BarSeries, type BarDatum } from "@/components/charts/bar-series";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { SectionTitle } from "@/components/ui/section-title";
 import { DataPill } from "@/components/ui/data-pill";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { IllustratedEmptyState } from "@/components/ui/illustrated-empty-state";
+import { InlineDetailGrid, type InlineDetailSection } from "@/components/ui/inline-detail-grid";
 import { BarChartSkeleton } from "@/components/charts/chart-skeleton";
-import { EmptyState } from "@/components/ui/empty-state";
 import { formatMoney, formatDateTime, formatInteger } from "@/lib/admin-format";
 import { UserBalanceHistoryDialog } from "@/components/admin/user-balance-history-dialog";
 import type { UsageLog } from "@/lib/sdk-types";
@@ -291,9 +293,25 @@ function UsageContent() {
       align: "right",
       hideOnMobile: true,
       render: (u) => (
-        <span className="text-[12px] text-srapi-text-tertiary tabular">
-          {formatInteger(u.input_tokens)}
-        </span>
+        <DataTooltip
+          title={t("dashboard.inputTokens")}
+          primary={formatInteger(u.input_tokens)}
+          rows={[
+            { label: t("usage.tokens"), value: formatInteger(u.input_tokens) },
+            { label: t("usage.costCacheRead"), value: formatInteger(u.cached_tokens), tone: "muted" },
+            ...(u.cache_creation_tokens
+              ? [{
+                  label: t("usage.costCacheWrite"),
+                  value: formatInteger(u.cache_creation_tokens),
+                  tone: "muted" as const,
+                }]
+              : []),
+          ]}
+        >
+          <span className="metric-tertiary tabular">
+            {formatInteger(u.input_tokens)}
+          </span>
+        </DataTooltip>
       ),
     },
     {
@@ -301,12 +319,29 @@ function UsageContent() {
       header: t("dashboard.outputTokens"),
       align: "right",
       render: (u) => (
-        <span className="text-sm font-medium text-srapi-text-secondary tabular">
-          {formatInteger(u.output_tokens)}
-          {u.cached_tokens > 0 ? (
-            <span className="ml-1 text-[11px] font-medium text-srapi-success">+{formatInteger(u.cached_tokens)}</span>
-          ) : null}
-        </span>
+        <DataTooltip
+          title={t("dashboard.outputTokens")}
+          primary={formatInteger(u.output_tokens)}
+          rows={[
+            { label: t("dashboard.outputTokens"), value: formatInteger(u.output_tokens) },
+            { label: t("dashboard.inputTokens"), value: formatInteger(u.input_tokens), tone: "muted" },
+            ...(u.cached_tokens > 0
+              ? [{
+                  label: t("usage.costCacheRead"),
+                  value: `+${formatInteger(u.cached_tokens)}`,
+                  tone: "success" as const,
+                }]
+              : []),
+            { label: t("usage.tokens"), value: formatInteger(u.total_tokens), tone: "muted" },
+          ]}
+        >
+          <span className="metric-secondary tabular">
+            {formatInteger(u.output_tokens)}
+            {u.cached_tokens > 0 ? (
+              <span className="ml-1 text-[11px] font-medium text-srapi-success">+{formatInteger(u.cached_tokens)}</span>
+            ) : null}
+          </span>
+        </DataTooltip>
       ),
     },
     {
@@ -391,20 +426,56 @@ function UsageContent() {
       header: t("adminUsage.latency"),
       align: "right",
       hideOnMobile: true,
-      render: (u) => (
-        <span className="text-[12px] text-srapi-text-tertiary tabular">
-          {formatLatency(u.latency_ms)}
-        </span>
-      ),
+      render: (u) => {
+        const tone: "success" | "warning" | "error" =
+          u.latency_ms <= 0
+            ? "warning"
+            : u.latency_ms < 2000
+              ? "success"
+              : u.latency_ms < 8000
+                ? "warning"
+                : "error";
+        return (
+          <DataTooltip
+            title={t("adminUsage.latency")}
+            primary={formatLatency(u.latency_ms)}
+            rows={[
+              { label: t("adminUsage.latency"), value: `${formatInteger(u.latency_ms)} ms`, tone },
+              { label: t("usage.tokens"), value: formatInteger(u.total_tokens), tone: "muted" },
+              ...(u.attempt_no > 1
+                ? [{ label: t("adminUsage.requests"), value: `#${u.attempt_no}`, tone: "warning" as const }]
+                : []),
+            ]}
+          >
+            <span className="metric-tertiary tabular">
+              {formatLatency(u.latency_ms)}
+            </span>
+          </DataTooltip>
+        );
+      },
     },
     {
       key: "cost",
       header: t("adminUsage.cost"),
       align: "right",
       render: (u) => (
-        <span className="text-sm font-medium text-srapi-text-secondary tabular">
-          {formatMoney(u.cost, u.currency)}
-        </span>
+        <DataTooltip
+          title={t("adminUsage.cost")}
+          primary={formatMoney(u.cost, u.currency)}
+          rows={[
+            { label: t("usage.costIn"), value: formatMoney(u.input_cost ?? "0", u.currency) },
+            { label: t("usage.costOut"), value: formatMoney(u.output_cost ?? "0", u.currency) },
+            { label: t("usage.costCacheRead"), value: formatMoney(u.cache_read_cost ?? "0", u.currency), tone: "muted" },
+            { label: t("usage.costCacheWrite"), value: formatMoney(u.cache_write_cost ?? "0", u.currency), tone: "muted" },
+            ...(u.rate_multiplier && u.rate_multiplier !== "1"
+              ? [{ label: "×", value: u.rate_multiplier, tone: "warning" as const }]
+              : []),
+          ]}
+        >
+          <span className="metric-secondary tabular">
+            {formatMoney(u.cost, u.currency)}
+          </span>
+        </DataTooltip>
       ),
     },
     {
@@ -448,9 +519,20 @@ function UsageContent() {
       align: "right",
       hideOnMobile: true,
       render: (u) => (
-        <span className="text-[12px] text-srapi-text-tertiary tabular">
-          {formatInteger(u.attempt_no)}
-        </span>
+        <DataTooltip
+          title={t("adminUsage.requests")}
+          primary={`#${u.attempt_no}`}
+          rows={[
+            { label: "request_id", value: u.request_id, tone: "muted" },
+            ...(u.attempt_no > 1
+              ? [{ label: t("usage.failed"), value: `${u.attempt_no - 1}`, tone: "warning" as const }]
+              : []),
+          ]}
+        >
+          <span className={u.attempt_no > 1 ? "metric-strong-warn" : "metric-tertiary tabular"}>
+            {formatInteger(u.attempt_no)}
+          </span>
+        </DataTooltip>
       ),
     },
     {
@@ -568,9 +650,99 @@ function UsageContent() {
         emptyIcon={BarChart3}
         emptyTitle={t("adminUsage.emptyTitle")}
         emptyBody={t("adminUsage.emptyBody")}
+        emptyContent={
+          <IllustratedEmptyState
+            illust="chart"
+            title={t("adminUsage.emptyTitle")}
+            description={t("adminUsage.emptyBody")}
+          />
+        }
         minWidth={820}
         isFiltered={isFiltered}
         onClearFilters={list.clearFilters}
+        rowSeverity={(u) =>
+          !u.success
+            ? "error"
+            : u.usage_estimated
+              ? "warning"
+              : undefined
+        }
+        expandRow={(u) => {
+          const identity: InlineDetailSection = {
+            title: t("adminUsage.time"),
+            rows: [
+              { label: t("adminUsage.time"), value: formatDateTime(u.created_at) },
+              { label: "request_id", value: u.request_id, mono: true },
+              { label: t("adminUsage.model"), value: u.model },
+              ...(u.requested_model && u.requested_model !== u.model
+                ? [{ label: "requested", value: u.requested_model, mono: true as const, tone: "muted" as const }]
+                : []),
+              ...(u.upstream_model && u.upstream_model !== u.model
+                ? [{ label: "upstream", value: u.upstream_model, mono: true as const, tone: "muted" as const }]
+                : []),
+              {
+                label: t("usage.endpoint"),
+                value: `${u.source_protocol}${u.target_protocol ? ` → ${u.target_protocol}` : ""}`,
+              },
+              {
+                label: t("usage.status"),
+                value: u.success ? t("usage.successful") : u.error_class || t("usage.failed"),
+                tone: u.success ? "success" : "error",
+              },
+            ],
+          };
+          const tokens: InlineDetailSection = {
+            title: t("usage.tokens"),
+            rows: [
+              { label: t("dashboard.inputTokens"), value: formatInteger(u.input_tokens) },
+              { label: t("dashboard.outputTokens"), value: formatInteger(u.output_tokens) },
+              ...(u.cached_tokens > 0
+                ? [{
+                    label: t("usage.costCacheRead"),
+                    value: formatInteger(u.cached_tokens),
+                    tone: "success" as const,
+                  }]
+                : []),
+              ...(u.cache_creation_tokens
+                ? [{
+                    label: t("usage.costCacheWrite"),
+                    value: formatInteger(u.cache_creation_tokens),
+                    tone: "muted" as const,
+                  }]
+                : []),
+              { label: t("usage.tokens"), value: formatInteger(u.total_tokens) },
+              {
+                label: t("adminUsage.latency"),
+                value: formatLatency(u.latency_ms),
+                tone:
+                  u.latency_ms <= 0
+                    ? "muted"
+                    : u.latency_ms < 2000
+                      ? "success"
+                      : u.latency_ms < 8000
+                        ? "warning"
+                        : "error",
+              },
+            ],
+          };
+          const costs: InlineDetailSection = {
+            title: t("adminUsage.cost"),
+            rows: [
+              { label: t("usage.costIn"), value: formatMoney(u.input_cost ?? "0", u.currency) },
+              { label: t("usage.costOut"), value: formatMoney(u.output_cost ?? "0", u.currency) },
+              { label: t("usage.costCacheRead"), value: formatMoney(u.cache_read_cost ?? "0", u.currency), tone: "muted" },
+              { label: t("usage.costCacheWrite"), value: formatMoney(u.cache_write_cost ?? "0", u.currency), tone: "muted" },
+              { label: t("adminUsage.cost"), value: formatMoney(u.cost, u.currency) },
+              ...(u.rate_multiplier && u.rate_multiplier !== "1"
+                ? [{ label: "×", value: u.rate_multiplier, tone: "warning" as const }]
+                : []),
+              ...(u.billing_mode
+                ? [{ label: "mode", value: u.billing_mode, tone: "muted" as const }]
+                : []),
+            ],
+          };
+          return <InlineDetailGrid sections={[identity, tokens, costs]} />;
+        }}
         toolbar={
           <ListToolbar>
             <FilterSelect
@@ -768,8 +940,8 @@ function UsageBreakdown() {
               .slice(0, TOP_N);
             if (top.length === 0) {
               return (
-                <EmptyState
-                  icon={BarChart3}
+                <IllustratedEmptyState
+                  illust="chart"
                   title={t("adminUsage.emptyTitle")}
                   description={t("adminUsage.emptyBody")}
                 />

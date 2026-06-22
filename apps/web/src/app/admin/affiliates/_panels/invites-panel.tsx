@@ -122,6 +122,14 @@ export function InvitesPanel() {
         emptyTitle={t("adminAffiliates.emptyTitle")}
         emptyBody={t("adminAffiliates.emptyBody")}
         minWidth={520}
+        rowSeverity={(r) => {
+          // Approval-state stripe: active = success, disabled = warning.
+          // First-paid invites stay success-tinted (the operator wants those
+          // to feel "confirmed"); cold leads sit on info.
+          if (r.status === "disabled") return "warning";
+          if (r.first_paid_at) return "success";
+          return "info";
+        }}
       />
 
       {bulkRebateOpen ? (

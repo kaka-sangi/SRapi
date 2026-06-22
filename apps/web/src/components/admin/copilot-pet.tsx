@@ -4,12 +4,13 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X, ExternalLink } from "lucide-react";
+import { X, ExternalLink, Keyboard } from "lucide-react";
 import { CopilotChat } from "@/components/admin/copilot-chat";
 import { useAdminCopilotConfig } from "@/hooks/admin-queries";
 import { useCopilotSession } from "@/context/CopilotSessionContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { ADMIN_ROUTES } from "@/lib/routes";
+import { Kbd, KbdShortcut } from "@/components/ui/kbd";
 
 /**
  * 小r — the admin AI copilot as a pixel-art crab pinned to the bottom-right.
@@ -21,6 +22,7 @@ export function CopilotPet() {
   const { t } = useLanguage();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
   const { data: cfg } = useAdminCopilotConfig();
   const { running } = useCopilotSession();
 
@@ -48,7 +50,7 @@ export function CopilotPet() {
 
       <DialogPrimitive.Portal>
         <DialogPrimitive.Content
-          className="srapi-anim-pet-panel card-raised fixed bottom-6 right-6 z-50 flex h-[min(760px,84vh)] w-[min(920px,92vw)] flex-col overflow-hidden rounded-2xl border border-srapi-border bg-srapi-card outline-none"
+          className="srapi-anim-pet-panel card-raised glass-frosted-strong fixed bottom-6 right-6 z-50 flex h-[min(760px,84vh)] w-[min(920px,92vw)] flex-col overflow-hidden rounded-2xl border border-srapi-border outline-none"
           onInteractOutside={(e) => e.preventDefault()}
         >
           <DialogPrimitive.Title className="sr-only">
@@ -67,6 +69,16 @@ export function CopilotPet() {
               </div>
             </div>
             <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setShowShortcuts((v) => !v)}
+                aria-label={t("copilot.petShortcuts")}
+                aria-pressed={showShortcuts}
+                title={t("copilot.petShortcuts")}
+                className="rounded-lg p-2 text-srapi-text-tertiary transition-colors hover:bg-srapi-card-muted hover:text-srapi-text-primary aria-[pressed=true]:bg-srapi-accent-soft aria-[pressed=true]:text-srapi-primary"
+              >
+                <Keyboard className="size-4" />
+              </button>
               <Link
                 href={ADMIN_ROUTES.copilot}
                 onClick={() => setOpen(false)}
@@ -86,12 +98,44 @@ export function CopilotPet() {
               </button>
             </div>
           </header>
+          {showShortcuts ? <ShortcutsList /> : null}
           <div className="min-h-0 flex-1 px-4 pb-3">
             <CopilotChat models={cfg.models ?? []} defaultModel={cfg.model ?? ""} />
           </div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
+  );
+}
+
+/** Compact shortcut reference revealed under the header on demand. Pure
+ * recall-aid — keyboard binding is implemented in the chat composer itself. */
+function ShortcutsList() {
+  const { t } = useLanguage();
+  const rows: Array<{ label: string; keys: React.ReactNode[] }> = [
+    { label: t("copilot.shortcutSend"), keys: ["Enter"] },
+    { label: t("copilot.shortcutNewline"), keys: ["⇧", "Enter"] },
+    { label: t("copilot.shortcutStop"), keys: ["Esc"] },
+    { label: t("copilot.shortcutNewChat"), keys: ["⌘", "K"] },
+  ];
+  return (
+    <div className="anim-rise-sm shrink-0 border-b border-srapi-border bg-srapi-card-muted/40 px-4 py-2.5">
+      <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
+        {t("copilot.petShortcuts")}
+      </div>
+      <ul className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px] text-srapi-text-secondary">
+        {rows.map((row) => (
+          <li key={row.label} className="flex items-center justify-between gap-2">
+            <span className="truncate">{row.label}</span>
+            {row.keys.length === 1 ? (
+              <Kbd>{row.keys[0]}</Kbd>
+            ) : (
+              <KbdShortcut keys={row.keys} separator=" " />
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

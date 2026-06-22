@@ -25,6 +25,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Input } from "@/components/ui/input";
+import { FloatingInput } from "@/components/ui/floating-input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FormSkeleton } from "@/components/charts/chart-skeleton";
@@ -293,14 +294,22 @@ function ProfileForm({ user }: { user: User }) {
             />
           </div>
         </div>
-        <div>
-          <Label htmlFor="email">{t("account.email")}</Label>
-          <Input id="email" value={user.email} disabled />
-        </div>
-        <div>
-          <Label htmlFor="name">{t("account.name")}</Label>
-          <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
-        </div>
+        <FloatingInput
+          id="email"
+          label={t("account.email")}
+          value={user.email}
+          onChange={() => {}}
+          disabled
+          autoComplete="email"
+        />
+        <FloatingInput
+          id="name"
+          label={t("account.name")}
+          value={name}
+          onChange={setName}
+          autoComplete="name"
+          required
+        />
         <div className="flex justify-end">
           <Button
             variant="primary"
@@ -348,19 +357,36 @@ function ChangePasswordCard() {
       <CardContent>
         <form onSubmit={submit} className="space-y-4">
           <h3 className="text-lg font-semibold tracking-tight text-srapi-text-primary">{t("account.changePassword")}</h3>
-          <div>
-            <Label htmlFor="cur">{t("account.currentPassword")}</Label>
-            <Input id="cur" type="password" value={current} onChange={(e) => setCurrent(e.target.value)} />
-          </div>
-          <div>
-            <Label htmlFor="new">{t("account.newPassword")}</Label>
-            <Input id="new" type="password" value={next} onChange={(e) => setNext(e.target.value)} />
-            <p className="mt-1 text-xs text-srapi-text-tertiary">{t("account.passwordHint")}</p>
-          </div>
-          <div>
-            <Label htmlFor="cfm">{t("account.confirmPassword")}</Label>
-            <Input id="cfm" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
-          </div>
+          <FloatingInput
+            id="cur"
+            type="password"
+            label={t("account.currentPassword")}
+            value={current}
+            onChange={setCurrent}
+            autoComplete="current-password"
+            required
+          />
+          <FloatingInput
+            id="new"
+            type="password"
+            label={t("account.newPassword")}
+            value={next}
+            onChange={setNext}
+            autoComplete="new-password"
+            required
+            hint={t("account.passwordHint")}
+            error={next.length > 0 && next.length < 8 ? t("account.passwordHint") : undefined}
+          />
+          <FloatingInput
+            id="cfm"
+            type="password"
+            label={t("account.confirmPassword")}
+            value={confirm}
+            onChange={setConfirm}
+            autoComplete="new-password"
+            required
+            error={confirm.length > 0 && confirm !== next ? t("account.passwordMismatch") : undefined}
+          />
           {error ? (
             <p role="alert" className="text-sm text-srapi-error">
               {error}
@@ -437,10 +463,13 @@ function TwoFactorCard() {
 
         {enabled ? (
           <div className="space-y-3">
-            <div>
-              <Label htmlFor="dis-code">{t("account.totpCode")}</Label>
-              <Input id="dis-code" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value)} />
-            </div>
+            <FloatingInput
+              id="dis-code"
+              label={t("account.totpCode")}
+              value={code}
+              onChange={setCode}
+              autoComplete="one-time-code"
+            />
             <div className="flex justify-end">
               <Button
                 variant="danger"
@@ -464,10 +493,13 @@ function TwoFactorCard() {
                 <CopyButton value={setup.secret} label={t("account.totpSecret")} />
               </div>
             </div>
-            <div>
-              <Label htmlFor="en-code">{t("account.totpCode")}</Label>
-              <Input id="en-code" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value)} />
-            </div>
+            <FloatingInput
+              id="en-code"
+              label={t("account.totpCode")}
+              value={code}
+              onChange={setCode}
+              autoComplete="one-time-code"
+            />
             <div className="flex justify-end">
               <Button
                 variant="primary"

@@ -4,6 +4,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import type { AccountHealthSnapshot } from "@/lib/sdk-types";
 import { cn } from "@/lib/cn";
 import { DataPill } from "@/components/ui/data-pill";
+import { DataTooltip, type DataTooltipRow } from "@/components/ui/data-tooltip";
 import { accountHealthNeedsInvestigation } from "@/lib/admin-account-health-investigation";
 import {
   accountHealthGroupMaintenanceActions,
@@ -173,6 +174,7 @@ export function AccountHealthCell({
   const isOpen = circuit === "open";
   const isHalfOpen = circuit === "half-open";
   const p50 = Math.round(health.latency_p50_ms);
+  const p95 = Math.round(health.latency_p95_ms);
   // Explain the routing state in plain language: an "open" circuit means the
   // account is benched — a common reason requests get 'no available account'.
   const circuitTitle = isOpen
@@ -180,24 +182,31 @@ export function AccountHealthCell({
     : isHalfOpen
       ? t("adminAccounts.circuitHalfOpen")
       : t("adminAccounts.circuitClosed");
+  const dotClass = cn(
+    "inline-block size-1.5 shrink-0 rounded-full",
+    isOpen
+      ? "bg-srapi-error"
+      : isHalfOpen
+        ? "bg-srapi-warning"
+        : rate >= 0.95
+          ? "bg-srapi-success"
+          : rate >= 0.8
+            ? "bg-srapi-warning"
+            : "bg-srapi-error",
+  );
+  const rateTone = rate >= 0.95 ? "success" : rate >= 0.8 ? "warning" : "error";
+  const rateClass = cn(
+    "font-medium tabular",
+    rate >= 0.95
+      ? "text-srapi-text-secondary"
+      : rate >= 0.8
+        ? "text-srapi-warning"
+        : "text-srapi-error",
+  );
   const content = (
     <>
-      <span
-        title={circuitTitle}
-        className={cn(
-          "inline-block size-1.5 shrink-0 rounded-full",
-          isOpen
-            ? "bg-srapi-error"
-            : isHalfOpen
-              ? "bg-srapi-warning"
-              : rate >= 0.95
-                ? "bg-srapi-success"
-                : rate >= 0.8
-                  ? "bg-srapi-warning"
-                  : "bg-srapi-error",
-        )}
-      />
-      <span className="font-medium text-srapi-text-secondary">{Math.round(rate * 100)}%</span>
+      <span title={circuitTitle} className={dotClass} />
+      <span className={rateClass}>{Math.round(rate * 100)}%</span>
       {p50 > 0 ? <span className="text-srapi-text-tertiary">{p50}ms</span> : null}
       {health.error_class ? (
         <span
@@ -210,8 +219,25 @@ export function AccountHealthCell({
     </>
   );
   const className = "flex min-w-0 items-center gap-1.5 text-xs tabular";
-  if (investigationHref && accountHealthNeedsInvestigation(health)) {
-    return (
+
+  const rows: DataTooltipRow[] = [
+    { label: t("adminAccounts.successRate"), value: `${Math.round(rate * 100)}%`, tone: rateTone },
+    { label: t("adminAccounts.circuitState"), value: circuit, tone: isOpen ? "error" : isHalfOpen ? "warning" : "default" },
+  ];
+  if (p50 > 0) rows.push({ label: "p50", value: `${p50}ms` });
+  if (p95 > 0) rows.push({ label: "p95", value: `${p95}ms` });
+  if (health.rate_limit_count > 0) {
+    rows.push({ label: t("adminAccounts.healthIssue.rate_limit"), value: String(health.rate_limit_count), tone: "warning" });
+  }
+  if (health.timeout_count > 0) {
+    rows.push({ label: t("adminAccounts.healthIssue.timeout"), value: String(health.timeout_count), tone: "warning" });
+  }
+  if (health.error_class) {
+    rows.push({ label: t("adminAccounts.lastError"), value: health.error_class, tone: "error" });
+  }
+
+  const wrapper = (
+    investigationHref && accountHealthNeedsInvestigation(health) ? (
       <Link
         href={investigationHref}
         className={`${className} hover:text-srapi-text-primary rounded-sm underline-offset-2 hover:underline`}
@@ -219,9 +245,27 @@ export function AccountHealthCell({
       >
         {content}
       </Link>
-    );
-  }
-  return <div className={className}>{content}</div>;
+    ) : (
+      <div className={className}>{content}</div>
+    )
+  );
+  return (
+    <DataTooltip
+      title={t("adminAccounts.healthTitle")}
+      primary={
+        <span className={cn(
+          "tabular",
+          rate >= 0.95 ? "text-srapi-success" : rate >= 0.8 ? "text-srapi-warning" : "text-srapi-error",
+        )}>
+          {Math.round(rate * 100)}%
+        </span>
+      }
+      rows={rows}
+      footer={circuitTitle}
+    >
+      {wrapper}
+    </DataTooltip>
+  );
 }
 
 export function AccountQuotaCell({ health }: { health?: AccountHealthSnapshot }) {
@@ -229,14 +273,43 @@ export function AccountQuotaCell({ health }: { health?: AccountHealthSnapshot })
   if (!health) return <span className="text-xs text-srapi-text-tertiary">—</span>;
   const windows = latestQuotaWindows(health.quota_windows ?? []);
   if (windows.length > 0) {
-    const title = windows
-      .map(
-        (window) =>
-          `${quotaWindowDisplayLabel(window, t)} ${Math.round(window.remainingPercent)}% · ${quotaWindowTiming(window, t)}`,
-      )
-      .join("\n");
+    const tooltipRows: DataTooltipRow[] = windows.map((window) => {
+      const pct = Math.round(window.remainingPercent);
+      const tone: DataTooltipRow["tone"] =
+        window.remainingPercent <= 0
+          ? "error"
+          : window.remainingPercent <= 20
+            ? "warning"
+            : "success";
+      return {
+        label: quotaWindowDisplayLabel(window, t),
+        value: `${pct}% · ${quotaWindowTiming(window, t)}`,
+        tone,
+      };
+    });
+    const minPct = Math.round(
+      windows.reduce((acc, w) => Math.min(acc, w.remainingPercent), 100),
+    );
     return (
-      <span className="flex min-w-0 flex-col gap-1" title={title}>
+      <DataTooltip
+        title={t("adminAccounts.quotaTitle")}
+        primary={
+          <span
+            className={cn(
+              "tabular",
+              minPct <= 0
+                ? "text-srapi-error"
+                : minPct <= 20
+                  ? "text-srapi-warning"
+                  : "text-srapi-success",
+            )}
+          >
+            {minPct}%
+          </span>
+        }
+        rows={tooltipRows}
+      >
+      <span className="flex min-w-0 flex-col gap-1">
         {windows.map((window) => {
           const ratio = window.remainingPercent / 100;
           const exhausted = window.remainingPercent <= 0;
@@ -278,12 +351,36 @@ export function AccountQuotaCell({ health }: { health?: AccountHealthSnapshot })
           );
         })}
       </span>
+      </DataTooltip>
     );
   }
   const ratio = health.quota_remaining_ratio;
   const exhausted = health.quota_exhausted;
   const pct = Math.round(ratio * 100);
   return (
+    <DataTooltip
+      title={t("adminAccounts.quotaTitle")}
+      primary={
+        <span
+          className={cn(
+            "tabular",
+            exhausted ? "text-srapi-error" : ratio <= 0.2 ? "text-srapi-warning" : "text-srapi-success",
+          )}
+        >
+          {pct}%
+        </span>
+      }
+      rows={[
+        {
+          label: t("adminAccounts.quotaTitle"),
+          value: `${pct}%`,
+          tone: exhausted ? "error" : ratio <= 0.2 ? "warning" : "success",
+        },
+        ...(exhausted
+          ? [{ label: t("adminAccounts.healthIssue.quota"), value: "—", tone: "error" as const }]
+          : []),
+      ]}
+    >
     <span className="flex items-center gap-1.5">
       <span className="bg-srapi-border relative h-1.5 w-12 overflow-hidden rounded-full">
         <span
@@ -307,5 +404,6 @@ export function AccountQuotaCell({ health }: { health?: AccountHealthSnapshot })
         {pct}%
       </span>
     </span>
+    </DataTooltip>
   );
 }

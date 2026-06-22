@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
 import type { LucideIcon } from "lucide-react";
 import { ChevronDown, ChevronUp, ChevronsUpDown, SearchX } from "lucide-react";
@@ -11,6 +12,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Pagination } from "@/components/ui/pagination";
+import { ExpandableRow } from "@/components/ui/expandable-row";
 import {
   Table,
   TableScroll,
@@ -24,6 +26,7 @@ import { cn } from "@/lib/cn";
 import type { AdminListResult } from "@/lib/admin-api";
 import type { SortState } from "@/hooks/use-admin-list";
 import type { ColumnVisibility } from "@/hooks/use-column-visibility";
+import { useListKeyboardNav } from "@/hooks/use-list-keyboard-nav";
 
 export interface Column<T> {
   key: string;
@@ -91,6 +94,10 @@ export function AdminListView<T>({
   noResultsBody,
   onClearFilters,
   columnVisibility,
+  expandRow,
+  density = "regular",
+  enableKeyboardNav = false,
+  emptyContent,
 }: {
   query: UseQueryResult<AdminListResult<T>>;
   columns: Column<T>[];
@@ -116,6 +123,21 @@ export function AdminListView<T>({
   noResultsBody?: string;
   onClearFilters?: () => void;
   columnVisibility?: ColumnVisibility;
+  /**
+   * When set, clicking a row toggles an inline expanded detail row rendered
+   * inside an <ExpandableRow> spanning all columns.
+   */
+  expandRow?: (row: T) => React.ReactNode;
+  /** Row vertical padding density. "compact" tightens py for log-dense lists. */
+  density?: "compact" | "regular";
+  /** Wire j/k/Enter/Esc/Home/End keyboard nav to the table scroll wrapper. */
+  enableKeyboardNav?: boolean;
+  /**
+   * Optional override for the "no data, not filtered" empty slot — e.g. an
+   * <IllustratedEmptyState>. When provided, replaces the bare <EmptyState>.
+   * The no-results state (filtered → empty) keeps the standard SearchX EmptyState.
+   */
+  emptyContent?: React.ReactNode;
 }) {
   const { t } = useLanguage();
 
@@ -151,6 +173,10 @@ export function AdminListView<T>({
                   ) : undefined
                 }
               />
+            ) : emptyContent ? (
+              <div className={cn("flex items-center justify-center px-4 py-12", EMPTY_FILL)}>
+                {emptyContent}
+              </div>
             ) : (
               <EmptyState
                 className={EMPTY_FILL}
@@ -173,6 +199,9 @@ export function AdminListView<T>({
               sort={sort}
               onSort={onSort}
               selection={selection}
+              expandRow={expandRow}
+              density={density}
+              enableKeyboardNav={enableKeyboardNav}
             />
           )
         }
@@ -206,6 +235,9 @@ function ListTable<T>({
   sort,
   onSort,
   selection,
+  expandRow,
+  density,
+  enableKeyboardNav,
 }: {
   rows: T[];
   columns: Column<T>[];
@@ -218,12 +250,35 @@ function ListTable<T>({
   sort?: SortState;
   onSort?: (key: string) => void;
   selection?: ListSelection;
+  expandRow?: (row: T) => React.ReactNode;
+  density: "compact" | "regular";
+  enableKeyboardNav: boolean;
 }) {
   const pageIds = rows.map(getRowId);
   const allOnPage = pageIds.length > 0 && pageIds.every((id) => selection?.selected.has(id));
   const someOnPage = pageIds.some((id) => selection?.selected.has(id));
 
-  return (
+  const [expandedRowId, setExpandedRowId] = React.useState<string | null>(null);
+  const toggleExpanded = React.useCallback((id: string) => {
+    setExpandedRowId((prev) => (prev === id ? null : id));
+  }, []);
+
+  // Keyboard nav: ArrowDown/j move selection, Enter activates (which toggles
+  // expansion when expandRow is provided).
+  const { active, bindRoot } = useListKeyboardNav({
+    rowIds: pageIds,
+    enabled: enableKeyboardNav,
+    onActivate: (id) => {
+      if (expandRow) toggleExpanded(id);
+    },
+  });
+
+  const densityCellClass = density === "compact" ? "py-1.5 px-3" : "py-3 px-4";
+
+  // Total column count for the inline expansion <td colSpan>.
+  const colSpanTotal = columns.length + (rowActions ? 1 : 0) + (selection ? 1 : 0);
+
+  const table = (
     <TableScroll minWidth={minWidth}>
       <Table>
         <TableHeader>
@@ -240,7 +295,7 @@ function ListTable<T>({
             ) : null}
             {columns.map((c) => {
               const sortable = Boolean(c.sortValue && onSort);
-              const active = sort?.key === c.key;
+              const isActive = sort?.key === c.key;
               return (
                 <TableHead
                   key={c.key}
@@ -256,11 +311,11 @@ function ListTable<T>({
                       className={cn(
                         "inline-flex items-center gap-1 transition-colors hover:text-srapi-text-primary",
                         c.align === "right" && "flex-row-reverse",
-                        active && "text-srapi-text-primary",
+                        isActive && "text-srapi-text-primary",
                       )}
                     >
                       {c.header}
-                      {active ? (
+                      {isActive ? (
                         sort?.dir === "asc" ? (
                           <ChevronUp className="size-3" />
                         ) : (
@@ -286,49 +341,98 @@ function ListTable<T>({
             // Cap stagger at 12 so a 100-row page doesn't waterfall for seconds.
             const stagger = Math.min(idx, 12);
             const sev = rowSeverity?.(row);
+            const isExpanded = expandRow != null && expandedRowId === id;
+            const isKbActive = enableKeyboardNav && active === id;
             return (
-              <TableRow
-                key={id}
-                data-sev={sev}
-                className={cn(
-                  "anim-rise-sm transition-colors",
-                  sev ? "log-row" : "hover:bg-srapi-card-muted/60",
-                  dimRow?.(row) && "opacity-50",
-                  isSelected && "bg-srapi-accent-soft",
-                  rowClassName?.(row),
-                )}
-                style={{ "--stagger-index": stagger } as React.CSSProperties}
-              >
-                {selection ? (
-                  <TableCell className="w-10">
-                    <Checkbox
-                      aria-label="select row"
-                      checked={isSelected}
-                      onChange={() => selection.onToggle(id)}
-                    />
-                  </TableCell>
+              <React.Fragment key={id}>
+                <TableRow
+                  data-sev={sev}
+                  data-row-id={id}
+                  aria-expanded={expandRow ? isExpanded : undefined}
+                  onClick={
+                    expandRow
+                      ? (e) => {
+                          // Don't toggle when interactive descendants were clicked.
+                          const target = e.target as HTMLElement | null;
+                          if (
+                            target?.closest(
+                              'button,a,input,textarea,select,[role="button"],[role="checkbox"],[role="menuitem"]',
+                            )
+                          ) {
+                            return;
+                          }
+                          toggleExpanded(id);
+                        }
+                      : undefined
+                  }
+                  className={cn(
+                    "anim-rise-sm transition-colors",
+                    sev ? "log-row" : "hover:bg-srapi-card-muted/60",
+                    dimRow?.(row) && "opacity-50",
+                    isSelected && "bg-srapi-accent-soft",
+                    expandRow && "cursor-pointer",
+                    isKbActive && "bg-srapi-card-muted/70 ring-1 ring-inset ring-srapi-primary/30",
+                    rowClassName?.(row),
+                  )}
+                  style={{ "--stagger-index": stagger } as React.CSSProperties}
+                >
+                  {selection ? (
+                    <TableCell className={cn("w-10", densityCellClass)}>
+                      <Checkbox
+                        aria-label="select row"
+                        checked={isSelected}
+                        onChange={() => selection.onToggle(id)}
+                      />
+                    </TableCell>
+                  ) : null}
+                  {columns.map((c) => (
+                    <TableCell
+                      key={c.key}
+                      className={cn(
+                        densityCellClass,
+                        c.align === "right" && "text-right",
+                        c.hideOnMobile && "hidden sm:table-cell",
+                        c.className,
+                      )}
+                    >
+                      {c.render(row)}
+                    </TableCell>
+                  ))}
+                  {rowActions && (
+                    <TableCell
+                      className={cn("w-px whitespace-nowrap text-right", densityCellClass)}
+                    >
+                      {rowActions(row)}
+                    </TableCell>
+                  )}
+                </TableRow>
+                {expandRow && isExpanded ? (
+                  <tr data-expand-for={id}>
+                    <TableCell colSpan={colSpanTotal} className="p-0">
+                      <ExpandableRow expanded>{expandRow(row)}</ExpandableRow>
+                    </TableCell>
+                  </tr>
                 ) : null}
-                {columns.map((c) => (
-                  <TableCell
-                    key={c.key}
-                    className={cn(
-                      c.align === "right" && "text-right",
-                      c.hideOnMobile && "hidden sm:table-cell",
-                      c.className,
-                    )}
-                  >
-                    {c.render(row)}
-                  </TableCell>
-                ))}
-                {rowActions && (
-                  <TableCell className="w-px whitespace-nowrap text-right">{rowActions(row)}</TableCell>
-                )}
-              </TableRow>
+              </React.Fragment>
             );
           })}
         </TableBody>
       </Table>
     </TableScroll>
+  );
+
+  if (!enableKeyboardNav) return table;
+
+  return (
+    <div
+      role="grid"
+      aria-label="list"
+      tabIndex={bindRoot.tabIndex}
+      onKeyDown={bindRoot.onKeyDown}
+      className="outline-none focus-visible:ring-2 focus-visible:ring-srapi-primary/30"
+    >
+      {table}
+    </div>
   );
 }
 
@@ -376,23 +480,45 @@ function BulkBar({
   );
 }
 
+/**
+ * Content-shaped loading placeholder mirroring the Table's row structure: a
+ * header strip + 5 body rows. Cell widths are varied per row so the shimmer
+ * reads as «list of distinct values» rather than a uniform block. The leading
+ * cell is widest (typical id/name column), the trailing cell narrows toward
+ * an actions slot — matches the columns most admin lists actually render.
+ */
 function ListSkeleton() {
+  // Widths per visual «column slot». Index 0 = primary identity, 4 = actions.
+  // Each row picks slightly different widths so the rows don't visually line up.
+  const ROW_WIDTHS: ReadonlyArray<readonly [string, string, string, string, string]> = [
+    ["w-44", "w-24", "w-20", "w-16", "w-8"],
+    ["w-36", "w-28", "w-24", "w-14", "w-8"],
+    ["w-48", "w-20", "w-28", "w-16", "w-8"],
+    ["w-32", "w-32", "w-20", "w-12", "w-8"],
+    ["w-40", "w-24", "w-24", "w-16", "w-8"],
+  ];
   return (
     <div className="min-h-[55vh] p-0">
-      {/* header row */}
-      <div className="flex gap-4 border-b border-srapi-border px-4 py-3">
-        <Skeleton className="h-3.5 w-28" />
-        <Skeleton className="hidden h-3.5 w-24 sm:block" />
-        <Skeleton className="hidden h-3.5 w-20 sm:block" />
-        <Skeleton className="ml-auto h-3.5 w-14" />
+      {/* header row — slightly smaller heights, matches TableHead */}
+      <div className="flex items-center gap-4 border-b border-srapi-border px-4 py-3">
+        <Skeleton className="h-3 w-28" />
+        <Skeleton className="hidden h-3 w-20 sm:block" />
+        <Skeleton className="hidden h-3 w-16 sm:block" />
+        <Skeleton className="hidden h-3 w-12 md:block" />
+        <Skeleton className="ml-auto h-3 w-8" />
       </div>
-      {/* data rows */}
-      {["w-36", "w-28", "w-32", "w-24", "w-30", "w-20"].map((w, i) => (
-        <div key={i} className="flex items-center gap-4 border-b border-srapi-border/50 px-4 py-3.5">
-          <Skeleton className={`h-4 ${w}`} />
-          <Skeleton className="hidden h-4 w-20 sm:block" />
-          <Skeleton className="hidden h-4 w-16 sm:block" />
-          <Skeleton className="ml-auto h-4 w-10" />
+      {/* body rows — content-shaped, mirrors visible columns under sm/md */}
+      {ROW_WIDTHS.map(([a, b, c, d, e], i) => (
+        <div
+          key={i}
+          className="anim-rise-sm flex items-center gap-4 border-b border-srapi-border/50 px-4 py-3.5"
+          style={{ "--stagger-index": i } as React.CSSProperties}
+        >
+          <Skeleton className={`h-4 ${a}`} />
+          <Skeleton className={`hidden h-4 ${b} sm:block`} />
+          <Skeleton className={`hidden h-4 ${c} sm:block`} />
+          <Skeleton className={`hidden h-4 ${d} md:block`} />
+          <Skeleton className={`ml-auto h-4 ${e}`} />
         </div>
       ))}
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
@@ -8,14 +8,19 @@ import { CurrentUserAttribute, apiService } from "@/lib/api";
 import { meErrorMessage } from "@/lib/me-api";
 import { USER_HOME_ROUTE } from "@/lib/routes";
 import { useLanguage } from "@/context/LanguageContext";
+import { cn } from "@/lib/cn";
 import { Card } from "@/components/ui/card";
+import { FloatingInput } from "@/components/ui/floating-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 import { useCaptcha } from "@/components/auth/captcha";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { LanguageToggle } from "@/components/layout/language-toggle";
 import type { SiteConfig } from "@/lib/api/types";
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * Self-service sign-up. Registration is gated server-side by
@@ -29,6 +34,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [emailTouched, setEmailTouched] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [site, setSite] = useState<SiteConfig | null>(null);
@@ -52,6 +58,22 @@ export default function RegisterPage() {
       active = false;
     };
   }, []);
+
+  const emailLooksValid = EMAIL_RE.test(email.trim());
+  const emailError = emailTouched && email.length > 0 && !emailLooksValid
+    ? t("authRegister.invalid")
+    : undefined;
+  const passwordLongEnough = password.length >= 8;
+  const passwordError = password.length > 0 && !passwordLongEnough
+    ? t("authRegister.passwordHint")
+    : undefined;
+
+  const requiredAttrsFilled = attributes.every(
+    (item) => !item.required || (attributeValues[item.definition_id] || "").trim().length > 0,
+  );
+
+  const formValid = name.trim().length > 0 && emailLooksValid && passwordLongEnough && requiredAttrsFilled && !(captcha.required && !captcha.token);
+  const formDirty = name.length > 0 || email.length > 0 || password.length > 0;
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -101,49 +123,47 @@ export default function RegisterPage() {
               {site?.site_subtitle?.trim() || t("authRegister.subtitle")}
             </p>
             <form onSubmit={handleSubmit} noValidate className="mt-7 space-y-5">
-              <div>
-                <Label htmlFor="reg-name">{t("authRegister.name")}</Label>
-                <Input
-                  id="reg-name"
-                  autoComplete="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="reg-email">{t("login.email")}</Label>
-                <Input
+              <FloatingInput
+                id="reg-name"
+                label={t("authRegister.name")}
+                autoComplete="name"
+                value={name}
+                onChange={setName}
+              />
+              <div onBlur={() => setEmailTouched(true)}>
+                <FloatingInput
                   id="reg-email"
+                  label={t("login.email")}
                   type="email"
                   autoComplete="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
+                  onChange={setEmail}
+                  error={emailError}
                 />
               </div>
               <div>
-                <Label htmlFor="reg-password">{t("login.password")}</Label>
                 <div className="relative">
-                  <Input
+                  <FloatingInput
                     id="reg-password"
+                    label={t("login.password")}
                     type={showPassword ? "text" : "password"}
                     autoComplete="new-password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pr-10"
+                    onChange={setPassword}
+                    error={passwordError}
+                    hint={password.length === 0 ? t("authRegister.passwordHint") : undefined}
+                    className="[&_input]:pr-12"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
                     aria-label={t(showPassword ? "login.hidePassword" : "login.showPassword")}
-                    className="absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-xl text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
+                    className="absolute right-0 top-0 flex h-14 w-12 items-center justify-center rounded-r-2xl text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
                   >
                     {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                   </button>
                 </div>
-                <p className="mt-1.5 text-xs text-srapi-text-tertiary">
-                  {t("authRegister.passwordHint")}
-                </p>
+                {password.length > 0 ? <PasswordStrength password={password} /> : null}
               </div>
               {attributes.map((item) => (
                 <div key={item.definition_id}>
@@ -184,7 +204,7 @@ export default function RegisterPage() {
                 </div>
               ))}
               {error && (
-                <p role="alert" className="rounded-xl bg-srapi-error/10 px-3 py-2 text-sm text-srapi-error">
+                <p role="alert" className="anim-shake rounded-xl bg-srapi-error/10 px-3 py-2 text-sm text-srapi-error">
                   {error}
                 </p>
               )}
@@ -197,7 +217,12 @@ export default function RegisterPage() {
                 loading={submitting}
                 disabled={submitting || (captcha.required && !captcha.token)}
               >
-                {submitting ? t("authRegister.submitting") : t("authRegister.cta")}
+                <span className="inline-flex items-center gap-2">
+                  {submitting ? t("authRegister.submitting") : t("authRegister.cta")}
+                  {formValid && formDirty && !submitting ? (
+                    <Kbd className="border-white/20 bg-white/10 text-white/90 shadow-none">↵</Kbd>
+                  ) : null}
+                </span>
               </Button>
             </form>
             {(site?.user_agreement || site?.privacy_policy) ? (
@@ -233,6 +258,45 @@ export default function RegisterPage() {
           </Card>
         </div>
       </main>
+    </div>
+  );
+}
+
+/**
+ * 4-segment strength bar mirroring the one in /setup. Lives co-located so each
+ * auth form can render it without a cross-feature import; the scoring is light
+ * (length + character-class buckets) and intentionally identical so the user
+ * sees the same signal across sign-up, set-password, and admin setup.
+ */
+function PasswordStrength({ password }: { password: string }) {
+  const strength = useMemo(() => {
+    let score = 0;
+    if (password.length >= 8) score++;
+    if (password.length >= 12) score++;
+    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
+    if (/\d/.test(password)) score++;
+    if (/[^a-zA-Z0-9]/.test(password)) score++;
+    return Math.min(score, 4);
+  }, [password]);
+
+  const color =
+    strength <= 1
+      ? "bg-srapi-error"
+      : strength === 2
+        ? "bg-srapi-warning"
+        : "bg-srapi-success";
+
+  return (
+    <div className="mt-2 flex gap-1" aria-hidden>
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div
+          key={i}
+          className={cn(
+            "h-1 flex-1 rounded-full transition-colors",
+            i < strength ? color : "bg-srapi-border",
+          )}
+        />
+      ))}
     </div>
   );
 }

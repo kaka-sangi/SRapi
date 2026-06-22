@@ -5,11 +5,15 @@ import { SlidersHorizontal } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
-import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-toolbar";
+import { ListToolbar, SearchInput } from "@/components/admin/list-toolbar";
 import { ResourceFormDialog, type FieldConfig } from "@/components/admin/resource-form-dialog";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { QuietBadge, type QuietStatus } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { InlineDetailGrid } from "@/components/ui/inline-detail-grid";
+import { formatDateTime } from "@/lib/admin-format";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
@@ -160,7 +164,18 @@ export function PayloadRulesPanel() {
       header: t("adminPayloadRules.priority"),
       align: "right",
       render: (r) => (
-        <span className="text-xs text-srapi-text-tertiary tabular">{r.priority}</span>
+        <DataTooltip
+          title={t("adminPayloadRules.priority")}
+          primary={String(r.priority)}
+          rows={[
+            { label: t("adminPayloadRules.action"), value: actionLabel(r.action) },
+            { label: t("adminPayloadRules.enabled"), value: r.enabled ? t("common.active") : t("common.disabled"), tone: r.enabled ? "success" : "muted" },
+            { label: t("adminPayloadRules.params"), value: String(Object.keys(r.params ?? {}).length), tone: "muted" },
+          ]}
+          footer={t("adminPayloadRules.priorityHelp")}
+        >
+          <span className="text-xs text-srapi-text-tertiary tabular">{r.priority}</span>
+        </DataTooltip>
       ),
     },
     {
@@ -222,6 +237,51 @@ export function PayloadRulesPanel() {
         minWidth={760}
         isFiltered={isFiltered}
         onClearFilters={list.clearFilters}
+        enableKeyboardNav
+        rowSeverity={(r) => {
+          // Disabled rules get a muted info stripe so they're visually
+          // distinguishable when scrolling a long list. Active 'filter'
+          // actions (which strip data) get a warning stripe — the operator
+          // should look twice before approving one.
+          if (!r.enabled) return "info";
+          if (r.action === "filter") return "warning";
+          return undefined;
+        }}
+        expandRow={(r) => {
+          const paramKeys = Object.keys(r.params ?? {});
+          return (
+            <InlineDetailGrid
+              sections={[
+                {
+                  title: t("adminPayloadRules.match"),
+                  rows: [
+                    { label: t("adminPayloadRules.matchModel"), value: r.match_model || "*", mono: true },
+                    { label: t("adminPayloadRules.matchProtocol"), value: r.match_protocol || t("adminPayloadRules.anyProtocol"), mono: true },
+                    { label: t("adminPayloadRules.action"), value: actionLabel(r.action) },
+                  ],
+                },
+                {
+                  title: t("adminPayloadRules.params"),
+                  rows: paramKeys.length === 0
+                    ? [{ label: t("adminPayloadRules.params"), value: "—", tone: "muted" }]
+                    : paramKeys.slice(0, 5).map((key) => ({
+                        label: key,
+                        value: typeof r.params?.[key] === "string" ? String(r.params[key]) : JSON.stringify(r.params?.[key]),
+                        mono: true,
+                      })),
+                },
+                {
+                  title: t("common.updated"),
+                  rows: [
+                    { label: t("common.created"), value: r.created_at ? formatDateTime(r.created_at) : "—", tone: "muted" },
+                    { label: t("common.updated"), value: r.updated_at ? formatDateTime(r.updated_at) : "—", tone: "muted" },
+                    { label: t("adminPayloadRules.priority"), value: String(r.priority) },
+                  ],
+                },
+              ]}
+            />
+          );
+        }}
         toolbar={
           <ListToolbar>
             <SearchInput
@@ -229,11 +289,15 @@ export function PayloadRulesPanel() {
               onChange={list.setSearchInput}
               placeholder={t("adminPayloadRules.searchPlaceholder")}
             />
-            <FilterSelect
-              value={list.filters.action}
-              onChange={(v) => list.setFilter("action", v)}
-              options={PAYLOAD_RULE_ACTIONS.map((value) => ({ value, label: actionLabel(value) }))}
-              allLabel={t("adminPayloadRules.allActions")}
+            <SegmentedControl<string>
+              value={list.filters.action || "__all__"}
+              onChange={(v) => list.setFilter("action", v === "__all__" ? undefined : v)}
+              ariaLabel={t("adminPayloadRules.action")}
+              size="sm"
+              options={[
+                { value: "__all__", label: t("adminPayloadRules.allActions") },
+                ...PAYLOAD_RULE_ACTIONS.map((value) => ({ value, label: actionLabel(value) })),
+              ]}
             />
           </ListToolbar>
         }

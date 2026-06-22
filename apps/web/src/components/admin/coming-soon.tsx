@@ -1,9 +1,8 @@
 "use client";
 
-import { Wrench } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
+import { IllustratedEmptyState } from "@/components/ui/illustrated-empty-state";
 import { useLanguage } from "@/context/LanguageContext";
 
 /**
@@ -16,7 +15,7 @@ export function ComingSoon({ title, subtitle }: { title: string; subtitle: strin
     <>
       <PageHeader eyebrow={t("nav.sectionAdmin")} title={title} description={subtitle} />
       <Card>
-        <EmptyState icon={Wrench} title={title} description={t("adminSettings.comingSoon")} />
+        <IllustratedEmptyState illust="cog" title={title} description={t("adminSettings.comingSoon")} />
       </Card>
     </>
   );

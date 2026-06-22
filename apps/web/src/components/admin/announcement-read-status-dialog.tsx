@@ -1,20 +1,16 @@
 "use client";
 
+import { Users } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
-import {
-  Table,
-  TableScroll,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from "@/components/ui/table";
+import { DataPill } from "@/components/ui/data-pill";
+import { IconBubble } from "@/components/ui/icon-bubble";
+import { IllustratedEmptyState } from "@/components/ui/illustrated-empty-state";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { useAnnouncementReadStatus } from "@/hooks/admin-queries";
@@ -41,47 +37,70 @@ export function AnnouncementReadStatusDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-lg font-semibold tracking-tight">
+          <div className="flex items-start gap-3">
+            <IconBubble tone="accent" size="md">
+              <Users />
+            </IconBubble>
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="text-lg font-semibold tracking-tight">
+                {t("adminAnnouncements.readStatus")}
+              </DialogTitle>
+              {title ? (
+                <p className="mt-0.5 truncate text-sm text-srapi-text-tertiary">{title}</p>
+              ) : null}
+            </div>
+          </div>
+          <DialogDescription className="sr-only">
             {t("adminAnnouncements.readStatus")}
-            {title ? <span className="text-srapi-text-tertiary"> · {title}</span> : null}
-          </DialogTitle>
+          </DialogDescription>
         </DialogHeader>
-        <div className="mt-3 max-h-[60vh] overflow-y-auto">
+
+        <div className="mt-2 max-h-[60vh] overflow-y-auto">
           <PageQueryState
             query={query}
             skeleton={<DialogListSkeleton rows={3} />}
-            isEmpty={(d) => d.readers.length === 0}
-            emptyTitle={t("adminAnnouncements.readStatusEmpty")}
           >
-            {(status) => (
+            {(status) =>
+              status.readers.length === 0 ? (
+                <IllustratedEmptyState
+                  illust="users"
+                  title={t("adminAnnouncements.readStatusEmpty")}
+                />
+              ) : (
               <>
-                <p className="mb-2 text-[11px] text-srapi-text-tertiary">
-                  {t("adminAnnouncements.readStatusTotal", { count: status.total })}
-                </p>
-                <TableScroll minWidth={320}>
-                  <Table>
-                    <TableHeader>
-                      <tr>
-                        <TableHead>{t("adminAnnouncements.readStatusUser")}</TableHead>
-                        <TableHead>{t("adminAnnouncements.readStatusTime")}</TableHead>
-                      </tr>
-                    </TableHeader>
-                    <TableBody>
-                      {status.readers.map((reader) => (
-                        <TableRow key={reader.user_id}>
-                          <TableCell className="text-srapi-text-secondary">
-                            {userLookup.get(reader.user_id)}
-                          </TableCell>
-                          <TableCell className="text-[12px] tabular text-srapi-text-tertiary">
-                            {formatDateTime(reader.read_at)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableScroll>
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <span className="text-[11px] uppercase tracking-[0.12em] text-srapi-text-tertiary">
+                    {t("adminAnnouncements.readStatusUser")}
+                  </span>
+                  <DataPill tone="accent" size="sm">
+                    <span className="metric-secondary tabular">{status.total}</span>
+                    <span className="text-srapi-text-tertiary">
+                      {t("adminAnnouncements.readStatusTotal", { count: "" })
+                        .replace(/\{count\}\s*/, "")
+                        .trim()}
+                    </span>
+                  </DataPill>
+                </div>
+
+                <ol className="space-y-1.5">
+                  {status.readers.map((reader) => (
+                    <li
+                      key={reader.user_id}
+                      className="log-row flex items-center justify-between gap-3 rounded-lg border border-srapi-border bg-srapi-card px-3 py-2"
+                      data-sev="success"
+                    >
+                      <span className="min-w-0 truncate text-sm text-srapi-text-secondary">
+                        {userLookup.get(reader.user_id)}
+                      </span>
+                      <span className="shrink-0 font-mono text-[11px] tabular text-srapi-text-tertiary">
+                        {formatDateTime(reader.read_at)}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
               </>
-            )}
+              )
+            }
           </PageQueryState>
         </div>
       </DialogContent>

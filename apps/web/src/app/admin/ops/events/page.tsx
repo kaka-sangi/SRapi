@@ -6,8 +6,7 @@ import { AdminShell } from "@/components/layout/admin-shell";
 import { SectionHero } from "@/components/visual/section-hero";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
-import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
-import { enumOptions } from "@/components/admin/resource-form-dialog";
+import { ListToolbar } from "@/components/admin/list-toolbar";
 import {
   Dialog,
   DialogContent,
@@ -16,6 +15,9 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { QuietBadge } from "@/components/ui/quiet-badge";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { InlineDetailGrid } from "@/components/ui/inline-detail-grid";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
@@ -26,6 +28,24 @@ import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import type { DomainEventOutbox } from "@/lib/sdk-types";
 
 const OUTBOX_STATUSES = ["pending", "published", "failed"];
+
+function outboxSeverity(
+  status: DomainEventOutbox["status"],
+  attemptCount: number,
+): "info" | "success" | "warning" | "error" | "critical" | undefined {
+  switch (status) {
+    case "published":
+      return "success";
+    case "pending":
+      // Repeatedly-deferred deliveries deserve a warning stripe.
+      return attemptCount > 1 ? "warning" : "info";
+    case "failed":
+      // Dead-letter rows (high attempt count) push to critical.
+      return attemptCount >= 5 ? "critical" : "error";
+    default:
+      return undefined;
+  }
+}
 
 export default function AdminOutboxPage() {
   return (
@@ -90,8 +110,47 @@ function OutboxContent() {
       header: t("adminOutbox.attempts"),
       align: "right",
       hideOnMobile: true,
+      sortValue: (e) => e.attempt_count,
       render: (e) => (
-        <span className="text-[12px] tabular text-srapi-text-tertiary">{e.attempt_count}</span>
+        <DataTooltip
+          title={t("adminOutbox.attempts")}
+          primary={String(e.attempt_count)}
+          rows={[
+            { label: t("adminOutbox.producer"), value: e.producer_module, tone: "muted" },
+            ...(e.next_retry_at
+              ? [
+                  {
+                    label: t("adminOutbox.nextRetry"),
+                    value: formatDateTime(e.next_retry_at),
+                    tone: "warning" as const,
+                  },
+                ]
+              : []),
+            ...(e.published_at
+              ? [
+                  {
+                    label: t("adminOutbox.publishedAt"),
+                    value: formatDateTime(e.published_at),
+                    tone: "success" as const,
+                  },
+                ]
+              : []),
+            ...(e.last_error
+              ? [{ label: t("adminOutbox.lastError"), value: e.last_error, tone: "error" as const }]
+              : []),
+          ]}
+          footer={e.idempotency_key || e.event_id}
+        >
+          <span
+            className={
+              e.attempt_count > 3
+                ? "metric-strong-warn text-[12px] tabular"
+                : "text-[12px] tabular text-srapi-text-tertiary"
+            }
+          >
+            {e.attempt_count}
+          </span>
+        </DataTooltip>
       ),
     },
     {
@@ -150,13 +209,19 @@ function OutboxContent() {
         sort={list.sort}
         onSort={list.toggleSort}
         dimRow={(e) => e.status === "published"}
+        rowSeverity={(e) => outboxSeverity(e.status, e.attempt_count)}
+        expandRow={(e) => <OutboxExpandDetail event={e} t={t} />}
         toolbar={
           <ListToolbar>
-            <FilterSelect
-              value={statusFilter}
-              onChange={(v) => list.setFilter("status", v)}
-              options={enumOptions(OUTBOX_STATUSES)}
-              allLabel={t("adminCommon.allStatuses")}
+            <SegmentedControl<string>
+              value={(statusFilter as string) ?? "all"}
+              onChange={(v) => list.setFilter("status", v === "all" ? "" : v)}
+              ariaLabel={t("adminCommon.allStatuses")}
+              size="sm"
+              options={[
+                { value: "all", label: t("adminCommon.allStatuses") },
+                ...OUTBOX_STATUSES.map((v) => ({ value: v, label: v })),
+              ]}
             />
           </ListToolbar>
         }
@@ -249,6 +314,102 @@ function JsonBlock({ label, value }: { label: string; value: unknown }) {
       <pre className="mt-1.5 max-h-48 overflow-auto rounded-lg bg-srapi-card-muted p-3 font-mono text-[11px] text-srapi-text-secondary">
         {safeJson(value)}
       </pre>
+    </div>
+  );
+}
+
+/**
+ * Inline outbox expansion: routing/payload preview + retry trail. Inline beats
+ * the modal — operators triaging a delivery storm scrub rows quickly without
+ * losing scroll position, then promote to the dialog only for the full dump.
+ */
+function OutboxExpandDetail({
+  event,
+  t,
+}: {
+  event: DomainEventOutbox;
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
+  const routing = [
+    { label: t("adminOutbox.event"), value: event.event_type, mono: true },
+    { label: "event_id", value: event.event_id, mono: true },
+    {
+      label: t("adminOutbox.aggregate"),
+      value: `${event.aggregate_type}${event.aggregate_id ? ` #${event.aggregate_id}` : ""}`,
+      mono: true,
+    },
+    { label: t("adminOutbox.producer"), value: event.producer_module, mono: true },
+    {
+      label: t("adminOutbox.correlation"),
+      value: event.correlation_id || "—",
+      mono: true,
+      tone: (event.correlation_id ? "default" : "muted") as "default" | "muted",
+    },
+    {
+      label: t("adminOutbox.idempotency"),
+      value: event.idempotency_key || "—",
+      mono: true,
+      tone: (event.idempotency_key ? "default" : "muted") as "default" | "muted",
+    },
+  ];
+
+  const retry: Array<{
+    label: string;
+    value: string;
+    mono?: boolean;
+    tone?: "default" | "muted" | "success" | "warning" | "error";
+  }> = [
+    { label: t("adminOutbox.attempts"), value: String(event.attempt_count) },
+    {
+      label: t("adminCommon.status"),
+      value: statusLabel(t, event.status),
+      tone:
+        event.status === "failed"
+          ? "error"
+          : event.status === "pending"
+            ? "warning"
+            : "success",
+    },
+    { label: t("adminCommon.created"), value: formatDateTime(event.created_at), tone: "muted" },
+  ];
+  if (event.next_retry_at)
+    retry.push({
+      label: t("adminOutbox.nextRetry"),
+      value: formatDateTime(event.next_retry_at),
+      tone: "warning",
+    });
+  if (event.published_at)
+    retry.push({
+      label: t("adminOutbox.publishedAt"),
+      value: formatDateTime(event.published_at),
+      tone: "success",
+    });
+  if (event.last_error)
+    retry.push({
+      label: t("adminOutbox.lastError"),
+      value: event.last_error,
+      tone: "error",
+    });
+
+  const payloadPreview = safeJson(event.payload);
+  const truncated = payloadPreview.length > 480 ? payloadPreview.slice(0, 480) + "…" : payloadPreview;
+
+  return (
+    <div>
+      <InlineDetailGrid
+        sections={[
+          { title: t("adminOutbox.event"), rows: routing },
+          { title: t("adminOutbox.attempts"), rows: retry },
+        ]}
+      />
+      <div className="border-t border-srapi-border/60 bg-srapi-card-muted/30 px-6 py-4">
+        <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
+          {t("adminOutbox.payload")}
+        </div>
+        <pre className="max-h-40 overflow-auto rounded-lg border border-srapi-border bg-srapi-card-muted/60 p-3 font-mono text-[11px] text-srapi-text-secondary">
+          {truncated}
+        </pre>
+      </div>
     </div>
   );
 }

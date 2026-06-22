@@ -16,6 +16,9 @@ import { Card } from "@/components/ui/card";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { DataPill } from "@/components/ui/data-pill";
 import { IconBubble } from "@/components/ui/icon-bubble";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { InlineDetailGrid } from "@/components/ui/inline-detail-grid";
 import {
   useAdminPricingRules,
   useAdminPricingRulePresets,
@@ -66,13 +69,25 @@ function PricingContent() {
   const modelFilter = list.filters.modelId || undefined;
   const providerFilter = list.filters.providerId || undefined;
   const searchQuery = list.search || undefined;
-  const rules = useAdminPricingRules({
+  const rulesRaw = useAdminPricingRules({
     page: list.page,
     page_size: list.pageSize,
     q: searchQuery,
     model_id: modelFilter,
     provider_id: providerFilter,
   });
+  // The API doesn't filter by billing_mode — narrow the visible page client-side
+  // so the SegmentedControl behaves like the other filters. Pagination total
+  // stays truthful to the server so the operator still sees the real roster size.
+  const rules = (list.filters.billingMode && rulesRaw.data)
+    ? {
+        ...rulesRaw,
+        data: {
+          ...rulesRaw.data,
+          data: rulesRaw.data.data.filter((r) => r.billing_mode === list.filters.billingMode),
+        },
+      }
+    : rulesRaw;
   const allRules = useAdminPricingRules();
   const presets = useAdminPricingRulePresets();
   const models = useAdminModels();
@@ -169,7 +184,8 @@ function PricingContent() {
     value: p.id,
     label: p.display_name ?? p.id,
   }));
-  const isFiltered = Boolean(searchQuery || modelFilter || providerFilter);
+  const billingModeFilter = (list.filters.billingMode as string | undefined) || undefined;
+  const isFiltered = Boolean(searchQuery || modelFilter || providerFilter || billingModeFilter);
   const billingModeOptions = [
     { value: "token", label: t("adminPricing.billingModeToken") },
     { value: "per_request", label: t("adminPricing.billingModePerRequest") },
@@ -295,9 +311,20 @@ function PricingContent() {
       header: t("adminPricing.inputPrice"),
       align: "right",
       render: (r) => (
-        <span className="text-sm text-srapi-text-secondary tabular">
-          {formatMoney(r.input_price_per_million_tokens, r.currency)}
-        </span>
+        <DataTooltip
+          title={t("adminPricing.billingMode")}
+          primary={formatMoney(r.input_price_per_million_tokens, r.currency)}
+          rows={[
+            { label: t("adminPricing.outputPrice"), value: formatMoney(r.output_price_per_million_tokens, r.currency) },
+            { label: t("adminPricing.cacheReadPrice"), value: formatMoney(r.cache_read_price_per_million_tokens, r.currency), tone: "muted" },
+            { label: t("adminPricing.cacheWritePrice"), value: formatMoney(r.cache_write_price_per_million_tokens, r.currency), tone: "muted" },
+          ]}
+          footer={t("adminCommon.currency") + ": " + (r.currency || "—")}
+        >
+          <span className="text-sm text-srapi-text-secondary tabular">
+            {formatMoney(r.input_price_per_million_tokens, r.currency)}
+          </span>
+        </DataTooltip>
       ),
     },
     {
@@ -306,9 +333,18 @@ function PricingContent() {
       align: "right",
       hideOnMobile: true,
       render: (r) => (
-        <span className="text-sm text-srapi-text-secondary tabular">
-          {formatMoney(r.output_price_per_million_tokens, r.currency)}
-        </span>
+        <DataTooltip
+          title={t("adminPricing.outputPrice")}
+          primary={formatMoney(r.output_price_per_million_tokens, r.currency)}
+          rows={[
+            { label: t("adminPricing.inputPrice"), value: formatMoney(r.input_price_per_million_tokens, r.currency) },
+            { label: t("adminPricing.perRequestPrice"), value: formatMoney(r.per_request_price, r.currency), tone: "muted" },
+          ]}
+        >
+          <span className="text-sm text-srapi-text-secondary tabular">
+            {formatMoney(r.output_price_per_million_tokens, r.currency)}
+          </span>
+        </DataTooltip>
       ),
     },
     {
@@ -382,6 +418,38 @@ function PricingContent() {
         noResultsTitle={t("adminPricing.emptyFilteredTitle")}
         noResultsBody={t("adminPricing.emptyFilteredBody")}
         onClearFilters={list.clearFilters}
+        enableKeyboardNav
+        expandRow={(r) => (
+          <InlineDetailGrid
+            sections={[
+              {
+                title: t("adminPricing.billingMode"),
+                rows: [
+                  { label: t("adminPricing.billingMode"), value: formatBillingMode(r.billing_mode, t) },
+                  { label: t("adminCommon.currency"), value: r.currency || "—" },
+                  { label: t("adminPricing.perRequestPrice"), value: formatMoney(r.per_request_price, r.currency) },
+                ],
+              },
+              {
+                title: t("adminPricing.inputPrice") + " / " + t("adminPricing.outputPrice"),
+                rows: [
+                  { label: t("adminPricing.inputPrice"), value: formatMoney(r.input_price_per_million_tokens, r.currency) },
+                  { label: t("adminPricing.outputPrice"), value: formatMoney(r.output_price_per_million_tokens, r.currency) },
+                  { label: t("adminPricing.cacheReadPrice"), value: formatMoney(r.cache_read_price_per_million_tokens, r.currency), tone: "muted" },
+                  { label: t("adminPricing.cacheWritePrice"), value: formatMoney(r.cache_write_price_per_million_tokens, r.currency), tone: "muted" },
+                ],
+              },
+              {
+                title: t("adminPricing.intervals"),
+                rows: [
+                  { label: t("adminPricing.intervals"), value: String(r.intervals.length) },
+                  { label: t("adminPricing.effectiveFrom"), value: r.effective_from ? r.effective_from : "—", tone: "muted" },
+                  { label: t("adminPricing.effectiveTo"), value: r.effective_to ? r.effective_to : "—", tone: "muted" },
+                ],
+              },
+            ]}
+          />
+        )}
         toolbar={
           <ListToolbar>
             <SearchInput
@@ -400,6 +468,18 @@ function PricingContent() {
               onChange={(value) => list.setFilter("providerId", value)}
               options={[{ value: "0", label: t("adminPricing.anyProvider") }, ...providerOptions]}
               allLabel={t("adminPricing.allProviders")}
+            />
+            <SegmentedControl<string>
+              value={(list.filters.billingMode as string) || "__all__"}
+              onChange={(v) => list.setFilter("billingMode", v === "__all__" ? undefined : v)}
+              ariaLabel={t("adminPricing.billingMode")}
+              size="sm"
+              options={[
+                { value: "__all__", label: t("adminCommon.allStatuses") },
+                { value: "token", label: t("adminPricing.billingModeToken") },
+                { value: "per_request", label: t("adminPricing.billingModePerRequest") },
+                { value: "image", label: t("adminPricing.billingModeImage") },
+              ]}
             />
           </ListToolbar>
         }

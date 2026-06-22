@@ -1,14 +1,15 @@
 "use client";
 
-import { Activity, AlertTriangle, RefreshCw, RotateCcw, Database, Wifi, WifiOff } from "lucide-react";
+import { Activity, RefreshCw, RotateCcw, Database, Wifi, WifiOff } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { SectionHero } from "@/components/visual/section-hero";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
 import { AutoRefreshControl } from "@/components/ui/auto-refresh";
-import { EmptyState } from "@/components/ui/empty-state";
+import { IllustratedEmptyState } from "@/components/ui/illustrated-empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DataTooltip } from "@/components/ui/data-tooltip";
 import {
   useAdminCircuitBreakers,
   useResetCircuitBreaker,
@@ -137,8 +138,8 @@ function DiagnosticsContent() {
                 ))}
               </div>
             ) : breakers.isError ? (
-              <EmptyState
-                icon={AlertTriangle}
+              <IllustratedEmptyState
+                illust="cog"
                 title={t("common.error")}
                 description={t("common.errorBody")}
                 action={
@@ -148,9 +149,11 @@ function DiagnosticsContent() {
                 }
               />
             ) : !breakers.data?.length ? (
-              <p className="py-6 text-center text-sm text-srapi-text-tertiary">
-                {t("diagnostics.noBreakers")}
-              </p>
+              <IllustratedEmptyState
+                illust="cog"
+                title={t("diagnostics.noBreakers")}
+                description={t("diagnostics.subtitle") === "diagnostics.subtitle" ? undefined : t("diagnostics.subtitle")}
+              />
             ) : (
               <div className="divide-y divide-srapi-border">
                 {breakers.data.map((entry) => {
@@ -176,18 +179,38 @@ function DiagnosticsContent() {
                         </div>
                       </div>
                       <div className="flex items-center gap-4">
-                        <span
-                          className={
-                            "text-[12px] font-medium tabular " +
-                            (entry.success_rate >= 0.95
-                              ? "text-srapi-success"
-                              : entry.success_rate >= 0.8
-                                ? "text-srapi-warning"
-                                : "text-srapi-error")
-                          }
+                        <DataTooltip
+                          title="Success rate"
+                          primary={`${Math.round(entry.success_rate * 100)}%`}
+                          rows={[
+                            { label: "State", value: entry.state, tone: "muted" },
+                            { label: "Requests", value: String(entry.requests), tone: "muted" },
+                            {
+                              label: "Failures",
+                              value: String(entry.total_failures),
+                              tone: entry.total_failures > 0 ? "error" : "muted",
+                            },
+                            {
+                              label: "Consecutive failures",
+                              value: String(entry.consecutive_failures),
+                              tone: entry.consecutive_failures > 0 ? "warning" : "muted",
+                            },
+                          ]}
+                          footer={summary.detail}
                         >
-                          {Math.round(entry.success_rate * 100)}%
-                        </span>
+                          <span
+                            className={
+                              "tabular " +
+                              (entry.success_rate >= 0.95
+                                ? "metric-strong-good"
+                                : entry.success_rate >= 0.8
+                                  ? "metric-strong-warn"
+                                  : "metric-strong-bad")
+                            }
+                          >
+                            {Math.round(entry.success_rate * 100)}%
+                          </span>
+                        </DataTooltip>
                         {entry.state !== "closed" && (
                           <Button
                             variant="ghost"
@@ -237,8 +260,8 @@ function DiagnosticsContent() {
                 <Skeleton className="h-12 w-full" />
               </div>
             ) : cacheStats.isError ? (
-              <EmptyState
-                icon={AlertTriangle}
+              <IllustratedEmptyState
+                illust="cog"
                 title={t("common.error")}
                 description={t("common.errorBody")}
                 action={
@@ -248,9 +271,7 @@ function DiagnosticsContent() {
                 }
               />
             ) : !cacheStats.data?.length ? (
-              <p className="py-6 text-center text-sm text-srapi-text-tertiary">
-                {t("diagnostics.noCaches")}
-              </p>
+              <IllustratedEmptyState illust="cog" title={t("diagnostics.noCaches")} />
             ) : (
               <div className="divide-y divide-srapi-border">
                 {cacheStats.data.map((cache) => {
@@ -276,11 +297,41 @@ function DiagnosticsContent() {
                       <div className="flex items-center gap-2">
                         <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-srapi-border">
                           <div
-                            className="h-full rounded-full bg-srapi-success transition-all"
+                            className={
+                              "h-full rounded-full transition-all " +
+                              (rateNum >= 80
+                                ? "bg-srapi-success"
+                                : rateNum >= 50
+                                  ? "bg-srapi-warning"
+                                  : "bg-srapi-error")
+                            }
                             style={{ width: `${Math.max(rateNum, 1)}%` }}
                           />
                         </div>
-                        <span className="text-[12px] tabular text-srapi-text-secondary">{cache.hit_rate}</span>
+                        <DataTooltip
+                          title="Cache hit rate"
+                          primary={cache.hit_rate}
+                          rows={[
+                            { label: "size", value: String(cache.size), tone: "muted" },
+                            { label: "hits", value: String(cache.hits), tone: "success" },
+                            { label: "misses", value: String(cache.misses), tone: cache.misses > 0 ? "error" : "muted" },
+                            { label: "evictions", value: String(cache.evictions), tone: "muted" },
+                          ]}
+                          footer={summary.detail}
+                        >
+                          <span
+                            className={
+                              "tabular " +
+                              (rateNum >= 80
+                                ? "metric-strong-good"
+                                : rateNum >= 50
+                                  ? "metric-strong-warn"
+                                  : "metric-strong-bad")
+                            }
+                          >
+                            {cache.hit_rate}
+                          </span>
+                        </DataTooltip>
                       </div>
                     </div>
                   );

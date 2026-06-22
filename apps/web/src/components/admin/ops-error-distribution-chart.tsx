@@ -7,7 +7,9 @@ import { cn } from "@/lib/cn";
 import { formatInteger } from "@/lib/admin-format";
 import { Card, CardContent } from "@/components/ui/card";
 import { SectionTitle } from "@/components/ui/section-title";
+import { DataTooltip } from "@/components/ui/data-tooltip";
 import { ChartEmpty } from "@/components/charts/chart-empty";
+import { useHoverSync } from "@/components/charts/hover-sync-provider";
 import type { OpsErrorDistributionItem } from "@/hooks/admin-queries/ops-charts";
 
 /**
@@ -16,17 +18,22 @@ import type { OpsErrorDistributionItem } from "@/hooks/admin-queries/ops-charts"
  * colors, no chart library — with the grand total in the hole, an owner legend,
  * and the top error_class rows beneath. Mirrors the sub2api ops error
  * distribution card but keyed on SRapi's owner/error_class read-model.
+ *
+ * Hover sync — hovering a top-error row pushes its index into the shared
+ * `HoverSyncProvider` so sibling ops charts (latency histogram, sparklines)
+ * highlight the matching bucket. Each row is wrapped in a `DataTooltip` that
+ * surfaces an error_class breakdown (owner, count, share).
  */
 
 type Owner = "provider" | "client" | "platform" | "other";
 
-const OWNER_STYLE: Record<Owner, { stroke: string; dot: string }> = {
+const OWNER_STYLE: Record<Owner, { stroke: string; dot: string; tone: "default" | "warning" | "error" | "muted" }> = {
   // Provider faults dominate the warning palette; client errors are neutral;
   // platform faults are the loud red; anything unattributed falls back to grey.
-  provider: { stroke: "stroke-srapi-warning", dot: "bg-srapi-warning" },
-  client: { stroke: "stroke-srapi-text-secondary", dot: "bg-srapi-text-secondary" },
-  platform: { stroke: "stroke-srapi-error", dot: "bg-srapi-error" },
-  other: { stroke: "stroke-srapi-text-tertiary", dot: "bg-srapi-text-tertiary" },
+  provider: { stroke: "stroke-srapi-warning", dot: "bg-srapi-warning", tone: "warning" },
+  client: { stroke: "stroke-srapi-text-secondary", dot: "bg-srapi-text-secondary", tone: "muted" },
+  platform: { stroke: "stroke-srapi-error", dot: "bg-srapi-error", tone: "error" },
+  other: { stroke: "stroke-srapi-text-tertiary", dot: "bg-srapi-text-tertiary", tone: "muted" },
 };
 
 function normalizeOwner(owner: string): Owner {
@@ -76,6 +83,12 @@ export function OpsErrorDistributionChart({
 
     return { total: sum, segments: segs, topClasses: top };
   }, [items]);
+
+  const hoverSync = useHoverSync();
+  const activeIdx =
+    hoverSync.index != null && hoverSync.index >= 0 && hoverSync.index < topClasses.length
+      ? hoverSync.index
+      : null;
 
   // Donut geometry — a stroke-dasharray ring so each owner slice is one arc.
   const R = 52;
@@ -158,13 +171,20 @@ export function OpsErrorDistributionChart({
                 ))}
               </div>
 
-              <div className="space-y-1.5">
-                {topClasses.map((item) => {
+              <div
+                className="space-y-1.5"
+                onMouseLeave={() => hoverSync.setIndex(null)}
+              >
+                {topClasses.map((item, idx) => {
                   const owner = normalizeOwner(item.owner);
+                  const isActive = activeIdx === idx;
                   const href = investigationHref?.(item) ?? null;
-                  const className =
-                    "flex items-center gap-2 border-t border-srapi-border pt-1.5 first:border-t-0 first:pt-0" +
-                    (href ? " rounded-sm underline-offset-2 hover:text-srapi-text-primary hover:underline" : "");
+                  const rowClass = cn(
+                    "flex items-center gap-2 border-t border-srapi-border pt-1.5 first:border-t-0 first:pt-0 transition-opacity",
+                    href && "rounded-sm underline-offset-2 hover:text-srapi-text-primary hover:underline",
+                    activeIdx != null && !isActive && "opacity-50",
+                    isActive && "opacity-100",
+                  );
                   const content = (
                     <>
                       <span
@@ -181,19 +201,32 @@ export function OpsErrorDistributionChart({
                       </span>
                     </>
                   );
-                  if (href) {
-                    return (
-                      <Link key={`${item.owner}:${item.error_class}`} href={href} className={className}>
-                        {content}
-                      </Link>
-                    );
-                  }
+                  const tooltip = (
+                    <DataTooltip
+                      title={item.error_class}
+                      primary={formatInteger(item.count)}
+                      rows={[
+                        { label: ownerLabels[owner], value: "owner", tone: OWNER_STYLE[owner].tone },
+                        { label: "Share", value: `${(item.share * 100).toFixed(2)}%`, tone: "muted" },
+                        { label: "Of total", value: `${((item.count / total) * 100).toFixed(2)}%`, tone: "muted" },
+                      ]}
+                      side="left"
+                    >
+                      {href ? (
+                        <Link href={href} className={rowClass}>
+                          {content}
+                        </Link>
+                      ) : (
+                        <div className={rowClass}>{content}</div>
+                      )}
+                    </DataTooltip>
+                  );
                   return (
                     <div
                       key={`${item.owner}:${item.error_class}`}
-                      className={className}
+                      onMouseEnter={() => hoverSync.setIndex(idx)}
                     >
-                      {content}
+                      {tooltip}
                     </div>
                   );
                 })}

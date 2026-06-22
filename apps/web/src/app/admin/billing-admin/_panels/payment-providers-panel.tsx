@@ -8,7 +8,7 @@ import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useClientPagedList } from "@/hooks/use-client-list";
 import { ColumnToggle } from "@/components/ui/column-toggle";
-import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-toolbar";
+import { ListToolbar, SearchInput } from "@/components/admin/list-toolbar";
 import {
   ResourceFormDialog,
   enumOptions,
@@ -28,6 +28,8 @@ import { useToast } from "@/context/ToastContext";
 import { adminErrorMessage } from "@/lib/admin-api";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import {
   PAYMENT_PROVIDER_STATUSES,
@@ -291,11 +293,25 @@ export function PaymentProvidersPanel() {
       hideOnMobile: true,
       align: "right",
       sortValue: (p) => Number(p.fee_rate),
-      render: (p) => (
-        <span className="text-xs tabular text-srapi-text-tertiary">
-          {(Number(p.fee_rate) * 100).toFixed(3)}%
-        </span>
-      ),
+      render: (p) => {
+        const fee = Number(p.fee_rate);
+        const perThousand = fee * 1000;
+        return (
+          <DataTooltip
+            title={t("adminPayments.feeHeader")}
+            primary={`${(fee * 100).toFixed(3)}%`}
+            rows={[
+              { label: "Decimal", value: fee.toFixed(5) },
+              { label: "Per 1k", value: `${perThousand.toFixed(2)}` },
+              { label: "On $100", value: `$${(fee * 100).toFixed(2)}` },
+            ]}
+          >
+            <span className="text-xs tabular text-srapi-text-tertiary">
+              {(fee * 100).toFixed(3)}%
+            </span>
+          </DataTooltip>
+        );
+      },
     },
     {
       key: "weight",
@@ -353,15 +369,17 @@ export function PaymentProvidersPanel() {
               onChange={list.setSearchInput}
               placeholder={t("adminPayments.searchPlaceholder")}
             />
-            <FilterSelect
-              value={list.filters.status}
-              onChange={(v) => list.setFilter("status", v)}
+            <SegmentedControl<string>
+              value={(list.filters.status as string) ?? "all"}
+              onChange={(v) => list.setFilter("status", v === "all" ? "" : v)}
+              ariaLabel={t("adminCommon.allStatuses")}
+              size="sm"
               options={[
+                { value: "all", label: t("adminCommon.allStatuses") },
                 { value: "active", label: t("common.active") },
                 { value: "disabled", label: t("common.disabled") },
                 { value: "archived", label: t("common.archived") },
               ]}
-              allLabel={t("adminCommon.allStatuses")}
             />
           </ListToolbar>
         }

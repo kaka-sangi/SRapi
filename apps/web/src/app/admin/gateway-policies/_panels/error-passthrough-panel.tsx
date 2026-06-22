@@ -5,12 +5,16 @@ import { ShieldAlert } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
-import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-toolbar";
+import { ListToolbar, SearchInput } from "@/components/admin/list-toolbar";
 import { ResourceFormDialog, type FieldConfig } from "@/components/admin/resource-form-dialog";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { QuietBadge, type QuietStatus } from "@/components/ui/quiet-badge";
 import { DataPill } from "@/components/ui/data-pill";
 import { Button } from "@/components/ui/button";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { InlineDetailGrid } from "@/components/ui/inline-detail-grid";
+import { formatDateTime } from "@/lib/admin-format";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
@@ -141,7 +145,18 @@ export function ErrorPassthroughPanel() {
       header: t("adminErrorPassthrough.priority"),
       align: "right",
       render: (r) => (
-        <span className="text-xs text-srapi-text-tertiary tabular">{r.priority}</span>
+        <DataTooltip
+          title={t("adminErrorPassthrough.priority")}
+          primary={String(r.priority)}
+          rows={[
+            { label: t("adminErrorPassthrough.action"), value: actionLabel(r.action) },
+            { label: t("adminErrorPassthrough.statusCodes"), value: String((r.status_codes ?? []).length), tone: "muted" },
+            { label: t("adminErrorPassthrough.classes"), value: String((r.classes ?? []).length), tone: "muted" },
+            { label: t("adminErrorPassthrough.keywords"), value: String((r.keywords ?? []).length), tone: "muted" },
+          ]}
+        >
+          <span className="text-xs text-srapi-text-tertiary tabular">{r.priority}</span>
+        </DataTooltip>
       ),
     },
     {
@@ -209,6 +224,42 @@ export function ErrorPassthroughPanel() {
         minWidth={680}
         isFiltered={isFiltered}
         onClearFilters={list.clearFilters}
+        enableKeyboardNav
+        rowSeverity={(r) => {
+          // Mask actions hide error details from clients — surface them as a
+          // warning stripe so operators can immediately spot which errors
+          // are being suppressed. Disabled rules stay muted via info.
+          if (!r.enabled) return "info";
+          if (r.action === "mask") return "warning";
+          return undefined;
+        }}
+        expandRow={(r) => (
+          <InlineDetailGrid
+            sections={[
+              {
+                title: t("adminErrorPassthrough.statusCodes"),
+                rows: (r.status_codes ?? []).length === 0
+                  ? [{ label: t("adminErrorPassthrough.statusCodes"), value: "—", tone: "muted" }]
+                  : (r.status_codes ?? []).slice(0, 6).map((s) => ({ label: String(s), value: "match", mono: true })),
+              },
+              {
+                title: t("adminErrorPassthrough.classes") + " / " + t("adminErrorPassthrough.keywords"),
+                rows: [
+                  { label: t("adminErrorPassthrough.classes"), value: (r.classes ?? []).slice(0, 4).join(", ") || "—", mono: true, tone: (r.classes ?? []).length > 0 ? "default" : "muted" },
+                  { label: t("adminErrorPassthrough.keywords"), value: (r.keywords ?? []).slice(0, 4).join(", ") || "—", mono: true, tone: (r.keywords ?? []).length > 0 ? "default" : "muted" },
+                ],
+              },
+              {
+                title: t("common.updated"),
+                rows: [
+                  { label: t("common.created"), value: r.created_at ? formatDateTime(r.created_at) : "—", tone: "muted" },
+                  { label: t("common.updated"), value: r.updated_at ? formatDateTime(r.updated_at) : "—", tone: "muted" },
+                  { label: t("adminErrorPassthrough.priority"), value: String(r.priority) },
+                ],
+              },
+            ]}
+          />
+        )}
         toolbar={
           <ListToolbar>
             <SearchInput
@@ -216,11 +267,15 @@ export function ErrorPassthroughPanel() {
               onChange={list.setSearchInput}
               placeholder={t("adminErrorPassthrough.searchPlaceholder")}
             />
-            <FilterSelect
-              value={list.filters.action}
-              onChange={(v) => list.setFilter("action", v)}
-              options={ERROR_PASSTHROUGH_ACTIONS.map((value) => ({ value, label: actionLabel(value) }))}
-              allLabel={t("adminErrorPassthrough.allActions")}
+            <SegmentedControl<string>
+              value={list.filters.action || "__all__"}
+              onChange={(v) => list.setFilter("action", v === "__all__" ? undefined : v)}
+              ariaLabel={t("adminErrorPassthrough.action")}
+              size="sm"
+              options={[
+                { value: "__all__", label: t("adminErrorPassthrough.allActions") },
+                ...ERROR_PASSTHROUGH_ACTIONS.map((value) => ({ value, label: actionLabel(value) })),
+              ]}
             />
           </ListToolbar>
         }

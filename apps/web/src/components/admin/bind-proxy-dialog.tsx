@@ -32,12 +32,21 @@ export function BindProxyDialog({
   const { t } = useLanguage();
   const bind = useBindAccountProxy();
 
+  const currentProxy = account.proxy_id ? String(account.proxy_id) : NO_PROXY;
+
   const fields: FieldConfig<BindProxyFormState>[] = [
     {
       name: "proxy",
       label: t("adminAccounts.proxy"),
       type: "select",
       options: [{ value: NO_PROXY, label: t("adminAccounts.noProxy") }, ...proxyOptions],
+      // Inline contextual help — the proxy column is one click deep so the
+      // operator needs a refresher on the consequence here.
+      help: t("adminAccounts.bindProxyHelp") ?? t("adminAccounts.bindProxy"),
+      hint:
+        currentProxy === NO_PROXY
+          ? t("adminAccounts.noProxy")
+          : (proxyOptions.find((opt) => opt.value === currentProxy)?.label ?? undefined),
     },
   ];
 
@@ -48,7 +57,10 @@ export function BindProxyDialog({
       title={t("adminAccounts.bindProxy")}
       description={account.name}
       fields={fields}
-      initial={{ proxy: NO_PROXY }}
+      // Pre-select the account's current proxy so the dialog reflects state on
+      // open — previously it always reset to "no proxy", which made a no-op
+      // submit silently clear the binding.
+      initial={{ proxy: currentProxy }}
       buildBody={(form) => ({ proxyId: form.proxy === NO_PROXY ? null : form.proxy })}
       submit={(body) => bind.mutateAsync({ id: account.id, proxyId: body.proxyId })}
       successMessage={t("adminAccounts.bindProxyDone")}

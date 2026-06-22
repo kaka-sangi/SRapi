@@ -10,10 +10,12 @@ import { AdminListView, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
-import { enumOptions } from "@/components/admin/resource-form-dialog";
 import { ColumnToggle } from "@/components/ui/column-toggle";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { CopyButton } from "@/components/ui/copy-button";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { InlineDetailGrid } from "@/components/ui/inline-detail-grid";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useAdminApiKeys, useResetAdminApiKeyUsage, useUpdateAdminApiKey } from "@/hooks/admin-queries";
@@ -108,9 +110,20 @@ function ApiKeysContent() {
       align: "right",
       hideOnMobile: true,
       render: (k) => (
-        <span className="text-xs text-srapi-text-tertiary tabular">
-          {k.rpm_limit != null ? k.rpm_limit : "∞"}
-        </span>
+        <DataTooltip
+          title={t("adminApiKeys.rpm")}
+          primary={k.rpm_limit != null ? String(k.rpm_limit) : "∞"}
+          rows={[
+            { label: "tpm", value: k.tpm_limit != null ? String(k.tpm_limit) : "∞", tone: "muted" },
+            { label: "concurrency", value: k.concurrency_limit != null ? String(k.concurrency_limit) : "∞", tone: "muted" },
+            { label: "5h req", value: k.request_limit_5h != null ? String(k.request_limit_5h) : "∞", tone: "muted" },
+            { label: "1d req", value: k.request_limit_1d != null ? String(k.request_limit_1d) : "∞", tone: "muted" },
+          ]}
+        >
+          <span className="text-xs text-srapi-text-tertiary tabular">
+            {k.rpm_limit != null ? k.rpm_limit : "∞"}
+          </span>
+        </DataTooltip>
       ),
     },
     {
@@ -118,9 +131,20 @@ function ApiKeysContent() {
       header: t("adminApiKeys.lastUsed"),
       hideOnMobile: true,
       render: (k) => (
-        <span className="text-xs text-srapi-text-tertiary tabular">
-          {k.last_used_at ? formatDateTime(k.last_used_at) : "—"}
-        </span>
+        <DataTooltip
+          title={t("adminApiKeys.lastUsed")}
+          primary={k.last_used_at ? formatDateTime(k.last_used_at) : "—"}
+          rows={[
+            { label: "cost (5h)", value: k.cost_used_5h ?? "0", tone: "muted" },
+            { label: "cost (1d)", value: k.cost_used_1d ?? "0", tone: "muted" },
+            { label: "cost (7d)", value: k.cost_used_7d ?? "0", tone: "muted" },
+            { label: "total cost", value: k.cost_used ?? "0" },
+          ]}
+        >
+          <span className="text-xs text-srapi-text-tertiary tabular">
+            {k.last_used_at ? formatDateTime(k.last_used_at) : "—"}
+          </span>
+        </DataTooltip>
       ),
     },
     {
@@ -190,13 +214,72 @@ function ApiKeysContent() {
         sort={list.sort}
         onSort={list.toggleSort}
         dimRow={(k) => k.status !== "active"}
+        enableKeyboardNav
+        rowSeverity={(k) => {
+          // Expired keys are terminal — make them stand out with an error
+          // stripe. Disabled keys are restorable, info-stripe. Active stays
+          // implicit (the default visual; per polish guidance, color is sparing).
+          if (k.status === "expired") return "error";
+          if (k.status === "disabled") return "info";
+          return undefined;
+        }}
+        expandRow={(k) => {
+          const ips = k.allowed_ips ?? [];
+          const deniedIps = k.denied_ips ?? [];
+          const scopes = k.scopes ?? [];
+          const allowedModels = k.allowed_models ?? [];
+          return (
+            <InlineDetailGrid
+              sections={[
+                {
+                  title: t("adminApiKeys.title"),
+                  rows: [
+                    { label: t("adminApiKeys.owner"), value: k.user_email || (k.user_id != null ? `#${k.user_id}` : "—") },
+                    { label: t("adminApiKeys.lastUsed"), value: k.last_used_at ? formatDateTime(k.last_used_at) : "—", tone: k.last_used_at ? "default" : "muted" },
+                    { label: t("common.created"), value: k.created_at ? formatDateTime(k.created_at) : "—", tone: "muted" },
+                    { label: "expires", value: k.expires_at ? formatDateTime(k.expires_at) : "—", tone: "muted" },
+                  ],
+                },
+                {
+                  title: "usage",
+                  rows: [
+                    { label: "rpm", value: k.rpm_limit != null ? String(k.rpm_limit) : "∞" },
+                    { label: "tpm", value: k.tpm_limit != null ? String(k.tpm_limit) : "∞", tone: "muted" },
+                    { label: "concurrency", value: k.concurrency_limit != null ? String(k.concurrency_limit) : "∞", tone: "muted" },
+                    { label: "total cost", value: k.cost_used ?? "0" },
+                    { label: "5h cost", value: k.cost_used_5h ?? "0", tone: "muted" },
+                    { label: "1d cost", value: k.cost_used_1d ?? "0", tone: "muted" },
+                  ],
+                },
+                {
+                  title: "ips & scopes",
+                  rows: [
+                    { label: "allowed_ips", value: ips.length === 0 ? "all" : (ips.slice(0, 4).join(", ") + (ips.length > 4 ? ` +${ips.length - 4}` : "")), mono: true, tone: ips.length === 0 ? "muted" : "default" },
+                    { label: "denied_ips", value: deniedIps.length === 0 ? "—" : (deniedIps.slice(0, 4).join(", ") + (deniedIps.length > 4 ? ` +${deniedIps.length - 4}` : "")), mono: true, tone: deniedIps.length === 0 ? "muted" : "warning" },
+                    { label: "scopes", value: scopes.length === 0 ? "all" : (scopes.slice(0, 4).join(", ") + (scopes.length > 4 ? ` +${scopes.length - 4}` : "")), tone: scopes.length === 0 ? "muted" : "default" },
+                    { label: "allowed_models", value: allowedModels.length === 0 ? "all" : (allowedModels.slice(0, 3).join(", ") + (allowedModels.length > 3 ? ` +${allowedModels.length - 3}` : "")), tone: allowedModels.length === 0 ? "muted" : "default" },
+                  ],
+                },
+              ]}
+              actions={
+                <Button variant="outline" size="sm" onClick={() => setUsageTarget(k)}>
+                  {t("apiKeys.usageAction")}
+                </Button>
+              }
+            />
+          );
+        }}
         toolbar={
           <ListToolbar>
-            <FilterSelect
-              value={statusFilter}
-              onChange={(v) => list.setFilter("status", v)}
-              options={enumOptions(API_KEY_STATUSES)}
-              allLabel={t("adminCommon.allStatuses")}
+            <SegmentedControl<string>
+              value={statusFilter || "__all__"}
+              onChange={(v) => list.setFilter("status", v === "__all__" ? undefined : v)}
+              ariaLabel={t("adminCommon.status")}
+              size="sm"
+              options={[
+                { value: "__all__", label: t("adminCommon.allStatuses") },
+                ...API_KEY_STATUSES.map((s) => ({ value: s, label: s })),
+              ]}
             />
             <FilterSelect
               value={userFilter}

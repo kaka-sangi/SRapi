@@ -20,6 +20,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { InlineDetailGrid, type InlineDetailRow } from "@/components/ui/inline-detail-grid";
+import { IconBubble } from "@/components/ui/icon-bubble";
+import { DataPill } from "@/components/ui/data-pill";
 import { useLanguage } from "@/context/LanguageContext";
 import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/admin-format";
@@ -122,8 +125,13 @@ export function AccountTestDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-            <ShieldCheck className="size-4 text-srapi-text-tertiary" />
+          <DialogTitle className="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
+            <IconBubble
+              tone={ok ? "success" : failed ? "error" : loading ? "neutral" : "accent"}
+              size="sm"
+            >
+              <ShieldCheck aria-hidden />
+            </IconBubble>
             {t("providers.testTitle")}
           </DialogTitle>
           <DialogDescription className="truncate font-mono text-xs">
@@ -176,8 +184,8 @@ export function AccountTestDialog({
         </div>
 
         {/* Result panel — mono, status-tinted */}
-        <div className="overflow-hidden rounded-xl border border-srapi-border bg-srapi-card-muted p-3.5 font-mono text-xs">
-          <div className="flex items-center gap-2">
+        <div className="overflow-hidden rounded-xl border border-srapi-border bg-srapi-card-muted font-mono text-xs">
+          <div className="flex items-center gap-2 px-3.5 py-3">
             {loading ? (
               <>
                 <Loader2 className="size-3.5 animate-spin text-srapi-text-tertiary" />
@@ -188,18 +196,18 @@ export function AccountTestDialog({
                 <XCircle className="size-3.5 text-srapi-error" />
                 <span className="text-srapi-error">{t("providers.testFailed")}</span>
                 {result?.latency_ms != null ? (
-                  <span className="ml-auto tabular text-srapi-text-tertiary">
+                  <DataPill tone="neutral" size="sm" className="ml-auto">
                     {formatLatency(result.latency_ms)}
-                  </span>
+                  </DataPill>
                 ) : null}
               </>
             ) : ok ? (
               <>
                 <CheckCircle2 className="size-3.5 text-srapi-success" />
                 <span className="text-srapi-success">{t("providers.testOk")}</span>
-                <span className="ml-auto tabular text-srapi-text-tertiary">
+                <DataPill tone="success" size="sm" className="ml-auto">
                   {formatLatency(result?.latency_ms)}
-                </span>
+                </DataPill>
               </>
             ) : (
               <span className="text-srapi-text-tertiary">{t("providers.testReady")}</span>
@@ -207,42 +215,75 @@ export function AccountTestDialog({
           </div>
 
           {!loading && (error || result?.message) ? (
-            <p className="mt-2 text-srapi-text-secondary [overflow-wrap:anywhere]">{error || result?.message}</p>
+            <p className="px-3.5 pb-3 text-srapi-text-secondary [overflow-wrap:anywhere]">{error || result?.message}</p>
           ) : null}
 
           {hintKey ? (
-            <div className="mt-2 flex items-start gap-1.5 rounded-md border border-srapi-border bg-srapi-card px-2.5 py-2 text-xs text-srapi-text-secondary">
+            <div className="mx-3.5 mb-3 flex items-start gap-1.5 rounded-md border border-srapi-border bg-srapi-card px-2.5 py-2 text-xs text-srapi-text-secondary">
               <Lightbulb className="mt-0.5 size-3 shrink-0 text-srapi-text-tertiary" />
               <span className="[overflow-wrap:anywhere]">{t(`gatewayHints.${hintKey}`)}</span>
             </div>
           ) : null}
 
+          {/* Per-check stripe rows — left 2.5px severity rail comes from
+              .log-row[data-sev], so true ✓, false ✗ and other values are
+              instantly scannable without re-reading column 2. */}
           {!loading && checks && Object.keys(checks).length > 0 ? (
-            <dl className="mt-2.5 space-y-1 border-t border-srapi-border/70 pt-2.5">
-              {Object.entries(checks).map(([k, v]) => (
-                <div key={k} className="flex items-baseline justify-between gap-3">
-                  <dt className="shrink-0 text-srapi-text-tertiary">{k}</dt>
-                  <dd
-                    className={cn(
-                      "min-w-0 tabular text-right [overflow-wrap:anywhere]",
-                      v === true
-                        ? "text-srapi-success"
-                        : v === false
-                          ? "text-srapi-error"
-                          : "text-srapi-text-primary",
-                    )}
+            <ul className="border-t border-srapi-border/70">
+              {Object.entries(checks).map(([k, v]) => {
+                const sev = v === true ? "success" : v === false ? "error" : "info";
+                const valueColor =
+                  v === true
+                    ? "text-srapi-success"
+                    : v === false
+                      ? "text-srapi-error"
+                      : "text-srapi-text-primary";
+                return (
+                  <li
+                    key={k}
+                    className="log-row flex items-baseline justify-between gap-3 px-3.5 py-2"
+                    data-sev={sev}
                   >
-                    {stringifyCheck(v)}
-                  </dd>
-                </div>
-              ))}
-            </dl>
+                    <span className="shrink-0 text-srapi-text-tertiary">{k}</span>
+                    <span className={cn("min-w-0 tabular text-right [overflow-wrap:anywhere]", valueColor)}>
+                      {stringifyCheck(v)}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
           ) : null}
 
-          {!loading && result?.checked_at ? (
-            <p className="mt-2.5 text-xs text-srapi-text-tertiary">
-              {formatDateTime(result.checked_at)}
-            </p>
+          {!loading && result ? (
+            <InlineDetailGrid
+              sections={[
+                {
+                  title: t("providers.testTitle"),
+                  rows: [
+                    {
+                      label: t("apiKeys.usageStatus"),
+                      value: ok ? t("providers.testOk") : failed ? t("providers.testFailed") : "—",
+                      tone: ok ? "success" : failed ? "error" : "muted",
+                    } satisfies InlineDetailRow,
+                    {
+                      label: t("apiKeys.usageLatency"),
+                      value: formatLatency(result.latency_ms),
+                      mono: true,
+                    } satisfies InlineDetailRow,
+                    ...(result.checked_at
+                      ? [
+                          {
+                            label: t("apiKeys.usageTime"),
+                            value: formatDateTime(result.checked_at),
+                            tone: "muted",
+                          } satisfies InlineDetailRow,
+                        ]
+                      : []),
+                  ],
+                },
+              ]}
+              className="border-t border-srapi-border/70 px-3.5 py-3"
+            />
           ) : null}
         </div>
 

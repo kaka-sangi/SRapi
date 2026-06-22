@@ -5,11 +5,14 @@ import { CalendarClock } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
-import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-toolbar";
+import { ListToolbar, SearchInput } from "@/components/admin/list-toolbar";
 import { ResourceFormDialog, type FieldConfig } from "@/components/admin/resource-form-dialog";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { QuietBadge, type QuietStatus } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { DataPill } from "@/components/ui/data-pill";
+import { IllustratedEmptyState } from "@/components/ui/illustrated-empty-state";
 import {
   Dialog,
   DialogContent,
@@ -49,6 +52,27 @@ const STATUS_TONE: Record<string, QuietStatus> = {
   partial: "limited",
   failed: "error",
 };
+
+/** Map the most recent run status onto a row severity stripe. Plans that have
+ * never run, or that are disabled, carry no stripe; failed plans get the
+ * "error" stripe; warning/partial map to "warning"; ok maps to "success". */
+function planSeverity(
+  p: ScheduledTestPlan,
+): "info" | "success" | "warning" | "error" | "critical" | undefined {
+  if (!p.enabled) return undefined;
+  if (!p.last_status) return undefined;
+  switch (p.last_status) {
+    case "ok":
+      return "success";
+    case "warning":
+    case "partial":
+      return "warning";
+    case "failed":
+      return "error";
+    default:
+      return undefined;
+  }
+}
 
 function planMatch(
   plan: ScheduledTestPlan,
@@ -258,6 +282,18 @@ export function ScheduledTestsContent() {
         emptyIcon={CalendarClock}
         emptyTitle={t("adminScheduledTests.emptyTitle")}
         emptyBody={t("adminScheduledTests.emptyBody")}
+        emptyContent={
+          <IllustratedEmptyState
+            illust="cog"
+            title={t("adminScheduledTests.emptyTitle")}
+            description={t("adminScheduledTests.emptyBody")}
+            action={
+              <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
+                ＋ {t("adminScheduledTests.create")}
+              </Button>
+            }
+          />
+        }
         emptyAction={
           <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
             ＋ {t("adminScheduledTests.create")}
@@ -266,6 +302,7 @@ export function ScheduledTestsContent() {
         minWidth={760}
         isFiltered={isFiltered}
         onClearFilters={list.clearFilters}
+        rowSeverity={planSeverity}
         toolbar={
           <ListToolbar>
             <SearchInput
@@ -273,11 +310,18 @@ export function ScheduledTestsContent() {
               onChange={list.setSearchInput}
               placeholder={t("adminScheduledTests.searchPlaceholder")}
             />
-            <FilterSelect
-              value={list.filters.scope_type}
-              onChange={(v) => list.setFilter("scope_type", v)}
-              options={SCHEDULED_TEST_SCOPES.map((value) => ({ value, label: scopeLabel(value) }))}
-              allLabel={t("adminScheduledTests.scope")}
+            <SegmentedControl
+              value={list.filters.scope_type || "__all__"}
+              onChange={(v) => list.setFilter("scope_type", v === "__all__" ? "" : v)}
+              size="sm"
+              ariaLabel={t("adminScheduledTests.scope")}
+              options={[
+                { value: "__all__", label: t("common.all") },
+                ...SCHEDULED_TEST_SCOPES.map((value) => ({
+                  value,
+                  label: scopeLabel(value),
+                })),
+              ]}
             />
           </ListToolbar>
         }
@@ -383,8 +427,14 @@ function RunHistoryDialog({
                 {runs.data.data.map((run) => (
                   <tr key={run.id} className="border-t border-srapi-border/60">
                     <td className="py-2 pr-3 align-top">
-                      <div className="text-srapi-text-primary">{formatDateTime(run.started_at)}</div>
-                      <div className="text-[11px] text-srapi-text-tertiary">{triggerLabel(run.trigger)}</div>
+                      <div className="text-srapi-text-primary tabular">{formatDateTime(run.started_at)}</div>
+                      <DataPill
+                        tone={run.trigger === "manual" ? "accent" : "neutral"}
+                        size="sm"
+                        className="mt-0.5"
+                      >
+                        {triggerLabel(run.trigger)}
+                      </DataPill>
                     </td>
                     <td className="py-2 pr-3 align-top">
                       <QuietBadge

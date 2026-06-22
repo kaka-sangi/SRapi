@@ -1,18 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Eye, EyeOff } from "lucide-react";
 import { apiService } from "@/lib/api";
 import type { OAuthPendingSession } from "@/lib/sdk-types";
 import { ADMIN_HOME_ROUTE, USER_HOME_ROUTE, SIGN_IN_ROUTE } from "@/lib/routes";
 import { useLanguage } from "@/context/LanguageContext";
+import { cn } from "@/lib/cn";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { FloatingInput } from "@/components/ui/floating-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
+import { Kbd } from "@/components/ui/kbd";
 
 type Phase = "loading" | "bind" | "twofactor" | "create" | "email" | "error";
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function OAuthCallbackPage() {
   const router = useRouter();
@@ -25,6 +31,7 @@ export default function OAuthCallbackPage() {
   // Step inputs.
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState("");
   const [challengeId, setChallengeId] = useState<string | null>(null);
   const [code, setCode] = useState("");
@@ -76,6 +83,8 @@ export default function OAuthCallbackPage() {
     started.current = true;
     void inspect();
   }, [inspect]);
+
+  const emailLooksValid = EMAIL_RE.test(email.trim());
 
   async function handleBind(e: React.FormEvent) {
     e.preventDefault();
@@ -165,6 +174,11 @@ export default function OAuthCallbackPage() {
     }
   }
 
+  const bindReady = emailLooksValid && password.length > 0;
+  const codeReady = code.length === 6;
+  const createReady = password.length >= 8;
+  const tokenReady = token.trim().length > 0;
+
   return (
     <div className="grid min-h-dvh place-items-center bg-srapi-bg px-4">
       <div className="w-full max-w-sm">
@@ -182,29 +196,35 @@ export default function OAuthCallbackPage() {
             </h2>
             <p className="mt-1.5 text-sm text-srapi-text-secondary">{t("oauthCallback.bindHint")}</p>
             <form onSubmit={handleBind} noValidate className="mt-7 space-y-5">
-              <div>
-                <Label htmlFor="email">{t("oauthCallback.emailLabel")}</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="password">{t("oauthCallback.password")}</Label>
-                <Input
+              <FloatingInput
+                id="email"
+                label={t("oauthCallback.emailLabel")}
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={setEmail}
+              />
+              <div className="relative">
+                <FloatingInput
                   id="password"
-                  type="password"
+                  label={t("oauthCallback.password")}
+                  type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
-                  autoFocus
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={setPassword}
+                  className="[&_input]:pr-12"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={t(showPassword ? "login.hidePassword" : "login.showPassword")}
+                  className="absolute right-0 top-0 flex h-14 w-12 items-center justify-center rounded-r-2xl text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
+                >
+                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
               </div>
               {error && (
-                <p role="alert" className="rounded-xl bg-srapi-error/10 px-3 py-2 text-sm text-srapi-error">
+                <p role="alert" className="anim-shake rounded-xl bg-srapi-error/10 px-3 py-2 text-sm text-srapi-error">
                   {error}
                 </p>
               )}
@@ -214,9 +234,14 @@ export default function OAuthCallbackPage() {
                 size="lg"
                 className="h-11 w-full rounded-xl btn-raise"
                 loading={busy}
-                disabled={busy || !email.trim() || !password}
+                disabled={busy || !bindReady}
               >
-                {busy ? t("login.signingIn") : t("oauthCallback.linkAndSignIn")}
+                <span className="inline-flex items-center gap-2">
+                  {busy ? t("login.signingIn") : t("oauthCallback.linkAndSignIn")}
+                  {bindReady && !busy ? (
+                    <Kbd className="border-white/20 bg-white/10 text-white/90 shadow-none">↵</Kbd>
+                  ) : null}
+                </span>
               </Button>
             </form>
           </Card>
@@ -240,11 +265,14 @@ export default function OAuthCallbackPage() {
                   value={code}
                   onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
                   placeholder="000000"
-                  className="text-center font-mono text-lg tracking-[0.4em]"
+                  className={cn(
+                    "text-center font-mono text-lg tracking-[0.4em]",
+                    error && "anim-shake",
+                  )}
                 />
               </div>
               {error && (
-                <p role="alert" className="rounded-xl bg-srapi-error/10 px-3 py-2 text-sm text-srapi-error">
+                <p role="alert" className="anim-shake rounded-xl bg-srapi-error/10 px-3 py-2 text-sm text-srapi-error">
                   {error}
                 </p>
               )}
@@ -254,9 +282,14 @@ export default function OAuthCallbackPage() {
                 size="lg"
                 className="h-11 w-full rounded-xl btn-raise"
                 loading={busy}
-                disabled={busy || code.length < 6}
+                disabled={busy || !codeReady}
               >
-                {busy ? t("login.verifying") : t("login.verify")}
+                <span className="inline-flex items-center gap-2">
+                  {busy ? t("login.verifying") : t("login.verify")}
+                  {codeReady && !busy ? (
+                    <Kbd className="border-white/20 bg-white/10 text-white/90 shadow-none">↵</Kbd>
+                  ) : null}
+                </span>
               </Button>
             </form>
           </Card>
@@ -271,33 +304,46 @@ export default function OAuthCallbackPage() {
               {t("oauthCallback.createHint")}
             </p>
             <form onSubmit={handleCreate} noValidate className="mt-7 space-y-5">
+              <FloatingInput
+                id="email"
+                label={t("oauthCallback.emailLabel")}
+                type="email"
+                value={pending?.profile.resolved_email || email}
+                onChange={() => {}}
+                disabled
+              />
+              <FloatingInput
+                id="name"
+                label={t("oauthCallback.displayName")}
+                value={name}
+                onChange={setName}
+              />
               <div>
-                <Label htmlFor="email">{t("oauthCallback.emailLabel")}</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={pending?.profile.resolved_email || email}
-                  readOnly
-                  disabled
-                />
-              </div>
-              <div>
-                <Label htmlFor="name">{t("oauthCallback.displayName")}</Label>
-                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
-              </div>
-              <div>
-                <Label htmlFor="password">{t("oauthCallback.password")}</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  autoComplete="new-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-                <p className="mt-1.5 text-xs text-srapi-text-tertiary">{t("authRegister.passwordHint")}</p>
+                <div className="relative">
+                  <FloatingInput
+                    id="password"
+                    label={t("oauthCallback.password")}
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    value={password}
+                    onChange={setPassword}
+                    hint={password.length === 0 ? t("authRegister.passwordHint") : undefined}
+                    error={password.length > 0 && !createReady ? t("authRegister.passwordHint") : undefined}
+                    className="[&_input]:pr-12"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={t(showPassword ? "login.hidePassword" : "login.showPassword")}
+                    className="absolute right-0 top-0 flex h-14 w-12 items-center justify-center rounded-r-2xl text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
+                  >
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
+                {password.length > 0 ? <PasswordStrength password={password} /> : null}
               </div>
               {error && (
-                <p role="alert" className="rounded-xl bg-srapi-error/10 px-3 py-2 text-sm text-srapi-error">
+                <p role="alert" className="anim-shake rounded-xl bg-srapi-error/10 px-3 py-2 text-sm text-srapi-error">
                   {error}
                 </p>
               )}
@@ -307,9 +353,14 @@ export default function OAuthCallbackPage() {
                 size="lg"
                 className="h-11 w-full rounded-xl btn-raise"
                 loading={busy}
-                disabled={busy || !password}
+                disabled={busy || !createReady}
               >
-                {busy ? t("common.loading") : t("oauthCallback.createAccount")}
+                <span className="inline-flex items-center gap-2">
+                  {busy ? t("common.loading") : t("oauthCallback.createAccount")}
+                  {createReady && !busy ? (
+                    <Kbd className="border-white/20 bg-white/10 text-white/90 shadow-none">↵</Kbd>
+                  ) : null}
+                </span>
               </Button>
             </form>
           </Card>
@@ -325,19 +376,16 @@ export default function OAuthCallbackPage() {
             </p>
             {!codeSent ? (
               <form onSubmit={handleSendCode} noValidate className="mt-7 space-y-5">
-                <div>
-                  <Label htmlFor="email">{t("oauthCallback.emailLabel")}</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    autoComplete="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                  />
-                </div>
+                <FloatingInput
+                  id="email"
+                  label={t("oauthCallback.emailLabel")}
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={setEmail}
+                />
                 {error && (
-                  <p role="alert" className="text-sm text-srapi-error">
+                  <p role="alert" className="anim-shake text-sm text-srapi-error">
                     {error}
                   </p>
                 )}
@@ -345,29 +393,29 @@ export default function OAuthCallbackPage() {
                   type="submit"
                   variant="primary"
                   size="lg"
-                  className="w-full"
+                  className="h-11 w-full rounded-xl btn-raise"
                   loading={busy}
-                  disabled={busy || !email.trim()}
+                  disabled={busy || !emailLooksValid}
                 >
-                  {busy ? t("oauthCallback.sending") : t("oauthCallback.sendCode")}
+                  <span className="inline-flex items-center gap-2">
+                    {busy ? t("oauthCallback.sending") : t("oauthCallback.sendCode")}
+                    {emailLooksValid && !busy ? (
+                      <Kbd className="border-white/20 bg-white/10 text-white/90 shadow-none">↵</Kbd>
+                    ) : null}
+                  </span>
                 </Button>
               </form>
             ) : (
               <form onSubmit={handleConfirmEmail} noValidate className="mt-7 space-y-5">
-                <div>
-                  <Label htmlFor="token">{t("oauthCallback.tokenLabel")}</Label>
-                  <Input
-                    id="token"
-                    autoFocus
-                    value={token}
-                    onChange={(e) => setToken(e.target.value)}
-                  />
-                  <p className="mt-1.5 text-xs text-srapi-text-tertiary">
-                    {t("oauthCallback.tokenHint", { email: email.trim() })}
-                  </p>
-                </div>
+                <FloatingInput
+                  id="token"
+                  label={t("oauthCallback.tokenLabel")}
+                  value={token}
+                  onChange={setToken}
+                  hint={t("oauthCallback.tokenHint", { email: email.trim() })}
+                />
                 {error && (
-                  <p role="alert" className="text-sm text-srapi-error">
+                  <p role="alert" className="anim-shake text-sm text-srapi-error">
                     {error}
                   </p>
                 )}
@@ -375,11 +423,16 @@ export default function OAuthCallbackPage() {
                   type="submit"
                   variant="primary"
                   size="lg"
-                  className="w-full"
+                  className="h-11 w-full rounded-xl btn-raise"
                   loading={busy}
-                  disabled={busy || !token.trim()}
+                  disabled={busy || !tokenReady}
                 >
-                  {busy ? t("common.loading") : t("oauthCallback.confirm")}
+                  <span className="inline-flex items-center gap-2">
+                    {busy ? t("common.loading") : t("oauthCallback.confirm")}
+                    {tokenReady && !busy ? (
+                      <Kbd className="border-white/20 bg-white/10 text-white/90 shadow-none">↵</Kbd>
+                    ) : null}
+                  </span>
                 </Button>
               </form>
             )}
@@ -403,6 +456,39 @@ export default function OAuthCallbackPage() {
           </Card>
         )}
       </div>
+    </div>
+  );
+}
+
+function PasswordStrength({ password }: { password: string }) {
+  const strength = useMemo(() => {
+    let score = 0;
+    if (password.length >= 8) score++;
+    if (password.length >= 12) score++;
+    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
+    if (/\d/.test(password)) score++;
+    if (/[^a-zA-Z0-9]/.test(password)) score++;
+    return Math.min(score, 4);
+  }, [password]);
+
+  const color =
+    strength <= 1
+      ? "bg-srapi-error"
+      : strength === 2
+        ? "bg-srapi-warning"
+        : "bg-srapi-success";
+
+  return (
+    <div className="mt-2 flex gap-1" aria-hidden>
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div
+          key={i}
+          className={cn(
+            "h-1 flex-1 rounded-full transition-colors",
+            i < strength ? color : "bg-srapi-border",
+          )}
+        />
+      ))}
     </div>
   );
 }

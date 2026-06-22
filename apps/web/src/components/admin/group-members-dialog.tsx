@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Users, UserMinus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,10 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { MultiSelect } from "@/components/ui/multi-select";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { DataPill } from "@/components/ui/data-pill";
+import { SectionTitle } from "@/components/ui/section-title";
+import { IllustratedEmptyState } from "@/components/ui/illustrated-empty-state";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
@@ -47,11 +51,29 @@ export function GroupMembersDialog({
   const [toAdd, setToAdd] = useState<string[]>([]);
   const [adding, setAdding] = useState(false);
 
-  const accountList = accounts.data?.data ?? [];
-  const memberRows = members.data?.data ?? [];
-  const accountName = (id: string) => accountList.find((a) => a.id === id)?.name ?? id;
+  const accountList = useMemo(() => accounts.data?.data ?? [], [accounts.data]);
+  const memberRows = useMemo(() => members.data?.data ?? [], [members.data]);
+  const accountById = useMemo(
+    () => new Map(accountList.map((a) => [a.id, a] as const)),
+    [accountList],
+  );
+  const accountName = (id: string) => accountById.get(id)?.name ?? id;
   const memberIds = new Set(memberRows.map((m) => m.account_id));
   const addable = accountList.filter((a) => !memberIds.has(a.id));
+
+  // Tooltip breakdown: provider mix (top-3) + total addable pool size, so the
+  // operator sees what's in the group without opening each row.
+  const providerBreakdown = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const m of memberRows) {
+      const acct = accountById.get(m.account_id);
+      const provider = acct?.provider_id != null ? String(acct.provider_id) : "—";
+      counts.set(provider, (counts.get(provider) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3);
+  }, [memberRows, accountById]);
 
   // Batch add: the API only takes one account at a time, so fan the selected
   // ids out over the single-member mutation and report an aggregate result —
@@ -129,37 +151,87 @@ export function GroupMembersDialog({
             </Button>
           </div>
 
-          <div className="rounded-xl border border-srapi-border bg-srapi-card">
-            <div className="border-b border-srapi-border/70 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
-              {t("adminGroups.members")}
+          <div className="rounded-2xl border border-srapi-border bg-srapi-card">
+            <div className="border-b border-srapi-border/70 px-4 py-3">
+              <SectionTitle
+                icon={<Users />}
+                label={t("adminGroups.members")}
+                action={
+                  memberRows.length > 0 ? (
+                    <DataTooltip
+                      title={t("adminGroups.members")}
+                      primary={
+                        <span className="tabular">
+                          {memberRows.length}
+                          <span className="ml-1 text-xs font-normal text-srapi-text-tertiary">
+                            / {accountList.length}
+                          </span>
+                        </span>
+                      }
+                      rows={[
+                        ...providerBreakdown.map(([provider, count]) => ({
+                          label: `provider #${provider}`,
+                          value: String(count),
+                        })),
+                        {
+                          label: t("adminGroups.allAccountsInGroup")
+                            .replace(/[.。]$/, "")
+                            .toLowerCase(),
+                          value: String(addable.length),
+                          tone: "muted" as const,
+                        },
+                      ]}
+                    >
+                      <DataPill tone="accent" size="sm" className="metric-tertiary cursor-help">
+                        {memberRows.length}
+                      </DataPill>
+                    </DataTooltip>
+                  ) : undefined
+                }
+              />
             </div>
             {members.isLoading ? (
               <DialogListSkeleton rows={2} className="p-3" />
             ) : memberRows.length === 0 ? (
-              <p className="px-3 py-6 text-center text-xs text-srapi-text-tertiary">
-                {t("adminGroups.membersEmpty")}
-              </p>
+              <div className="px-3 py-6">
+                <IllustratedEmptyState
+                  illust="accounts"
+                  title={t("adminGroups.membersEmpty")}
+                />
+              </div>
             ) : (
               <ul className="divide-y divide-srapi-border/70">
-                {memberRows.map((m) => (
-                  <li
-                    key={m.id}
-                    className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-srapi-card-muted/60"
-                  >
-                    <span className="truncate text-sm text-srapi-text-primary">
-                      {accountName(m.account_id)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => void remove(m.account_id)}
-                      disabled={removeMut.isPending}
-                      aria-label={t("adminGroups.removeMember")}
-                      className="text-srapi-text-tertiary transition-colors hover:text-srapi-error"
+                {memberRows.map((m) => {
+                  const acct = accountById.get(m.account_id);
+                  const providerLabel =
+                    acct?.provider_id != null ? `provider #${acct.provider_id}` : null;
+                  return (
+                    <li
+                      key={m.id}
+                      className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-srapi-card-muted/60"
                     >
-                      <X className="size-4" />
-                    </button>
-                  </li>
-                ))}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm text-srapi-text-primary">
+                          {accountName(m.account_id)}
+                        </p>
+                        {providerLabel ? (
+                          <p className="mt-0.5 text-[11px] font-mono text-srapi-text-tertiary">
+                            {providerLabel}
+                          </p>
+                        ) : null}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void remove(m.account_id)}
+                        disabled={removeMut.isPending}
+                        aria-label={t("adminGroups.removeMember")}
+                        className="text-srapi-text-tertiary transition-colors hover:text-srapi-error"
+                      >
+                        <UserMinus className="size-4" />
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>

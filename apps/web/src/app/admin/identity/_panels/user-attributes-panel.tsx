@@ -10,6 +10,12 @@ import { ResourceFormDialog, type FieldConfig } from "@/components/admin/resourc
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
+import { DataPill } from "@/components/ui/data-pill";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { InlineDetailGrid } from "@/components/ui/inline-detail-grid";
+import { IllustratedEmptyState } from "@/components/ui/illustrated-empty-state";
+import { formatDateTime } from "@/lib/admin-format";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
@@ -30,7 +36,16 @@ import {
 } from "@/lib/admin-user-attribute-form";
 import type { UserAttributeDefinition } from "@/lib/sdk-types";
 
-function definitionMatch(definition: UserAttributeDefinition, term: string): boolean {
+type EnabledFilter = "__all__" | "enabled" | "disabled";
+
+function definitionMatch(
+  definition: UserAttributeDefinition,
+  term: string,
+  filters: Record<string, string>,
+): boolean {
+  const status = (filters.status as EnabledFilter | undefined) ?? "__all__";
+  if (status === "enabled" && !definition.enabled) return false;
+  if (status === "disabled" && definition.enabled) return false;
   if (!term) return true;
   return [definition.key, definition.name, definition.data_type]
     .filter(Boolean)
@@ -60,7 +75,7 @@ export function UserAttributesPanel() {
   const [formTarget, setFormTarget] = useState<UserAttributeDefinition | "new" | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<UserAttributeDefinition | null>(null);
   const isNew = formTarget === "new";
-  const isFiltered = Boolean(list.search);
+  const isFiltered = Boolean(list.search || list.filters.status);
 
   // `key` is the stable API identifier — editable only at creation time.
   const fields: FieldConfig<UserAttributeFormState>[] = [
@@ -100,11 +115,41 @@ export function UserAttributesPanel() {
     {
       key: "dataType",
       header: t("adminUserAttributes.dataType"),
-      render: (d) => (
-        <span className="rounded-full bg-srapi-card-muted px-2 py-0.5 font-mono text-[11px] font-medium text-srapi-text-secondary">
-          {d.data_type}
-        </span>
-      ),
+      render: (d) => {
+        const optionCount = d.data_type === "select" ? (d.options ?? []).length : 0;
+        return (
+          <DataTooltip
+            title={t("adminUserAttributes.dataType")}
+            primary={d.data_type}
+            rows={
+              d.data_type === "select"
+                ? [
+                    {
+                      label: t("adminUserAttributes.optionsCount"),
+                      value: String(optionCount),
+                      tone: optionCount > 0 ? undefined : "warning",
+                    },
+                    {
+                      label: t("adminUserAttributes.required"),
+                      value: d.required ? t("common.active") : t("common.disabled"),
+                      tone: d.required ? "warning" : "muted",
+                    },
+                  ]
+                : [
+                    {
+                      label: t("adminUserAttributes.required"),
+                      value: d.required ? t("common.active") : t("common.disabled"),
+                      tone: d.required ? "warning" : "muted",
+                    },
+                  ]
+            }
+          >
+            <DataPill tone="neutral" size="sm">
+              {d.data_type}
+            </DataPill>
+          </DataTooltip>
+        );
+      },
     },
     {
       key: "required",
@@ -165,22 +210,115 @@ export function UserAttributesPanel() {
         emptyIcon={Tags}
         emptyTitle={t("adminUserAttributes.emptyTitle")}
         emptyBody={t("adminUserAttributes.emptyBody")}
-        emptyAction={
-          <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
-            ＋ {t("adminUserAttributes.create")}
-          </Button>
+        emptyContent={
+          <IllustratedEmptyState
+            illust="users"
+            title={t("adminUserAttributes.emptyTitle")}
+            description={t("adminUserAttributes.emptyBody")}
+            action={
+              <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
+                ＋ {t("adminUserAttributes.create")}
+              </Button>
+            }
+          />
         }
         minWidth={680}
         isFiltered={isFiltered}
         onClearFilters={list.clearFilters}
         sort={list.sort}
         onSort={list.toggleSort}
+        enableKeyboardNav
+        // Disabled attributes are hidden from the profile form but still
+        // visible to operators — surface that with a muted info stripe.
+        rowSeverity={(d) => (d.enabled ? undefined : "info")}
+        expandRow={(d) => {
+          const options = d.options ?? [];
+          return (
+            <>
+              <InlineDetailGrid
+                sections={[
+                  {
+                    title: t("adminUserAttributes.schema"),
+                    rows: [
+                      { label: t("adminUserAttributes.key"), value: d.key, mono: true },
+                      { label: t("adminUserAttributes.name"), value: d.name },
+                      { label: t("adminUserAttributes.dataType"), value: d.data_type, mono: true },
+                    ],
+                  },
+                  {
+                    title: t("adminUserAttributes.required"),
+                    rows: [
+                      {
+                        label: t("adminUserAttributes.required"),
+                        value: d.required ? t("common.active") : t("common.disabled"),
+                        tone: d.required ? "warning" : "muted",
+                      },
+                      {
+                        label: t("adminUserAttributes.enabled"),
+                        value: d.enabled ? t("common.active") : t("common.disabled"),
+                        tone: d.enabled ? "success" : "muted",
+                      },
+                      {
+                        label: t("adminUserAttributes.order"),
+                        value: String(d.display_order ?? 0),
+                        tone: "muted",
+                      },
+                    ],
+                  },
+                  {
+                    title: t("adminUserAttributes.metadata"),
+                    rows: [
+                      { label: t("common.created"), value: d.created_at ? formatDateTime(d.created_at) : "—", tone: "muted" },
+                      { label: t("common.updated"), value: d.updated_at ? formatDateTime(d.updated_at) : "—", tone: "muted" },
+                      {
+                        label: t("adminUserAttributes.optionsCount"),
+                        value: String(options.length),
+                        tone: "muted",
+                      },
+                    ],
+                  },
+                ]}
+              />
+              {d.data_type === "select" ? (
+                <div className="border-t border-srapi-border/60 bg-srapi-card-muted/30 px-6 py-4">
+                  <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
+                    {t("adminUserAttributes.options")}
+                  </div>
+                  {options.length === 0 ? (
+                    <p className="text-xs text-srapi-text-tertiary">
+                      {t("adminUserAttributes.noOptions")}
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {options.map((opt) => (
+                        <DataPill key={opt} tone="neutral" size="sm">
+                          {opt}
+                        </DataPill>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </>
+          );
+        }}
         toolbar={
           <ListToolbar>
             <SearchInput
               value={list.searchInput}
               onChange={list.setSearchInput}
               placeholder={t("adminUserAttributes.searchPlaceholder")}
+            />
+            <SegmentedControl<EnabledFilter>
+              value={(list.filters.status as EnabledFilter | undefined) ?? "__all__"}
+              onChange={(v) => list.setFilter("status", v === "__all__" ? undefined : v)}
+              ariaLabel={t("adminUserAttributes.enabled")}
+              size="sm"
+              options={[
+                { value: "__all__", label: t("adminUserAttributes.filter_all") },
+                { value: "enabled", label: t("adminUserAttributes.filter_enabled") },
+                { value: "disabled", label: t("adminUserAttributes.filter_disabled") },
+              ]}
             />
           </ListToolbar>
         }

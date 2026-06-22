@@ -19,6 +19,7 @@ import {
 import { useLanguage } from "@/context/LanguageContext";
 import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
 import { Button } from "@/components/ui/button";
+import { DataTooltip } from "@/components/ui/data-tooltip";
 import { formatMoney, formatDateTime } from "@/lib/admin-format";
 import type { AffiliateLedgerEntry } from "@/lib/sdk-types";
 
@@ -105,15 +106,55 @@ export function ManualAdjustmentsPanel() {
       align: "right",
       render: (r) => {
         const negative = String(r.amount).startsWith("-");
+        const numeric = Number(r.amount);
+        const decimals = String(r.amount).split(".")[1]?.length ?? 0;
         return (
-          <span
-            className={
-              "text-sm font-semibold tabular " +
-              (negative ? "text-srapi-error" : "text-srapi-success")
-            }
+          <DataTooltip
+            title={negative ? "Debit" : "Credit"}
+            primary={formatMoney(r.amount, r.currency)}
+            rows={[
+              { label: "Currency", value: (r.currency || "USD").toUpperCase() },
+              { label: "Precision", value: `${decimals} dp` },
+              {
+                label: "Direction",
+                value: negative ? "Debit (out)" : "Credit (in)",
+                tone: negative ? "error" : "success",
+              },
+              ...(r.currency &&
+              r.currency.toUpperCase() !== "USD" &&
+              Number.isFinite(numeric)
+                ? [
+                    {
+                      label: "≈ USD",
+                      value: (() => {
+                        const fx: Record<string, number> = {
+                          CNY: 0.14,
+                          EUR: 1.08,
+                          JPY: 0.0066,
+                          GBP: 1.27,
+                          HKD: 0.13,
+                          TWD: 0.031,
+                          KRW: 0.00075,
+                        };
+                        const rate = fx[r.currency.toUpperCase()];
+                        return rate ? formatMoney(numeric * rate, "USD") : "—";
+                      })(),
+                      tone: "muted" as const,
+                    },
+                  ]
+                : []),
+            ]}
+            footer={r.status}
           >
-            {formatMoney(r.amount, r.currency)}
-          </span>
+            <span
+              className={
+                "text-sm font-semibold tabular " +
+                (negative ? "text-srapi-error" : "text-srapi-success")
+              }
+            >
+              {formatMoney(r.amount, r.currency)}
+            </span>
+          </DataTooltip>
         );
       },
     },
@@ -156,6 +197,22 @@ export function ManualAdjustmentsPanel() {
         emptyTitle={t("adminAffiliates.emptyAdjustments")}
         emptyBody={t("adminAffiliates.emptyAdjustmentsBody")}
         minWidth={620}
+        rowSeverity={(r) => {
+          // Approval-state stripe: settled = success, pending = info,
+          // canceled = warning, compensated = error (recovery / claw-back).
+          switch (r.status) {
+            case "settled":
+              return "success";
+            case "pending":
+              return "info";
+            case "canceled":
+              return "warning";
+            case "compensated":
+              return "error";
+            default:
+              return undefined;
+          }
+        }}
       />
 
       {creating ? (

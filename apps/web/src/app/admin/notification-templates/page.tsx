@@ -1,12 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { Mail } from "lucide-react";
+import { Fragment, useMemo, useState } from "react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { SectionHero } from "@/components/visual/section-hero";
 import { Card } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -22,6 +20,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { DataPill } from "@/components/ui/data-pill";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { SearchInput, ListToolbar } from "@/components/admin/list-toolbar";
+import { ExpandableRow } from "@/components/ui/expandable-row";
+import { IllustratedEmptyState } from "@/components/ui/illustrated-empty-state";
 import {
   Dialog,
   DialogContent,
@@ -38,6 +42,7 @@ import {
 import { adminApi, adminErrorMessage } from "@/lib/admin-api";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
+import { cn } from "@/lib/cn";
 import type {
   NotificationEmailTemplate,
   NotificationEmailTemplateEvent,
@@ -57,15 +62,43 @@ interface EditTarget {
   placeholders: string[];
 }
 
+type CustomFilter = "__all__" | "custom" | "default";
+
 function NotificationTemplatesContent() {
   const { t } = useLanguage();
   const query = useNotificationEmailTemplates();
   const [editing, setEditing] = useState<EditTarget | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<CustomFilter>("__all__");
+
+  // Pre-compute the filtered + counted view so the SectionHero metrics and
+  // the table draw from the same source — no risk of drifting numbers.
+  const view = useMemo(() => {
+    if (!query.data) return null;
+    const templateByEvent = new Map(query.data.templates.map((tpl) => [tpl.event, tpl]));
+    const customCount = query.data.templates.filter((tpl) => tpl.is_custom).length;
+    const defaultCount = query.data.events.length - customCount;
+    const term = search.trim().toLowerCase();
+    const rows = query.data.events
+      .map((event) => ({ event, template: templateByEvent.get(event.event) }))
+      .filter(({ event, template }) => {
+        if (filter === "custom" && !template?.is_custom) return false;
+        if (filter === "default" && template?.is_custom) return false;
+        if (!term) return true;
+        return [event.event, event.label, event.description, event.category]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(term);
+      });
+    return { rows, customCount, defaultCount, placeholders: query.data.placeholders };
+  }, [query.data, search, filter]);
 
   return (
     <>
       <SectionHero
-        eyebrow="System · Notifications"
+        eyebrow={t("nav.sectionAdmin")}
         title={t("adminNotificationTemplates.title")}
         description={t("adminNotificationTemplates.subtitle")}
         metrics={
@@ -73,8 +106,12 @@ function NotificationTemplatesContent() {
             ? [
                 { label: t("adminNotificationTemplates.event"), value: String(query.data.events.length) },
                 {
-                  label: t("adminNotificationTemplates.custom"),
-                  value: String(query.data.templates.filter((tpl) => tpl.is_custom).length),
+                  label: t("adminNotificationTemplates.customizedCount"),
+                  value: String(view?.customCount ?? 0),
+                },
+                {
+                  label: t("adminNotificationTemplates.defaultCount"),
+                  value: String(view?.defaultCount ?? 0),
                 },
               ]
             : undefined
@@ -82,79 +119,180 @@ function NotificationTemplatesContent() {
       />
       <PageQueryState query={query} skeleton={<TemplatesSkeleton />}>
         {(list) => {
-          const templateByEvent = new Map(list.templates.map((tpl) => [tpl.event, tpl]));
           if (list.events.length === 0) {
             return (
-              <EmptyState
-                icon={Mail}
+              <IllustratedEmptyState
+                illust="bell"
                 title={t("adminNotificationTemplates.emptyTitle")}
                 description={t("adminNotificationTemplates.emptyBody")}
               />
             );
           }
+          const rows = view?.rows ?? [];
           return (
             <Card className="overflow-hidden">
-              <TableScroll minWidth={640}>
-                <Table>
-                  <TableHeader>
-                    <tr>
-                      <TableHead>{t("adminNotificationTemplates.event")}</TableHead>
-                      <TableHead className="hidden sm:table-cell">
-                        {t("adminNotificationTemplates.category")}
-                      </TableHead>
-                      <TableHead>{t("adminNotificationTemplates.status")}</TableHead>
-                      <TableHead aria-label="actions" className="w-px" />
-                    </tr>
-                  </TableHeader>
-                  <TableBody>
-                    {list.events.map((event) => {
-                      const template = templateByEvent.get(event.event);
-                      return (
-                        <TableRow key={event.event}>
-                          <TableCell>
-                            <div className="text-srapi-text-primary">{event.label}</div>
-                            {event.description ? (
-                              <div className="mt-0.5 text-xs text-srapi-text-tertiary">
-                                {event.description}
-                              </div>
-                            ) : null}
-                          </TableCell>
-                          <TableCell className="hidden sm:table-cell">
-                            {event.category ? (
-                              <span className="rounded-full bg-srapi-card-muted px-2 py-0.5 font-mono text-[11px] font-medium text-srapi-text-secondary">
-                                {event.category}
-                              </span>
-                            ) : (
-                              <span className="text-xs text-srapi-text-tertiary">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <QuietBadge
-                              status={template?.is_custom ? "active" : "disabled"}
-                              label={
-                                template?.is_custom
-                                  ? t("adminNotificationTemplates.custom")
-                                  : t("adminNotificationTemplates.default")
-                              }
-                            />
-                          </TableCell>
-                          <TableCell className="w-px whitespace-nowrap text-right">
-                            <Button
-                              variant="outline"
-                              size="sm"
+              <ListToolbar>
+                <SearchInput
+                  value={search}
+                  onChange={setSearch}
+                  placeholder={t("adminNotificationTemplates.searchPlaceholder")}
+                />
+                <SegmentedControl<CustomFilter>
+                  value={filter}
+                  onChange={setFilter}
+                  ariaLabel={t("adminNotificationTemplates.status")}
+                  size="sm"
+                  options={[
+                    { value: "__all__", label: t("adminNotificationTemplates.filter_all") },
+                    { value: "custom", label: t("adminNotificationTemplates.filter_custom") },
+                    { value: "default", label: t("adminNotificationTemplates.filter_default") },
+                  ]}
+                />
+              </ListToolbar>
+              {rows.length === 0 ? (
+                <div className="p-8">
+                  <IllustratedEmptyState
+                    illust="search"
+                    title={t("adminCommon.noResults")}
+                    description={t("adminCommon.noResultsBody")}
+                    action={
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSearch("");
+                          setFilter("__all__");
+                        }}
+                      >
+                        {t("adminCommon.clearFilters")}
+                      </Button>
+                    }
+                  />
+                </div>
+              ) : (
+                <TableScroll minWidth={720}>
+                  <Table>
+                    <TableHeader>
+                      <tr>
+                        <TableHead>{t("adminNotificationTemplates.event")}</TableHead>
+                        <TableHead className="hidden sm:table-cell">
+                          {t("adminNotificationTemplates.category")}
+                        </TableHead>
+                        <TableHead className="hidden md:table-cell">
+                          {t("adminNotificationTemplates.placeholders")}
+                        </TableHead>
+                        <TableHead>{t("adminNotificationTemplates.status")}</TableHead>
+                        <TableHead aria-label="actions" className="w-px" />
+                      </tr>
+                    </TableHeader>
+                    <TableBody>
+                      {rows.map(({ event, template }) => {
+                        const isCustom = Boolean(template?.is_custom);
+                        const isExpanded = expanded === event.event;
+                        const isCustomized = template?.is_custom;
+                        const placeholderCount = event.placeholders?.length ?? 0;
+                        const htmlSize = template?.html?.length ?? 0;
+                        return (
+                          <Fragment key={event.event}>
+                            <TableRow
+                              aria-expanded={isExpanded}
+                              data-sev={isCustom ? "success" : undefined}
+                              className={cn(
+                                "log-row cursor-pointer transition-colors",
+                                isExpanded && "bg-srapi-card-muted/40",
+                              )}
                               onClick={() =>
-                                setEditing({ event, template, placeholders: list.placeholders })
+                                setExpanded((prev) => (prev === event.event ? null : event.event))
                               }
                             >
-                              {t("common.edit")}
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </TableScroll>
+                              <TableCell>
+                                <div className="text-srapi-text-primary">{event.label}</div>
+                                {event.description ? (
+                                  <div className="mt-0.5 text-xs text-srapi-text-tertiary">
+                                    {event.description}
+                                  </div>
+                                ) : null}
+                              </TableCell>
+                              <TableCell className="hidden sm:table-cell">
+                                {event.category ? (
+                                  <DataPill tone="neutral" size="sm">
+                                    {event.category}
+                                  </DataPill>
+                                ) : (
+                                  <span className="text-xs text-srapi-text-tertiary">—</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell">
+                                <DataTooltip
+                                  title={t("adminNotificationTemplates.placeholders")}
+                                  primary={String(placeholderCount)}
+                                  rows={
+                                    placeholderCount > 0
+                                      ? event.placeholders.slice(0, 6).map((name) => ({
+                                          label: name,
+                                          value: "",
+                                          tone: "muted" as const,
+                                        }))
+                                      : undefined
+                                  }
+                                  footer={
+                                    isCustomized
+                                      ? t("adminNotificationTemplates.bytes", { count: htmlSize })
+                                      : undefined
+                                  }
+                                >
+                                  <span className="text-xs text-srapi-text-tertiary tabular">
+                                    {placeholderCount}
+                                  </span>
+                                </DataTooltip>
+                              </TableCell>
+                              <TableCell>
+                                <QuietBadge
+                                  status={isCustom ? "active" : "disabled"}
+                                  label={
+                                    isCustom
+                                      ? t("adminNotificationTemplates.custom")
+                                      : t("adminNotificationTemplates.default")
+                                  }
+                                />
+                              </TableCell>
+                              <TableCell className="w-px whitespace-nowrap text-right">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditing({
+                                      event,
+                                      template,
+                                      placeholders: list.placeholders,
+                                    });
+                                  }}
+                                >
+                                  {t("common.edit")}
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                            {isExpanded ? (
+                              <tr>
+                                <td colSpan={5} className="p-0">
+                                  <ExpandableRow expanded>
+                                    <TemplatePreviewDetail
+                                      event={event}
+                                      template={template}
+                                      globalPlaceholders={list.placeholders}
+                                    />
+                                  </ExpandableRow>
+                                </td>
+                              </tr>
+                            ) : null}
+                          </Fragment>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableScroll>
+              )}
             </Card>
           );
         }}
@@ -162,6 +300,80 @@ function NotificationTemplatesContent() {
 
       {editing ? <TemplateEditor target={editing} onClose={() => setEditing(null)} /> : null}
     </>
+  );
+}
+
+function TemplatePreviewDetail({
+  event,
+  template,
+  globalPlaceholders,
+}: {
+  event: NotificationEmailTemplateEvent;
+  template?: NotificationEmailTemplate;
+  globalPlaceholders: string[];
+}) {
+  const { t } = useLanguage();
+  const placeholders = [...new Set([...(event.placeholders ?? []), ...globalPlaceholders])];
+  const htmlSize = template?.html?.length ?? 0;
+  return (
+    <div className="border-t border-srapi-border/60 bg-srapi-card-muted/30 px-6 py-4 space-y-4">
+      <div className="grid gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div>
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
+            {t("adminNotificationTemplates.subject")}
+          </div>
+          <p className="text-sm text-srapi-text-primary">
+            {template?.subject || <span className="text-srapi-text-tertiary">—</span>}
+          </p>
+        </div>
+        <div>
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
+            {t("adminNotificationTemplates.category")}
+          </div>
+          <p className="text-sm text-srapi-text-primary">
+            {event.category || <span className="text-srapi-text-tertiary">—</span>}
+          </p>
+        </div>
+        <div>
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
+            {t("adminNotificationTemplates.htmlSize")}
+          </div>
+          <p className="metric-secondary tabular">
+            {t("adminNotificationTemplates.bytes", { count: htmlSize })}
+          </p>
+        </div>
+      </div>
+      {placeholders.length > 0 ? (
+        <div>
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
+            {t("adminNotificationTemplates.placeholders")}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {placeholders.map((name) => (
+              <DataPill key={name} tone="neutral" size="sm">
+                {name}
+              </DataPill>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {template?.html ? (
+        <div>
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
+            {t("adminNotificationTemplates.previewTitle")}
+          </div>
+          <iframe
+            title={t("adminNotificationTemplates.previewTitle")}
+            sandbox=""
+            srcDoc={template.html}
+            className="h-56 w-full rounded-xl border border-srapi-border/70 bg-white"
+          />
+          <p className="mt-1 text-xs text-srapi-text-tertiary">
+            {t("adminNotificationTemplates.previewHint")}
+          </p>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

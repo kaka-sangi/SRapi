@@ -1,5 +1,6 @@
 import { useLanguage } from "@/context/LanguageContext";
 import { QuietBadge } from "@/components/ui/quiet-badge";
+import { DataTooltip, type DataTooltipRow } from "@/components/ui/data-tooltip";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import type { ProviderAccount } from "@/lib/sdk-types";
 import { cn } from "@/lib/cn";
@@ -51,9 +52,35 @@ export function AccountStatusCell({
     <QuietBadge status={tone} label={label} />
   );
 
+  // Build a hover-reveal data card for the status chip: priority/weight/risk
+  // are routing-level numbers that operators triage with — surface them on
+  // hover so the chip doubles as a routing summary.
+  const rows: DataTooltipRow[] = [
+    { label: t("adminCommon.status"), value: label, tone: tone === "active" ? "success" : tone === "error" ? "error" : tone === "limited" ? "warning" : "muted" },
+    { label: t("adminAccounts.priority"), value: String(account.priority ?? 0) },
+    { label: t("adminAccounts.weight"), value: String(account.weight ?? 1) },
+  ];
+  if (account.risk_level) {
+    rows.push({ label: t("adminAccounts.riskLevel"), value: account.risk_level });
+  }
+  if (quotaClass) {
+    rows.push({
+      label: t("adminAccounts.lastError"),
+      value: quotaClass === "validation_required" ? t("adminAccounts.validationRequired") : quotaClass,
+      tone: quotaClass === "validation_required" ? "warning" : "error",
+    });
+  }
+
   return (
     <span className="flex flex-wrap items-center gap-1.5">
-      {statusBadge}
+      <DataTooltip
+        title={t("adminCommon.status")}
+        primary={label}
+        rows={rows}
+        footer={account.upstream_client || undefined}
+      >
+        {statusBadge}
+      </DataTooltip>
       {quotaClass ? (
         <QuietBadge
           status={quotaClass === "validation_required" ? "limited" : "error"}

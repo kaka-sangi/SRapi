@@ -4,10 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
-  Activity,
   BellRing,
-  BellOff,
-  Mail,
   Maximize2,
   Minimize2,
   Pencil,
@@ -66,7 +63,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Sparkline } from "@/components/charts/sparkline";
 import { QuotaNotchRail } from "@/components/ui/quota-notch-rail";
 import { QuietBadge } from "@/components/ui/quiet-badge";
-import { EmptyState } from "@/components/ui/empty-state";
+import { IllustratedEmptyState } from "@/components/ui/illustrated-empty-state";
 import { SloCardSkeleton } from "@/components/charts/chart-skeleton";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -335,8 +332,8 @@ function OpsOverviewContent() {
         {(result) =>
           result.data.length === 0 ? (
             <Card>
-              <EmptyState
-                icon={Activity}
+              <IllustratedEmptyState
+                illust="chart"
                 title={t("adminOps.emptySlo")}
                 description={t("adminOps.emptySloBody")}
               />
@@ -486,8 +483,8 @@ function OpsOverviewContent() {
         <CardContent className="space-y-3">
           <AlertRuleBaselinePostureSummary posture={alertRules.data?.baseline_posture} />
           {(alertRules.data?.data ?? []).length === 0 ? (
-            <EmptyState
-              icon={BellRing}
+            <IllustratedEmptyState
+              illust="bell"
               title={t("adminOps.alertRules.empty")}
               description={t("adminOps.alertRules.emptyBody")}
             />
@@ -563,8 +560,8 @@ function OpsOverviewContent() {
           </CardHeader>
           <CardContent className="space-y-3">
             {(notificationChannels.data?.data ?? []).length === 0 ? (
-              <EmptyState
-                icon={Mail}
+              <IllustratedEmptyState
+                illust="inbox"
                 title={t("adminOps.notificationChannels.empty")}
                 description={t("adminOps.notificationChannels.emptyBody")}
               />
@@ -636,8 +633,8 @@ function OpsOverviewContent() {
           </CardHeader>
           <CardContent className="space-y-3">
             {(notificationDeliveries.data?.data ?? []).length === 0 ? (
-              <EmptyState
-                icon={BellRing}
+              <IllustratedEmptyState
+                illust="bell"
                 title={t("adminOps.notificationDeliveries.empty")}
                 description={t("adminOps.notificationDeliveries.emptyBody")}
               />
@@ -698,8 +695,8 @@ function OpsOverviewContent() {
         </CardHeader>
         <CardContent className="space-y-3">
           {(alertSilences.data?.data ?? []).length === 0 ? (
-            <EmptyState
-              icon={BellOff}
+            <IllustratedEmptyState
+              illust="bell"
               title={t("adminOps.silences.empty")}
               description={t("adminOps.silences.emptyBody")}
             />

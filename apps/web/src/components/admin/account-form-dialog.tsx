@@ -22,6 +22,8 @@ import { KeyValueEditor } from "@/components/ui/key-value-editor";
 import { TagInput } from "@/components/ui/tag-input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { FloatingInput } from "@/components/ui/floating-input";
+import { Kbd } from "@/components/ui/kbd";
 import { useTlsProfiles, useTestAccount } from "@/hooks/admin-queries";
 import {
   Select,
@@ -469,7 +471,16 @@ export function AccountFormDialog({
       ) : null}
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent>
-          <form onSubmit={onSubmit}>
+          <form
+            onSubmit={onSubmit}
+            onKeyDown={(e) => {
+              // ⌘+Enter / Ctrl+Enter quick-submits from any input inside the form.
+              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                e.preventDefault();
+                e.currentTarget.requestSubmit();
+              }
+            }}
+          >
           <DialogHeader>
             <DialogTitle>
               {mode === "create" ? t("adminAccounts.create") : t("adminAccounts.edit")}
@@ -511,16 +522,15 @@ export function AccountFormDialog({
               </div>
             ) : null}
 
-            <div>
-              <Label htmlFor="account-name">{t("adminAccounts.name")}</Label>
-              <Input
-                id="account-name"
-                value={name}
-                placeholder={mode === "create" ? defaultName : t("adminAccounts.namePlaceholder")}
-                disabled={busy}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
+            <FloatingInput
+              id="account-name"
+              label={t("adminAccounts.name")}
+              value={name}
+              onChange={setName}
+              disabled={busy}
+              placeholder={mode === "create" ? defaultName : t("adminAccounts.namePlaceholder")}
+              hint={mode === "create" ? defaultName : undefined}
+            />
 
             {/* ── Section: Authentication ── */}
             <div className="space-y-4 border-t border-srapi-border pt-4">
@@ -707,21 +717,17 @@ export function AccountFormDialog({
             </div>
 
             {/* ── Section: Endpoint ── */}
-            <div>
-              <Label htmlFor="account-base-url">{t("adminAccounts.baseUrl")}</Label>
-              <Input
-                id="account-base-url"
-                type="url"
-                className="mt-1.5 font-mono"
-                placeholder={t("adminAccounts.baseUrlPlaceholder")}
-                value={baseUrl}
-                disabled={busy}
-                onChange={(e) => setBaseUrl(e.target.value)}
-              />
-              <p className="mt-1 text-[11px] text-srapi-text-tertiary">
-                {t("adminAccounts.baseUrlHint")}
-              </p>
-            </div>
+            <FloatingInput
+              id="account-base-url"
+              label={t("adminAccounts.baseUrl")}
+              type="url"
+              value={baseUrl}
+              onChange={setBaseUrl}
+              disabled={busy}
+              placeholder={t("adminAccounts.baseUrlPlaceholder")}
+              hint={t("adminAccounts.baseUrlHint")}
+              className="[&_input]:font-mono"
+            />
 
             {/* Advanced — everything an admin rarely touches, collapsed by default. */}
             <div className="rounded-lg border border-srapi-border">
@@ -802,15 +808,13 @@ export function AccountFormDialog({
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
-                    <Label htmlFor="account-upstream">{t("adminAccounts.upstreamClient")}</Label>
-                    <Input
-                      id="account-upstream"
-                      value={upstreamClient}
-                      disabled={busy}
-                      onChange={(e) => setUpstreamClient(e.target.value)}
-                    />
-                  </div>
+                  <FloatingInput
+                    id="account-upstream"
+                    label={t("adminAccounts.upstreamClient")}
+                    value={upstreamClient}
+                    onChange={setUpstreamClient}
+                    disabled={busy}
+                  />
                   <div>
                     <div className="flex items-center gap-2">
                       <Switch
@@ -954,9 +958,13 @@ export function AccountFormDialog({
             </div>
 
             {error ? (
-              <p role="alert" className="text-sm text-srapi-error">
-                {error}
-              </p>
+              <div
+                role="alert"
+                className="log-row rounded-lg"
+                data-sev="error"
+              >
+                <p className="px-3 py-2 text-sm text-srapi-error">{error}</p>
+              </div>
             ) : null}
           </div>
 
@@ -988,6 +996,10 @@ export function AccountFormDialog({
             ) : null}
             <Button type="submit" variant="primary" loading={busy}>
               {t("common.save")}
+              <span className="ml-1.5 hidden items-center gap-1 sm:inline-flex">
+                <Kbd>⌘</Kbd>
+                <Kbd>↵</Kbd>
+              </span>
             </Button>
           </DialogFooter>
           </form>

@@ -20,6 +20,10 @@ import { UserBalanceHistoryDialog } from "@/components/admin/user-balance-histor
 import { UserAttributeValuesDialog } from "@/components/admin/user-attribute-values-dialog";
 import { ListToolbar, SearchInput, FilterSelect } from "@/components/admin/list-toolbar";
 import { ColumnToggle } from "@/components/ui/column-toggle";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { InlineDetailGrid, type InlineDetailSection } from "@/components/ui/inline-detail-grid";
+import { IllustratedEmptyState } from "@/components/ui/illustrated-empty-state";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useCurrentUserShell } from "@/components/layout/auth-gate";
@@ -48,7 +52,7 @@ import { QuietBadge } from "@/components/ui/quiet-badge";
 import { DataPill } from "@/components/ui/data-pill";
 import { Button } from "@/components/ui/button";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
-import { formatMoney, formatInteger, formatPercent } from "@/lib/admin-format";
+import { formatMoney, formatInteger, formatPercent, formatDateTime } from "@/lib/admin-format";
 import {
   USER_STATUSES,
   USER_FILTER_ROLES,
@@ -257,11 +261,39 @@ function UsersContent() {
       header: t("adminUsers.balance"),
       align: "right",
       sortValue: (u) => Number(u.balance),
-      render: (u) => (
-        <span className="text-sm font-medium text-srapi-text-secondary tabular">
-          {formatMoney(u.balance, u.currency)}
-        </span>
-      ),
+      render: (u) => {
+        const num = Number(u.balance);
+        const balanceClass =
+          num <= 0
+            ? "metric-strong-bad"
+            : num < 1
+              ? "metric-strong-warn"
+              : "metric-secondary tabular";
+        return (
+          <DataTooltip
+            title={t("adminUsers.balance")}
+            primary={formatMoney(u.balance, u.currency)}
+            rows={[
+              { label: t("adminCommon.currency"), value: u.currency, tone: "muted" },
+              {
+                label: t("adminUsers.rpmLimit"),
+                value: u.rpm_limit != null ? formatInteger(u.rpm_limit) : t("adminUsers.unlimited"),
+              },
+              ...(u.last_login_at
+                ? [{
+                    label: t("adminUsers.lastLogin"),
+                    value: formatDateTime(u.last_login_at),
+                    tone: "muted" as const,
+                  }]
+                : []),
+            ]}
+          >
+            <span className={balanceClass}>
+              {formatMoney(u.balance, u.currency)}
+            </span>
+          </DataTooltip>
+        );
+      },
     },
     {
       key: "today",
@@ -271,24 +303,44 @@ function UsersContent() {
       render: (u) => {
         const today = spendingByUserId.get(u.id);
         if (!today) {
-          return <span className="text-[12px] text-srapi-text-tertiary">—</span>;
+          return <span className="metric-tertiary tabular">—</span>;
         }
         if (today.requests === 0) {
           return (
-            <span className="text-[12px] text-srapi-text-tertiary">
+            <span className="metric-tertiary">
               {t("adminUsers.todayIdle")}
             </span>
           );
         }
+        const successTone =
+          today.success_rate >= 0.95
+            ? "success"
+            : today.success_rate >= 0.8
+              ? "warning"
+              : "error";
         return (
-          <div className="flex flex-col gap-0.5">
-            <span className="text-[12px] font-medium text-srapi-text-secondary tabular">
-              {formatInteger(today.requests)} · {formatMoney(today.cost, today.currency)}
-            </span>
-            <span className="text-[11px] text-srapi-text-tertiary tabular">
-              {formatPercent(today.success_rate)}
-            </span>
-          </div>
+          <DataTooltip
+            title={t("adminUsers.today")}
+            primary={`${formatInteger(today.requests)} · ${formatMoney(today.cost, today.currency)}`}
+            rows={[
+              { label: t("adminUsage.requests"), value: formatInteger(today.requests) },
+              { label: t("adminUsage.cost"), value: formatMoney(today.cost, today.currency) },
+              {
+                label: t("usage.successful"),
+                value: formatPercent(today.success_rate),
+                tone: successTone,
+              },
+            ]}
+          >
+            <div className="flex flex-col items-end gap-0.5">
+              <span className="metric-secondary tabular">
+                {formatInteger(today.requests)} · {formatMoney(today.cost, today.currency)}
+              </span>
+              <span className="metric-tertiary tabular">
+                {formatPercent(today.success_rate)}
+              </span>
+            </div>
+          </DataTooltip>
         );
       },
     },
@@ -359,12 +411,84 @@ function UsersContent() {
         emptyIcon={Users}
         emptyTitle={t("adminUsers.emptyTitle")}
         emptyBody={t("adminUsers.emptyBody")}
-        emptyAction={
-          <Button variant="primary" size="sm" onClick={() => setCreating(true)}>
-            ＋ {t("adminUsers.create")}
-          </Button>
+        emptyContent={
+          <IllustratedEmptyState
+            illust="users"
+            title={t("adminUsers.emptyTitle")}
+            description={t("adminUsers.emptyBody")}
+            action={
+              <Button variant="primary" size="sm" onClick={() => setCreating(true)}>
+                ＋ {t("adminUsers.create")}
+              </Button>
+            }
+          />
         }
         dimRow={(u) => u.status === "disabled"}
+        rowSeverity={(u) =>
+          u.status === "disabled" ? "error" : u.status === "pending" ? "warning" : undefined
+        }
+        expandRow={(u) => {
+          const today = spendingByUserId.get(u.id);
+          const attrs = (attributesByUserId.get(u.id) ?? []).filter((r) => r.value !== "");
+          const identitySection: InlineDetailSection = {
+            title: t("adminUsers.email"),
+            rows: [
+              { label: t("adminUsers.name"), value: u.name },
+              { label: t("adminUsers.email"), value: u.email, mono: true },
+              { label: t("adminCommon.status"), value: statusLabel(t, u.status) },
+              { label: t("adminUsers.roles"), value: u.roles.join(", ") || "—" },
+              ...(u.last_login_at
+                ? [{
+                    label: t("adminUsers.lastLogin"),
+                    value: formatDateTime(u.last_login_at),
+                    tone: "muted" as const,
+                  }]
+                : []),
+            ],
+          };
+          const balanceSection: InlineDetailSection = {
+            title: t("adminUsers.balance"),
+            rows: [
+              { label: t("adminUsers.balance"), value: formatMoney(u.balance, u.currency) },
+              { label: t("adminCommon.currency"), value: u.currency, tone: "muted" },
+              {
+                label: t("adminUsers.rpmLimit"),
+                value: u.rpm_limit != null ? formatInteger(u.rpm_limit) : t("adminUsers.unlimited"),
+                tone: u.rpm_limit != null ? "default" : "muted",
+              },
+            ],
+          };
+          const activitySection: InlineDetailSection = {
+            title: t("adminUsers.today"),
+            rows: today
+              ? [
+                  { label: t("adminUsage.requests"), value: formatInteger(today.requests) },
+                  { label: t("adminUsage.cost"), value: formatMoney(today.cost, today.currency) },
+                  {
+                    label: t("usage.successful"),
+                    value: formatPercent(today.success_rate),
+                    tone:
+                      today.success_rate >= 0.95
+                        ? "success"
+                        : today.success_rate >= 0.8
+                          ? "warning"
+                          : "error",
+                  },
+                ]
+              : [{ label: "—", value: t("adminUsers.todayIdle"), tone: "muted" }],
+          };
+          const sections: InlineDetailSection[] = [identitySection, balanceSection, activitySection];
+          if (attrs.length > 0) {
+            sections.push({
+              title: t("adminUsers.attributesColumn"),
+              rows: attrs.slice(0, 6).map((row) => ({
+                label: row.key,
+                value: row.value,
+              })),
+            });
+          }
+          return <InlineDetailGrid sections={sections} />;
+        }}
         isFiltered={isFiltered}
         onClearFilters={list.clearFilters}
         sort={list.sort}
@@ -376,11 +500,15 @@ function UsersContent() {
               onChange={list.setSearchInput}
               placeholder={t("adminUsers.searchPlaceholder")}
             />
-            <FilterSelect
-              value={statusFilter}
-              onChange={(v) => list.setFilter("status", v)}
-              options={enumOptions(USER_STATUSES)}
-              allLabel={t("adminCommon.allStatuses")}
+            <SegmentedControl
+              size="sm"
+              ariaLabel={t("adminCommon.allStatuses")}
+              value={statusFilter ?? "__all__"}
+              onChange={(v) => list.setFilter("status", v === "__all__" ? undefined : v)}
+              options={[
+                { value: "__all__", label: t("adminCommon.allStatuses") },
+                ...USER_STATUSES.map((s) => ({ value: s, label: statusLabel(t, s) })),
+              ]}
             />
             <FilterSelect
               value={roleFilter}

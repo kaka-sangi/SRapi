@@ -1,12 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Settings2 } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { CopilotChat } from "@/components/admin/copilot-chat";
 import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
+import { IllustratedEmptyState } from "@/components/ui/illustrated-empty-state";
 import { ChatSkeleton } from "@/components/charts/chart-skeleton";
 import { useAdminCopilotConfig } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
@@ -45,8 +44,8 @@ function CopilotContent() {
 function DisabledNotice({ reason }: { reason: "disabled" | "unconfigured" }) {
   const { t } = useLanguage();
   return (
-    <EmptyState
-      icon={Settings2}
+    <IllustratedEmptyState
+      illust="cog"
       title={reason === "disabled" ? t("copilot.disabledTitle") : t("copilot.unconfiguredTitle")}
       description={reason === "disabled" ? t("copilot.disabledBody") : t("copilot.unconfiguredBody")}
       action={

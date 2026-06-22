@@ -6,7 +6,10 @@ import { AdminShell } from "@/components/layout/admin-shell";
 import { SectionHero } from "@/components/visual/section-hero";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
-import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
+import { ListToolbar } from "@/components/admin/list-toolbar";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { InlineDetailGrid } from "@/components/ui/inline-detail-grid";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
@@ -45,6 +48,24 @@ export default function AdminAnnouncementsPage() {
       <AnnouncementsContent />
     </AdminShell>
   );
+}
+
+function announcementSeverityTone(
+  a: Announcement,
+): "info" | "success" | "warning" | "error" | "critical" | undefined {
+  // Draft/archived announcements should fade; status carries weight over severity.
+  if (a.status === "draft") return undefined;
+  if (a.status === "archived") return undefined;
+  switch (a.severity) {
+    case "critical":
+      return "critical";
+    case "warning":
+      return "warning";
+    case "info":
+      return "info";
+    default:
+      return undefined;
+  }
 }
 
 function AnnouncementsContent() {
@@ -128,22 +149,52 @@ function AnnouncementsContent() {
       header: t("adminAnnouncements.headline"),
       pinned: true,
       sortValue: (a) => a.title,
-      render: (a) => <span className="text-srapi-text-primary">{a.title}</span>,
+      render: (a) => (
+        <div className="min-w-0">
+          <div className="truncate text-srapi-text-primary">{a.title}</div>
+          {a.audience ? (
+            <div className="truncate text-[11px] text-srapi-text-tertiary">
+              {a.audience} · {a.severity}
+            </div>
+          ) : null}
+        </div>
+      ),
     },
     {
       key: "published",
       header: t("adminAnnouncements.published"),
       hideOnMobile: true,
+      sortValue: (a) => a.starts_at ?? a.created_at,
       render: (a) => (
-        <span className="text-[12px] tabular text-srapi-text-tertiary">
-          {formatDateTime(a.starts_at ?? a.created_at)}
-        </span>
+        <DataTooltip
+          title={t("adminAnnouncements.published")}
+          primary={formatDateTime(a.starts_at ?? a.created_at)}
+          rows={[
+            { label: t("adminCommon.created"), value: formatDateTime(a.created_at), tone: "muted" },
+            ...(a.starts_at
+              ? [{ label: t("adminAnnouncements.startsAt"), value: formatDateTime(a.starts_at) }]
+              : []),
+            ...(a.ends_at
+              ? [{ label: t("adminAnnouncements.endsAt"), value: formatDateTime(a.ends_at), tone: "muted" as const }]
+              : []),
+          ]}
+        >
+          <span className="text-[12px] tabular text-srapi-text-tertiary">
+            {formatDateTime(a.starts_at ?? a.created_at)}
+          </span>
+        </DataTooltip>
       ),
     },
     {
       key: "status",
       header: t("adminAnnouncements.state"),
-      render: (a) => <QuietBadge status={quietStatusFor(a.status)} label={statusLabel(t, a.status)} />,
+      sortValue: (a) => a.status,
+      render: (a) => (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <QuietBadge status={quietStatusFor(a.status)} label={statusLabel(t, a.status)} />
+          <QuietBadge status={quietStatusFor(a.severity)} label={a.severity} />
+        </div>
+      ),
     },
   ];
 
@@ -191,13 +242,20 @@ function AnnouncementsContent() {
         onClearFilters={list.clearFilters}
         sort={list.sort}
         onSort={list.toggleSort}
+        rowSeverity={(a) => announcementSeverityTone(a)}
+        dimRow={(a) => a.status === "draft" || a.status === "archived"}
+        expandRow={(a) => <AnnouncementExpandDetail announcement={a} t={t} />}
         toolbar={
           <ListToolbar>
-            <FilterSelect
-              value={statusFilter}
-              onChange={(v) => list.setFilter("status", v)}
-              options={ANNOUNCEMENT_STATUSES.map((v) => ({ value: v, label: v }))}
-              allLabel={t("adminCommon.allStatuses")}
+            <SegmentedControl<string>
+              value={(statusFilter as string) ?? "all"}
+              onChange={(v) => list.setFilter("status", v === "all" ? "" : v)}
+              ariaLabel={t("adminCommon.allStatuses")}
+              size="sm"
+              options={[
+                { value: "all", label: t("adminCommon.allStatuses") },
+                ...ANNOUNCEMENT_STATUSES.map((v) => ({ value: v, label: v })),
+              ]}
             />
           </ListToolbar>
         }
@@ -263,5 +321,91 @@ function AnnouncementsContent() {
         }}
       />
     </>
+  );
+}
+
+/**
+ * Inline announcement expansion — a body preview (no truncation), the lifecycle
+ * window, and audience targeting. Read-rate stats live behind the «Read status»
+ * action menu because they hit a separate endpoint; we surface a hint here
+ * pointing operators to that dialog rather than blocking row hover on a fetch.
+ */
+function AnnouncementExpandDetail({
+  announcement,
+  t,
+}: {
+  announcement: Announcement;
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
+  const lifecycle: Array<{ label: string; value: string; mono?: boolean; tone?: "default" | "muted" | "success" }> = [
+    { label: t("adminCommon.created"), value: formatDateTime(announcement.created_at), tone: "muted" },
+    { label: t("adminCommon.updated"), value: formatDateTime(announcement.updated_at), tone: "muted" },
+  ];
+  if (announcement.starts_at)
+    lifecycle.push({
+      label: t("adminAnnouncements.startsAt"),
+      value: formatDateTime(announcement.starts_at),
+      tone: "success",
+    });
+  if (announcement.ends_at)
+    lifecycle.push({
+      label: t("adminAnnouncements.endsAt"),
+      value: formatDateTime(announcement.ends_at),
+    });
+
+  const audience: Array<{ label: string; value: string; mono?: boolean; tone?: "default" | "muted" }> = [
+    { label: t("adminAnnouncements.audience"), value: announcement.audience, mono: true },
+    { label: t("adminAnnouncements.severity"), value: announcement.severity, mono: true },
+    { label: t("adminAnnouncements.state"), value: statusLabel(t, announcement.status), mono: true },
+  ];
+  const segments = announcement.segments ?? [];
+  for (const seg of segments) {
+    if (seg.roles?.length)
+      audience.push({
+        label: t("adminAnnouncements.segmentRoles"),
+        value: seg.roles.join(", "),
+        mono: true,
+        tone: "muted",
+      });
+    if (seg.email_domains?.length)
+      audience.push({
+        label: t("adminAnnouncements.segmentEmailDomains"),
+        value: seg.email_domains.join(", "),
+        mono: true,
+        tone: "muted",
+      });
+    if (seg.user_ids?.length)
+      audience.push({
+        label: t("adminAnnouncements.segmentUserIds"),
+        value: seg.user_ids.map(String).join(", "),
+        mono: true,
+        tone: "muted",
+      });
+  }
+
+  const body = announcement.content?.trim() || "";
+  // Markdown preview is intentionally text-only — operators read what users will
+  // see in the in-product modal, no need to evaluate markdown here.
+  const preview = body.length > 800 ? body.slice(0, 800) + "…" : body;
+
+  return (
+    <div>
+      <InlineDetailGrid
+        sections={[
+          { title: t("adminAnnouncements.audience"), rows: audience },
+          { title: t("adminAnnouncements.published"), rows: lifecycle },
+        ]}
+      />
+      {preview ? (
+        <div className="border-t border-srapi-border/60 bg-srapi-card-muted/30 px-6 py-4">
+          <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
+            {t("adminAnnouncements.content")}
+          </div>
+          <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-srapi-border bg-srapi-card-muted/60 p-3 text-[12px] text-srapi-text-secondary">
+            {preview}
+          </pre>
+        </div>
+      ) : null}
+    </div>
   );
 }

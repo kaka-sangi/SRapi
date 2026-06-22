@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { writeClipboard } from "@/components/ui/copy-button";
 import { DataPill } from "@/components/ui/data-pill";
 import { IconBubble } from "@/components/ui/icon-bubble";
+import { Kbd } from "@/components/ui/kbd";
 import { Markdown } from "@/components/ui/markdown";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
@@ -181,7 +182,18 @@ export function CopilotChat({ models, defaultModel }: { models: string[]; defaul
               ))}
               {running && !pending ? (
                 <div className="flex items-center gap-3 pl-12 text-sm text-srapi-text-tertiary">
-                  <Loader2 className="size-4 animate-spin" />
+                  <span aria-hidden className="inline-flex items-end gap-1">
+                    {[0, 1, 2].map((i) => (
+                      <span
+                        key={i}
+                        className="anim-pop-in size-1.5 rounded-full bg-srapi-primary motion-safe:animate-bounce"
+                        style={{
+                          ["--stagger-index" as string]: i,
+                          animationDelay: `${i * 140}ms`,
+                        }}
+                      />
+                    ))}
+                  </span>
                   {t("copilot.thinking")}
                 </div>
               ) : null}
@@ -527,7 +539,7 @@ function MessageActions({
     });
   };
   return (
-    <div className="flex items-center gap-3 pt-1 text-srapi-text-tertiary">
+    <div className="group/actions flex items-center gap-3 pt-1 text-srapi-text-tertiary">
       <button
         type="button"
         onClick={copy}
@@ -535,6 +547,7 @@ function MessageActions({
       >
         {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
         {t("copilot.copy")}
+        <Kbd className="ml-1 opacity-0 transition-opacity group-hover/actions:opacity-100">C</Kbd>
       </button>
       {canRegenerate && onRegenerate ? (
         <button
@@ -544,6 +557,7 @@ function MessageActions({
         >
           <RefreshCw className="size-3.5" />
           {t("copilot.regenerate")}
+          <Kbd className="ml-1 opacity-0 transition-opacity group-hover/actions:opacity-100">R</Kbd>
         </button>
       ) : null}
     </div>

@@ -6,7 +6,7 @@ import { AdminShell } from "@/components/layout/admin-shell";
 import { SectionHero } from "@/components/visual/section-hero";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
-import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-toolbar";
+import { ListToolbar, SearchInput } from "@/components/admin/list-toolbar";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
@@ -44,6 +44,8 @@ import { QuietBadge } from "@/components/ui/quiet-badge";
 import { CopyButton, writeClipboard } from "@/components/ui/copy-button";
 import { StatCard } from "@/components/ui/stat-card";
 import { Button } from "@/components/ui/button";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -252,23 +254,80 @@ function RedeemContent() {
     {
       key: "value",
       header: t("adminPromos.value"),
-      render: (c) => (
-        <span className="text-sm font-medium tabular text-srapi-text-primary">
-          {formatMoney(c.value, c.currency)}
-        </span>
-      ),
+      render: (c) => {
+        const numeric = Number(c.value);
+        const decimals = String(c.value).split(".")[1]?.length ?? 0;
+        return (
+          <DataTooltip
+            title={t("adminPromos.value")}
+            primary={formatMoney(c.value, c.currency)}
+            rows={[
+              { label: "Currency", value: (c.currency || "USD").toUpperCase() },
+              { label: "Precision", value: `${decimals} dp` },
+              ...(c.currency && c.currency.toUpperCase() !== "USD" && Number.isFinite(numeric)
+                ? [
+                    {
+                      label: "≈ USD",
+                      value: (() => {
+                        const fx: Record<string, number> = {
+                          CNY: 0.14,
+                          EUR: 1.08,
+                          JPY: 0.0066,
+                          GBP: 1.27,
+                          HKD: 0.13,
+                          TWD: 0.031,
+                          KRW: 0.00075,
+                        };
+                        const rate = fx[c.currency.toUpperCase()];
+                        return rate ? formatMoney(numeric * rate, "USD") : "—";
+                      })(),
+                      tone: "muted" as const,
+                    },
+                  ]
+                : []),
+              { label: "Type", value: c.type, tone: "muted" as const },
+            ]}
+          >
+            <span className="text-sm font-medium tabular text-srapi-text-primary">
+              {formatMoney(c.value, c.currency)}
+            </span>
+          </DataTooltip>
+        );
+      },
     },
     {
       key: "uses",
       header: t("adminPromos.uses"),
       align: "right",
       hideOnMobile: true,
-      render: (c) => (
-        <span className="text-xs tabular text-srapi-text-tertiary">
-          {c.redeemed_count ?? 0}
-          {c.max_redemptions ? ` / ${c.max_redemptions}` : ""}
-        </span>
-      ),
+      render: (c) => {
+        const used = c.redeemed_count ?? 0;
+        const max = c.max_redemptions ?? 0;
+        return (
+          <DataTooltip
+            title={t("adminPromos.uses")}
+            primary={`${used}${max ? ` / ${max}` : ""}`}
+            rows={[
+              { label: "Redeemed", value: String(used) },
+              { label: "Cap", value: max > 0 ? String(max) : "Unlimited" },
+              ...(max > 0
+                ? [
+                    {
+                      label: "Remaining",
+                      value: String(Math.max(0, max - used)),
+                      tone: "muted" as const,
+                    },
+                  ]
+                : []),
+            ]}
+          >
+            <span className="text-xs tabular text-srapi-text-tertiary">
+              {used}
+              {max ? ` / ${max}` : ""}
+            </span>
+          </DataTooltip>
+        );
+      },
     },
     {
       key: "expires",
@@ -360,11 +419,15 @@ function RedeemContent() {
               onChange={list.setSearchInput}
               placeholder={t("adminPromos.searchPlaceholder")}
             />
-            <FilterSelect
-              value={statusFilter}
-              onChange={(v) => list.setFilter("status", v)}
-              options={statusOptions}
-              allLabel={t("adminCommon.allStatuses")}
+            <SegmentedControl<string>
+              value={(statusFilter as string) ?? "all"}
+              onChange={(v) => list.setFilter("status", v === "all" ? "" : v)}
+              ariaLabel={t("adminCommon.allStatuses")}
+              size="sm"
+              options={[
+                { value: "all", label: t("adminCommon.allStatuses") },
+                ...statusOptions,
+              ]}
             />
           </ListToolbar>
         }

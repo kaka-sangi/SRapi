@@ -4,7 +4,7 @@ import { useState } from "react";
 import { CreditCard } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
-import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-toolbar";
+import { ListToolbar, SearchInput } from "@/components/admin/list-toolbar";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useClientPagedList } from "@/hooks/use-client-list";
 import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
@@ -28,6 +28,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import {
   Dialog,
   DialogContent,
@@ -215,14 +216,18 @@ export function SubscriptionsPanel() {
               onChange={list.setSearchInput}
               placeholder={t("adminSubscriptions.searchPlaceholder")}
             />
-            <FilterSelect
-              value={list.filters.status}
-              onChange={(v) => list.setFilter("status", v)}
-              options={USER_SUBSCRIPTION_STATUSES.map((s) => ({
-                value: s,
-                label: statusLabel(t, s),
-              }))}
-              allLabel={t("adminCommon.allStatuses")}
+            <SegmentedControl<string>
+              value={(list.filters.status as string) ?? "all"}
+              onChange={(v) => list.setFilter("status", v === "all" ? "" : v)}
+              ariaLabel={t("adminCommon.allStatuses")}
+              size="sm"
+              options={[
+                { value: "all", label: t("adminCommon.allStatuses") },
+                ...USER_SUBSCRIPTION_STATUSES.map((s) => ({
+                  value: s,
+                  label: statusLabel(t, s),
+                })),
+              ]}
             />
             <ColumnToggle
               columns={subColumns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}

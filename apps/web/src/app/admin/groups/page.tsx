@@ -38,6 +38,9 @@ import { useToast } from "@/context/ToastContext";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { DataPill } from "@/components/ui/data-pill";
 import { Button } from "@/components/ui/button";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { InlineDetailGrid } from "@/components/ui/inline-detail-grid";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -76,13 +79,41 @@ export default function AdminGroupsPage() {
   );
 }
 
-function groupMatch(group: AccountGroup, term: string): boolean {
+function groupMatch(group: AccountGroup, term: string, filters: Record<string, string>): boolean {
+  // Status segmented-control filter sits client-side because /admin/groups is
+  // already paged in-memory via useClientPagedList — adding a server filter
+  // would require an API change and we have the whole list locally.
+  if (filters.status && group.status !== filters.status) return false;
   if (!term) return true;
   return [group.name, group.description, group.strategy_hint]
     .filter(Boolean)
     .join(" ")
     .toLowerCase()
     .includes(term);
+}
+
+// Summarise provider_scope / model_scope JSON for the inline expand row.
+// The scope shape varies (empty -> "all", { provider: "foo" } -> "foo", { items: [...] } -> "n items"),
+// so we coerce to a readable string and flag empty as muted so the operator
+// instantly sees "this group covers everything" vs "this group is narrowed".
+function scopeSummary(scope: unknown): { label: string; tone: "default" | "muted" } {
+  if (!scope || typeof scope !== "object") return { label: "all", tone: "muted" };
+  const obj = scope as Record<string, unknown>;
+  const keys = Object.keys(obj);
+  if (keys.length === 0) return { label: "all", tone: "muted" };
+  const values: string[] = [];
+  for (const key of keys) {
+    const value = obj[key];
+    if (Array.isArray(value)) {
+      values.push(...value.map(String));
+    } else if (value != null) {
+      values.push(String(value));
+    }
+  }
+  if (values.length === 0) return { label: "all", tone: "muted" };
+  const shown = values.slice(0, 4).join(", ");
+  const extra = values.length - 4;
+  return { label: extra > 0 ? `${shown} +${extra}` : shown, tone: "default" };
 }
 
 const groupCompare = (a: AccountGroup, b: AccountGroup) => a.name.localeCompare(b.name);
@@ -96,7 +127,7 @@ function GroupsContent() {
     match: groupMatch,
     compare: groupCompare,
   });
-  const isFiltered = Boolean(list.search);
+  const isFiltered = Boolean(list.search || list.filters.status);
   const [formTarget, setFormTarget] = useState<AccountGroup | "new" | null>(null);
   const [membersTarget, setMembersTarget] = useState<AccountGroup | null>(null);
   const [rateLimitTarget, setRateLimitTarget] = useState<AccountGroup | null>(null);
@@ -141,11 +172,23 @@ function GroupsContent() {
       header: t("adminGroups.rateMultiplier"),
       hideOnMobile: true,
       align: "right",
-      render: (g) => (
-        <span className="text-xs text-srapi-text-tertiary tabular">
-          {g.rate_multiplier || "1.00000000"}×
-        </span>
-      ),
+      render: (g) => {
+        const rl = rateLimitByGroup.get(Number(g.id));
+        return (
+          <DataTooltip
+            title={t("adminGroups.rateMultiplier")}
+            primary={`${g.rate_multiplier || "1.00000000"}×`}
+            rows={[
+              { label: t("adminGroups.strategy"), value: g.strategy_hint || "default", tone: "muted" },
+              { label: t("adminRateLimit.column"), value: rl ? (rl.enabled ? rateLimitSummary(rl) : t("adminRateLimit.off")) : t("adminRateLimit.none"), tone: rl?.enabled ? "default" : "muted" },
+            ]}
+          >
+            <span className="text-xs text-srapi-text-tertiary tabular">
+              {g.rate_multiplier || "1.00000000"}×
+            </span>
+          </DataTooltip>
+        );
+      },
     },
     {
       key: "ratelimit",
@@ -218,12 +261,73 @@ function GroupsContent() {
         onSort={list.toggleSort}
         isFiltered={isFiltered}
         onClearFilters={list.clearFilters}
+        enableKeyboardNav
+        rowSeverity={(g) => {
+          // Inactive groups get an info stripe so the operator can scan a
+          // long list and notice deactivated ones without scrolling to the
+          // status column. Active stays unstriped (the default visual).
+          if (g.status !== "active") return "info";
+          return undefined;
+        }}
+        expandRow={(g) => {
+          const rl = rateLimitByGroup.get(Number(g.id));
+          const providerScope = scopeSummary(g.provider_scope);
+          const modelScope = scopeSummary(g.model_scope);
+          return (
+            <InlineDetailGrid
+              sections={[
+                {
+                  title: t("adminGroups.description"),
+                  rows: [
+                    { label: t("adminGroups.description"), value: g.description || "—", tone: g.description ? "default" : "muted" },
+                    { label: t("adminGroups.strategy"), value: g.strategy_hint || "default" },
+                    { label: t("adminCommon.status"), value: statusLabel(t, g.status) },
+                  ],
+                },
+                {
+                  title: t("adminGroups.providerScope"),
+                  rows: [
+                    { label: t("adminGroups.providerScope"), value: providerScope.label, tone: providerScope.tone },
+                    { label: t("adminGroups.modelScope"), value: modelScope.label, tone: modelScope.tone },
+                  ],
+                },
+                {
+                  title: t("adminRateLimit.column"),
+                  rows: [
+                    { label: t("adminGroups.rateMultiplier"), value: `${g.rate_multiplier || "1.00000000"}×` },
+                    { label: t("adminRateLimit.column"), value: rl ? (rl.enabled ? rateLimitSummary(rl) : t("adminRateLimit.off")) : t("adminRateLimit.none"), tone: rl?.enabled ? "default" : "muted" },
+                  ],
+                },
+              ]}
+              actions={
+                <>
+                  <Button variant="outline" size="sm" onClick={() => setMembersTarget(g)}>
+                    {t("adminGroups.manageMembers")}
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setRateLimitTarget(g)}>
+                    {t("adminRateLimit.action")}
+                  </Button>
+                </>
+              }
+            />
+          );
+        }}
         toolbar={
           <ListToolbar>
             <SearchInput
               value={list.searchInput}
               onChange={list.setSearchInput}
               placeholder={t("adminGroups.searchPlaceholder")}
+            />
+            <SegmentedControl<string>
+              value={(list.filters.status as string) || "__all__"}
+              onChange={(v) => list.setFilter("status", v === "__all__" ? undefined : v)}
+              ariaLabel={t("adminCommon.status")}
+              size="sm"
+              options={[
+                { value: "__all__", label: t("adminCommon.allStatuses") },
+                ...ACCOUNT_GROUP_STATUSES.map((s) => ({ value: s, label: s })),
+              ]}
             />
           </ListToolbar>
         }

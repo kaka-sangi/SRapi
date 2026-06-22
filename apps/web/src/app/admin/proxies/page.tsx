@@ -30,6 +30,9 @@ import { useToast } from "@/context/ToastContext";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { DataPill } from "@/components/ui/data-pill";
 import { Button } from "@/components/ui/button";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { InlineDetailGrid } from "@/components/ui/inline-detail-grid";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import {
   PROXY_TYPES,
@@ -341,7 +344,20 @@ function ProxiesContent() {
             </span>
           );
         }
-        return <AvailabilityBadge pct={p.probe_success_pct_7d} />;
+        return (
+          <DataTooltip
+            title={t("adminProxies.availabilityColumn")}
+            primary={`${p.probe_success_pct_7d}%`}
+            rows={[
+              { label: t("adminProxies.lastTest"), value: formatLatency(p.last_probe_latency_ms || 0) },
+              { label: "ok", value: String(p.probe_success_count ?? 0), tone: "success" },
+              { label: "fail", value: String(p.probe_failure_count ?? 0), tone: (p.probe_failure_count ?? 0) > 0 ? "warning" : "muted" },
+            ]}
+            footer={p.last_probed_at ? formatDateTime(p.last_probed_at) : undefined}
+          >
+            <span><AvailabilityBadge pct={p.probe_success_pct_7d} /></span>
+          </DataTooltip>
+        );
       },
     },
     {
@@ -457,13 +473,70 @@ function ProxiesContent() {
         onClearFilters={list.clearFilters}
         sort={list.sort}
         onSort={list.toggleSort}
+        enableKeyboardNav
+        rowSeverity={(p) => {
+          // Severity drives the 2.5px left stripe: terminal blocked proxies as
+          // critical, expired or low-availability as warning, healthy stays
+          // implicit (no stripe — color sparingly per the polish bar).
+          if (p.status === "disabled") return "warning";
+          if (p.expires_at && new Date(p.expires_at).getTime() <= nowMs) return "warning";
+          const snap = readLastTest(p);
+          if (snap && !snap.ok) return "warning";
+          if (typeof p.probe_success_pct_7d === "number" && p.probe_success_pct_7d < 70) return "error";
+          if (typeof p.probe_success_pct_7d === "number" && p.probe_success_pct_7d < 95) return "warning";
+          return undefined;
+        }}
+        expandRow={(p) => {
+          const snap = readLastTest(p);
+          const total = (p.probe_success_count ?? 0) + (p.probe_failure_count ?? 0);
+          const expiresAt = p.expires_at ? new Date(p.expires_at) : null;
+          const expired = expiresAt ? expiresAt.getTime() <= nowMs : false;
+          return (
+            <InlineDetailGrid
+              sections={[
+                {
+                  title: t("adminProxies.lastTest"),
+                  rows: snap
+                    ? [
+                        { label: t("adminProxies.lastTest"), value: formatDateTime(snap.at) },
+                        { label: "ok", value: snap.ok ? formatLatency(snap.latency_ms) : (snap.error_class || "—"), tone: snap.ok ? "success" : "error" },
+                        { label: t("adminProxies.url"), value: p.url_configured ? "✓" : "—", tone: "muted" },
+                      ]
+                    : [
+                        { label: t("adminProxies.neverTested"), value: "—", tone: "muted" },
+                      ],
+                },
+                {
+                  title: t("adminProxies.availabilityColumn"),
+                  rows: [
+                    { label: "%", value: typeof p.probe_success_pct_7d === "number" ? `${p.probe_success_pct_7d}%` : "—" },
+                    { label: "ok / total", value: `${p.probe_success_count ?? 0} / ${total}`, tone: "muted" },
+                    { label: t("adminProxies.lastTest"), value: formatLatency(p.last_probe_latency_ms || 0), tone: "muted" },
+                  ],
+                },
+                {
+                  title: t("adminProxies.lifecycleColumn"),
+                  rows: [
+                    { label: t("adminProxies.expiresAt"), value: expiresAt ? (expired ? t("adminProxies.expired") : formatDateTime(p.expires_at)) : t("adminProxies.noExpiry"), tone: expired ? "error" : "default" },
+                    { label: t("adminProxies.fallbackMode"), value: fallbackModeLabel(t, p.fallback_mode ?? "none"), tone: "muted" },
+                    { label: t("adminProxies.countryColumn"), value: localizedCountryName(p.country_code, p.country_name) || "—", tone: "muted" },
+                  ],
+                },
+              ]}
+            />
+          );
+        }}
         toolbar={
           <ListToolbar>
-            <FilterSelect
-              value={statusFilter}
-              onChange={(v) => list.setFilter("status", v)}
-              options={enumOptions(PROXY_STATUSES)}
-              allLabel={t("adminCommon.allStatuses")}
+            <SegmentedControl<string>
+              value={statusFilter || "__all__"}
+              onChange={(v) => list.setFilter("status", v === "__all__" ? undefined : v)}
+              ariaLabel={t("adminCommon.status")}
+              size="sm"
+              options={[
+                { value: "__all__", label: t("adminCommon.allStatuses") },
+                ...PROXY_STATUSES.map((s) => ({ value: s, label: s })),
+              ]}
             />
             <FilterSelect
               value={countryFilter}

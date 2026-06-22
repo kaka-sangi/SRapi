@@ -7,9 +7,12 @@ import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { PageHeader } from "@/components/layout/page-header";
 import { AutoRefreshControl } from "@/components/ui/auto-refresh";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { QuietBadge } from "@/components/ui/quiet-badge";
 import { useAffiliateWithdrawals, useApproveWithdrawal, useCancelWithdrawal } from "@/hooks/admin-queries";
 import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
 import { useLanguage } from "@/context/LanguageContext";
+import { quietStatusFor } from "@/lib/status-badge";
 import { formatMoney, formatDateTime } from "@/lib/admin-format";
 import type { AffiliateLedgerEntry } from "@/lib/sdk-types";
 
@@ -47,16 +50,53 @@ export function WithdrawalsPanel() {
       key: "amount",
       header: t("adminAffiliates.amount"),
       align: "right",
-      render: (r) => (
-        <span className="text-sm font-medium tabular text-srapi-text-primary">
-          {formatMoney(r.amount, r.currency)}
-        </span>
-      ),
+      render: (r) => {
+        const numeric = Number(r.amount);
+        const decimals = String(r.amount).split(".")[1]?.length ?? 0;
+        return (
+          <DataTooltip
+            title={t("adminAffiliates.amount")}
+            primary={formatMoney(r.amount, r.currency)}
+            rows={[
+              { label: "Currency", value: (r.currency || "USD").toUpperCase() },
+              { label: "Precision", value: `${decimals} dp` },
+              ...(r.currency &&
+              r.currency.toUpperCase() !== "USD" &&
+              Number.isFinite(numeric)
+                ? [
+                    {
+                      label: "≈ USD",
+                      value: (() => {
+                        const fx: Record<string, number> = {
+                          CNY: 0.14,
+                          EUR: 1.08,
+                          JPY: 0.0066,
+                          GBP: 1.27,
+                          HKD: 0.13,
+                          TWD: 0.031,
+                          KRW: 0.00075,
+                        };
+                        const rate = fx[r.currency.toUpperCase()];
+                        return rate ? formatMoney(numeric * rate, "USD") : "—";
+                      })(),
+                      tone: "muted" as const,
+                    },
+                  ]
+                : []),
+            ]}
+            footer={r.status}
+          >
+            <span className="text-sm font-medium tabular text-srapi-text-primary">
+              {formatMoney(r.amount, r.currency)}
+            </span>
+          </DataTooltip>
+        );
+      },
     },
     {
       key: "status",
       header: t("adminAffiliates.withdrawalStatus"),
-      render: (r) => <span className="text-srapi-text-secondary">{r.status}</span>,
+      render: (r) => <QuietBadge status={quietStatusFor(r.status)} label={r.status} />,
     },
     {
       key: "destination",
@@ -114,6 +154,22 @@ export function WithdrawalsPanel() {
         emptyTitle={t("adminAffiliates.emptyWithdrawals")}
         emptyBody={t("adminAffiliates.emptyWithdrawalsBody")}
         minWidth={560}
+        rowSeverity={(r) => {
+          // Approval-state stripe: pending = info (awaits operator),
+          // settled = success, canceled = warning, compensated = error.
+          switch (r.status) {
+            case "settled":
+              return "success";
+            case "pending":
+              return "info";
+            case "canceled":
+              return "warning";
+            case "compensated":
+              return "error";
+            default:
+              return undefined;
+          }
+        }}
         rowActions={(r) =>
           r.status === "pending" ? (
             <RowActionsMenu

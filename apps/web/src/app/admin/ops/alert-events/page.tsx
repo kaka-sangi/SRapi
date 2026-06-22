@@ -1,14 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { BellRing } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { SectionHero } from "@/components/visual/section-hero";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
-import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
-import { enumOptions } from "@/components/admin/resource-form-dialog";
+import { ListToolbar } from "@/components/admin/list-toolbar";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +17,9 @@ import {
 } from "@/components/ui/dialog";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { InlineDetailGrid } from "@/components/ui/inline-detail-grid";
 import { OpsAlertRunbookSteps } from "@/components/admin/ops-alert-runbook-steps";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
@@ -42,6 +44,25 @@ import type {
 
 const ALERT_STATUSES: OpsAlertStatus[] = ["firing", "acknowledged", "resolved", "suppressed"];
 const ALERT_SEVERITIES: OpsAlertSeverity[] = ["critical", "warning", "ticket"];
+
+function alertSeverityTone(
+  severity: OpsAlertSeverity | undefined,
+  status: OpsAlertStatus,
+): "info" | "success" | "warning" | "error" | "critical" | undefined {
+  // Resolved/suppressed alerts mute — they don't need to scream.
+  if (status === "resolved") return "success";
+  if (status === "suppressed") return "info";
+  switch (severity) {
+    case "critical":
+      return "critical";
+    case "warning":
+      return "warning";
+    case "ticket":
+      return "info";
+    default:
+      return undefined;
+  }
+}
 
 export default function AdminOpsAlertEventsPage() {
   return (
@@ -95,7 +116,35 @@ function AlertEventsContent() {
       sortValue: (event) => event.status,
       render: (event) => (
         <div className="flex flex-wrap items-center gap-1.5">
-          <QuietBadge status={quietStatusFor(event.status)} label={statusLabel(t, event.status)} />
+          <DataTooltip
+            title={t("adminCommon.status")}
+            primary={statusLabel(t, event.status)}
+            rows={[
+              { label: t("adminOpsAlertEvents.startedAt"), value: formatDateTime(event.started_at) },
+              { label: t("adminOpsAlertEvents.updated"), value: formatDateTime(event.updated_at) },
+              ...(event.acknowledged_at
+                ? [
+                    {
+                      label: t("adminOpsAlertEvents.acknowledgedAt"),
+                      value: formatDateTime(event.acknowledged_at),
+                      tone: "muted" as const,
+                    },
+                  ]
+                : []),
+              ...(event.resolved_at
+                ? [
+                    {
+                      label: t("adminOpsAlertEvents.resolvedAt"),
+                      value: formatDateTime(event.resolved_at),
+                      tone: "success" as const,
+                    },
+                  ]
+                : []),
+            ]}
+            footer={event.fingerprint}
+          >
+            <QuietBadge status={quietStatusFor(event.status)} label={statusLabel(t, event.status)} />
+          </DataTooltip>
           <QuietBadge status={quietStatusFor(event.severity)} label={event.severity} />
         </div>
       ),
@@ -134,10 +183,31 @@ function AlertEventsContent() {
         title={t("adminOpsAlertEvents.title")}
         description={t("adminOpsAlertEvents.subtitle")}
         metrics={(() => {
-          const unack = (events.data?.data ?? []).filter(
+          const rows = events.data?.data ?? [];
+          const firing = rows.filter((e) => e.status === "firing").length;
+          const unack = rows.filter(
             (e) => e.status === "firing" && !e.acknowledged_at,
           ).length;
-          return [{ label: "未确认告警", value: formatInteger(unack), tone: unack > 0 ? "warning" : "default" }];
+          const critical = rows.filter(
+            (e) => e.severity === "critical" && e.status === "firing",
+          ).length;
+          return [
+            {
+              label: "未确认",
+              value: formatInteger(unack),
+              tone: unack > 0 ? "warning" : "default",
+            },
+            {
+              label: "触发中",
+              value: formatInteger(firing),
+              tone: firing > 0 ? "error" : "default",
+            },
+            {
+              label: "Critical",
+              value: formatInteger(critical),
+              tone: critical > 0 ? "error" : "default",
+            },
+          ];
         })()}
         actions={
           <div className="flex items-center gap-3">
@@ -165,19 +235,31 @@ function AlertEventsContent() {
         sort={list.sort}
         onSort={list.toggleSort}
         dimRow={(event) => event.status === "resolved" || event.status === "suppressed"}
+        rowSeverity={(event) => alertSeverityTone(event.severity, event.status)}
+        expandRow={(event) => (
+          <AlertExpandDetail event={event} t={t} />
+        )}
         toolbar={
           <ListToolbar>
-            <FilterSelect
-              value={statusFilter}
-              onChange={(value) => list.setFilter("status", value)}
-              options={enumOptions(ALERT_STATUSES)}
-              allLabel={t("adminOpsAlertEvents.allStatuses")}
+            <SegmentedControl<string>
+              value={(severityFilter as string) ?? "all"}
+              onChange={(v) => list.setFilter("severity", v === "all" ? "" : v)}
+              ariaLabel={t("adminOpsAlertEvents.allSeverities")}
+              size="sm"
+              options={[
+                { value: "all", label: t("adminOpsAlertEvents.allSeverities") },
+                ...ALERT_SEVERITIES.map((v) => ({ value: v, label: v })),
+              ]}
             />
-            <FilterSelect
-              value={severityFilter}
-              onChange={(value) => list.setFilter("severity", value)}
-              options={enumOptions(ALERT_SEVERITIES)}
-              allLabel={t("adminOpsAlertEvents.allSeverities")}
+            <SegmentedControl<string>
+              value={(statusFilter as string) ?? "all"}
+              onChange={(v) => list.setFilter("status", v === "all" ? "" : v)}
+              ariaLabel={t("adminOpsAlertEvents.allStatuses")}
+              size="sm"
+              options={[
+                { value: "all", label: t("adminOpsAlertEvents.allStatuses") },
+                ...ALERT_STATUSES.map((v) => ({ value: v, label: v })),
+              ]}
             />
           </ListToolbar>
         }
@@ -626,4 +708,108 @@ function JsonBlock({ label, value }: { label: string; value: unknown }) {
 
 function SectionLabel({ children }: { children: string }) {
   return <span className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{children}</span>;
+}
+
+/**
+ * Inline expansion rendered under an alert row. Surfaces the canonical fields
+ * (severity, lifecycle timestamps, scope), the evidence-link strip and the
+ * runbook checklist — i.e. everything the dialog has minus the deep JSON dump,
+ * so an operator can triage without opening the modal.
+ */
+function AlertExpandDetail({
+  event,
+  t,
+}: {
+  event: OpsAlertEvent;
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
+  const ruleName = detailString(event.details, "rule_name", "ruleName") ?? event.rule_id;
+  const metricType = detailString(event.details, "metric_type", "metricType");
+  const observed = detailNumber(event.details, "observed_value");
+  const threshold = detailNumber(event.details, "threshold");
+  const operator = detailString(event.details, "operator");
+  const runbookSteps = buildOpsAlertRunbookSteps(event.details);
+  const evidence = buildOpsAlertEvidenceLinks(event.details);
+
+  const lifecycle: Array<{ label: string; value: ReactNode; mono?: boolean; tone?: "muted" | "success" | "warning" | "error" }> = [
+    { label: t("adminOpsAlertEvents.startedAt"), value: formatDateTime(event.started_at) },
+    { label: t("adminOpsAlertEvents.updated"), value: formatDateTime(event.updated_at), tone: "muted" },
+  ];
+  if (event.acknowledged_at)
+    lifecycle.push({
+      label: t("adminOpsAlertEvents.acknowledgedAt"),
+      value: formatDateTime(event.acknowledged_at),
+      tone: "muted",
+    });
+  if (event.resolved_at)
+    lifecycle.push({
+      label: t("adminOpsAlertEvents.resolvedAt"),
+      value: formatDateTime(event.resolved_at),
+      tone: "success",
+    });
+  if (event.suppressed_by)
+    lifecycle.push({
+      label: t("adminOpsAlertEvents.suppressedBy"),
+      value: event.suppressed_by,
+      mono: true,
+      tone: "muted",
+    });
+
+  const trigger: Array<{ label: string; value: ReactNode; mono?: boolean }> = [
+    { label: t("adminOpsAlertEvents.ruleName"), value: ruleName, mono: true },
+    { label: t("adminOpsAlertEvents.severity"), value: event.severity },
+  ];
+  if (metricType) trigger.push({ label: t("adminOpsAlertEvents.metric"), value: metricType, mono: true });
+  if (metricType && operator && threshold !== null)
+    trigger.push({
+      label: t("adminOpsAlertEvents.condition"),
+      value: `${metricType} ${operator} ${formatAlertNumber("threshold", threshold, metricType)}`,
+      mono: true,
+    });
+  if (observed !== null)
+    trigger.push({
+      label: t("adminOpsAlertEvents.observed"),
+      value: formatAlertNumber("observed_value", observed, metricType),
+      mono: true,
+    });
+
+  const scope: Array<{ label: string; value: ReactNode; mono?: boolean }> = [];
+  const accountId = detailString(event.details, "account_id", "accountId");
+  const providerId = detailString(event.details, "provider_id", "providerId");
+  const model = detailString(event.details, "model", "canonical_model", "model_alias");
+  const sourceEndpoint = detailString(event.details, "source_endpoint", "sourceEndpoint");
+  const errorClass = detailString(event.details, "error_class", "errorClass");
+  if (accountId) scope.push({ label: t("adminOpsAlertEvents.accountId"), value: accountId, mono: true });
+  if (providerId) scope.push({ label: t("adminOpsAlertEvents.providerId"), value: providerId, mono: true });
+  if (model) scope.push({ label: t("adminOpsAlertEvents.model"), value: model, mono: true });
+  if (sourceEndpoint)
+    scope.push({ label: t("adminOpsAlertEvents.sourceEndpoint"), value: sourceEndpoint, mono: true });
+  if (errorClass)
+    scope.push({ label: t("adminOpsAlertEvents.errorClass"), value: errorClass, mono: true });
+  if (scope.length === 0) scope.push({ label: t("adminOpsAlertEvents.fingerprint"), value: event.fingerprint, mono: true });
+
+  return (
+    <InlineDetailGrid
+      sections={[
+        { title: t("adminOpsAlertEvents.signalTrigger"), rows: trigger },
+        { title: t("adminCommon.status"), rows: lifecycle },
+        { title: t("adminOpsAlertEvents.signalScope"), rows: scope },
+      ]}
+      actions={
+        <div className="flex w-full flex-col gap-3">
+          {runbookSteps.length > 0 ? (
+            <div>
+              <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
+                {t("adminOps.runbook.title")}
+              </div>
+              <OpsAlertRunbookSteps steps={runbookSteps} compact />
+            </div>
+          ) : null}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <AlertEvidenceLinks links={evidence} />
+          </div>
+        </div>
+      }
+    />
+  );
 }

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ExternalLink, GitBranch } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { useSchedulerDecisions } from "@/hooks/queries";
@@ -12,8 +12,10 @@ import { useProviderNameLookup } from "@/hooks/use-provider-name-lookup";
 import { useLanguage } from "@/context/LanguageContext";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
+import { IllustratedEmptyState } from "@/components/ui/illustrated-empty-state";
 import { QuietBadge, type QuietStatus } from "@/components/ui/quiet-badge";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { DataPill } from "@/components/ui/data-pill";
 import { SchedulerDecisionStream } from "@/components/ui/scheduler-decision-stream";
 import { AutoRefreshControl } from "@/components/ui/auto-refresh";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
@@ -69,8 +71,8 @@ export function SchedulerDecisionsPanel() {
       >
         {(data) =>
           data.length === 0 ? (
-            <EmptyState
-              icon={GitBranch}
+            <IllustratedEmptyState
+              illust="logs"
               title={t("scheduler.emptyTitle")}
               description={t("scheduler.emptyBody")}
             />
@@ -132,11 +134,20 @@ function SchedulerBody({
               const selectedAccount = selectedAccountLabel(d, accountLookup.get, t("scheduler.noAccount"));
               const primaryReject = primaryRejectReason(d);
               const outcome = decisionOutcome(d);
+              // Left stripe encodes the decision outcome at a glance — no need
+              // to scan the QuietBadge on the right.
+              const sev: "success" | "warning" | "error" =
+                outcome.status === "active"
+                  ? "success"
+                  : outcome.status === "error"
+                    ? "error"
+                    : "warning";
               return (
                 <button
                   key={key}
                   onClick={() => onSelect(key)}
-                  className={`grid w-full gap-2 px-5 py-3 text-left transition-colors ${
+                  data-sev={sev}
+                  className={`log-row grid w-full gap-2 px-5 py-3 text-left transition-colors ${
                     active
                       ? "bg-srapi-accent-soft"
                       : "hover:bg-srapi-card-muted/60"
@@ -156,24 +167,36 @@ function SchedulerBody({
                     <QuietBadge status={outcome.status} label={t(outcome.labelKey)} />
                   </div>
                   <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                    <span className="rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-tertiary">
-                      {d.strategy}
-                    </span>
-                    <span className="rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-tertiary">
-                      {d.candidate_count}/{d.rejected_count}
-                    </span>
+                    <DataPill tone="neutral" size="sm">{d.strategy}</DataPill>
+                    <DataTooltip
+                      title={t("scheduler.candidateSummary")}
+                      rows={[
+                        { label: t("scheduler.candidates"), value: d.candidate_count, tone: "success" },
+                        { label: t("scheduler.rejected"), value: d.rejected_count, tone: d.rejected_count > 0 ? "error" : "muted" },
+                      ]}
+                    >
+                      <DataPill tone="neutral" size="sm">
+                        {d.candidate_count}/{d.rejected_count}
+                      </DataPill>
+                    </DataTooltip>
                     {d.fallback_from_decision_id ? (
-                      <span className="rounded-full bg-srapi-warning/12 px-2 py-0.5 text-[11px] font-medium text-srapi-warning">
+                      <DataPill tone="warning" size="sm">
                         {t("scheduler.fallback")}
-                      </span>
+                      </DataPill>
                     ) : null}
                     <span className="max-w-44 truncate font-mono text-[11px] text-srapi-text-secondary">
                       {selectedAccount}
                     </span>
                     {primaryReject ? (
-                      <span className="max-w-40 truncate text-[11px] text-srapi-error">
-                        {primaryReject.reason} ×{primaryReject.count}
-                      </span>
+                      <DataTooltip
+                        title={t("scheduler.primaryReject")}
+                        primary={primaryReject.reason}
+                        rows={[{ label: "count", value: primaryReject.count, tone: "error" }]}
+                      >
+                        <span className="max-w-40 truncate text-[11px] text-srapi-error">
+                          {primaryReject.reason} ×{primaryReject.count}
+                        </span>
+                      </DataTooltip>
                     ) : null}
                   </div>
                 </button>
@@ -283,10 +306,19 @@ function DecisionInvestigationSummary({
   return (
     <div className="mb-5 grid gap-4 border-b border-srapi-border/70 pb-5">
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-        <DecisionStat label={t("scheduler.strategy")} value={strategyLabel(decision)} />
-        <DecisionStat label={t("scheduler.selectedAccount")} value={accountName} tone={decision.selected_account_id ? "normal" : "error"} />
-        <DecisionStat label={t("scheduler.selectedProvider")} value={providerName} />
-        <DecisionStat label={t("scheduler.estimatedCost")} value={formatMoney(decision.estimated_cost, decision.currency)} />
+        <DecisionStat label={t("scheduler.strategy")} value={strategyLabel(decision)} tier="tertiary" />
+        <DecisionStat
+          label={t("scheduler.selectedAccount")}
+          value={accountName}
+          tone={decision.selected_account_id ? "normal" : "error"}
+          tier="primary"
+        />
+        <DecisionStat label={t("scheduler.selectedProvider")} value={providerName} tier="secondary" />
+        <DecisionStat
+          label={t("scheduler.estimatedCost")}
+          value={formatMoney(decision.estimated_cost, decision.currency)}
+          tier="primary"
+        />
       </div>
       <div className="grid gap-2 sm:grid-cols-3">
         <DecisionStat label={t("scheduler.protocol")} value={`${decision.source_protocol} -> ${decision.target_protocol || "-"}`} />
@@ -345,10 +377,12 @@ function DecisionStat({
   label,
   value,
   tone = "normal",
+  tier = "secondary",
 }: {
   label: string;
   value: string;
   tone?: "normal" | "muted" | "warning" | "error";
+  tier?: "primary" | "secondary" | "tertiary";
 }) {
   const toneClass =
     tone === "error"
@@ -358,12 +392,18 @@ function DecisionStat({
         : tone === "muted"
           ? "text-srapi-text-tertiary"
           : "text-srapi-text-primary";
+  const tierClass =
+    tier === "primary"
+      ? "metric-primary"
+      : tier === "secondary"
+        ? "metric-secondary"
+        : "metric-tertiary";
   return (
     <div className="min-w-0 rounded-xl border border-srapi-border px-3 py-2">
       <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
         {label}
       </div>
-      <div className={`truncate text-sm font-medium ${toneClass}`} title={value}>
+      <div className={`truncate ${tierClass} ${toneClass}`} title={value}>
         {value || "-"}
       </div>
     </div>

@@ -23,7 +23,7 @@ import { useToast } from "@/context/ToastContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { FloatingInput } from "@/components/ui/floating-input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -160,16 +160,13 @@ function BalanceTab() {
         <CardContent>
           <form onSubmit={topUp} className="space-y-4">
             <h3 className="text-lg font-semibold tracking-tight text-srapi-text-primary">{t("billing.topUp")}</h3>
-            <div>
-              <Label htmlFor="amount">{t("billing.amount")}</Label>
-              <Input
-                id="amount"
-                inputMode="decimal"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                disabled={createMut.isPending}
-              />
-            </div>
+            <FloatingInput
+              id="amount"
+              label={t("billing.amount")}
+              value={amount}
+              onChange={setAmount}
+              disabled={createMut.isPending}
+            />
             <div>
               <Label htmlFor="method">{t("billing.method")}</Label>
               {methodList.length === 0 ? (
@@ -216,24 +213,20 @@ function BalanceTab() {
             ) : null}
             {needsWeChatPayer ? (
               <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <Label htmlFor="payer-openid">{t("billing.payerOpenID")}</Label>
-                  <Input
-                    id="payer-openid"
-                    value={payerOpenID}
-                    onChange={(e) => setPayerOpenID(e.target.value)}
-                    disabled={createMut.isPending}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="payer-client-ip">{t("billing.payerClientIP")}</Label>
-                  <Input
-                    id="payer-client-ip"
-                    value={payerClientIP}
-                    onChange={(e) => setPayerClientIP(e.target.value)}
-                    disabled={createMut.isPending}
-                  />
-                </div>
+                <FloatingInput
+                  id="payer-openid"
+                  label={t("billing.payerOpenID")}
+                  value={payerOpenID}
+                  onChange={setPayerOpenID}
+                  disabled={createMut.isPending}
+                />
+                <FloatingInput
+                  id="payer-client-ip"
+                  label={t("billing.payerClientIP")}
+                  value={payerClientIP}
+                  onChange={setPayerClientIP}
+                  disabled={createMut.isPending}
+                />
               </div>
             ) : null}
             {createdOrder ? (

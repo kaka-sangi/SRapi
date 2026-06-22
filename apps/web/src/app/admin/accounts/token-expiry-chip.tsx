@@ -2,7 +2,7 @@
 
 import { useLanguage } from "@/context/LanguageContext";
 import { QuietBadge } from "@/components/ui/quiet-badge";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { DataTooltip, type DataTooltipRow } from "@/components/ui/data-tooltip";
 import type { ProviderAccount } from "@/lib/sdk-types";
 
 // Compact duration formatter shared by the three render branches. Mirrors the
@@ -22,6 +22,19 @@ function formatDurationMs(deltaMs: number): string {
 
 function isOAuthRuntimeClass(value: ProviderAccount["runtime_class"]): boolean {
   return value === "oauth_refresh" || value === "oauth_device_code";
+}
+
+/** Best-effort ISO/timestamp -> short local datetime string. Falls back to raw. */
+function formatLocalShort(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export interface TokenExpiryChipProps {
@@ -49,6 +62,10 @@ export function TokenExpiryChip({ account, now }: TokenExpiryChipProps) {
     return null;
   }
 
+  const lastRefresh = formatLocalShort(account.last_refreshed_at);
+  const expiresAtLocal = formatLocalShort(account.token_expires_at);
+  const needsReauthAt = formatLocalShort(account.needs_reauth_at);
+
   if (account.needs_reauth_at) {
     // Pull the (already truncated to 500 chars by the backend) last refresh
     // error so operators can tell why the refresh worker gave up — was it
@@ -58,31 +75,36 @@ export function TokenExpiryChip({ account, now }: TokenExpiryChipProps) {
     // single most informative signal for triaging needs_reauth accounts.
     const reason = account.refresh_last_error?.trim();
     const attempts = account.refresh_attempts ?? 0;
-    if (!reason && attempts === 0) {
-      return <QuietBadge status="error" label={t("adminAccounts.tokenNeedsReauth")} />;
+    const rows: DataTooltipRow[] = [];
+    if (attempts > 0) {
+      rows.push({
+        label: t("adminAccounts.tokenReauthAttemptsLabel", { count: attempts }),
+        value: String(attempts),
+        tone: "error",
+      });
+    }
+    if (lastRefresh) {
+      rows.push({ label: t("adminAccounts.lastRefreshedAt"), value: lastRefresh });
+    }
+    if (needsReauthAt) {
+      rows.push({ label: t("adminAccounts.tokenNeedsReauth"), value: needsReauthAt, tone: "error" });
     }
     return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="inline-block">
-            <QuietBadge status="error" label={t("adminAccounts.tokenNeedsReauth")} />
-          </span>
-        </TooltipTrigger>
-        <TooltipContent className="max-w-sm" side="top">
-          {attempts > 0 ? (
-            <div className="mb-1 font-medium">
-              {t("adminAccounts.tokenReauthAttemptsLabel", { count: attempts })}
-            </div>
-          ) : null}
-          {reason ? (
-            <div className="break-words font-mono text-2xs leading-snug">{reason}</div>
+      <DataTooltip
+        title={t("adminAccounts.tokenNeedsReauth")}
+        primary={
+          reason ? (
+            <span className="block max-w-[18rem] break-words font-mono text-xs leading-snug">
+              {reason}
+            </span>
           ) : (
-            <div className="text-srapi-text-tertiary">
-              {t("adminAccounts.tokenReauthNoReason")}
-            </div>
-          )}
-        </TooltipContent>
-      </Tooltip>
+            t("adminAccounts.tokenReauthNoReason")
+          )
+        }
+        rows={rows.length > 0 ? rows : undefined}
+      >
+        <QuietBadge status="error" label={t("adminAccounts.tokenNeedsReauth")} />
+      </DataTooltip>
     );
   }
 
@@ -97,18 +119,49 @@ export function TokenExpiryChip({ account, now }: TokenExpiryChipProps) {
   }
   const deltaMs = expiry.getTime() - reference.getTime();
   const duration = formatDurationMs(deltaMs);
-  if (deltaMs < 0) {
-    return (
-      <QuietBadge
-        status="limited"
-        label={t("adminAccounts.tokenExpiredAgo", { duration })}
-      />
-    );
+  const expired = deltaMs < 0;
+
+  const rows: DataTooltipRow[] = [];
+  if (expiresAtLocal) {
+    rows.push({
+      label: t("adminAccounts.tokenExpiresAt"),
+      value: expiresAtLocal,
+      tone: expired ? "warning" : "default",
+    });
   }
+  if (lastRefresh) {
+    rows.push({ label: t("adminAccounts.lastRefreshedAt"), value: lastRefresh });
+  }
+  const attempts = account.refresh_attempts ?? 0;
+  if (attempts > 0) {
+    rows.push({
+      label: t("adminAccounts.tokenReauthAttemptsLabel", { count: attempts }),
+      value: String(attempts),
+      tone: "warning",
+    });
+  }
+
+  const label = expired
+    ? t("adminAccounts.tokenExpiredAgo", { duration })
+    : t("adminAccounts.tokenRefreshesIn", { duration });
+
+  // Skip the tooltip wrapper when we have nothing extra to reveal — keeps the
+  // chip cheap for accounts with no refresh history snapshotted yet.
+  if (rows.length === 0) {
+    return <QuietBadge status={expired ? "limited" : "disabled"} label={label} />;
+  }
+
   return (
-    <QuietBadge
-      status="disabled"
-      label={t("adminAccounts.tokenRefreshesIn", { duration })}
-    />
+    <DataTooltip
+      title={expired ? t("adminAccounts.tokenExpiredAgo", { duration }) : t("adminAccounts.tokenRefreshesIn", { duration })}
+      primary={
+        <span className="tabular text-srapi-text-primary">
+          {expired ? `-${duration}` : duration}
+        </span>
+      }
+      rows={rows}
+    >
+      <QuietBadge status={expired ? "limited" : "disabled"} label={label} />
+    </DataTooltip>
   );
 }

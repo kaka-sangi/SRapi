@@ -9,9 +9,11 @@ import type { EnabledOAuthProvider } from "@/lib/sdk-types";
 import { ADMIN_HOME_ROUTE, USER_HOME_ROUTE } from "@/lib/routes";
 import { useLanguage } from "@/context/LanguageContext";
 import { Button } from "@/components/ui/button";
+import { FloatingInput } from "@/components/ui/floating-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { Kbd } from "@/components/ui/kbd";
 import { useCaptcha } from "@/components/auth/captcha";
 
 // Where the provider redirects the browser after the callback creates the
@@ -25,12 +27,18 @@ function startOAuthHref(provider: string, providerKey: string): string {
   return `/api/v1/auth/oauth/${encodeURIComponent(provider)}/start?${params.toString()}`;
 }
 
+// Cheap email shape check — matches "x@y.z" with no spaces. Strict RFC-5322 is
+// overkill for inline UX; the server still validates definitively on submit.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export function LoginForm() {
   const router = useRouter();
   const { t } = useLanguage();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [emailTouched, setEmailTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
   const [submitting, setSubmitting] = useState(false);
   const [providers, setProviders] = useState<EnabledOAuthProvider[]>([]);
   const [passwordlessSent, setPasswordlessSent] = useState(false);
@@ -62,10 +70,25 @@ export function LoginForm() {
     router.replace(from && from.startsWith("/") ? from : home);
   }
 
+  // Inline validation for the email shape — only "complains" after the field
+  // has been touched (blurred), so the user isn't yelled at while typing.
+  const emailLooksValid = EMAIL_RE.test(email.trim());
+  const inlineEmailError = emailTouched && email.length > 0 && !emailLooksValid
+    ? t("login.errRequired")
+    : undefined;
+
+  const formValid = emailLooksValid && password.length > 0 && !(captcha.required && !captcha.token);
+  const formDirty = email.length > 0 || password.length > 0;
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setFieldErrors({});
     if (!email || !password) {
+      const next: { email?: string; password?: string } = {};
+      if (!email) next.email = t("login.errRequired");
+      if (!password) next.password = t("login.errRequired");
+      setFieldErrors(next);
       setError(t("login.errRequired"));
       return;
     }
@@ -89,6 +112,7 @@ export function LoginForm() {
   async function requestPasswordless() {
     setError(null);
     if (!email) {
+      setFieldErrors({ email: t("login.errRequired") });
       setError(t("login.errRequired"));
       return;
     }
@@ -129,6 +153,7 @@ export function LoginForm() {
 
   // ---- Two-factor step ----
   if (challengeId) {
+    const codeReady = code.length === 6;
     return (
       <Card className="p-7 sm:p-8">
         <h2 className="text-2xl font-semibold tracking-tight text-srapi-text-primary">{t("login.twoFactorTitle")}</h2>
@@ -145,11 +170,14 @@ export function LoginForm() {
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
               placeholder="000000"
-              className="text-center font-mono text-lg tracking-[0.4em]"
+              className={cn(
+                "text-center font-mono text-lg tracking-[0.4em]",
+                error && "anim-shake",
+              )}
             />
           </div>
           {error && (
-            <p role="alert" className="rounded-xl bg-srapi-error/10 px-3 py-2 text-sm text-srapi-error">
+            <p role="alert" className="anim-shake rounded-xl bg-srapi-error/10 px-3 py-2 text-sm text-srapi-error">
               {error}
             </p>
           )}
@@ -158,9 +186,12 @@ export function LoginForm() {
             variant="primary"
             size="lg"
             className="h-11 w-full rounded-xl btn-raise"
-            disabled={submitting || code.length < 6}
+            disabled={submitting || !codeReady}
           >
-            {submitting ? t("login.verifying") : t("login.verify")}
+            <span className="inline-flex items-center gap-2">
+              {submitting ? t("login.verifying") : t("login.verify")}
+              {codeReady && !submitting ? <Kbd className="bg-white/10 border-white/20 text-white/90 shadow-none">↵</Kbd> : null}
+            </span>
           </Button>
           <button
             type="button"
@@ -185,20 +216,45 @@ export function LoginForm() {
       <p className="mt-1.5 text-sm text-srapi-text-secondary">{t("login.subtitle")}</p>
 
       <form onSubmit={handleSubmit} noValidate className="mt-7 space-y-5">
-        <div>
-          <Label htmlFor="email">{t("login.email")}</Label>
-          <Input
+        <div onBlur={() => setEmailTouched(true)}>
+          <FloatingInput
             id="email"
+            label={t("login.email")}
             type="email"
             autoComplete="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
+            onChange={(v) => {
+              setEmail(v);
+              if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
+            }}
+            error={fieldErrors.email ?? inlineEmailError}
           />
         </div>
         <div>
-          <div className="flex items-baseline justify-between">
-            <Label htmlFor="password">{t("login.password")}</Label>
+          <div className="relative">
+            <FloatingInput
+              id="password"
+              label={t("login.password")}
+              type={showPassword ? "text" : "password"}
+              autoComplete="current-password"
+              value={password}
+              onChange={(v) => {
+                setPassword(v);
+                if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
+              }}
+              error={fieldErrors.password}
+              className="[&_input]:pr-12"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={t(showPassword ? "login.hidePassword" : "login.showPassword")}
+              className="absolute right-0 top-0 flex h-14 w-12 items-center justify-center rounded-r-2xl text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
+            >
+              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
+          </div>
+          <div className="mt-1 flex justify-end">
             <a
               href="/auth/reset"
               className="text-xs text-srapi-text-tertiary underline-offset-2 transition-colors hover:text-srapi-text-secondary hover:underline"
@@ -206,27 +262,9 @@ export function LoginForm() {
               {t("login.forgot")}
             </a>
           </div>
-          <div className="relative">
-            <Input
-              id="password"
-              type={showPassword ? "text" : "password"}
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="pr-10"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              aria-label={t(showPassword ? "login.hidePassword" : "login.showPassword")}
-              className="absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-xl text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
-            >
-              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-            </button>
-          </div>
         </div>
-        {error && (
-          <p role="alert" className="rounded-xl bg-srapi-error/10 px-3 py-2 text-sm text-srapi-error">
+        {error && !fieldErrors.email && !fieldErrors.password && (
+          <p role="alert" className="anim-shake rounded-xl bg-srapi-error/10 px-3 py-2 text-sm text-srapi-error">
             {error}
           </p>
         )}
@@ -238,7 +276,12 @@ export function LoginForm() {
           className="h-11 w-full rounded-xl btn-raise"
           disabled={submitting || (captcha.required && !captcha.token)}
         >
-          {submitting ? t("login.signingIn") : t("login.signIn")}
+          <span className="inline-flex items-center gap-2">
+            {submitting ? t("login.signingIn") : t("login.signIn")}
+            {formValid && formDirty && !submitting ? (
+              <Kbd className="border-white/20 bg-white/10 text-white/90 shadow-none">↵</Kbd>
+            ) : null}
+          </span>
         </Button>
         <Button
           type="button"

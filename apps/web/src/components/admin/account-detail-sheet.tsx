@@ -1,13 +1,16 @@
 "use client";
 
 import type { UseQueryResult } from "@tanstack/react-query";
-import { Activity, RefreshCw, Server } from "lucide-react";
+import { Activity, AlertTriangle, History, RefreshCw, Server, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { DataPill } from "@/components/ui/data-pill";
+import { DataTooltip } from "@/components/ui/data-tooltip";
 import { IconBubble } from "@/components/ui/icon-bubble";
 import { SectionTitle } from "@/components/ui/section-title";
 import { QuietBadge } from "@/components/ui/quiet-badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { IllustratedEmptyState } from "@/components/ui/illustrated-empty-state";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import {
@@ -212,18 +215,37 @@ function QuotaWindowRow({ window }: { window: QuotaDisplayWindow }) {
         <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-srapi-text-secondary">
           {quotaWindowDisplayLabel(window, t)}
         </span>
-        <span
-          className={cn(
-            "text-2xl font-semibold tracking-tight tabular",
-            level === "crit"
-              ? "text-srapi-error"
-              : level === "warn"
-                ? "text-srapi-warning"
-                : "text-srapi-text-primary",
-          )}
+        <DataTooltip
+          title={quotaWindowDisplayLabel(window, t)}
+          primary={`${Math.round(window.remainingPercent)}%`}
+          rows={[
+            { label: t("adminAccounts.usage"), value: quotaWindowValue(window) },
+            {
+              label: t("adminCommon.status"),
+              value:
+                level === "crit"
+                  ? t("adminAccounts.quotaCritical") ?? "Critical"
+                  : level === "warn"
+                    ? t("adminAccounts.quotaWarn") ?? "Warning"
+                    : t("adminAccounts.quotaOk") ?? "Healthy",
+              tone: level === "crit" ? "error" : level === "warn" ? "warning" : "success",
+            },
+          ]}
+          footer={quotaWindowTiming(window, t)}
         >
-          {Math.round(window.remainingPercent)}%
-        </span>
+          <span
+            className={cn(
+              "text-2xl font-semibold tracking-tight tabular cursor-help",
+              level === "crit"
+                ? "metric-strong-bad"
+                : level === "warn"
+                  ? "metric-strong-warn"
+                  : "metric-primary",
+            )}
+          >
+            {Math.round(window.remainingPercent)}%
+          </span>
+        </DataTooltip>
       </div>
       <div className="relative h-1.5 overflow-hidden rounded-full bg-srapi-border">
         <div
@@ -272,12 +294,37 @@ function UsageWindowCard({
         <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-srapi-text-secondary">
           {usageWindowLabel(window.window, t)}
         </span>
-        <span className="text-lg font-semibold tracking-tight tabular text-srapi-text-primary">
-          {formatCompactNumber(window.requests)}{" "}
-          <span className="text-[11px] font-normal text-srapi-text-tertiary">
-            {t("adminAccounts.usageRequests").toLowerCase()}
+        <DataTooltip
+          title={usageWindowLabel(window.window, t)}
+          primary={`${formatCompactNumber(window.requests)} ${t("adminAccounts.usageRequests").toLowerCase()}`}
+          rows={[
+            {
+              label: t("adminAccounts.usageTokens"),
+              value: formatCompactNumber(window.total_tokens),
+            },
+            {
+              label: t("adminAccounts.usageCost"),
+              value: formatMoney(window.cost, window.currency),
+            },
+            {
+              label: t("adminAccounts.usageErrors"),
+              value: window.error_count,
+              tone: hasErrors ? "error" : "muted",
+            },
+          ]}
+          footer={
+            window.last_request_at
+              ? `${t("adminAccounts.lastUsedAt")} ${formatDateTime(window.last_request_at)}`
+              : undefined
+          }
+        >
+          <span className="metric-secondary tabular cursor-help">
+            {formatCompactNumber(window.requests)}{" "}
+            <span className="text-[11px] font-normal text-srapi-text-tertiary">
+              {t("adminAccounts.usageRequests").toLowerCase()}
+            </span>
           </span>
-        </span>
+        </DataTooltip>
       </div>
       <div className="relative h-1.5 overflow-hidden rounded-full bg-srapi-border">
         <div
@@ -440,8 +487,12 @@ function Section<T>({
 }
 
 /**
- * Read-only diagnostics drawer for one provider account. Surfaces the admin
- * health / quota / RPM / proxy-quality endpoints that previously had no UI.
+ * Read-only diagnostics drawer for one provider account. Three-tab layout:
+ *   Overview — identity + KPI strip + chips + facts.
+ *   Health   — health digest, today/window usage, quota, RPM, proxy quality.
+ *   History  — daily usage feed (audit-log-style change feed when available).
+ *
+ * Surfaces the admin health / quota / RPM / proxy-quality endpoints.
  */
 export function AccountDetailSheet({
   account,
@@ -471,6 +522,12 @@ export function AccountDetailSheet({
   const latestRequestAt = latestUsageWindowRequestAt(usageWindows.data);
   const lastUsageDate = latestRequestAt || [...activeUsagePoints].reverse()[0]?.date || "";
 
+  // KPI strip values — sourced from the today/health digest where available.
+  const todayRequests = usageToday.data?.requests ?? 0;
+  const todaySuccessRate = usageToday.data?.success_rate;
+  const healthLatencyP95 = health.data?.latency_p95_ms ?? 0;
+  const healthErrorClass = health.data?.error_class ?? null;
+
   async function refreshQuota() {
     if (!id) return;
     try {
@@ -495,6 +552,7 @@ export function AccountDetailSheet({
   return (
     <Sheet open={account !== null} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-[28rem] gap-0 overflow-y-auto p-6">
+        {/* ── Header: identity + chips ── */}
         <div className="flex items-start gap-3">
           <IconBubble size="lg" tone="accent">
             <Server aria-hidden />
@@ -524,7 +582,16 @@ export function AccountDetailSheet({
                   {runtimeClassLabel(t, account.runtime_class)}
                 </DataPill>
                 {account.priority != null && account.priority !== 0 ? (
-                  <DataPill tone="neutral">P{account.priority}</DataPill>
+                  <DataTooltip
+                    title={t("adminAccounts.routing")}
+                    primary={`P${account.priority}`}
+                    rows={[
+                      { label: t("adminAccounts.priority"), value: account.priority },
+                      { label: t("adminAccounts.weight"), value: account.weight ?? 1 },
+                    ]}
+                  >
+                    <DataPill tone="neutral">P{account.priority}</DataPill>
+                  </DataTooltip>
                 ) : null}
                 {account.weight != null && account.weight !== 1 ? (
                   <DataPill tone="neutral">W{account.weight}</DataPill>
@@ -535,225 +602,410 @@ export function AccountDetailSheet({
         </div>
 
         {account ? (
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            {identity ? (
-              <DetailMetric
-                label={t("adminAccounts.identity")}
-                value={
-                  <span className="inline-block max-w-full truncate" title={identity.primary}>
-                    {identity.primary}
-                  </span>
-                }
-              />
-            ) : null}
-            <DetailMetric
-              label={t("adminAccounts.provider")}
-              value={providerName ?? account.provider_id}
-            />
-            <DetailMetric
-              label={t("adminAccounts.models")}
-              value={accountModelPolicyLabel(t, account.metadata)}
-            />
-            <DetailMetric
-              label={t("adminAccounts.groups")}
-              value={accountGroupSummary(account, groupNameById) || t("adminAccounts.ungrouped")}
-            />
-            <DetailMetric
-              label={t("adminAccounts.proxy")}
-              value={
-                account.proxy_id ? t("adminAccounts.proxyConfigured") : t("adminAccounts.noProxy")
-              }
-            />
-            <DetailMetric
-              label={t("adminAccounts.routing")}
-              value={`P${account.priority ?? 0} / W${account.weight ?? 1}`}
-            />
-            <DetailMetric
-              label={t("adminAccounts.lastUsedAt")}
-              value={
-                usageWindows.isLoading || usageDaily.isLoading
-                  ? t("adminAccounts.detailLoading")
-                  : latestRequestAt
-                    ? formatDateTime(latestRequestAt)
-                    : lastUsageDate
-                      ? formatDate(lastUsageDate)
-                      : t("adminAccounts.neverUsed")
-              }
-            />
-            <DetailMetric
-              label={t("adminAccounts.activeUsageRange")}
-              value={
-                usageWindows.isLoading || usageDaily.isLoading
-                  ? t("adminAccounts.detailLoading")
-                  : activeUsagePoints.length > 0
-                    ? activeUsageDateSummary(usageDaily.data ?? [], t)
-                    : usageWindowActiveRangeLabel(usageWindows.data, t)
-              }
-            />
-            <DetailMetric
-              label={t("adminAccounts.activeUsageDaysLabel")}
-              value={
-                usageDaily.isLoading
-                  ? t("adminAccounts.detailLoading")
-                  : activeUsageDayCountLabel(usageDaily.data ?? [], t)
-              }
-            />
-            <DetailMetric
-              label={t("adminAccounts.createdAt")}
-              value={formatDateTime(account.created_at)}
-            />
-            <DetailMetric
-              label={t("adminAccounts.endpointOverrides")}
-              value={
-                endpointFacts.length > 0
-                  ? endpointFacts.map((fact) => `${fact.label}: ${fact.value}`).join(" ")
-                  : t("adminAccounts.inheritProvider")
-              }
-            />
-            {account.last_refreshed_at ? (
-              <DetailMetric
-                label={t("adminAccounts.lastRefreshedAt")}
-                value={formatDateTime(account.last_refreshed_at)}
-              />
-            ) : null}
-            {account.token_expires_at ? (
-              <DetailMetric
-                label={t("adminAccounts.tokenExpiresAt")}
-                value={formatDateTime(account.token_expires_at)}
-              />
-            ) : null}
-            {accountCapacityFacts(t, account).map((fact) => (
-              <DetailMetric key={fact.key} label={fact.label} value={fact.value} />
-            ))}
-            {accountProfileFacts(t, account)
-              .filter((fact) => !["max-concurrency", "max-sessions", "rpm"].includes(fact.key))
-              .slice(0, 4)
-              .map((fact) => (
-                <DetailMetric key={fact.key} label={fact.label} value={fact.value} />
-              ))}
-          </div>
-        ) : null}
+          <Tabs defaultValue="overview" className="mt-5">
+            <TabsList className="w-full">
+              <TabsTrigger value="overview" className="flex-1 gap-1.5">
+                <Server className="size-3.5" />
+                {t("adminCommon.overview") ?? "Overview"}
+              </TabsTrigger>
+              <TabsTrigger value="health" className="flex-1 gap-1.5">
+                <ShieldCheck className="size-3.5" />
+                {t("adminAccounts.healthTitle")}
+              </TabsTrigger>
+              <TabsTrigger value="history" className="flex-1 gap-1.5">
+                <History className="size-3.5" />
+                {t("adminCommon.history") ?? "History"}
+              </TabsTrigger>
+            </TabsList>
 
-        <div className="mt-6 space-y-5">
-          <Section title={t("adminAccounts.healthTitle")} query={health} icon={<Activity />}>
-            {(h) => {
-              const investigationLinks = adminAccountHealthInvestigationLinks(h);
-              return (
-                <div>
-                  <Row label={t("adminCommon.status")} value={h.status} />
-                  <Row label={t("adminAccounts.successRate")} value={pct(h.success_rate)} />
-                  <Row
-                    label={`${t("adminAccounts.latency")} p50 / p95`}
-                    value={`${Math.round(h.latency_p50_ms)} / ${Math.round(h.latency_p95_ms)}ms`}
-                  />
-                  <Row label={t("adminAccounts.circuitState")} value={h.circuit_state} />
-                  {h.error_class ? (
-                    <Row
-                      label={t("adminAccounts.lastError")}
-                      value={
-                        investigationLinks?.errorLogs ? (
-                          <Link
-                            href={investigationLinks.errorLogs}
-                            className="text-srapi-error underline-offset-2 hover:underline"
-                          >
-                            {h.error_class}
-                          </Link>
-                        ) : (
-                          h.error_class
-                        )
-                      }
-                    />
-                  ) : null}
-                  {investigationLinks ? (
-                    <Row
-                      label={t("adminAccounts.evidence")}
-                      value={<AccountHealthEvidenceLinks links={investigationLinks} />}
-                    />
-                  ) : null}
-                  {h.cooldown_until ? (
-                    <Row
-                      label={t("adminAccounts.cooldown")}
-                      value={h.cooldown_reason ?? h.cooldown_until}
-                    />
-                  ) : null}
-                </div>
-              );
-            }}
-          </Section>
-
-          <Section title={t("adminAccounts.usageTodayTitle")} query={usageToday}>
-            {(today) => <UsageTodayBody today={today} />}
-          </Section>
-
-          <Section title={t("adminAccounts.usageWindowsTitle")} query={usageWindows}>
-            {(result) => <UsageWindowsBody result={result} />}
-          </Section>
-
-          <Section title={t("adminAccounts.usageDailyTitle")} query={usageDaily}>
-            {(points) => <UsageDailyBody points={points} />}
-          </Section>
-
-          <Section title={t("adminAccounts.rpmTitle")} query={rpm}>
-            {(r) => (
-              <div>
-                <Row
-                  label={t("adminAccounts.rpmTitle")}
-                  value={`${r.rpm_used} / ${r.rpm_limit ?? "∞"}`}
-                />
-                <Row label="window" value={`${r.window_seconds}s`} />
-              </div>
-            )}
-          </Section>
-
-          <Section
-            title={t("adminAccounts.quotaTitle")}
-            query={quota}
-            action={
-              id ? (
-                <button
-                  type="button"
-                  onClick={() => void refreshQuota()}
-                  disabled={fetchQuota.isPending}
-                  className="flex items-center gap-1.5 rounded-full border border-srapi-border px-2.5 py-1 text-[11px] font-medium text-srapi-text-secondary transition-colors hover:bg-srapi-card-muted hover:text-srapi-text-primary disabled:opacity-50"
+            {/* ── Tab: Overview ── identity + KPI strip + chips */}
+            <TabsContent value="overview">
+              {/* KPI strip — 3-tier hierarchy via .metric-* utilities. */}
+              <div className="grid grid-cols-3 gap-2 rounded-2xl border border-srapi-border bg-srapi-card-muted/60 p-3">
+                <DataTooltip
+                  title={t("adminAccounts.usageRequests")}
+                  primary={formatCompactNumber(todayRequests)}
+                  rows={[
+                    {
+                      label: t("adminAccounts.usageSuccessRate"),
+                      value:
+                        todaySuccessRate != null ? formatPercent(todaySuccessRate) : "—",
+                      tone:
+                        todaySuccessRate != null && todaySuccessRate < 0.9
+                          ? "warning"
+                          : "success",
+                    },
+                    {
+                      label: t("adminAccounts.usageErrors"),
+                      value: usageToday.data?.error_count ?? 0,
+                      tone:
+                        (usageToday.data?.error_count ?? 0) > 0 ? "error" : "muted",
+                    },
+                  ]}
+                  footer={t("adminAccounts.usageTodayTitle")}
                 >
-                  <RefreshCw className={cn("size-3", fetchQuota.isPending && "animate-spin")} />
-                  {t("adminAccounts.quotaRefresh")}
-                </button>
-              ) : null
-            }
-          >
-            {(q) =>
-              q.data.length === 0 ? (
-                <p className="text-xs text-srapi-text-tertiary">
-                  {t("adminAccounts.detailNoData")}
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {latestQuotaWindows(q.data).map((window) => (
-                    <QuotaWindowRow key={window.snapshot.quota_type} window={window} />
-                  ))}
-                </div>
-              )
-            }
-          </Section>
-
-          <Section title={t("adminAccounts.proxyQualityTitle")} query={proxy}>
-            {(p) => (
-              <div>
-                <Row
-                  label={t("adminAccounts.proxy")}
-                  value={p.proxy_id ?? t("adminAccounts.noProxy")}
-                />
-                <Row label={t("adminAccounts.successRate")} value={pct(p.success_rate)} />
-                <Row
-                  label={`${t("adminAccounts.latency")} p95`}
-                  value={`${Math.round(p.latency_p95_ms)}ms`}
-                />
-                <Row label="samples" value={p.sample_count} />
+                  <div className="flex min-w-0 flex-col cursor-help">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-srapi-text-tertiary">
+                      {t("adminAccounts.usageRequests")}
+                    </span>
+                    <span className="metric-primary tabular truncate">
+                      {formatCompactNumber(todayRequests)}
+                    </span>
+                  </div>
+                </DataTooltip>
+                <DataTooltip
+                  title={t("adminAccounts.usageSuccessRate")}
+                  primary={todaySuccessRate != null ? formatPercent(todaySuccessRate) : "—"}
+                  rows={[
+                    {
+                      label: t("adminAccounts.usageRequests"),
+                      value: formatCompactNumber(todayRequests),
+                    },
+                  ]}
+                >
+                  <div className="flex min-w-0 flex-col cursor-help">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-srapi-text-tertiary">
+                      {t("adminAccounts.usageSuccessRate")}
+                    </span>
+                    <span
+                      className={cn(
+                        "metric-secondary tabular truncate",
+                        todaySuccessRate != null && todaySuccessRate < 0.9 &&
+                          "metric-strong-warn",
+                      )}
+                    >
+                      {todaySuccessRate != null ? formatPercent(todaySuccessRate) : "—"}
+                    </span>
+                  </div>
+                </DataTooltip>
+                <DataTooltip
+                  title={`${t("adminAccounts.latency")} p95`}
+                  primary={`${Math.round(healthLatencyP95)}ms`}
+                  rows={[
+                    {
+                      label: "p50",
+                      value: `${Math.round(health.data?.latency_p50_ms ?? 0)}ms`,
+                    },
+                    {
+                      label: "p95",
+                      value: `${Math.round(healthLatencyP95)}ms`,
+                      tone: healthLatencyP95 > 5000 ? "warning" : "default",
+                    },
+                  ]}
+                >
+                  <div className="flex min-w-0 flex-col cursor-help">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-srapi-text-tertiary">
+                      p95
+                    </span>
+                    <span className="metric-tertiary tabular truncate">
+                      {Math.round(healthLatencyP95)}ms
+                    </span>
+                  </div>
+                </DataTooltip>
               </div>
-            )}
-          </Section>
-        </div>
+
+              {/* Facts grid — identity, provider, runtime, last-used, etc. */}
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {identity ? (
+                  <DetailMetric
+                    label={t("adminAccounts.identity")}
+                    value={
+                      <span
+                        className="inline-block max-w-full truncate"
+                        title={identity.primary}
+                      >
+                        {identity.primary}
+                      </span>
+                    }
+                  />
+                ) : null}
+                <DetailMetric
+                  label={t("adminAccounts.provider")}
+                  value={providerName ?? account.provider_id}
+                />
+                <DetailMetric
+                  label={t("adminAccounts.models")}
+                  value={accountModelPolicyLabel(t, account.metadata)}
+                />
+                <DetailMetric
+                  label={t("adminAccounts.groups")}
+                  value={
+                    accountGroupSummary(account, groupNameById) || t("adminAccounts.ungrouped")
+                  }
+                />
+                <DetailMetric
+                  label={t("adminAccounts.proxy")}
+                  value={
+                    account.proxy_id
+                      ? t("adminAccounts.proxyConfigured")
+                      : t("adminAccounts.noProxy")
+                  }
+                />
+                <DetailMetric
+                  label={t("adminAccounts.routing")}
+                  value={`P${account.priority ?? 0} / W${account.weight ?? 1}`}
+                />
+                <DetailMetric
+                  label={t("adminAccounts.lastUsedAt")}
+                  value={
+                    usageWindows.isLoading || usageDaily.isLoading
+                      ? t("adminAccounts.detailLoading")
+                      : latestRequestAt
+                        ? formatDateTime(latestRequestAt)
+                        : lastUsageDate
+                          ? formatDate(lastUsageDate)
+                          : t("adminAccounts.neverUsed")
+                  }
+                />
+                <DetailMetric
+                  label={t("adminAccounts.activeUsageRange")}
+                  value={
+                    usageWindows.isLoading || usageDaily.isLoading
+                      ? t("adminAccounts.detailLoading")
+                      : activeUsagePoints.length > 0
+                        ? activeUsageDateSummary(usageDaily.data ?? [], t)
+                        : usageWindowActiveRangeLabel(usageWindows.data, t)
+                  }
+                />
+                <DetailMetric
+                  label={t("adminAccounts.activeUsageDaysLabel")}
+                  value={
+                    usageDaily.isLoading
+                      ? t("adminAccounts.detailLoading")
+                      : activeUsageDayCountLabel(usageDaily.data ?? [], t)
+                  }
+                />
+                <DetailMetric
+                  label={t("adminAccounts.createdAt")}
+                  value={formatDateTime(account.created_at)}
+                />
+                <DetailMetric
+                  label={t("adminAccounts.endpointOverrides")}
+                  value={
+                    endpointFacts.length > 0
+                      ? endpointFacts.map((fact) => `${fact.label}: ${fact.value}`).join(" ")
+                      : t("adminAccounts.inheritProvider")
+                  }
+                />
+                {account.last_refreshed_at ? (
+                  <DetailMetric
+                    label={t("adminAccounts.lastRefreshedAt")}
+                    value={formatDateTime(account.last_refreshed_at)}
+                  />
+                ) : null}
+                {account.token_expires_at ? (
+                  <DetailMetric
+                    label={t("adminAccounts.tokenExpiresAt")}
+                    value={formatDateTime(account.token_expires_at)}
+                  />
+                ) : null}
+                {accountCapacityFacts(t, account).map((fact) => (
+                  <DetailMetric key={fact.key} label={fact.label} value={fact.value} />
+                ))}
+                {accountProfileFacts(t, account)
+                  .filter((fact) => !["max-concurrency", "max-sessions", "rpm"].includes(fact.key))
+                  .slice(0, 4)
+                  .map((fact) => (
+                    <DetailMetric key={fact.key} label={fact.label} value={fact.value} />
+                  ))}
+              </div>
+            </TabsContent>
+
+            {/* ── Tab: Health ── digest + recent error severity stripe */}
+            <TabsContent value="health">
+              <div className="space-y-5">
+                <Section
+                  title={t("adminAccounts.healthTitle")}
+                  query={health}
+                  icon={<Activity />}
+                >
+                  {(h) => {
+                    const investigationLinks = adminAccountHealthInvestigationLinks(h);
+                    const sev: "info" | "success" | "warning" | "error" =
+                      h.circuit_state === "open"
+                        ? "error"
+                        : h.success_rate < 0.5
+                          ? "error"
+                          : h.success_rate < 0.9
+                            ? "warning"
+                            : "success";
+                    return (
+                      <div className="log-row rounded-lg" data-sev={sev}>
+                        <div className="px-3 py-2">
+                          <Row label={t("adminCommon.status")} value={h.status} />
+                          <Row
+                            label={t("adminAccounts.successRate")}
+                            value={
+                              <span
+                                className={cn(
+                                  "tabular",
+                                  sev === "error"
+                                    ? "metric-strong-bad"
+                                    : sev === "warning"
+                                      ? "metric-strong-warn"
+                                      : "metric-strong-good",
+                                )}
+                              >
+                                {pct(h.success_rate)}
+                              </span>
+                            }
+                          />
+                          <Row
+                            label={`${t("adminAccounts.latency")} p50 / p95`}
+                            value={`${Math.round(h.latency_p50_ms)} / ${Math.round(h.latency_p95_ms)}ms`}
+                          />
+                          <Row
+                            label={t("adminAccounts.circuitState")}
+                            value={h.circuit_state}
+                          />
+                          {h.error_class ? (
+                            <Row
+                              label={t("adminAccounts.lastError")}
+                              value={
+                                investigationLinks?.errorLogs ? (
+                                  <Link
+                                    href={investigationLinks.errorLogs}
+                                    className="text-srapi-error underline-offset-2 hover:underline"
+                                  >
+                                    {h.error_class}
+                                  </Link>
+                                ) : (
+                                  h.error_class
+                                )
+                              }
+                            />
+                          ) : null}
+                          {investigationLinks ? (
+                            <Row
+                              label={t("adminAccounts.evidence")}
+                              value={<AccountHealthEvidenceLinks links={investigationLinks} />}
+                            />
+                          ) : null}
+                          {h.cooldown_until ? (
+                            <Row
+                              label={t("adminAccounts.cooldown")}
+                              value={h.cooldown_reason ?? h.cooldown_until}
+                            />
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  }}
+                </Section>
+
+                {/* Recent errors stripe — surfaces the latest error_class when present. */}
+                {healthErrorClass ? (
+                  <div className="log-row rounded-lg" data-sev="error">
+                    <div className="flex items-start gap-2 px-3 py-2">
+                      <AlertTriangle className="mt-0.5 size-4 shrink-0 text-srapi-error" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-srapi-text-tertiary">
+                          {t("adminAccounts.lastError")}
+                        </div>
+                        <div className="mt-0.5 text-sm font-medium text-srapi-text-primary">
+                          {healthErrorClass}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                <Section title={t("adminAccounts.usageTodayTitle")} query={usageToday}>
+                  {(today) => <UsageTodayBody today={today} />}
+                </Section>
+
+                <Section title={t("adminAccounts.usageWindowsTitle")} query={usageWindows}>
+                  {(result) => <UsageWindowsBody result={result} />}
+                </Section>
+
+                <Section title={t("adminAccounts.rpmTitle")} query={rpm}>
+                  {(r) => (
+                    <div>
+                      <Row
+                        label={t("adminAccounts.rpmTitle")}
+                        value={`${r.rpm_used} / ${r.rpm_limit ?? "∞"}`}
+                      />
+                      <Row label="window" value={`${r.window_seconds}s`} />
+                    </div>
+                  )}
+                </Section>
+
+                <Section
+                  title={t("adminAccounts.quotaTitle")}
+                  query={quota}
+                  action={
+                    id ? (
+                      <button
+                        type="button"
+                        onClick={() => void refreshQuota()}
+                        disabled={fetchQuota.isPending}
+                        className="flex items-center gap-1.5 rounded-full border border-srapi-border px-2.5 py-1 text-[11px] font-medium text-srapi-text-secondary transition-colors hover:bg-srapi-card-muted hover:text-srapi-text-primary disabled:opacity-50"
+                      >
+                        <RefreshCw
+                          className={cn("size-3", fetchQuota.isPending && "animate-spin")}
+                        />
+                        {t("adminAccounts.quotaRefresh")}
+                      </button>
+                    ) : null
+                  }
+                >
+                  {(q) =>
+                    q.data.length === 0 ? (
+                      <p className="text-xs text-srapi-text-tertiary">
+                        {t("adminAccounts.detailNoData")}
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {latestQuotaWindows(q.data).map((window) => (
+                          <QuotaWindowRow key={window.snapshot.quota_type} window={window} />
+                        ))}
+                      </div>
+                    )
+                  }
+                </Section>
+
+                <Section title={t("adminAccounts.proxyQualityTitle")} query={proxy}>
+                  {(p) => (
+                    <div>
+                      <Row
+                        label={t("adminAccounts.proxy")}
+                        value={p.proxy_id ?? t("adminAccounts.noProxy")}
+                      />
+                      <Row
+                        label={t("adminAccounts.successRate")}
+                        value={pct(p.success_rate)}
+                      />
+                      <Row
+                        label={`${t("adminAccounts.latency")} p95`}
+                        value={`${Math.round(p.latency_p95_ms)}ms`}
+                      />
+                      <Row label="samples" value={p.sample_count} />
+                    </div>
+                  )}
+                </Section>
+              </div>
+            </TabsContent>
+
+            {/* ── Tab: History ── daily usage feed (audit-log-style change feed) */}
+            <TabsContent value="history">
+              <div className="space-y-5">
+                <Section title={t("adminAccounts.usageDailyTitle")} query={usageDaily}>
+                  {(points) =>
+                    activeDailyUsagePoints(points).length === 0 ? (
+                      <IllustratedEmptyState
+                        illust="chart"
+                        title={t("adminAccounts.neverUsed")}
+                        description={t("adminAccounts.detailNoData")}
+                      />
+                    ) : (
+                      <UsageDailyBody points={points} />
+                    )
+                  }
+                </Section>
+              </div>
+            </TabsContent>
+          </Tabs>
+        ) : null}
       </SheetContent>
     </Sheet>
   );

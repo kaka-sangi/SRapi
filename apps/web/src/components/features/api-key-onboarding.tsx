@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CopyButton, CopyableValue } from "@/components/ui/copy-button";
+import { IllustratedEmptyState } from "@/components/ui/illustrated-empty-state";
+import { DataPill } from "@/components/ui/data-pill";
 
 const KEY_PLACEHOLDER = "YOUR_API_KEY";
 
@@ -130,8 +132,18 @@ export function ApiKeyOnboarding({
     }
   }
 
+  // Three-step illustrated walkthrough — orients the operator before they
+  // pick a snippet. Each tile renders an abstract IllustratedEmptyState glyph
+  // (no extra SVG mass here) so the visuals tonally match other empty/illust
+  // surfaces across the console.
+  const steps: Array<{ illust: "search" | "logs" | "chart"; title: string; body: string }> = [
+    { illust: "search", title: t("apiKeys.onboardingStep1Title"), body: t("apiKeys.onboardingStep1Body") },
+    { illust: "logs", title: t("apiKeys.onboardingStep2Title"), body: t("apiKeys.onboardingStep2Body") },
+    { illust: "chart", title: t("apiKeys.onboardingStep3Title"), body: t("apiKeys.onboardingStep3Body") },
+  ];
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
           {t("apiKeys.onboardingTitle")}
@@ -141,6 +153,27 @@ export function ApiKeyOnboarding({
           label={t("apiKeys.onboardingBaseUrl")}
           className="max-w-56 text-xs text-srapi-text-secondary"
         />
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-3">
+        {steps.map((step, i) => (
+          <div
+            key={step.title}
+            className="relative overflow-hidden rounded-2xl border border-srapi-border bg-srapi-card-muted/40 p-3"
+          >
+            <div className="absolute right-2 top-2">
+              <DataPill tone="accent" size="sm">
+                {i + 1}
+              </DataPill>
+            </div>
+            <IllustratedEmptyState
+              illust={step.illust}
+              title={step.title}
+              description={step.body}
+              className="border-0 bg-transparent p-2"
+            />
+          </div>
+        ))}
       </div>
 
       {allowPaste && !apiKey ? (

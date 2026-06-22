@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { cn } from "@/lib/cn";
 
 /** Search box for an admin list toolbar. Controlled by `useAdminList`. */
@@ -83,11 +84,65 @@ export function FilterSelect({
   );
 }
 
-/** Horizontal toolbar wrapper: search on the left, filters trailing. */
-export function ListToolbar({ children }: { children: React.ReactNode }) {
+/**
+ * Horizontal toolbar wrapper: search on the left, filters trailing.
+ *
+ * When `sticky` (default), the toolbar pins to the top of its parent Card
+ * on scroll with a translucent backdrop-blur surface so filters/search stay
+ * reachable while skimming long lists.
+ */
+export function ListToolbar({
+  children,
+  sticky = true,
+}: {
+  children: React.ReactNode;
+  sticky?: boolean;
+}) {
   return (
-    <div className="flex flex-col gap-2 border-b border-srapi-border/70 bg-srapi-card px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
+    <div
+      className={cn(
+        "flex flex-col gap-2 border-b border-srapi-border/70 bg-srapi-card px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2",
+        sticky &&
+          "sticky top-0 z-10 bg-srapi-card/95 backdrop-blur-sm border-b border-srapi-border",
+      )}
+    >
       {children}
     </div>
+  );
+}
+
+const SEVERITY_ALL_VALUE = "all";
+
+const DEFAULT_SEVERITY_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "critical", label: "Critical" },
+  { value: "error", label: "Error" },
+  { value: "warning", label: "Warning" },
+];
+
+/**
+ * Severity quick-filter for list toolbars. Wraps SegmentedControl with a
+ * default {All / Critical / Error / Warning} option set. Selecting "All"
+ * surfaces `undefined` to the consumer so a single filter param drives the
+ * query state.
+ */
+export function ToolbarSeverityFilter({
+  value,
+  onChange,
+  options = DEFAULT_SEVERITY_OPTIONS,
+}: {
+  value: string | undefined;
+  onChange: (v: string | undefined) => void;
+  options?: Array<{ value: string; label: string }>;
+}) {
+  const current = value ?? SEVERITY_ALL_VALUE;
+  return (
+    <SegmentedControl
+      ariaLabel="severity filter"
+      size="sm"
+      value={current}
+      onChange={(next) => onChange(next === SEVERITY_ALL_VALUE ? undefined : next)}
+      options={options.map((o) => ({ value: o.value, label: o.label }))}
+    />
   );
 }

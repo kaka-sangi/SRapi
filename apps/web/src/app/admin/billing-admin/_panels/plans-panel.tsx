@@ -26,6 +26,7 @@ import { useToast } from "@/context/ToastContext";
 import { adminErrorMessage } from "@/lib/admin-api";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
+import { DataTooltip, type DataTooltipRow } from "@/components/ui/data-tooltip";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import { formatMoney } from "@/lib/admin-format";
 import {
@@ -37,6 +38,40 @@ import {
   type SubscriptionPlanFormState,
 } from "@/lib/admin-subscription-form";
 import type { SubscriptionPlan } from "@/lib/sdk-types";
+
+// Approximate FX rates against USD for hover-to-reveal context only — the
+// figure is illustrative ("≈"), so a rough table is fine. Real billing uses
+// the per-order captured rate, not this lookup.
+const FX_TO_USD: Record<string, number> = {
+  USD: 1,
+  CNY: 0.14,
+  EUR: 1.08,
+  JPY: 0.0066,
+  GBP: 1.27,
+  HKD: 0.13,
+  TWD: 0.031,
+  KRW: 0.00075,
+};
+
+function buildMoneyTooltipRows(
+  value: string | number | null | undefined,
+  currency: string,
+  labels: { currency: string; precision: string; usd: string },
+): DataTooltipRow[] {
+  const rows: DataTooltipRow[] = [];
+  const numeric = typeof value === "number" ? value : Number(value);
+  const valid = Number.isFinite(numeric);
+  rows.push({ label: labels.currency, value: currency.toUpperCase() });
+  if (valid) {
+    const decimals = String(value).split(".")[1]?.length ?? 0;
+    rows.push({ label: labels.precision, value: `${decimals} dp` });
+    const fx = FX_TO_USD[currency.toUpperCase()];
+    if (fx !== undefined && currency.toUpperCase() !== "USD") {
+      rows.push({ label: labels.usd, value: `≈ ${formatMoney(numeric * fx, "USD")}` });
+    }
+  }
+  return rows;
+}
 
 export function PlansPanel() {
   const { t } = useLanguage();
@@ -175,12 +210,23 @@ export function PlansPanel() {
       header: t("adminSubscriptions.price"),
       align: "right",
       render: (p) => (
-        <span className="text-sm font-medium tabular text-srapi-text-primary">
-          {formatMoney(p.price, p.currency)}{" "}
-          <span className="font-normal text-srapi-text-tertiary">
-            / {t("adminSubscriptions.validity", { days: p.validity_days })}
+        <DataTooltip
+          title={t("adminSubscriptions.price")}
+          primary={formatMoney(p.price, p.currency)}
+          rows={buildMoneyTooltipRows(p.price, p.currency, {
+            currency: t("adminCommon.currency"),
+            precision: t("adminCommon.decimalPrecision") || "Precision",
+            usd: t("adminCommon.usdEquivalent") || "≈ USD",
+          })}
+          footer={t("adminSubscriptions.validity", { days: p.validity_days })}
+        >
+          <span className="text-sm font-medium tabular text-srapi-text-primary">
+            {formatMoney(p.price, p.currency)}{" "}
+            <span className="font-normal text-srapi-text-tertiary">
+              / {t("adminSubscriptions.validity", { days: p.validity_days })}
+            </span>
           </span>
-        </span>
+        </DataTooltip>
       ),
     },
     {

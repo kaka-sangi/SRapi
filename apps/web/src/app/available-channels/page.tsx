@@ -7,8 +7,7 @@ import { PageQueryState } from "@/components/layout/page-query-state";
 import { SectionHero } from "@/components/visual/section-hero";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Radio, SearchX } from "lucide-react";
+import { IllustratedEmptyState } from "@/components/ui/illustrated-empty-state";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { QuietBadge, type QuietStatus } from "@/components/ui/quiet-badge";
@@ -60,8 +59,8 @@ function AvailableChannelsContent() {
       <PageQueryState query={availableModels} skeleton={<DialogListSkeleton rows={6} />}>
         {(models) =>
           models.length === 0 ? (
-            <EmptyState
-              icon={Radio}
+            <IllustratedEmptyState
+              illust="inbox"
               title={t("availableChannels.emptyTitle")}
               description={t("availableChannels.emptyBody")}
             />
@@ -120,8 +119,8 @@ function AvailableModelsTable({
       </CardHeader>
       <CardContent className="p-0">
         {rows.length === 0 ? (
-          <EmptyState
-            icon={SearchX}
+          <IllustratedEmptyState
+            illust="search"
             title={t("adminCommon.noResults")}
             description={t("adminCommon.noResultsBody")}
             action={

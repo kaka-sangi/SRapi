@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Gauge, Activity, Zap, Layers, Info } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -10,9 +11,12 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { FloatingInput } from "@/components/ui/floating-input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { DataPill } from "@/components/ui/data-pill";
+import { IconBubble } from "@/components/ui/icon-bubble";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { adminErrorMessage } from "@/lib/admin-api";
@@ -60,14 +64,21 @@ export function RateLimitDialog({
     return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : 0;
   }
 
+  const rpmCount = toCount(rpm);
+  const tpmCount = toCount(tpm);
+  const concurrencyCount = toCount(concurrency);
+  // How many dimensions are unlimited (= 0)? Drives the summary pill so the
+  // operator sees at a glance whether they've effectively turned the limit off.
+  const unlimitedDims = [rpmCount, tpmCount, concurrencyCount].filter((n) => n === 0).length;
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
     try {
       await onSubmit({
-        rpm_limit: toCount(rpm),
-        tpm_limit: toCount(tpm),
-        max_concurrency: toCount(concurrency),
+        rpm_limit: rpmCount,
+        tpm_limit: tpmCount,
+        max_concurrency: concurrencyCount,
         enabled,
       });
       toast({ title: t("feedback.saved"), tone: "success" });
@@ -94,53 +105,138 @@ export function RateLimitDialog({
       <DialogContent>
         <form onSubmit={submit}>
           <DialogHeader>
-            <DialogTitle>{title}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2.5">
+              <IconBubble tone="accent" size="md">
+                <Gauge />
+              </IconBubble>
+              <span>{title}</span>
+            </DialogTitle>
             <DialogDescription>{t("adminRateLimit.subtitle")}</DialogDescription>
           </DialogHeader>
+
+          {/* Live summary — three at-a-glance pills with DataTooltip context */}
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <DataTooltip
+              title={t("adminRateLimit.rpm")}
+              primary={
+                <span className="tabular">
+                  {rpmCount > 0 ? rpmCount.toLocaleString() : t("adminRateLimit.none")}
+                </span>
+              }
+              rows={[
+                {
+                  label: "per second",
+                  value: rpmCount > 0 ? (rpmCount / 60).toFixed(2) : "—",
+                  tone: "muted",
+                },
+              ]}
+              footer={rpmCount === 0 ? t("adminRateLimit.zeroHint") : undefined}
+            >
+              <DataPill
+                tone={rpmCount > 0 ? "accent" : "neutral"}
+                size="sm"
+                className="cursor-help"
+              >
+                <Activity className="size-3" /> RPM {rpmCount > 0 ? rpmCount : "∞"}
+              </DataPill>
+            </DataTooltip>
+            <DataTooltip
+              title={t("adminRateLimit.tpm")}
+              primary={
+                <span className="tabular">
+                  {tpmCount > 0 ? tpmCount.toLocaleString() : t("adminRateLimit.none")}
+                </span>
+              }
+              rows={[
+                {
+                  label: "tokens / hour",
+                  value: tpmCount > 0 ? (tpmCount * 60).toLocaleString() : "—",
+                  tone: "muted",
+                },
+              ]}
+              footer={tpmCount === 0 ? t("adminRateLimit.zeroHint") : undefined}
+            >
+              <DataPill
+                tone={tpmCount > 0 ? "accent" : "neutral"}
+                size="sm"
+                className="cursor-help"
+              >
+                <Zap className="size-3" /> TPM {tpmCount > 0 ? tpmCount : "∞"}
+              </DataPill>
+            </DataTooltip>
+            <DataTooltip
+              title={t("adminRateLimit.concurrency")}
+              primary={
+                <span className="tabular">
+                  {concurrencyCount > 0
+                    ? concurrencyCount.toLocaleString()
+                    : t("adminRateLimit.none")}
+                </span>
+              }
+              footer={concurrencyCount === 0 ? t("adminRateLimit.zeroHint") : undefined}
+            >
+              <DataPill
+                tone={concurrencyCount > 0 ? "accent" : "neutral"}
+                size="sm"
+                className="cursor-help"
+              >
+                <Layers className="size-3" /> ‖ {concurrencyCount > 0 ? concurrencyCount : "∞"}
+              </DataPill>
+            </DataTooltip>
+            {!enabled ? (
+              <DataPill tone="warning" size="sm">
+                {t("adminRateLimit.off")}
+              </DataPill>
+            ) : null}
+          </div>
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-3">
+            <FloatingInput
+              label={t("adminRateLimit.rpm")}
+              value={rpm}
+              onChange={setRpm}
+              type="number"
+              disabled={isPending}
+              placeholder="0"
+            />
+            <FloatingInput
+              label={t("adminRateLimit.tpm")}
+              value={tpm}
+              onChange={setTpm}
+              type="number"
+              disabled={isPending}
+              placeholder="0"
+            />
+            <FloatingInput
+              label={t("adminRateLimit.concurrency")}
+              value={concurrency}
+              onChange={setConcurrency}
+              type="number"
+              disabled={isPending}
+              placeholder="0"
+            />
+          </div>
+
           <div className="mt-4 space-y-4">
-            <div>
-              <Label htmlFor="rl-rpm">{t("adminRateLimit.rpm")}</Label>
-              <Input
-                id="rl-rpm"
-                type="number"
-                min={0}
-                inputMode="numeric"
-                placeholder="0"
-                value={rpm}
-                disabled={isPending}
-                onChange={(e) => setRpm(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="rl-tpm">{t("adminRateLimit.tpm")}</Label>
-              <Input
-                id="rl-tpm"
-                type="number"
-                min={0}
-                inputMode="numeric"
-                placeholder="0"
-                value={tpm}
-                disabled={isPending}
-                onChange={(e) => setTpm(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="rl-conc">{t("adminRateLimit.concurrency")}</Label>
-              <Input
-                id="rl-conc"
-                type="number"
-                min={0}
-                inputMode="numeric"
-                placeholder="0"
-                value={concurrency}
-                disabled={isPending}
-                onChange={(e) => setConcurrency(e.target.value)}
-              />
-            </div>
-            <p className="text-xs text-srapi-text-tertiary">{t("adminRateLimit.zeroHint")}</p>
-            <div className="flex items-center justify-between">
-              <Label htmlFor="rl-enabled" className="mb-0">
-                {t("adminRateLimit.enabled")}
+            <p className="flex items-center gap-1.5 text-xs text-srapi-text-tertiary">
+              <Info className="size-3.5" aria-hidden />
+              {t("adminRateLimit.zeroHint")}
+              {unlimitedDims === 3 ? (
+                <span className="ml-1 text-srapi-warning">
+                  ({t("adminRateLimit.none")})
+                </span>
+              ) : null}
+            </p>
+            <div className="flex items-center justify-between rounded-2xl border border-srapi-border bg-srapi-card-muted/40 px-4 py-3">
+              <Label htmlFor="rl-enabled" className="mb-0 flex flex-col gap-0.5">
+                <span className="text-sm font-medium text-srapi-text-primary">
+                  {t("adminRateLimit.enabled")}
+                </span>
+                <span className="text-[11px] text-srapi-text-tertiary">
+                  {enabled
+                    ? t("adminRateLimit.subtitle")
+                    : t("adminRateLimit.off")}
+                </span>
               </Label>
               <Switch
                 id="rl-enabled"

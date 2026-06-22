@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { QuietBadge, type QuietStatus } from "@/components/ui/quiet-badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DataTooltip } from "@/components/ui/data-tooltip";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime, formatInteger } from "@/lib/admin-format";
 import { ADMIN_ROUTES } from "@/lib/routes";
@@ -97,6 +98,32 @@ export function OpsEvidenceChainHealth({
         <EvidenceMetric
           label={t("adminOps.errorEvidence")}
           value={`${formatInteger(recorder?.queue_depth)}/${formatInteger(recorder?.queue_capacity)}`}
+          valueTooltip={
+            recorder ? (
+              <DataTooltip
+                title={t("adminOps.errorEvidence")}
+                primary={`${formatInteger(recorder.queue_depth)}/${formatInteger(recorder.queue_capacity)}`}
+                rows={[
+                  { label: t("adminOps.recorded"), value: formatInteger(recorder.recorded_count), tone: "muted" },
+                  { label: t("adminOps.processed"), value: formatInteger(recorder.processed_count), tone: "muted" },
+                  {
+                    label: t("adminOps.dropped"),
+                    value: formatInteger(recorder.dropped_count),
+                    tone: recorder.dropped_count > 0 ? "error" : "muted",
+                  },
+                  {
+                    label: t("adminOps.failed"),
+                    value: formatInteger(recorder.write_failed_count),
+                    tone: recorder.write_failed_count > 0 ? "error" : "muted",
+                  },
+                ]}
+              >
+                <span className="cursor-help">
+                  {formatInteger(recorder.queue_depth)}/{formatInteger(recorder.queue_capacity)}
+                </span>
+              </DataTooltip>
+            ) : undefined
+          }
           footer={
             <span className="flex flex-wrap gap-1.5">
               <QuietBadge
@@ -174,16 +201,22 @@ function EvidenceMetric({
   label,
   value,
   footer,
+  valueTooltip,
 }: {
   label: string;
   value: string;
   footer: ReactNode;
+  /**
+   * Optional drop-in replacement for the value cell — pass a DataTooltip-wrapped
+   * span when the value benefits from a breakdown reveal on hover.
+   */
+  valueTooltip?: ReactNode;
 }) {
   return (
     <div className="min-w-0 space-y-2 md:border-l md:border-srapi-border md:pl-4 md:first:border-l-0 md:first:pl-0">
       <div className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{label}</div>
       <div className="truncate text-sm font-medium tabular text-srapi-text-primary" title={value}>
-        {value}
+        {valueTooltip ?? value}
       </div>
       <div className="text-[11px] text-srapi-text-tertiary">{footer}</div>
     </div>

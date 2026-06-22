@@ -10,6 +10,10 @@ import { ResourceFormDialog, type FieldConfig } from "@/components/admin/resourc
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { InlineDetailGrid } from "@/components/ui/inline-detail-grid";
+import { formatDateTime } from "@/lib/admin-format";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
@@ -33,7 +37,12 @@ import {
 } from "@/lib/admin-tls-profile-form";
 import type { TlsProfile } from "@/lib/sdk-types";
 
-function profileMatch(profile: TlsProfile, term: string): boolean {
+function profileMatch(profile: TlsProfile, term: string, filters: Record<string, string>): boolean {
+  // Status filter rides client-side because /admin/tls-profiles already pages
+  // in-memory via useClientPagedList — the whole roster is local so we can
+  // narrow without an API change.
+  if (filters.enabled === "on" && !profile.enabled) return false;
+  if (filters.enabled === "off" && profile.enabled) return false;
   if (!term) return true;
   return [profile.name, profile.tls_template, profile.http_version_policy, profile.user_agent]
     .filter(Boolean)
@@ -63,7 +72,7 @@ export function TlsProfilesPanel() {
   const [deleteTarget, setDeleteTarget] = useState<TlsProfile | null>(null);
   const [togglingId, setTogglingId] = useState<number | null>(null);
   const isNew = formTarget === "new";
-  const isFiltered = Boolean(list.search);
+  const isFiltered = Boolean(list.search || list.filters.enabled);
 
   async function toggleEnabled(profile: TlsProfile) {
     if (togglingId === profile.id) return;
@@ -128,9 +137,19 @@ export function TlsProfilesPanel() {
       key: "template",
       header: t("adminTlsProfiles.template"),
       render: (p) => (
-        <span className="text-srapi-text-secondary text-sm tabular">
-          {p.tls_template || "default"}
-        </span>
+        <DataTooltip
+          title={t("adminTlsProfiles.template")}
+          primary={p.tls_template || "default"}
+          rows={[
+            { label: t("adminTlsProfiles.httpPolicy"), value: p.http_version_policy || "—" },
+            { label: t("adminTlsProfiles.userAgent"), value: p.user_agent ? p.user_agent.slice(0, 60) : "—", tone: "muted" },
+            { label: t("adminTlsProfiles.extraHeaders"), value: String(Object.keys(p.extra_headers ?? {}).length), tone: "muted" },
+          ]}
+        >
+          <span className="text-srapi-text-secondary text-sm tabular">
+            {p.tls_template || "default"}
+          </span>
+        </DataTooltip>
       ),
     },
     {
@@ -216,12 +235,63 @@ export function TlsProfilesPanel() {
         minWidth={680}
         isFiltered={isFiltered}
         onClearFilters={list.clearFilters}
+        enableKeyboardNav
+        rowSeverity={(p) => (p.enabled ? undefined : "info")}
+        expandRow={(p) => {
+          const headerKeys = Object.keys(p.extra_headers ?? {});
+          return (
+            <InlineDetailGrid
+              sections={[
+                {
+                  title: t("adminTlsProfiles.template"),
+                  rows: [
+                    { label: t("adminTlsProfiles.template"), value: p.tls_template || "default" },
+                    { label: t("adminTlsProfiles.httpPolicy"), value: p.http_version_policy || "—" },
+                    { label: t("adminTlsProfiles.enabled"), value: p.enabled ? t("common.active") : t("common.disabled"), tone: p.enabled ? "success" : "muted" },
+                  ],
+                },
+                {
+                  title: t("adminTlsProfiles.userAgent"),
+                  rows: [
+                    { label: "UA", value: p.user_agent || "—", mono: true, tone: p.user_agent ? "default" : "muted" },
+                  ],
+                },
+                {
+                  title: t("adminTlsProfiles.extraHeaders"),
+                  rows: headerKeys.length === 0
+                    ? [{ label: t("adminTlsProfiles.extraHeaders"), value: "—", tone: "muted" }]
+                    : headerKeys.slice(0, 5).map((key) => ({
+                        label: key,
+                        value: String(p.extra_headers?.[key] ?? ""),
+                        mono: true,
+                      })),
+                },
+              ]}
+              actions={
+                <span className="text-[11px] text-srapi-text-tertiary tabular">
+                  {t("common.updated")}: {p.updated_at ? formatDateTime(p.updated_at) : "—"}
+                </span>
+              }
+            />
+          );
+        }}
         toolbar={
           <ListToolbar>
             <SearchInput
               value={list.searchInput}
               onChange={list.setSearchInput}
               placeholder={t("adminTlsProfiles.searchPlaceholder")}
+            />
+            <SegmentedControl<string>
+              value={list.filters.enabled || "__all__"}
+              onChange={(v) => list.setFilter("enabled", v === "__all__" ? undefined : v)}
+              ariaLabel={t("adminTlsProfiles.enabled")}
+              size="sm"
+              options={[
+                { value: "__all__", label: t("adminCommon.allStatuses") },
+                { value: "on", label: t("common.active") },
+                { value: "off", label: t("common.disabled") },
+              ]}
             />
           </ListToolbar>
         }

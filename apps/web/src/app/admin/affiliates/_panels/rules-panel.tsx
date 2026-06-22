@@ -19,6 +19,7 @@ import { useToast } from "@/context/ToastContext";
 import { adminErrorMessage } from "@/lib/admin-api";
 import { Button } from "@/components/ui/button";
 import { QuietBadge } from "@/components/ui/quiet-badge";
+import { DataTooltip } from "@/components/ui/data-tooltip";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import { formatDateTime } from "@/lib/admin-format";
 import {
@@ -92,12 +93,46 @@ export function RulesPanel() {
     {
       key: "rate",
       header: t("adminAffiliates.rate"),
-      render: (rule) => (
-        <span className="text-sm font-medium tabular text-srapi-text-primary">
-          {rule.rate}
-          {rule.fixed_amount !== "0.00000000" ? ` + ${rule.fixed_amount}` : ""}
-        </span>
-      ),
+      render: (rule) => {
+        const ratePct = Number(rule.rate) * 100;
+        const fixed = Number(rule.fixed_amount);
+        const maxRebate = Number(rule.max_rebate_amount);
+        return (
+          <DataTooltip
+            title={t("adminAffiliates.rate")}
+            primary={
+              <span>
+                {rule.rate}
+                {rule.fixed_amount !== "0.00000000" ? ` + ${rule.fixed_amount}` : ""}
+              </span>
+            }
+            rows={[
+              {
+                label: "Rate",
+                value: Number.isFinite(ratePct) ? `${ratePct.toFixed(3)}%` : rule.rate,
+              },
+              ...(fixed > 0
+                ? [{ label: "+ Fixed", value: `${rule.fixed_amount} ${rule.currency}` }]
+                : []),
+              { label: "Currency", value: rule.currency.toUpperCase() },
+              ...(maxRebate > 0
+                ? [
+                    {
+                      label: "Max rebate",
+                      value: `${rule.max_rebate_amount} ${rule.currency}`,
+                      tone: "muted" as const,
+                    },
+                  ]
+                : [{ label: "Max rebate", value: "Uncapped", tone: "muted" as const }]),
+            ]}
+          >
+            <span className="text-sm font-medium tabular text-srapi-text-primary">
+              {rule.rate}
+              {rule.fixed_amount !== "0.00000000" ? ` + ${rule.fixed_amount}` : ""}
+            </span>
+          </DataTooltip>
+        );
+      },
     },
     {
       key: "currency",
@@ -183,6 +218,20 @@ export function RulesPanel() {
         minWidth={680}
         sort={list.sort}
         onSort={list.toggleSort}
+        rowSeverity={(rule) => {
+          // Approval-state stripe: active = success, disabled = info,
+          // archived = warning so deprecated rules are visually demoted.
+          switch (rule.status) {
+            case "active":
+              return "success";
+            case "disabled":
+              return "info";
+            case "archived":
+              return "warning";
+            default:
+              return undefined;
+          }
+        }}
         pagination={{
           page: list.page,
           pageSize: list.pageSize,

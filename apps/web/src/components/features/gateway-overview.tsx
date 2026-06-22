@@ -38,7 +38,7 @@ import { DataTooltip } from "@/components/ui/data-tooltip";
 import { TrendChart } from "@/components/charts/trend-chart";
 import { ChartEmpty } from "@/components/charts/chart-empty";
 import { DialogListSkeleton, TrendChartSkeleton, BarChartSkeleton } from "@/components/charts/chart-skeleton";
-import { EmptyState } from "@/components/ui/empty-state";
+import { IllustratedEmptyState } from "@/components/ui/illustrated-empty-state";
 import { formatMoney, formatCompactNumber } from "@/lib/admin-format";
 import type { UserPlatformQuota, UsageModelShare, UsageTrendPoint } from "@/lib/sdk-types";
 import type { UsageLogSummary } from "@/lib/srapi-types";
@@ -396,8 +396,8 @@ export function GatewayOverview() {
         >
           {(rows) =>
             rows.length === 0 ? (
-              <EmptyState
-                icon={Activity}
+              <IllustratedEmptyState
+                illust="chart"
                 title={t("dashboard.noActivityTitle")}
                 description={t("dashboard.noActivityBody")}
                 action={

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Eraser, Eye, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -9,25 +10,25 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { FloatingInput } from "@/components/ui/floating-input";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { DataPill } from "@/components/ui/data-pill";
+import { IconBubble } from "@/components/ui/icon-bubble";
+import { SectionTitle } from "@/components/ui/section-title";
 import { useCleanupOpsSystemLogs } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { adminErrorMessage } from "@/lib/admin-api";
+import { formatInteger } from "@/lib/admin-format";
 import { localDateTimeInputToIso } from "@/lib/datetime-local";
 import type { OpsSystemLogCleanupResult, OpsSystemLogLevel } from "@/lib/sdk-types";
 
 const LEVELS: OpsSystemLogLevel[] = ["debug", "info", "warn", "error"];
 const ANY = "any";
+type LevelChoice = typeof ANY | OpsSystemLogLevel;
 
 /**
  * Bounded cleanup of sanitized system logs. The backend requires at least one
@@ -44,7 +45,7 @@ export function OpsLogCleanupDialog({
 }) {
   const { t } = useLanguage();
   const cleanup = useCleanupOpsSystemLogs();
-  const [level, setLevel] = useState<string>(ANY);
+  const [level, setLevel] = useState<LevelChoice>(ANY);
   const [source, setSource] = useState("");
   const [q, setQ] = useState("");
   const [requestID, setRequestID] = useState("");
@@ -55,7 +56,9 @@ export function OpsLogCleanupDialog({
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<OpsSystemLogCleanupResult | null>(null);
 
-  const hasFilter = level !== ANY || Boolean(source.trim() || q.trim() || requestID.trim() || traceID.trim() || before.trim());
+  const hasFilter =
+    level !== ANY ||
+    Boolean(source.trim() || q.trim() || requestID.trim() || traceID.trim() || before.trim());
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -86,88 +89,126 @@ export function OpsLogCleanupDialog({
     }
   }
 
+  const bubbleTone = dryRun ? "accent" : "error";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-xl">
         <form onSubmit={submit}>
           <DialogHeader>
-            <DialogTitle className="text-lg font-semibold tracking-tight">{t("adminOpsCleanup.title")}</DialogTitle>
-            <DialogDescription>{t("adminOpsCleanup.subtitle")}</DialogDescription>
-          </DialogHeader>
-          <div className="mt-4 space-y-4">
-            <div>
-              <Label htmlFor="cl-level">{t("adminOpsCleanup.level")}</Label>
-              <Select value={level} onValueChange={setLevel}>
-                <SelectTrigger id="cl-level">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ANY}>{t("adminOpsCleanup.anyLevel")}</SelectItem>
-                  {LEVELS.map((l) => (
-                    <SelectItem key={l} value={l}>
-                      {l}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex items-start gap-3">
+              <IconBubble tone={bubbleTone} size="md">
+                {dryRun ? <Eye /> : <Trash2 />}
+              </IconBubble>
+              <div className="min-w-0 flex-1">
+                <DialogTitle className="text-lg font-semibold tracking-tight">
+                  {t("adminOpsCleanup.title")}
+                </DialogTitle>
+                <DialogDescription className="mt-0.5">
+                  {t("adminOpsCleanup.subtitle")}
+                </DialogDescription>
+              </div>
             </div>
+          </DialogHeader>
+
+          <div className="mt-5 space-y-5">
+            {/* Level filter (SegmentedControl) */}
             <div>
-              <Label htmlFor="cl-source">{t("adminOpsCleanup.source")}</Label>
-              <Input
-                id="cl-source"
+              <Label className="mb-1.5 block">{t("adminOpsCleanup.level")}</Label>
+              <SegmentedControl<LevelChoice>
+                value={level}
+                onChange={setLevel}
+                options={[
+                  { value: ANY, label: t("adminOpsCleanup.anyLevel") },
+                  ...LEVELS.map((l) => ({ value: l as LevelChoice, label: l })),
+                ]}
+                ariaLabel={t("adminOpsCleanup.level")}
+                size="sm"
+              />
+            </div>
+
+            {/* Source + search */}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FloatingInput
+                label={t("adminOpsCleanup.source")}
                 value={source}
-                onChange={(e) => setSource(e.target.value)}
+                onChange={setSource}
                 placeholder="scheduler, gateway…"
               />
+              <FloatingInput
+                label={t("adminOpsCleanup.q")}
+                value={q}
+                onChange={setQ}
+              />
             </div>
-            <div>
-              <Label htmlFor="cl-q">{t("adminOpsCleanup.q")}</Label>
-              <Input id="cl-q" value={q} onChange={(e) => setQ(e.target.value)} />
+
+            {/* Correlation IDs */}
+            <div className="space-y-3 rounded-xl border border-srapi-border/70 bg-srapi-card-muted/30 p-4">
+              <SectionTitle label={t("adminOpsCleanup.requestId")} />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="cl-request-id" className="mb-1.5 block text-[11px] text-srapi-text-tertiary">
+                    {t("adminOpsCleanup.requestId")}
+                  </Label>
+                  <Input
+                    id="cl-request-id"
+                    value={requestID}
+                    onChange={(e) => setRequestID(e.target.value)}
+                    className="font-mono text-xs"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="cl-trace-id" className="mb-1.5 block text-[11px] text-srapi-text-tertiary">
+                    {t("adminOpsCleanup.traceId")}
+                  </Label>
+                  <Input
+                    id="cl-trace-id"
+                    value={traceID}
+                    onChange={(e) => setTraceID(e.target.value)}
+                    className="font-mono text-xs"
+                  />
+                </div>
+              </div>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
+
+            {/* Time bound + max delete */}
+            <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <Label htmlFor="cl-request-id">{t("adminOpsCleanup.requestId")}</Label>
+                <Label htmlFor="cl-before" className="mb-1.5 block">
+                  {t("adminOpsCleanup.before")}
+                </Label>
                 <Input
-                  id="cl-request-id"
-                  value={requestID}
-                  onChange={(e) => setRequestID(e.target.value)}
-                  className="text-xs"
+                  id="cl-before"
+                  type="datetime-local"
+                  value={before}
+                  onChange={(e) => setBefore(e.target.value)}
                 />
               </div>
               <div>
-                <Label htmlFor="cl-trace-id">{t("adminOpsCleanup.traceId")}</Label>
+                <Label htmlFor="cl-max" className="mb-1.5 block">
+                  {t("adminOpsCleanup.maxDelete")}
+                </Label>
                 <Input
-                  id="cl-trace-id"
-                  value={traceID}
-                  onChange={(e) => setTraceID(e.target.value)}
-                  className="text-xs"
+                  id="cl-max"
+                  type="number"
+                  min={1}
+                  inputMode="numeric"
+                  value={maxDelete}
+                  onChange={(e) => setMaxDelete(e.target.value)}
                 />
               </div>
             </div>
-            <div>
-              <Label htmlFor="cl-before">{t("adminOpsCleanup.before")}</Label>
-              <Input
-                id="cl-before"
-                type="datetime-local"
-                value={before}
-                onChange={(e) => setBefore(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="cl-max">{t("adminOpsCleanup.maxDelete")}</Label>
-              <Input
-                id="cl-max"
-                type="number"
-                min={1}
-                inputMode="numeric"
-                value={maxDelete}
-                onChange={(e) => setMaxDelete(e.target.value)}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <Label htmlFor="cl-dry" className="mb-0">
-                {t("adminOpsCleanup.dryRun")}
-              </Label>
+
+            {/* Dry run toggle */}
+            <div className="flex items-center justify-between gap-4 rounded-xl border border-srapi-border bg-srapi-card px-4 py-3">
+              <div className="min-w-0">
+                <Label htmlFor="cl-dry" className="mb-0">
+                  {t("adminOpsCleanup.dryRun")}
+                </Label>
+                <p className="mt-0.5 text-[11px] text-srapi-text-tertiary">
+                  {t("adminOpsCleanup.hint")}
+                </p>
+              </div>
               <Switch
                 id="cl-dry"
                 checked={dryRun}
@@ -177,26 +218,50 @@ export function OpsLogCleanupDialog({
                 }}
               />
             </div>
-            <p className="text-[11px] text-srapi-text-tertiary">{t("adminOpsCleanup.hint")}</p>
+
+            {/* Result panel */}
             {result ? (
-              <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-3 text-xs text-srapi-text-secondary">
-                {result.dry_run
-                  ? t("adminOpsCleanup.previewResult", { matched: String(result.matched) })
-                  : t("adminOpsCleanup.deletedResult", {
-                      deleted: String(result.deleted),
-                      matched: String(result.matched),
-                    })}
-                {result.limited
-                  ? ` · ${t("adminOpsCleanup.limited", { max: String(result.max_delete) })}`
-                  : ""}
+              <div
+                className="log-row rounded-xl border border-srapi-border bg-srapi-card p-4"
+                data-sev={result.dry_run ? "info" : "warning"}
+              >
+                <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.12em] text-srapi-text-tertiary">
+                      {result.dry_run
+                        ? t("adminOpsCleanup.dryRun")
+                        : t("adminOpsCleanup.delete")}
+                    </p>
+                    <p className="metric-primary tabular text-srapi-text-primary">
+                      {formatInteger(result.dry_run ? result.matched : result.deleted)}
+                    </p>
+                  </div>
+                  {!result.dry_run ? (
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.12em] text-srapi-text-tertiary">
+                        matched
+                      </p>
+                      <p className="metric-secondary tabular text-srapi-text-secondary">
+                        {formatInteger(result.matched)}
+                      </p>
+                    </div>
+                  ) : null}
+                  {result.limited ? (
+                    <DataPill tone="warning" size="sm">
+                      {t("adminOpsCleanup.limited", { max: String(result.max_delete) })}
+                    </DataPill>
+                  ) : null}
+                </div>
               </div>
             ) : null}
+
             {error ? (
               <p role="alert" className="text-sm text-srapi-error">
                 {error}
               </p>
             ) : null}
           </div>
+
           <DialogFooter className="mt-6">
             <Button
               type="button"
@@ -212,6 +277,7 @@ export function OpsLogCleanupDialog({
               loading={cleanup.isPending}
               disabled={!hasFilter}
             >
+              {dryRun ? <Eye /> : <Eraser />}
               {dryRun ? t("adminOpsCleanup.preview") : t("adminOpsCleanup.delete")}
             </Button>
           </DialogFooter>

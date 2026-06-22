@@ -9,6 +9,10 @@ import { PageHeader } from "@/components/layout/page-header";
 import { AutoRefreshControl } from "@/components/ui/auto-refresh";
 import { Input } from "@/components/ui/input";
 import { QuietBadge, type QuietStatus } from "@/components/ui/quiet-badge";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { DensityToggle, type DensityValue } from "@/components/ui/density-toggle";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { InlineDetailGrid } from "@/components/ui/inline-detail-grid";
 import {
   Dialog,
   DialogContent,
@@ -33,11 +37,25 @@ import {
 } from "@/lib/log-window-filter";
 import type { RequestEvidenceDetailResponse, RequestEvidenceRow } from "@/lib/sdk-types";
 
+// Severity for the row stripe — driven by HTTP code, with stream_completion_state
+// overriding to «warning» when the request completed but bailed mid-stream.
+function evidenceSeverity(row: RequestEvidenceRow): "info" | "success" | "warning" | "error" | "critical" {
+  const code = row.status_code ?? 0;
+  if (code >= 500) return "critical";
+  if (code >= 400) return "error";
+  if (row.stream_completion_state === "failed" || row.stream_completion_state === "idle_timeout") return "error";
+  if (row.stream_completion_state === "interrupted") return "warning";
+  if (row.kind === "success") return "success";
+  if (row.kind === "error") return "error";
+  return "info";
+}
+
 export function RequestEvidencePanel() {
   const { t } = useLanguage();
   const list = useAdminList({ pageSize: 50 });
   const [detailRequestID, setDetailRequestID] = useState<string | undefined>();
   const [mountedAtMS] = useState(() => Date.now());
+  const [density, setDensity] = useState<DensityValue>("regular");
   const kind = list.filters.kind || undefined;
   const source = list.filters.source || undefined;
   const windowFilter = list.filters.window || "1h";
@@ -180,13 +198,26 @@ export function RequestEvidencePanel() {
       key: "status",
       header: t("adminRequestEvidence.status"),
       align: "right",
+      // Status code + attempt with hover breakdown (kind / error class / stream
+      // state) so a row at-a-glance answers «is this fatal or transient?».
       render: (row) => (
-        <div className="space-y-0.5 text-right">
-          <div className={statusClass(row.status_code)}>{row.status_code ?? "—"}</div>
-          <div className="text-[12px] text-srapi-text-tertiary">
-            {row.attempt_no ? `#${row.attempt_no}` : "—"}
+        <DataTooltip
+          title={t("adminRequestEvidence.status")}
+          primary={row.status_code ?? "—"}
+          rows={[
+            { label: t("adminRequestEvidence.result"), value: kindLabel(t, row.kind), tone: row.kind === "success" ? "success" : row.kind === "error" ? "error" : "muted" },
+            { label: t("adminRequestEvidence.errorKind"), value: row.error_class || "—", tone: "error" },
+            { label: t("adminRequestEvidence.stream"), value: row.stream_completion_state || "—", tone: row.stream_completion_state === "failed" ? "error" : row.stream_completion_state === "interrupted" ? "warning" : "muted" },
+            { label: "attempt", value: row.attempt_no ? `#${row.attempt_no}` : "—", tone: "muted" },
+          ]}
+        >
+          <div className="space-y-0.5 text-right">
+            <div className={statusClass(row.status_code)}>{row.status_code ?? "—"}</div>
+            <div className="text-[12px] text-srapi-text-tertiary">
+              {row.attempt_no ? `#${row.attempt_no}` : "—"}
+            </div>
           </div>
-        </div>
+        </DataTooltip>
       ),
     },
     {
@@ -212,14 +243,33 @@ export function RequestEvidencePanel() {
       header: t("adminRequestEvidence.latency"),
       align: "right",
       hideOnMobile: true,
-      render: (row) => (
-        <div className="space-y-0.5 text-right">
-          <div className="text-[12px] tabular text-srapi-text-tertiary">
-            {typeof row.latency_ms === "number" ? formatLatency(row.latency_ms) : "—"}
-          </div>
-          <StreamCompletionBadge state={row.stream_completion_state} />
-        </div>
-      ),
+      // Latency tooltip: queue + route + upstream + stream waterfall. Per-phase
+      // numbers aren't on RequestEvidenceRow yet — once the API exposes them
+      // the breakdown lights up; today it surfaces stream-completion + outlier
+      // hint so triage isn't blind.
+      render: (row) => {
+        const total = typeof row.latency_ms === "number" ? row.latency_ms : null;
+        return (
+          <DataTooltip
+            title={t("adminRequestEvidence.latency")}
+            primary={total !== null ? formatLatency(total) : "—"}
+            rows={[
+              { label: "queue", value: "—", tone: "muted" },
+              { label: "route", value: "—", tone: "muted" },
+              { label: "upstream", value: total !== null ? formatLatency(total) : "—", tone: total !== null && total >= 10000 ? "warning" : "default" },
+              { label: "stream", value: row.stream_completion_state || "—", tone: row.stream_completion_state === "failed" ? "error" : row.stream_completion_state === "interrupted" ? "warning" : "muted" },
+            ]}
+            footer={total !== null && total >= 30000 ? "outlier — likely upstream stall" : undefined}
+          >
+            <div className="space-y-0.5 text-right">
+              <div className="text-[12px] tabular text-srapi-text-tertiary">
+                {total !== null ? formatLatency(total) : "—"}
+              </div>
+              <StreamCompletionBadge state={row.stream_completion_state} />
+            </div>
+          </DataTooltip>
+        );
+      },
     },
     {
       key: "tokens",
@@ -275,14 +325,17 @@ export function RequestEvidencePanel() {
         title={t("adminRequestEvidence.title")}
         description={t("adminRequestEvidence.subtitle")}
         actions={
-          <AutoRefreshControl
-            onRefresh={async () => {
-              await query.refetch();
-            }}
-            isRefreshing={query.isFetching}
-            storageKey="admin-request-evidence-refresh"
-            defaultSec={0}
-          />
+          <div className="flex items-center gap-3">
+            <DensityToggle value={density} onChange={setDensity} />
+            <AutoRefreshControl
+              onRefresh={async () => {
+                await query.refetch();
+              }}
+              isRefreshing={query.isFetching}
+              storageKey="admin-request-evidence-refresh"
+              defaultSec={0}
+            />
+          </div>
         }
       />
       <AdminListView
@@ -295,8 +348,79 @@ export function RequestEvidencePanel() {
         emptyTitle={t("adminRequestEvidence.emptyTitle")}
         emptyBody={t("adminRequestEvidence.emptyBody")}
         minWidth={1120}
+        density={density}
+        enableKeyboardNav
+        rowSeverity={evidenceSeverity}
+        // Inline detail — Request / Response / Routing / Cost panels covering the
+        // ~12 fields a triage operator wants without opening the modal. The
+        // request_id is still clickable in the row to deep-link into the modal
+        // for the full attempt timeline + system logs.
+        expandRow={(row) => (
+          <InlineDetailGrid
+            sections={[
+              {
+                title: "Request",
+                rows: [
+                  { label: "request_id", value: row.request_id, mono: true },
+                  { label: t("adminRequestEvidence.userShort"), value: row.user_id ?? "—", mono: true, tone: "muted" },
+                  { label: t("adminRequestEvidence.keyShort"), value: row.api_key_id ?? "—", mono: true, tone: "muted" },
+                  { label: t("adminRequestEvidence.accountShort"), value: row.account_id ?? "—", mono: true, tone: "muted" },
+                  { label: "endpoint", value: row.source_endpoint || "—", mono: true },
+                ],
+              },
+              {
+                title: "Response",
+                rows: [
+                  { label: "status", value: row.status_code ?? "—", mono: true, tone: (row.status_code ?? 0) >= 500 ? "error" : (row.status_code ?? 0) >= 400 ? "warning" : "default" },
+                  { label: "kind", value: kindLabel(t, row.kind), tone: row.kind === "success" ? "success" : row.kind === "error" ? "error" : "muted" },
+                  { label: "error_class", value: row.error_class || "—", mono: true, tone: "error" },
+                  { label: "error_message", value: row.error_message || "—", tone: "muted" },
+                  { label: "stream", value: row.stream_completion_state || "—" },
+                ],
+              },
+              {
+                title: "Routing",
+                rows: [
+                  { label: "protocol", value: `${row.source_protocol || "—"}${row.target_protocol ? ` → ${row.target_protocol}` : ""}`, mono: true },
+                  { label: "attempt", value: row.attempt_no ? `#${row.attempt_no}` : "—", mono: true, tone: "muted" },
+                  { label: "model", value: row.model || "—", mono: true },
+                  { label: "scheduler", value: row.scheduler_strategy || "—", mono: true, tone: "muted" },
+                ],
+              },
+              {
+                title: "Cost",
+                rows: [
+                  { label: t("adminRequestEvidence.latency"), value: typeof row.latency_ms === "number" ? formatLatency(row.latency_ms) : "—", mono: true },
+                  { label: t("adminRequestEvidence.tokens"), value: typeof row.total_tokens === "number" ? formatInteger(row.total_tokens) : "—", mono: true },
+                  { label: "estimated", value: row.usage_estimated === true ? "yes" : row.usage_estimated === false ? "no" : "—", tone: row.usage_estimated === true ? "warning" : "muted" },
+                ],
+              },
+            ]}
+          />
+        )}
         toolbar={
-          <ListToolbar>
+          <>
+            {/* Severity chip strip — collapses the kind filter into a single-
+                click triage pivot. The granular «source» FilterSelect still
+                lives in the toolbar below for ops/dump/system splits. */}
+            <div className="flex items-center gap-3 border-b border-srapi-border/60 bg-srapi-card-muted/40 px-4 py-2">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
+                Severity
+              </span>
+              <SegmentedControl
+                value={kind === "error" ? "error" : kind === "success" ? "success" : kind === "unknown" ? "unknown" : "all"}
+                onChange={(v) => list.setFilter("kind", v === "all" ? undefined : v)}
+                options={[
+                  { value: "all", label: "All" },
+                  { value: "error", label: "Errors" },
+                  { value: "success", label: "OK" },
+                  { value: "unknown", label: "Unknown" },
+                ]}
+                size="sm"
+                ariaLabel="evidence severity filter"
+              />
+            </div>
+            <ListToolbar>
             <RequestEvidenceScopeFilters
               requestID={requestID}
               accountID={accountID}
@@ -378,6 +502,7 @@ export function RequestEvidencePanel() {
               {t("adminRequestEvidence.total", { count: total })}
             </div>
           </ListToolbar>
+          </>
         }
         pagination={{
           page: list.page,

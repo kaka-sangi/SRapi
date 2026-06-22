@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, ShieldCheck, Sparkles, Star } from "lucide-react";
+import { CheckCircle2, Sparkles, Star } from "lucide-react";
 import { apiService } from "@/lib/api";
 import { CheckoutRedirect } from "@/components/features/checkout-redirect";
 import {
@@ -15,7 +15,7 @@ import { meErrorMessage } from "@/lib/me-api";
 import { useLanguage } from "@/context/LanguageContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { IconBubble } from "@/components/ui/icon-bubble";
+import { IllustratedEmptyState } from "@/components/ui/illustrated-empty-state";
 import { DataPill } from "@/components/ui/data-pill";
 import { Label } from "@/components/ui/label";
 import {
@@ -194,17 +194,11 @@ function PlanCard({
 function EmptyState() {
   const { t } = useLanguage();
   return (
-    <div className="mx-auto flex max-w-md flex-col items-center gap-3 rounded-2xl border border-dashed border-srapi-border/70 bg-srapi-card-muted/40 px-6 py-10 text-center">
-      <IconBubble tone="accent" className="size-12 [&>svg]:size-5">
-        <ShieldCheck aria-hidden />
-      </IconBubble>
-      <h3 className="text-base font-semibold tracking-tight text-srapi-text-primary">
-        {t("pricing.emptyTitle")}
-      </h3>
-      <p className="max-w-sm text-sm leading-relaxed text-srapi-text-secondary">
-        {t("pricing.emptyBody")}
-      </p>
-    </div>
+    <IllustratedEmptyState
+      illust="chart"
+      title={t("pricing.emptyTitle")}
+      description={t("pricing.emptyBody")}
+    />
   );
 }
 

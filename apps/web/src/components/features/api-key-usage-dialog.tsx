@@ -18,12 +18,14 @@ import {
 } from "@/components/ui/table";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { QuietBadge } from "@/components/ui/quiet-badge";
+import { DataTooltip, type DataTooltipRow } from "@/components/ui/data-tooltip";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { useApiKeyUsage } from "@/hooks/queries";
 import { useAdminApiKeyUsage } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatMoney, formatDateTime } from "@/lib/admin-format";
+import { cn } from "@/lib/cn";
 import type { GatewayUsageResponse } from "@/lib/sdk-types";
 
 const WINDOWS = [7, 30, 90];
@@ -87,14 +89,81 @@ function UsageBody({ usage }: { usage: GatewayUsageResponse }) {
   const totals = usage.usage;
   const currency = totals.currency;
 
+  // Cost breakdown rows are reused by Cost/Tokens tooltips so we build once.
+  const costRows: DataTooltipRow[] = [
+    { label: t("usage.costIn"), value: formatMoney(totals.input_cost ?? "0", currency) },
+    { label: t("usage.costOut"), value: formatMoney(totals.output_cost ?? "0", currency) },
+    { label: t("usage.costCacheRead"), value: formatMoney(totals.cache_read_cost ?? "0", currency) },
+    { label: t("usage.costCacheWrite"), value: formatMoney(totals.cache_write_cost ?? "0", currency) },
+  ];
+  const successRate =
+    totals.requests > 0 ? Math.round((totals.success_count / totals.requests) * 100) : 0;
+  const errorRate =
+    totals.requests > 0 ? Math.round((totals.error_count / totals.requests) * 100) : 0;
+
   return (
     <div className="space-y-5">
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <Stat label={t("apiKeys.usageRequests")} value={totals.requests.toLocaleString()} />
-        <Stat label={t("apiKeys.usageSuccess")} value={totals.success_count.toLocaleString()} />
-        <Stat label={t("apiKeys.usageErrors")} value={totals.error_count.toLocaleString()} />
-        <Stat label={t("apiKeys.usageTokens")} value={totals.total_tokens.toLocaleString()} />
-        <Stat label={t("apiKeys.usageCost")} value={formatMoney(totals.cost, currency)} />
+        <Stat
+          label={t("apiKeys.usageRequests")}
+          value={totals.requests.toLocaleString()}
+          tier="primary"
+          tooltip={{
+            title: t("apiKeys.usageRequests"),
+            rows: [
+              { label: t("apiKeys.usageSuccess"), value: totals.success_count.toLocaleString(), tone: "success" },
+              { label: t("apiKeys.usageErrors"), value: totals.error_count.toLocaleString(), tone: totals.error_count > 0 ? "error" : "muted" },
+            ],
+          }}
+        />
+        <Stat
+          label={t("apiKeys.usageSuccess")}
+          value={totals.success_count.toLocaleString()}
+          tier="secondary"
+          tone={totals.success_count > 0 ? "good" : undefined}
+          tooltip={{
+            title: t("apiKeys.usageSuccess"),
+            primary: `${successRate}%`,
+            rows: [
+              { label: t("apiKeys.usageRequests"), value: totals.requests.toLocaleString() },
+              { label: t("apiKeys.usageSuccess"), value: totals.success_count.toLocaleString(), tone: "success" },
+            ],
+          }}
+        />
+        <Stat
+          label={t("apiKeys.usageErrors")}
+          value={totals.error_count.toLocaleString()}
+          tier="secondary"
+          tone={totals.error_count > 0 ? "bad" : undefined}
+          tooltip={{
+            title: t("apiKeys.usageErrors"),
+            primary: `${errorRate}%`,
+            rows: [
+              { label: t("apiKeys.usageRequests"), value: totals.requests.toLocaleString() },
+              { label: t("apiKeys.usageErrors"), value: totals.error_count.toLocaleString(), tone: totals.error_count > 0 ? "error" : "muted" },
+            ],
+          }}
+        />
+        <Stat
+          label={t("apiKeys.usageTokens")}
+          value={totals.total_tokens.toLocaleString()}
+          tier="tertiary"
+          tooltip={{
+            title: t("apiKeys.usageTokens"),
+            primary: totals.total_tokens.toLocaleString(),
+            rows: costRows,
+          }}
+        />
+        <Stat
+          label={t("apiKeys.usageCost")}
+          value={formatMoney(totals.cost, currency)}
+          tier="primary"
+          tooltip={{
+            title: t("apiKeys.usageCost"),
+            primary: formatMoney(totals.cost, currency),
+            rows: costRows,
+          }}
+        />
       </dl>
       <div className="grid grid-cols-2 gap-2 text-xs text-srapi-text-tertiary sm:grid-cols-4">
         <span>{t("usage.costIn")} {formatMoney(totals.input_cost ?? "0", currency)}</span>
@@ -179,11 +248,43 @@ function UsageBody({ usage }: { usage: GatewayUsageResponse }) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-srapi-border bg-srapi-card-muted px-3 py-2">
+function Stat({
+  label,
+  value,
+  tier = "tertiary",
+  tone,
+  tooltip,
+}: {
+  label: string;
+  value: string;
+  tier?: "primary" | "secondary" | "tertiary";
+  tone?: "good" | "warn" | "bad";
+  tooltip?: { title?: string; primary?: React.ReactNode; rows?: DataTooltipRow[] };
+}) {
+  const tierClass =
+    tier === "primary"
+      ? "metric-primary"
+      : tier === "secondary"
+        ? "metric-secondary"
+        : "metric-tertiary";
+  const toneClass =
+    tone === "good"
+      ? "metric-strong-good"
+      : tone === "warn"
+        ? "metric-strong-warn"
+        : tone === "bad"
+          ? "metric-strong-bad"
+          : undefined;
+  const tile = (
+    <div className="block rounded-xl border border-srapi-border bg-srapi-card-muted px-3 py-2 text-left transition-colors hover:bg-srapi-card-muted/80">
       <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{label}</dt>
-      <dd className="mt-0.5 text-sm font-semibold tabular text-srapi-text-primary">{value}</dd>
+      <dd className={cn("mt-0.5 tabular tracking-tight", tierClass, toneClass)}>{value}</dd>
     </div>
+  );
+  if (!tooltip) return tile;
+  return (
+    <DataTooltip title={tooltip.title} primary={tooltip.primary} rows={tooltip.rows}>
+      {tile}
+    </DataTooltip>
   );
 }

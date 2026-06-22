@@ -1,13 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
-import { Bug, FileSearch, FileText, ExternalLink } from "lucide-react";
+import { Bug, ChevronDown, ChevronRight, FileSearch, FileText, ExternalLink } from "lucide-react";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { RequestDumpSummaryGrid } from "@/components/admin/request-log-dump-summary-panel";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { DensityToggle, type DensityValue } from "@/components/ui/density-toggle";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { IllustratedEmptyState } from "@/components/ui/illustrated-empty-state";
+import { InlineDetailGrid } from "@/components/ui/inline-detail-grid";
+import { ExpandableRow } from "@/components/ui/expandable-row";
 import {
   Dialog,
   DialogContent,
@@ -48,6 +54,9 @@ export function RequestLogFilesPanel() {
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [selected, setSelected] = useState<RequestLogFileDescriptor | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<RequestLogFileDescriptor | null>(null);
+  const [severityFilter, setSeverityFilter] = useState<"all" | "error" | "ok">("all");
+  const [density, setDensity] = useState<DensityValue>("regular");
+  const [expandedName, setExpandedName] = useState<string | null>(null);
   const queryParams = useMemo(
     () => ({
       request_id: prefix.trim() || undefined,
@@ -104,16 +113,29 @@ export function RequestLogFilesPanel() {
     })();
   }, [queryClient]);
 
-  const formattedRows = useMemo(
-    () =>
-      items.map((item) => ({
+  const formattedRows = useMemo(() => {
+    const rows = items.map((item) => {
+      const summary = requestLogDescriptorSummary(item);
+      return {
         ...item,
         createdAtLabel: formatDateTime(item.created_at),
         sizeLabel: formatSize(item.size),
-        summary: requestLogDescriptorSummary(item),
-      })),
-    [items],
-  );
+        summary,
+        // Severity drives the .log-row stripe — error dumps stand out, summary-
+        // missing rows read as neutral info, successful captures show no stripe.
+        severity:
+          item.is_error_only || summary.success === false
+            ? ("error" as const)
+            : summary.success === true
+              ? ("success" as const)
+              : ("info" as const),
+      };
+    });
+    if (severityFilter === "all") return rows;
+    if (severityFilter === "error") return rows.filter((r) => r.severity === "error");
+    return rows.filter((r) => r.severity !== "error");
+  }, [items, severityFilter]);
+  const rowPad = density === "compact" ? "py-1.5 px-3" : "py-3 px-4";
 
   return (
     <div className="space-y-4">
@@ -122,38 +144,60 @@ export function RequestLogFilesPanel() {
         description={t("adminRequestLogFiles.subtitle")}
       />
 
-      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-srapi-border bg-srapi-card p-3">
-        <input
-          value={prefix}
-          onChange={(e) => setPrefix(e.target.value)}
-          placeholder={t("adminRequestLogFiles.searchPlaceholder")}
-          className="h-9 flex-1 min-w-[180px] rounded-lg border border-srapi-border bg-srapi-card px-2.5 text-sm"
-        />
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={errorOnly}
-            onChange={(e) => setErrorOnly(e.target.checked)}
+      <div className="space-y-2 rounded-2xl border border-srapi-border bg-srapi-card p-3">
+        {/* Severity chip strip — picks between "all", "error only" or
+            "successful" without a checkbox. The legacy errorOnly checkbox is
+            still honored server-side; this strip narrows the visible feed. */}
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
+            Severity
+          </span>
+          <SegmentedControl
+            value={severityFilter}
+            onChange={(v) => setSeverityFilter(v)}
+            options={[
+              { value: "all", label: "All" },
+              { value: "error", label: "Errors" },
+              { value: "ok", label: "Successful" },
+            ]}
+            size="sm"
+            ariaLabel="dump severity filter"
           />
-          {t("adminRequestLogFiles.errorOnly")}
-        </label>
-        <label className="flex items-center gap-2 text-sm">
+          <div className="flex-1" />
+          <DensityToggle value={density} onChange={setDensity} />
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
           <input
-            type="checkbox"
-            checked={autoRefresh}
-            onChange={(e) => setAutoRefresh(e.target.checked)}
+            value={prefix}
+            onChange={(e) => setPrefix(e.target.value)}
+            placeholder={t("adminRequestLogFiles.searchPlaceholder")}
+            className="h-9 flex-1 min-w-[180px] rounded-lg border border-srapi-border bg-srapi-card px-2.5 text-sm"
           />
-          {t("adminRequestLogFiles.autoRefresh")}
-        </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={errorOnly}
+              onChange={(e) => setErrorOnly(e.target.checked)}
+            />
+            {t("adminRequestLogFiles.errorOnly")}
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={autoRefresh}
+              onChange={(e) => setAutoRefresh(e.target.checked)}
+            />
+            {t("adminRequestLogFiles.autoRefresh")}
+          </label>
+        </div>
       </div>
 
       {formattedRows.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-srapi-border/70 bg-srapi-card-muted/40 p-8 text-center text-sm text-srapi-text-tertiary">
-          <p className="text-base font-semibold tracking-tight text-srapi-text-primary">
-            {t("adminRequestLogFiles.emptyTitle")}
-          </p>
-          <p className="mt-1 text-srapi-text-secondary">{t("adminRequestLogFiles.emptyBody")}</p>
-        </div>
+        <IllustratedEmptyState
+          illust="logs"
+          title={t("adminRequestLogFiles.emptyTitle")}
+          description={t("adminRequestLogFiles.emptyBody")}
+        />
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-srapi-border bg-srapi-card">
           <table className="w-full table-fixed text-left text-sm">
@@ -177,69 +221,139 @@ export function RequestLogFilesPanel() {
               </tr>
             </thead>
             <tbody>
-              {formattedRows.map((row) => (
-                <tr key={row.name} className="border-t border-srapi-border/70 transition-colors hover:bg-srapi-card-muted/50">
-                  <td className="px-4 py-3 text-xs">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => openPreview(row)}
-                        title={row.name}
-                        className="min-w-0 truncate underline-offset-2 hover:underline"
-                      >
-                        {row.name}
-                      </button>
-                      {row.is_error_only ? (
-                        <span className="shrink-0 rounded-full bg-srapi-error/12 px-2 py-0.5 text-[11px] font-medium text-srapi-error">
-                          error
-                        </span>
-                      ) : null}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-srapi-text-secondary">
-                    <div className="truncate" title={row.request_id}>
-                      {row.request_id}
-                    </div>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-[12px] tabular text-srapi-text-tertiary">
-                    {row.createdAtLabel}
-                  </td>
-                  <td className="px-4 py-3 text-[12px] text-srapi-text-tertiary">
-                    {row.sizeLabel}
-                  </td>
-                  <td className="px-4 py-3">
-                    <RequestDumpDescriptorSummary file={row} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <RequestDumpEvidencePills file={row} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => openPreview(row)}
-                        className="rounded-lg border border-srapi-border px-2.5 py-1 text-xs font-medium text-srapi-text-secondary hover:bg-srapi-card-muted hover:text-srapi-text-primary"
-                      >
-                        {t("adminRequestLogFiles.preview")}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => downloadFile(row)}
-                        className="rounded-lg border border-srapi-border px-2.5 py-1 text-xs font-medium text-srapi-text-secondary hover:bg-srapi-card-muted hover:text-srapi-text-primary"
-                      >
-                        {t("adminRequestLogFiles.download")}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDeleteTarget(row)}
-                        className="rounded-lg border border-srapi-error/30 px-2.5 py-1 text-xs font-medium text-srapi-error hover:bg-srapi-error/10"
-                      >
-                        {t("adminRequestLogFiles.delete")}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {formattedRows.map((row) => {
+                const open = expandedName === row.name;
+                const sev =
+                  row.severity === "error" ? "error" : row.severity === "success" ? "info" : "info";
+                return (
+                  <React.Fragment key={row.name}>
+                    <tr
+                      data-sev={sev}
+                      onClick={(e) => {
+                        const target = e.target as HTMLElement | null;
+                        if (target?.closest('a,button,input')) return;
+                        setExpandedName((prev) => (prev === row.name ? null : row.name));
+                      }}
+                      className={`log-row cursor-pointer border-t border-srapi-border/70 transition-colors hover:bg-srapi-card-muted/50`}
+                    >
+                      <td className={`${rowPad} text-xs`}>
+                        <div className="flex min-w-0 items-center gap-2">
+                          {open ? (
+                            <ChevronDown aria-hidden className="size-3 shrink-0" />
+                          ) : (
+                            <ChevronRight aria-hidden className="size-3 shrink-0" />
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => openPreview(row)}
+                            title={row.name}
+                            className="min-w-0 truncate underline-offset-2 hover:underline"
+                          >
+                            {row.name}
+                          </button>
+                          {row.is_error_only ? (
+                            <span className="shrink-0 rounded-full bg-srapi-error/12 px-2 py-0.5 text-[11px] font-medium text-srapi-error">
+                              error
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td className={`${rowPad} text-xs text-srapi-text-secondary`}>
+                        <div className="truncate" title={row.request_id}>
+                          {row.request_id}
+                        </div>
+                      </td>
+                      <td className={`whitespace-nowrap ${rowPad} text-[12px] tabular text-srapi-text-tertiary`}>
+                        {row.createdAtLabel}
+                      </td>
+                      <td className={`${rowPad} text-[12px] text-srapi-text-tertiary`}>
+                        {/* File size with breakdown so ops can spot an
+                            unusually-large dump before opening it. */}
+                        <DataTooltip
+                          title="Size"
+                          primary={row.sizeLabel}
+                          rows={[
+                            { label: "bytes", value: row.size.toLocaleString(), mono: true } as never,
+                            { label: "attempts", value: row.summary.attemptCount, tone: "muted" },
+                            { label: "responses", value: row.summary.responseCount, tone: "muted" },
+                          ]}
+                        >
+                          <span>{row.sizeLabel}</span>
+                        </DataTooltip>
+                      </td>
+                      <td className={rowPad}>
+                        <RequestDumpDescriptorSummary file={row} />
+                      </td>
+                      <td className={rowPad}>
+                        <RequestDumpEvidencePills file={row} />
+                      </td>
+                      <td className={rowPad}>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openPreview(row)}
+                            className="rounded-lg border border-srapi-border px-2.5 py-1 text-xs font-medium text-srapi-text-secondary hover:bg-srapi-card-muted hover:text-srapi-text-primary"
+                          >
+                            {t("adminRequestLogFiles.preview")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => downloadFile(row)}
+                            className="rounded-lg border border-srapi-border px-2.5 py-1 text-xs font-medium text-srapi-text-secondary hover:bg-srapi-card-muted hover:text-srapi-text-primary"
+                          >
+                            {t("adminRequestLogFiles.download")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteTarget(row)}
+                            className="rounded-lg border border-srapi-error/30 px-2.5 py-1 text-xs font-medium text-srapi-error hover:bg-srapi-error/10"
+                          >
+                            {t("adminRequestLogFiles.delete")}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {open ? (
+                      <tr data-expand-for={row.name}>
+                        <td colSpan={7} className="p-0">
+                          <ExpandableRow expanded>
+                            <InlineDetailGrid
+                              sections={[
+                                {
+                                  title: "Request",
+                                  rows: [
+                                    { label: "name", value: row.name, mono: true },
+                                    { label: "request_id", value: row.request_id, mono: true },
+                                    { label: "created_at", value: row.createdAtLabel, mono: true, tone: "muted" },
+                                    { label: "endpoint", value: row.summary.sourceEndpoint || "—", mono: true },
+                                  ],
+                                },
+                                {
+                                  title: "Response",
+                                  rows: [
+                                    { label: "outcome", value: row.summary.success === true ? "success" : row.summary.success === false ? "error" : "—", tone: row.summary.success === true ? "success" : row.summary.success === false ? "error" : "muted" },
+                                    { label: "status", value: row.summary.statusCode ?? "—", mono: true, tone: (row.summary.statusCode ?? 0) >= 500 ? "error" : (row.summary.statusCode ?? 0) >= 400 ? "warning" : "default" },
+                                    { label: "error_class", value: row.summary.errorClass || "—", mono: true, tone: "error" },
+                                  ],
+                                },
+                                {
+                                  title: "Cost",
+                                  rows: [
+                                    { label: "size", value: row.sizeLabel, mono: true },
+                                    { label: "latency_ms", value: row.summary.latencyMS ?? "—", mono: true, tone: typeof row.summary.latencyMS === "number" && row.summary.latencyMS >= 10000 ? "warning" : "default" },
+                                    { label: "attempts", value: row.summary.attemptCount, mono: true, tone: "muted" },
+                                    { label: "responses", value: row.summary.responseCount, mono: true, tone: "muted" },
+                                  ],
+                                },
+                              ]}
+                            />
+                          </ExpandableRow>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </React.Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>

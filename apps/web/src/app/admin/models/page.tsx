@@ -9,10 +9,13 @@ import { ADMIN_ROUTES } from "@/lib/routes";
 import { PRESET_MODEL_NAMES } from "@/app/admin/quick-setup/presets";
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
-import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-toolbar";
+import { ListToolbar, SearchInput } from "@/components/admin/list-toolbar";
 import { ColumnToggle } from "@/components/ui/column-toggle";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { InlineDetailGrid, type InlineDetailSection } from "@/components/ui/inline-detail-grid";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import {
   ResourceFormDialog,
   enumOptions,
@@ -249,11 +252,35 @@ function ModelsContent() {
       align: "right",
       hideOnMobile: true,
       sortValue: (m) => m.context_window ?? 0,
-      render: (m) => (
-        <span className="text-xs tabular text-srapi-text-secondary">
-          {m.context_window != null ? m.context_window.toLocaleString() : "—"}
-        </span>
-      ),
+      render: (m) => {
+        if (m.context_window == null) {
+          return <span className="text-xs tabular text-srapi-text-tertiary">—</span>;
+        }
+        return (
+          <DataTooltip
+            title={t("adminModels.contextWindow")}
+            primary={
+              <span className="tabular">{m.context_window.toLocaleString()}</span>
+            }
+            rows={[
+              { label: t("adminModels.contextWindow"), value: m.context_window.toLocaleString() },
+              {
+                label: t("adminModels.maxOutput"),
+                value: m.max_output_tokens != null ? m.max_output_tokens.toLocaleString() : "—",
+                tone: m.max_output_tokens == null ? "muted" : "default",
+              },
+              ...(m.family ? [{ label: t("adminModels.family"), value: m.family }] : []),
+              ...(m.quality_tier
+                ? [{ label: t("adminModels.qualityTier"), value: m.quality_tier }]
+                : []),
+            ]}
+          >
+            <span className="text-xs tabular text-srapi-text-secondary">
+              {m.context_window.toLocaleString()}
+            </span>
+          </DataTooltip>
+        );
+      },
     },
     {
       key: "ratelimit",
@@ -266,10 +293,18 @@ function ModelsContent() {
             <span className="text-xs text-srapi-text-tertiary">{t("adminRateLimit.none")}</span>
           );
         }
+        const summary = rl.enabled ? rateLimitSummary(rl) : t("adminRateLimit.off");
         return (
-          <DataPill tone={rl.enabled ? "accent" : "neutral"}>
-            {rl.enabled ? rateLimitSummary(rl) : t("adminRateLimit.off")}
-          </DataPill>
+          <DataTooltip
+            title={t("adminRateLimit.column")}
+            primary={summary}
+            rows={[
+              { label: t("adminCommon.status"), value: rl.enabled ? t("common.active") : t("common.off"), tone: rl.enabled ? "success" : "muted" },
+              { label: t("adminRateLimit.column"), value: summary },
+            ]}
+          >
+            <DataPill tone={rl.enabled ? "accent" : "neutral"}>{summary}</DataPill>
+          </DataTooltip>
         );
       },
     },
@@ -333,6 +368,8 @@ function ModelsContent() {
         columnVisibility={colVis}
         getRowId={(m) => m.id}
         emptyIcon={Cpu}
+        rowSeverity={(m) => (m.status === "disabled" || m.status === "archived" ? "warning" : undefined)}
+        expandRow={(m) => <ModelDetailRow model={m} />}
         emptyTitle={t("adminModels.emptyTitle")}
         emptyBody={t("adminModels.emptyBody")}
         emptyAction={
@@ -358,13 +395,22 @@ function ModelsContent() {
               onChange={list.setSearchInput}
               placeholder={t("adminCommon.search")}
             />
-            <FilterSelect
-              value={statusFilter}
-              onChange={(v) => list.setFilter("status", v)}
-              options={enumOptions(MODEL_STATUSES)}
-              allLabel={t("adminCommon.allStatuses")}
+            <SegmentedControl<string>
+              value={statusFilter ?? "__all__"}
+              onChange={(v) => list.setFilter("status", v === "__all__" ? undefined : v)}
+              ariaLabel={t("adminCommon.status")}
+              size="sm"
+              options={[
+                { value: "__all__", label: t("common.all") },
+                ...enumOptions(MODEL_STATUSES).map((opt) => ({
+                  value: opt.value,
+                  label: opt.label,
+                })),
+              ]}
             />
-            <ColumnToggle columns={toggleColumns} visibility={colVis} />
+            <div className="ml-auto">
+              <ColumnToggle columns={toggleColumns} visibility={colVis} />
+            </div>
           </ListToolbar>
         }
         pagination={{
@@ -565,4 +611,68 @@ function ModelsContent() {
       ) : null}
     </>
   );
+}
+
+/**
+ * Inline expansion content for a model row. Surfaces identity / capability
+ * matrix / sizing constraints as label-value pairs inside an
+ * <InlineDetailGrid>. The capability matrix groups each registered
+ * capability by status (stable / experimental / deprecated) and level
+ * (required / optional / unsupported) — the same fields the scheduler
+ * reads when picking a serving account.
+ */
+function ModelDetailRow({ model }: { model: Model }) {
+  const { t } = useLanguage();
+  const caps = model.capabilities ?? [];
+
+  const identitySection: InlineDetailSection = {
+    title: t("adminModels.canonicalName"),
+    rows: [
+      { label: t("adminModels.canonicalName"), value: model.canonical_name, mono: true },
+      { label: t("adminModels.displayName"), value: model.display_name },
+      ...(model.family ? [{ label: t("adminModels.family"), value: model.family, mono: true as const }] : []),
+      ...(model.quality_tier
+        ? [{ label: t("adminModels.qualityTier"), value: model.quality_tier }]
+        : []),
+    ],
+  };
+
+  const sizingSection: InlineDetailSection = {
+    title: t("adminModels.contextWindow"),
+    rows: [
+      {
+        label: t("adminModels.contextWindow"),
+        value: model.context_window != null ? model.context_window.toLocaleString() : "—",
+        tone: model.context_window == null ? "muted" : "default",
+      },
+      {
+        label: t("adminModels.maxOutput"),
+        value: model.max_output_tokens != null ? model.max_output_tokens.toLocaleString() : "—",
+        tone: model.max_output_tokens == null ? "muted" : "default",
+      },
+      { label: t("adminCommon.status"), value: model.status },
+    ],
+  };
+
+  const capabilitySection: InlineDetailSection = {
+    title: t("adminModels.capabilities"),
+    rows:
+      caps.length > 0
+        ? caps.slice(0, 12).map((c) => ({
+            label: c.key,
+            value: `${c.level} · ${c.status}`,
+            mono: true,
+            tone:
+              c.level === "unsupported"
+                ? ("error" as const)
+                : c.status === "deprecated"
+                  ? ("warning" as const)
+                  : c.status === "experimental"
+                    ? ("warning" as const)
+                    : ("success" as const),
+          }))
+        : [{ label: "—", value: t("adminCommon.noResults"), tone: "muted" as const }],
+  };
+
+  return <InlineDetailGrid sections={[identitySection, capabilitySection, sizingSection]} />;
 }

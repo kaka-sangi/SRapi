@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FloatingInput } from "@/components/ui/floating-input";
 import { cn } from "@/lib/cn";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
@@ -396,7 +397,10 @@ export function AccountOAuthAuthorizeDialog({
 
           {isAuthCode ? (
             <div className="space-y-3">
-              <div className="rounded-lg border border-srapi-border bg-srapi-card-muted/60 p-3.5">
+              <div
+                className="log-row rounded-lg border border-srapi-border bg-srapi-card-muted/60 p-3.5"
+                data-sev={authUrl ? "success" : "info"}
+              >
                 <div className="flex gap-3">
                   <StepBadge value="1" />
                   <div className="min-w-0 flex-1">
@@ -415,7 +419,10 @@ export function AccountOAuthAuthorizeDialog({
                   </div>
                 </div>
               </div>
-              <div className="rounded-lg border border-srapi-border bg-srapi-card-muted/60 p-3.5">
+              <div
+                className="log-row rounded-lg border border-srapi-border bg-srapi-card-muted/60 p-3.5"
+                data-sev={authUrl ? "info" : "info"}
+              >
                 <div className="flex gap-3">
                   <StepBadge value="2" />
                   <div className="min-w-0 flex-1">
@@ -439,29 +446,26 @@ export function AccountOAuthAuthorizeDialog({
                   </div>
                 </div>
               </div>
-              <div className="rounded-lg border border-srapi-border bg-srapi-card-muted/60 p-3.5">
+              <div
+                className="log-row rounded-lg border border-srapi-border bg-srapi-card-muted/60 p-3.5"
+                data-sev={callbackCode.trim() ? "success" : "info"}
+              >
                 <div className="flex gap-3">
                   <StepBadge value="3" />
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium text-srapi-text-primary">
                       {t("accountOAuth.stepCodeTitle")}
                     </div>
-                    <p className="mt-1 text-[11px] text-srapi-text-tertiary">
-                      {t("accountOAuth.pasteCodeHint")}
-                    </p>
-                    <div className="mt-2">
-                      <Label htmlFor="oauth-callback-code" className="text-[11px]">
-                        {t("accountOAuth.callbackCode")}
-                      </Label>
-                      <Input
-                        id="oauth-callback-code"
-                        autoComplete="off"
-                        className="mt-1 font-mono"
-                        value={callbackCode}
-                        disabled={busy || !authUrl}
-                        onChange={(e) => setCallbackCode(e.target.value)}
-                      />
-                    </div>
+                    <FloatingInput
+                      id="oauth-callback-code"
+                      className="mt-2 [&_input]:font-mono"
+                      label={t("accountOAuth.callbackCode")}
+                      value={callbackCode}
+                      onChange={setCallbackCode}
+                      disabled={busy || !authUrl}
+                      autoComplete="off"
+                      hint={t("accountOAuth.pasteCodeHint")}
+                    />
                   </div>
                 </div>
               </div>
@@ -470,10 +474,13 @@ export function AccountOAuthAuthorizeDialog({
 
           {/* Device-code: show the user code + verification URI while polling. */}
           {!isAuthCode && device ? (
-            <div className="space-y-2 rounded-lg border border-srapi-border bg-srapi-card-muted px-3.5 py-3">
+            <div
+              className="log-row space-y-2 rounded-lg border border-srapi-border bg-srapi-card-muted px-3.5 py-3"
+              data-sev={polling ? "info" : "success"}
+            >
               <p className="text-[11px] text-srapi-text-tertiary">{t("accountOAuth.deviceCodeHint")}</p>
               <div className="flex items-center gap-2">
-                <span className="font-mono text-lg tracking-widest text-srapi-text-primary">
+                <span className="font-mono text-lg tracking-widest text-srapi-text-primary metric-primary">
                   {device.user_code}
                 </span>
                 <a
@@ -495,7 +502,11 @@ export function AccountOAuthAuthorizeDialog({
             </div>
           ) : null}
 
-          {error ? <p className="text-sm text-srapi-error">{error}</p> : null}
+          {error ? (
+            <div className="log-row rounded-lg" data-sev="error">
+              <p className="px-3 py-2 text-sm text-srapi-error">{error}</p>
+            </div>
+          ) : null}
         </div>
 
         <DialogFooter>

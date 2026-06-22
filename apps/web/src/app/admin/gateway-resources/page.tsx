@@ -9,17 +9,17 @@ import {
   Globe,
   KeyRound,
   Route,
-  SearchX,
   Shuffle,
   Tag,
 } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { SectionHero } from "@/components/visual/section-hero";
 import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-toolbar";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
+import { IllustratedEmptyState } from "@/components/ui/illustrated-empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IconBubble } from "@/components/ui/icon-bubble";
 import { DataPill } from "@/components/ui/data-pill";
@@ -182,8 +182,8 @@ function GatewayResourcesContent() {
 
       {loading ? <GatewayResourcesSkeleton /> : null}
       {!loading && error ? (
-        <EmptyState
-          icon={AlertTriangle}
+        <IllustratedEmptyState
+          illust="cog"
           title={t("common.error")}
           description={t("common.errorBody")}
           action={
@@ -250,8 +250,8 @@ function GatewayResourcesContent() {
           />
 
           {isFiltered && filters.total === 0 ? (
-            <EmptyState
-              icon={SearchX}
+            <IllustratedEmptyState
+              illust="search"
               title={t("adminGatewayResources.emptyFilteredTitle")}
               description={t("adminGatewayResources.emptyFilteredBody")}
               action={
@@ -450,14 +450,18 @@ function GatewayResourceToolbar({
           placeholder={t("adminGatewayResources.searchPlaceholder")}
           className="sm:max-w-sm"
         />
-        <FilterSelect
-          value={validStatusFilter(status)}
-          onChange={onStatus}
-          options={GATEWAY_STATUSES.map((value) => ({
-            value,
-            label: t(`adminGatewayResources.${value}`),
-          }))}
-          allLabel={t("adminGatewayResources.allStatuses")}
+        <SegmentedControl<string>
+          value={validStatusFilter(status) || "__all__"}
+          onChange={(v) => onStatus(v === "__all__" ? undefined : v)}
+          ariaLabel={t("adminCommon.status")}
+          size="sm"
+          options={[
+            { value: "__all__", label: t("adminGatewayResources.allStatuses") },
+            ...GATEWAY_STATUSES.map((value) => ({
+              value,
+              label: t(`adminGatewayResources.${value}`),
+            })),
+          ]}
         />
         <FilterSelect
           value={validReasonFilter(reason)}
@@ -468,14 +472,18 @@ function GatewayResourceToolbar({
           }))}
           allLabel={t("adminGatewayResources.allReasons")}
         />
-        <FilterSelect
-          value={validScopeFilter(scope)}
-          onChange={onScope}
-          options={GATEWAY_SCOPES.map((value) => ({
-            value,
-            label: t(`adminGatewayResources.scope.${value}`),
-          }))}
-          allLabel={t("adminGatewayResources.allScopes")}
+        <SegmentedControl<string>
+          value={validScopeFilter(scope) || "__all__"}
+          onChange={(v) => onScope(v === "__all__" ? undefined : v)}
+          ariaLabel={t("adminGatewayResources.allScopes")}
+          size="sm"
+          options={[
+            { value: "__all__", label: t("adminGatewayResources.allScopes") },
+            ...GATEWAY_SCOPES.map((value) => ({
+              value,
+              label: t(`adminGatewayResources.scope.${value}`),
+            })),
+          ]}
         />
         <FilterSelect
           value={sortValue}
@@ -505,16 +513,27 @@ function ResourceKpi({
   label: string;
   value: string;
 }) {
+  // Split "ready/total" ratios so the leading "ready" is .metric-primary and
+  // the trailing "/total" drops to .metric-tertiary — gives the KPI card a
+  // 3-tier hierarchy without needing two separate values from the caller.
+  const split = value.match(/^([^/]+)(\/.+)$/);
   return (
-    <Card className="p-5">
+    <Card className="p-5 card-spotlight">
       <div className="flex items-center justify-between gap-3">
         <span className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{label}</span>
         <IconBubble size="sm" tone="accent">
           <Icon aria-hidden />
         </IconBubble>
       </div>
-      <div className="mt-3 text-3xl font-semibold tracking-tight tabular leading-none text-srapi-text-primary">
-        {value}
+      <div className="mt-3 tabular leading-none">
+        {split ? (
+          <>
+            <span className="metric-primary">{split[1]}</span>
+            <span className="metric-tertiary">{split[2]}</span>
+          </>
+        ) : (
+          <span className="metric-primary">{value}</span>
+        )}
       </div>
     </Card>
   );

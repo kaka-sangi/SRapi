@@ -8,10 +8,13 @@ import { AdminListView, type Column } from "@/components/admin/admin-list-view";
 import { ADMIN_ROUTES } from "@/lib/routes";
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
-import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-toolbar";
+import { ListToolbar, SearchInput } from "@/components/admin/list-toolbar";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { InlineDetailGrid, type InlineDetailSection } from "@/components/ui/inline-detail-grid";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import {
   ResourceFormDialog,
   enumOptions,
@@ -29,6 +32,7 @@ import {
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { adminErrorMessage } from "@/lib/admin-api";
+import { cn } from "@/lib/cn";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
 import { DataPill } from "@/components/ui/data-pill";
@@ -272,11 +276,28 @@ function ProvidersContent() {
         const counts = accountCountByProvider.get(p.id);
         if (!counts)
           return <span className="text-xs tabular text-srapi-text-tertiary">0</span>;
+        const inactive = Math.max(0, counts.total - counts.active);
         return (
-          <span className="flex items-center gap-1.5 text-xs tabular">
-            <span className="font-medium text-srapi-success">{counts.active}</span>
-            <span className="text-srapi-text-tertiary">/ {counts.total}</span>
-          </span>
+          <DataTooltip
+            title={t("dashboard.accounts")}
+            primary={
+              <span className="tabular">
+                {counts.active}
+                <span className="text-srapi-text-tertiary"> / {counts.total}</span>
+              </span>
+            }
+            rows={[
+              { label: t("common.active"), value: String(counts.active), tone: counts.active > 0 ? "success" : "muted" },
+              { label: t("common.disabled"), value: String(inactive), tone: inactive > 0 ? "warning" : "muted" },
+            ]}
+          >
+            <span className="flex items-center gap-1.5 text-xs tabular">
+              <span className={cn("font-medium", counts.active > 0 ? "metric-strong-good" : "text-srapi-text-tertiary")}>
+                {counts.active}
+              </span>
+              <span className="text-srapi-text-tertiary">/ {counts.total}</span>
+            </span>
+          </DataTooltip>
         );
       },
     },
@@ -348,6 +369,13 @@ function ProvidersContent() {
         columnVisibility={colVis}
         getRowId={(p) => p.id}
         emptyIcon={Plug}
+        rowSeverity={(p) => {
+          if (p.status === "disabled" || p.status === "archived") return "warning";
+          const counts = accountCountByProvider.get(p.id);
+          if (counts && counts.total > 0 && counts.active === 0) return "warning";
+          return undefined;
+        }}
+        expandRow={(p) => <ProviderDetailRow provider={p} />}
         emptyTitle={t("adminProviders.emptyTitle")}
         emptyBody={t("adminProviders.emptyBody")}
         emptyAction={
@@ -373,16 +401,25 @@ function ProvidersContent() {
               onChange={list.setSearchInput}
               placeholder={t("adminProviders.searchPlaceholder")}
             />
-            <FilterSelect
-              value={statusFilter}
-              onChange={(v) => list.setFilter("status", v)}
-              options={enumOptions(RESOURCE_STATUSES)}
-              allLabel={t("adminCommon.allStatuses")}
+            <SegmentedControl<string>
+              value={statusFilter ?? "__all__"}
+              onChange={(v) => list.setFilter("status", v === "__all__" ? undefined : v)}
+              ariaLabel={t("adminCommon.status")}
+              size="sm"
+              options={[
+                { value: "__all__", label: t("common.all") },
+                ...enumOptions(RESOURCE_STATUSES).map((opt) => ({
+                  value: opt.value,
+                  label: opt.label,
+                })),
+              ]}
             />
-            <ColumnToggle
-              columns={columns.map((c) => ({ key: c.key, label: c.header }))}
-              visibility={colVis}
-            />
+            <div className="ml-auto">
+              <ColumnToggle
+                columns={columns.map((c) => ({ key: c.key, label: c.header }))}
+                visibility={colVis}
+              />
+            </div>
           </ListToolbar>
         }
         pagination={{
@@ -455,4 +492,67 @@ function ProvidersContent() {
       ) : null}
     </>
   );
+}
+
+/**
+ * Inline expansion content for a provider row. Surfaces identity / routing /
+ * capability matrix / config schema as label-value pairs inside an
+ * <InlineDetailGrid>. Replaces a per-row click→modal hop with at-a-glance
+ * detail.
+ */
+function ProviderDetailRow({ provider }: { provider: Provider }) {
+  const { t } = useLanguage();
+  const capabilities = provider.capabilities as Record<string, unknown> | undefined;
+  const configSchema = provider.config_schema as Record<string, unknown> | undefined;
+  const authMethods = provider.auth_methods ?? [];
+
+  const sections: InlineDetailSection[] = [
+    {
+      title: t("adminProviders.name"),
+      rows: [
+        { label: t("adminProviders.name"), value: provider.name, mono: true },
+        { label: t("adminProviders.displayName"), value: provider.display_name },
+        { label: t("adminProviders.adapterType"), value: provider.adapter_type, mono: true },
+        { label: t("adminProviders.protocol"), value: provider.protocol, mono: true },
+        ...(provider.platform_family
+          ? [{ label: "platform", value: String(provider.platform_family), mono: true }]
+          : []),
+      ],
+    },
+    {
+      title: t("adminProviders.capabilities"),
+      rows:
+        capabilities && Object.keys(capabilities).length > 0
+          ? Object.entries(capabilities)
+              .slice(0, 10)
+              .map(([k, v]) => ({
+                label: k,
+                value: typeof v === "object" ? JSON.stringify(v) : String(v),
+                mono: true,
+              }))
+          : [{ label: "—", value: t("adminCommon.noResults"), tone: "muted" as const }],
+    },
+  ];
+
+  if (authMethods.length > 0) {
+    sections.push({
+      title: "auth methods",
+      rows: authMethods.map((m) => ({ label: m, value: "✓", mono: true, tone: "success" as const })),
+    });
+  }
+
+  if (configSchema && Object.keys(configSchema).length > 0) {
+    sections.push({
+      title: t("adminProviders.configSchema"),
+      rows: Object.entries(configSchema)
+        .slice(0, 10)
+        .map(([k, v]) => ({
+          label: k,
+          value: typeof v === "object" ? JSON.stringify(v) : String(v),
+          mono: true,
+        })),
+    });
+  }
+
+  return <InlineDetailGrid sections={sections} />;
 }

@@ -6,7 +6,7 @@ import { Bug, ExternalLink, FileText, Link2 } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { SectionHero } from "@/components/visual/section-hero";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
-import { ListToolbar, SearchInput, FilterSelect } from "@/components/admin/list-toolbar";
+import { ListToolbar, SearchInput } from "@/components/admin/list-toolbar";
 import { OpsLogCleanupDialog } from "@/components/admin/ops-log-cleanup-dialog";
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,9 @@ import { Card } from "@/components/ui/card";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { DataTooltip } from "@/components/ui/data-tooltip";
+import { InlineDetailGrid } from "@/components/ui/inline-detail-grid";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +38,21 @@ import type { OpsSystemLog, OpsSystemLogHealth, OpsSystemLogLevel } from "@/lib/
 import { opsSystemLogEvidenceItems } from "./system-log-evidence";
 
 const LOG_LEVELS: OpsSystemLogLevel[] = ["debug", "info", "warn", "error"];
+
+function logSeverity(
+  level: OpsSystemLogLevel,
+): "info" | "success" | "warning" | "error" | "critical" | undefined {
+  switch (level) {
+    case "error":
+      return "error";
+    case "warn":
+      return "warning";
+    case "info":
+      return "info";
+    default:
+      return undefined;
+  }
+}
 export default function AdminOpsSystemLogsPage() {
   return (
     <AdminShell>
@@ -76,7 +94,24 @@ function Content() {
     {
       key: "level",
       header: t("adminOpsSystemLogs.level"),
-      render: (row) => <QuietBadge status={levelTone(row.level)} label={row.level} />,
+      render: (row) => (
+        <DataTooltip
+          title={t("adminOpsSystemLogs.level")}
+          primary={row.level}
+          rows={[
+            { label: t("adminOpsSystemLogs.source"), value: row.source || "—", tone: "muted" },
+            ...(row.request_id
+              ? [{ label: t("adminOpsSystemLogs.requestId"), value: row.request_id, tone: "muted" as const }]
+              : []),
+            ...(row.trace_id
+              ? [{ label: t("adminOpsSystemLogs.traceId"), value: row.trace_id, tone: "muted" as const }]
+              : []),
+          ]}
+          footer={formatDateTime(row.created_at)}
+        >
+          <QuietBadge status={levelTone(row.level)} label={row.level} />
+        </DataTooltip>
+      ),
     },
     {
       key: "source",
@@ -138,6 +173,9 @@ function Content() {
         emptyTitle={t("adminOpsSystemLogs.emptyTitle")}
         emptyBody={t("adminOpsSystemLogs.emptyBody")}
         minWidth={720}
+        density="compact"
+        rowSeverity={(row) => logSeverity(row.level)}
+        expandRow={(row) => <SystemLogExpandDetail log={row} t={t} />}
         toolbar={
           <ListToolbar>
             <SearchInput
@@ -145,11 +183,15 @@ function Content() {
               onChange={list.setSearchInput}
               placeholder={t("adminOpsSystemLogs.searchPlaceholder")}
             />
-            <FilterSelect
-              value={level}
-              onChange={(value) => list.setFilter("level", value)}
-              allLabel={t("adminOpsSystemLogs.allLevels")}
-              options={LOG_LEVELS.map((l) => ({ value: l, label: l }))}
+            <SegmentedControl<string>
+              value={(level as string) ?? "all"}
+              onChange={(v) => list.setFilter("level", v === "all" ? "" : v)}
+              ariaLabel={t("adminOpsSystemLogs.allLevels")}
+              size="sm"
+              options={[
+                { value: "all", label: t("adminOpsSystemLogs.allLevels") },
+                ...LOG_LEVELS.map((l) => ({ value: l, label: l })),
+              ]}
             />
             <ExactFilterInput
               value={source ?? ""}
@@ -533,4 +575,63 @@ function levelTone(level: OpsSystemLogLevel): "active" | "limited" | "disabled" 
     default:
       return "disabled";
   }
+}
+
+/**
+ * Inline log expansion: shows the full message (no truncation), correlation
+ * ids with copy buttons, and a metadata key/value grid. Inline because log
+ * triage is a scroll-and-scan exercise — opening a modal for every row would
+ * shred flow.
+ */
+function SystemLogExpandDetail({
+  log,
+  t,
+}: {
+  log: OpsSystemLog;
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
+  const meta = log.metadata ?? {};
+  const metaEntries = Object.entries(meta).slice(0, 12);
+
+  const correlation: Array<{ label: string; value: string; mono?: boolean; tone?: "muted" | "default" }> = [
+    { label: t("adminOpsSystemLogs.source"), value: log.source || "—", mono: true },
+    { label: t("adminOpsSystemLogs.time"), value: formatDateTime(log.created_at), tone: "muted" },
+  ];
+  if (log.request_id)
+    correlation.push({ label: t("adminOpsSystemLogs.requestId"), value: log.request_id, mono: true });
+  if (log.trace_id)
+    correlation.push({ label: t("adminOpsSystemLogs.traceId"), value: log.trace_id, mono: true });
+
+  return (
+    <div className="border-t border-srapi-border/60 bg-srapi-card-muted/30 px-6 py-4 space-y-4">
+      <div>
+        <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
+          {t("adminOpsSystemLogs.message")}
+        </div>
+        <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-srapi-border bg-srapi-card-muted/60 p-3 font-mono text-[11px] text-srapi-text-secondary">
+          {log.message}
+        </pre>
+      </div>
+      <InlineDetailGrid
+        sections={[
+          { title: t("adminCommon.metadata"), rows: correlation },
+          ...(metaEntries.length > 0
+            ? [
+                {
+                  title: t("adminOpsSystemLogs.metadata"),
+                  rows: metaEntries.map(([k, v]) => ({
+                    label: k,
+                    value:
+                      typeof v === "string" || typeof v === "number" || typeof v === "boolean"
+                        ? String(v)
+                        : safeJson(v),
+                    mono: true,
+                  })),
+                },
+              ]
+            : []),
+        ]}
+      />
+    </div>
+  );
 }

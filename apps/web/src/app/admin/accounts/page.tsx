@@ -55,6 +55,8 @@ import { useToast } from "@/context/ToastContext";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
 import { DataPill } from "@/components/ui/data-pill";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { InlineDetailGrid, type InlineDetailSection } from "@/components/ui/inline-detail-grid";
 import {
   Dialog,
   DialogContent,
@@ -644,6 +646,211 @@ function AccountsContent() {
     );
   }
 
+  /**
+   * Build the inline expansion grid for an account row. Surfaces six sections
+   * the operator triages with: who is this (Identity), how is it routed
+   * (Routing), how is it doing right now (Health), how much budget is left
+   * (Quota), what has it done today (Today), and what extra fields does it
+   * carry (Profile). Inline > modal: keeps cognitive load low when scanning
+   * a noisy fleet.
+   */
+  function buildExpandRow(account: ProviderAccount): React.ReactNode {
+    const identity = accountIdentitySummary(t, account);
+    const capacity = accountCapacityFacts(t, account);
+    const profile = accountProfileFacts(t, account);
+    const today = todayByAccountId.get(account.id);
+    const health = healthById.get(account.id);
+
+    const identitySection: InlineDetailSection = {
+      title: t("adminAccounts.identity"),
+      rows: [
+        { label: t("adminAccounts.name"), value: account.name, mono: true },
+        { label: t("adminAccounts.provider"), value: providerNameById.get(String(account.provider_id)) || account.provider_id },
+        { label: t("adminAccounts.type"), value: runtimeClassLabel(t, account.runtime_class) },
+        ...(identity.primary !== account.name
+          ? [{ label: t("adminAccounts.factEmail"), value: identity.primary, mono: true as const }]
+          : []),
+        ...(identity.secondary.length > 0
+          ? [{ label: t("adminAccounts.profile"), value: identity.secondary.join(" · ") }]
+          : []),
+      ],
+    };
+
+    const routingSection: InlineDetailSection = {
+      title: t("adminAccounts.routing"),
+      rows: [
+        { label: t("adminAccounts.priority"), value: String(account.priority ?? 0) },
+        { label: t("adminAccounts.weight"), value: String(account.weight ?? 1) },
+        ...(account.risk_level ? [{ label: t("adminAccounts.riskLevel"), value: account.risk_level }] : []),
+        {
+          label: t("adminAccounts.proxy"),
+          value: account.proxy_id ? t("adminAccounts.proxyConfigured") : t("adminAccounts.noProxy"),
+          tone: account.proxy_id ? "default" as const : "muted" as const,
+        },
+        {
+          label: t("adminAccounts.models"),
+          value: accountModelPolicyLabel(t, account.metadata),
+        },
+      ],
+    };
+
+    const healthSection: InlineDetailSection = {
+      title: t("adminAccounts.healthTitle"),
+      rows: health
+        ? [
+            {
+              label: t("adminAccounts.successRate"),
+              value: `${Math.round(health.success_rate * 100)}%`,
+              tone:
+                health.success_rate >= 0.95
+                  ? "success" as const
+                  : health.success_rate >= 0.8
+                    ? "warning" as const
+                    : "error" as const,
+            },
+            {
+              label: t("adminAccounts.circuitState"),
+              value: health.circuit_state,
+              tone:
+                health.circuit_state === "open"
+                  ? "error" as const
+                  : health.circuit_state === "half-open"
+                    ? "warning" as const
+                    : "success" as const,
+            },
+            ...(health.latency_p50_ms > 0
+              ? [{ label: "p50", value: `${Math.round(health.latency_p50_ms)}ms` }]
+              : []),
+            ...(health.latency_p95_ms > 0
+              ? [{ label: "p95", value: `${Math.round(health.latency_p95_ms)}ms` }]
+              : []),
+            ...(health.error_class
+              ? [{ label: t("adminAccounts.lastError"), value: health.error_class, tone: "error" as const }]
+              : []),
+            ...(health.rate_limit_count > 0
+              ? [{ label: t("adminAccounts.healthIssue.rate_limit"), value: String(health.rate_limit_count), tone: "warning" as const }]
+              : []),
+          ]
+        : [{ label: "—", value: t("adminAccounts.detailNoData"), tone: "muted" as const }],
+    };
+
+    const quotaSection: InlineDetailSection = {
+      title: t("adminAccounts.quotaTitle"),
+      rows:
+        health && (health.quota_windows ?? []).length > 0
+          ? (health.quota_windows ?? []).slice(0, 6).map((window) => {
+              const ratio = window.remaining_ratio;
+              const pct = Math.round(ratio * 100);
+              return {
+                label: window.quota_type,
+                value: `${pct}%`,
+                tone:
+                  ratio <= 0
+                    ? "error" as const
+                    : ratio <= 0.2
+                      ? "warning" as const
+                      : "success" as const,
+              };
+            })
+          : health
+            ? [
+                {
+                  label: t("adminAccounts.quotaTitle"),
+                  value: `${Math.round((health.quota_remaining_ratio ?? 0) * 100)}%`,
+                  tone:
+                    health.quota_exhausted
+                      ? "error" as const
+                      : (health.quota_remaining_ratio ?? 0) <= 0.2
+                        ? "warning" as const
+                        : "success" as const,
+                },
+              ]
+            : [{ label: "—", value: t("adminAccounts.detailNoData"), tone: "muted" as const }],
+    };
+
+    const todaySection: InlineDetailSection = {
+      title: t("adminAccounts.today"),
+      rows: today
+        ? [
+            {
+              label: t("adminAccounts.usageRequests"),
+              value: formatInteger(today.requests),
+              tone: today.requests > 0 ? "default" as const : "muted" as const,
+            },
+            {
+              label: t("adminAccounts.usageTokens"),
+              value: formatInteger(today.total_tokens || today.input_tokens + today.output_tokens),
+            },
+            {
+              label: t("adminAccounts.usageCost"),
+              value: formatMoney(today.cost, today.currency),
+            },
+            {
+              label: t("adminAccounts.usageSuccessRate"),
+              value: formatPercent(today.success_rate),
+              tone:
+                today.success_rate >= 0.95
+                  ? "success" as const
+                  : today.success_rate >= 0.8
+                    ? "warning" as const
+                    : "error" as const,
+            },
+          ]
+        : [{ label: "—", value: t("adminAccounts.todayIdle"), tone: "muted" as const }],
+    };
+
+    const profileSection: InlineDetailSection = {
+      title: t("adminAccounts.profile"),
+      rows:
+        [
+          ...capacity.map((fact) => ({ label: fact.label, value: fact.value })),
+          ...profile.map((fact) => ({ label: fact.label, value: fact.value, mono: fact.key === "upstream-id" || fact.key === "org" })),
+        ].length > 0
+          ? [
+              ...capacity.map((fact) => ({ label: fact.label, value: fact.value })),
+              ...profile.map((fact) => ({ label: fact.label, value: fact.value, mono: fact.key === "upstream-id" || fact.key === "org" })),
+            ]
+          : [{ label: "—", value: t("adminAccounts.detailNoData"), tone: "muted" as const }],
+    };
+
+    return (
+      <InlineDetailGrid
+        sections={[
+          identitySection,
+          routingSection,
+          healthSection,
+          quotaSection,
+          todaySection,
+          profileSection,
+        ]}
+        actions={
+          <Button variant="outline" size="sm" onClick={() => setManualDetailTarget(account)}>
+            {t("adminAccounts.details")}
+          </Button>
+        }
+      />
+    );
+  }
+
+  /**
+   * Map an account's status / health snapshot to the row-stripe severity used
+   * by `.log-row[data-sev=…]`. Errors get a red stripe (needs_reauth, dead,
+   * circuit open, quota exhausted); warnings get amber (limited, manual
+   * pause); active rows stay neutral.
+   */
+  function accountRowSeverity(account: ProviderAccount): "info" | "success" | "warning" | "error" | "critical" | undefined {
+    if (account.status === "needs_reauth" || account.status === "dead") return "error";
+    if (account.status === "disabled") return undefined;
+    const health = healthById.get(account.id);
+    if (health) {
+      if (health.circuit_state === "open" || health.quota_exhausted) return "error";
+      if (health.circuit_state === "half-open" || health.success_rate < 0.8) return "warning";
+    }
+    if (manualPauseActive(account)) return "warning";
+    if (account.status === "suspended") return "warning";
+    return undefined;
+  }
+
   const columns: Column<ProviderAccount>[] = [
     {
       key: "name",
@@ -1136,11 +1343,18 @@ function AccountsContent() {
         onChange={list.setSearchInput}
         placeholder={t("adminAccounts.searchPlaceholder")}
       />
-      <FilterSelect
-        value={statusFilter}
-        onChange={(v) => list.setFilter("status", v)}
-        options={enumOptions(ACCOUNT_STATUSES)}
-        allLabel={t("adminCommon.allStatuses")}
+      <SegmentedControl<string>
+        value={statusFilter ?? "__all__"}
+        onChange={(v) => list.setFilter("status", v === "__all__" ? undefined : v)}
+        ariaLabel={t("adminCommon.status")}
+        size="sm"
+        options={[
+          { value: "__all__", label: t("common.all") },
+          ...enumOptions(ACCOUNT_STATUSES).map((opt) => ({
+            value: opt.value,
+            label: opt.label,
+          })),
+        ]}
       />
       {providerOptions.length > 0 ? (
         <FilterSelect
@@ -1423,6 +1637,8 @@ function AccountsContent() {
             )
           }
           dimRow={(a) => a.status === "disabled"}
+          rowSeverity={accountRowSeverity}
+          expandRow={buildExpandRow}
           isFiltered={isFiltered}
           onClearFilters={list.clearFilters}
           sort={list.sort}
