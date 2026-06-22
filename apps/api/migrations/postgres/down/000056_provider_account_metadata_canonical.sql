@@ -1,0 +1,10 @@
+-- No-op down migration.
+--
+-- 000056 only rewrites JSONB values inside provider_accounts.metadata_json
+-- (alias keys → canonical keys); it does not change schema. The rewrite is
+-- destructive — once codex_email is merged into the canonical email field
+-- there is no record of which key was original. Restoring the alias keys
+-- would risk corrupting rows where the canonical key was set explicitly.
+-- Rolling forward by re-running the up migration is safe (idempotent on
+-- canonical rows), so leaving the data canonical-only on rollback is the
+-- safest behavior.

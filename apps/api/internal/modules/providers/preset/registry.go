@@ -222,8 +222,8 @@ func codexCLIPreset() Preset {
 			DefaultMetadata: map[string]any{"base_url": "https://chatgpt.com/backend-api/codex"},
 			ModelCatalog:    []string{"gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "codex-auto-review", "gpt-5.3-codex", "gpt-5.3-codex-spark", "gpt-5.2", "codex-mini-latest"},
 			MetadataHints: map[string]string{
-				"base_url":           "Codex upstream (adapter appends /responses)",
-				"chatgpt_account_id": "From session JWT (optional)",
+				"base_url":            "Codex upstream (adapter appends /responses)",
+				"upstream_account_id": "From session JWT (optional)",
 			},
 		},
 		QuotaConfig: map[string]string{
@@ -471,7 +471,7 @@ func chatGPTWebPreset() Preset {
 			MetadataHints: map[string]string{
 				"chatgpt_requirements_token": "OpenAI Sentinel chat requirements token, or enable requirements_auto",
 				"user_agent":                 "Browser user agent for ChatGPT web requests",
-				"chatgpt_account_id":         "ChatGPT account id from the OpenAI session/account check response",
+				"upstream_account_id":        "ChatGPT account id from the OpenAI session/account check response",
 				"originator":                 "Optional upstream originator header, e.g. codex_cli_rs",
 				"version":                    "Optional upstream client version header",
 			},

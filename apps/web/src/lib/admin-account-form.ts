@@ -306,15 +306,23 @@ function normalizeSub2apiAccount(
   if (concurrency !== undefined && metadata.max_concurrency == null) {
     metadata.max_concurrency = concurrency;
   }
-  for (const key of [
-    "email",
-    "chatgpt_account_id",
-    "chatgpt_user_id",
-    "organization_id",
-    "plan_type",
-  ]) {
-    const value = stringValue(credential[key]);
-    if (value && metadata[key] == null) metadata[key] = value;
+  // Lift identity fields from the sub2api credential bag (upstream-protocol
+  // names like chatgpt_account_id) into canonical account metadata keys —
+  // canonical names match the backend service-layer canonicalizer at
+  // apps/api/internal/modules/accounts/service/metadata_canonical.go. The
+  // backend canonicalizes on write so an alias-keyed payload would still land
+  // canonical, but writing canonical from the start avoids one round-trip of
+  // confusion in the operator-facing import preview.
+  const credentialToCanonicalMetadata: Record<string, string> = {
+    email: "email",
+    chatgpt_account_id: "upstream_account_id",
+    chatgpt_user_id: "upstream_user_id",
+    organization_id: "organization_id",
+    plan_type: "plan_type",
+  };
+  for (const [credKey, metaKey] of Object.entries(credentialToCanonicalMetadata)) {
+    const value = stringValue(credential[credKey]);
+    if (value && metadata[metaKey] == null) metadata[metaKey] = value;
   }
   const runtimeClass =
     runtimeClassFromSub2apiType(stringValue(raw.type)) ??

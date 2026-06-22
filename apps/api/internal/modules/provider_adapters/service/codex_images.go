@@ -1005,7 +1005,7 @@ func codexImageGenerationHeaders(req contract.ImageGenerationRequest, payload ma
 	if headers.Get("User-Agent") == "" {
 		headers.Set("User-Agent", codexDefaultUserAgent)
 	}
-	if accountID := codexImageGenerationSetting(req, "chatgpt_account_id", "account_id"); accountID != "" {
+	if accountID := codexImageGenerationSetting(req, "chatgpt_account_id", "account_id", "upstream_account_id"); accountID != "" {
 		headers.Set("ChatGPT-Account-ID", accountID)
 	}
 	if version := codexImageGenerationSetting(req, "codex_version", "version", "Version"); version != "" {

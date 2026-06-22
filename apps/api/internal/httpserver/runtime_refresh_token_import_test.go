@@ -86,8 +86,10 @@ func TestAdminAccountImportChatGPTWebEnrichesIdentityFromIDToken(t *testing.T) {
 		t.Fatalf("expected imported account metadata")
 	}
 	metadata := *accountResp.Data.Metadata
+	// Backend canonicalizes alias keys on write — chatgpt_account_id lands as
+	// upstream_account_id in storage (see accounts/service/metadata_canonical.go).
 	if metadata["subscription_expires_at"] != "2026-08-01T00:00:00Z" ||
-		metadata["chatgpt_account_id"] != "chatgpt-import-account" ||
+		metadata["upstream_account_id"] != "chatgpt-import-account" ||
 		metadata["plan_type"] != "team" {
 		t.Fatalf("expected id_token claims in imported metadata, got %+v", metadata)
 	}

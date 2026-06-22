@@ -215,8 +215,19 @@ func enrichOpenAIImportIdentity(runtimeClass accountcontract.RuntimeClass, upstr
 	if metadata == nil {
 		metadata = map[string]any{}
 	}
-	for _, key := range []string{"email", "plan_type", "chatgpt_account_id", "chatgpt_user_id", "organization_id", "subscription_expires_at"} {
-		setImportStringIfMissing(metadata, key, mapString(credential, key))
+	// Read alias keys from the upstream credential bag (the JWT/identity blob
+	// uses upstream-protocol names like chatgpt_account_id) and write to
+	// canonical metadata keys; canonical here matches the service-layer
+	// canonicalization in accounts/service/metadata_canonical.go.
+	for _, lift := range []struct{ credKey, metaKey string }{
+		{"email", "email"},
+		{"plan_type", "plan_type"},
+		{"chatgpt_account_id", "upstream_account_id"},
+		{"chatgpt_user_id", "upstream_user_id"},
+		{"organization_id", "organization_id"},
+		{"subscription_expires_at", "subscription_expires_at"},
+	} {
+		setImportStringIfMissing(metadata, lift.metaKey, mapString(credential, lift.credKey))
 	}
 	return metadata
 }

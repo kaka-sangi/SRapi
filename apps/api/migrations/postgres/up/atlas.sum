@@ -1,4 +1,4 @@
-h1:t1wtVV8tc2RVSt+eFuy7DykmjKUHX+6njVYCImZRnRs=
+h1:iAoVF79DUNSduo1YuH+D8vnvetQwEptpSfqz7R1RrOI=
 000001_initial_schema.sql h1:cyZ0pax3l7J4onSmEmgqPwpoJYXPXuJYXeTAGUOEHs4=
 000002_auth_sessions.sql h1:zJ6uEWQDpw4sa3JpABmlbbFR2Sy3JCceNl4UnBtcX9c=
 000003_api_key_concurrency_limit.sql h1:j/8OE2iF7+LUa5XCsyYSC4dvN1Vh2cihbc41rySg4OQ=
@@ -54,3 +54,4 @@ h1:t1wtVV8tc2RVSt+eFuy7DykmjKUHX+6njVYCImZRnRs=
 000053_ops_notification_channels.sql h1:ifMWdh+AnxAL1yOKrXL1/MCnaTVef+1u5djeyZjHAnQ=
 000054_ops_error_log_stream_completion_state.sql h1:yREf87iC6UANbgyvxaXUDjm4L/KIkSVFuoCb/eCQvBg=
 000055_proxy_lifecycle.sql h1:jCjLhys+GZR4BmlQu1TwktbeelIJ5qme3W7YUUox/6A=
+000056_provider_account_metadata_canonical.sql h1:u4KbYbllX3m42LeH2SPivH9W+UIAJZkUGCr/c3d/q94=

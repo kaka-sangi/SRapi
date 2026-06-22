@@ -207,7 +207,7 @@ func (s *Service) applyRefreshSuccess(ctx context.Context, account contract.Prov
 		delete(metadata, "needs_reauth_reason")
 		account.Metadata = metadata
 	}
-	updated, err := s.store.Update(ctx, account)
+	updated, err := s.persistAccount(ctx, account)
 	if err != nil {
 		return account, RefreshOutcome{Class: RefreshOutcomeTransientError, Attempts: account.RefreshAttempts}, err
 	}
@@ -228,7 +228,7 @@ func (s *Service) applyRefreshFailure(ctx context.Context, account contract.Prov
 		class = RefreshOutcomeThresholdExceeded
 		account.NeedsReauthAt = timePtr(now)
 	}
-	if _, updateErr := s.store.Update(ctx, account); updateErr != nil {
+	if _, updateErr := s.persistAccount(ctx, account); updateErr != nil {
 		// Surface the original refresh error to the caller; the store error is
 		// secondary and the worker will retry on the next pass.
 		return account, RefreshOutcome{Class: class, Attempts: account.RefreshAttempts}, refreshErr

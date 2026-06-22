@@ -410,7 +410,7 @@ func codexResponsesHeaders(req contract.ConversationRequest, stream bool, payloa
 	headers.Set("OpenAI-Beta", codexResponsesBetaHeaderValue)
 	headers.Set("Originator", codexResponsesOriginator(req))
 	headers.Set("User-Agent", codexUserAgent(req))
-	if accountID := requestSetting(req, "chatgpt_account_id", "account_id"); accountID != "" {
+	if accountID := requestSetting(req, "chatgpt_account_id", "account_id", "upstream_account_id"); accountID != "" {
 		headers.Set("ChatGPT-Account-ID", accountID)
 	}
 	if betaFeatures := requestSetting(req, "codex_beta_features", "x_codex_beta_features", "X-Codex-Beta-Features"); betaFeatures != "" {
@@ -451,7 +451,7 @@ func codexResponseInputItemsHeaders(req contract.ResponseInputItemsRequest) http
 	headers.Set("OpenAI-Beta", codexResponsesBetaHeaderValue)
 	headers.Set("Originator", codexResponseInputItemsOriginator(req))
 	headers.Set("User-Agent", codexResponseInputItemsUserAgent(req))
-	if accountID := responseInputItemsSetting(req, "chatgpt_account_id", "account_id"); accountID != "" {
+	if accountID := responseInputItemsSetting(req, "chatgpt_account_id", "account_id", "upstream_account_id"); accountID != "" {
 		headers.Set("ChatGPT-Account-ID", accountID)
 	}
 	if betaFeatures := responseInputItemsSetting(req, "codex_beta_features", "x_codex_beta_features", "X-Codex-Beta-Features"); betaFeatures != "" {
@@ -553,7 +553,7 @@ func codexRealtimeHeaders(req contract.RealtimeRequest, initialFrame []byte) htt
 	headers.Set("OpenAI-Beta", codexRealtimeBetaHeaderValue(req))
 	headers.Set("Originator", codexRealtimeOriginator(req))
 	headers.Set("User-Agent", codexRealtimeUserAgent(req))
-	if accountID := realtimeSetting(req, "chatgpt_account_id", "account_id"); accountID != "" {
+	if accountID := realtimeSetting(req, "chatgpt_account_id", "account_id", "upstream_account_id"); accountID != "" {
 		headers.Set("ChatGPT-Account-ID", accountID)
 	}
 	if betaFeatures := realtimeSetting(req, "codex_beta_features", "x_codex_beta_features", "X-Codex-Beta-Features"); betaFeatures != "" {

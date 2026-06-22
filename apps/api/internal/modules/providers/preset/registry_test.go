@@ -294,7 +294,8 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 		chatGPTWebPreset.AccountTemplate.UpstreamClient != "chatgpt_web" {
 		t.Fatalf("unexpected chatgpt-web auth/template preset: %+v", chatGPTWebPreset)
 	}
-	for _, key := range []string{"chatgpt_account_id", "originator", "version"} {
+	// Canonical metadata key (see accounts/service/metadata_canonical.go).
+	for _, key := range []string{"upstream_account_id", "originator", "version"} {
 		if chatGPTWebPreset.AccountTemplate.MetadataHints[key] == "" {
 			t.Fatalf("expected chatgpt-web metadata hint for %s", key)
 		}

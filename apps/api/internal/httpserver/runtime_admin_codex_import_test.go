@@ -131,8 +131,10 @@ func TestAdminImportCodexSessionFromFullSessionJSON(t *testing.T) {
 		t.Fatalf("expected account metadata")
 	}
 	metadata := *getResp.Data.Metadata
-	if metadata["codex_account_id"] != "acct-abc" || metadata["codex_email"] != "ada@example.com" || metadata["codex_plan_type"] != "pro" || metadata["codex_organization_id"] != "org-default" {
-		t.Fatalf("unexpected codex metadata: %+v", metadata)
+	// Backend canonicalizes metadata at write time — Codex aliases land under
+	// canonical keys (email / plan_type / organization_id / upstream_account_id).
+	if metadata["upstream_account_id"] != "acct-abc" || metadata["email"] != "ada@example.com" || metadata["plan_type"] != "pro" || metadata["organization_id"] != "org-default" {
+		t.Fatalf("unexpected canonical metadata: %+v", metadata)
 	}
 
 	// Re-importing the same identity updates the existing account (no skip).

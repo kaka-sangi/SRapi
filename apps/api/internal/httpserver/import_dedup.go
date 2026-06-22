@@ -23,9 +23,9 @@ func buildImportIdentityKeys(providerID int, name string, runtimeClass accountco
 	if name = strings.ToLower(strings.TrimSpace(name)); name != "" {
 		keys = append(keys, prefix+"name:"+name)
 	}
-	accountID := firstImportIdentityValue(metadata, []string{"codex_account_id", "account_id", "chatgpt_account_id"})
-	userID := firstImportIdentityValue(metadata, []string{"codex_user_id", "user_id", "chatgpt_user_id"})
-	email := firstImportIdentityValue(metadata, []string{"codex_email", "email"})
+	accountID := firstImportIdentityValue(metadata, []string{"upstream_account_id"})
+	userID := firstImportIdentityValue(metadata, []string{"upstream_user_id"})
+	email := firstImportIdentityValue(metadata, []string{"email"})
 	if accountID != "" && userID != "" {
 		keys = append(keys, prefix+"account_user:"+accountID+":"+userID)
 	} else if accountID != "" && email != "" {
@@ -59,9 +59,9 @@ func firstImportIdentityValue(metadata map[string]any, fields []string) string {
 
 func buildCodexIdentityKeys(accountID, userID, email, accessToken string) []string {
 	metadata := map[string]any{
-		"codex_account_id": strings.TrimSpace(accountID),
-		"codex_user_id":    strings.TrimSpace(userID),
-		"codex_email":      strings.TrimSpace(email),
+		"upstream_account_id": strings.TrimSpace(accountID),
+		"upstream_user_id":    strings.TrimSpace(userID),
+		"email":               strings.TrimSpace(email),
 	}
 	credential := map[string]any{}
 	if accessToken = strings.TrimSpace(accessToken); accessToken != "" {

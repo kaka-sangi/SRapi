@@ -215,7 +215,7 @@ func codexQuotaHeaders(req contract.ProbeRequest) (http.Header, error) {
 	headers.Set("Origin", "https://chatgpt.com")
 	headers.Set("Referer", "https://chatgpt.com/")
 	headers.Set("User-Agent", firstNonEmpty(codexQuotaSetting(req, "user_agent"), codexDefaultUserAgent))
-	if accountID := codexQuotaSetting(req, "chatgpt_account_id", "account_id"); accountID != "" {
+	if accountID := codexQuotaSetting(req, "chatgpt_account_id", "account_id", "upstream_account_id"); accountID != "" {
 		headers.Set("ChatGPT-Account-ID", accountID)
 	}
 	return headers, nil
@@ -455,7 +455,7 @@ func codexAccountsCheckCandidateIDs(req contract.ProbeRequest) []string {
 	seen := map[string]bool{}
 	out := []string{}
 	for _, valuesMap := range values {
-		for _, key := range []string{"chatgpt_account_id", "account_id", "organization_id", "org_id", "poid"} {
+		for _, key := range []string{"chatgpt_account_id", "account_id", "upstream_account_id", "organization_id", "org_id", "poid"} {
 			value := mapString(valuesMap, key)
 			if value == "" || seen[value] {
 				continue

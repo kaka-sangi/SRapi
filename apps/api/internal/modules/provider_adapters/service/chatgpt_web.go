@@ -652,7 +652,7 @@ func chatGPTWebBaseHeaders(req contract.ConversationRequest, baseURL string, pat
 		"X-OpenAI-Target-Path":        {path},
 		"X-OpenAI-Target-Route":       {path},
 	}
-	if accountID := chatGPTWebAccountSetting(req, "chatgpt_account_id", "account_id"); accountID != "" {
+	if accountID := chatGPTWebAccountSetting(req, "chatgpt_account_id", "account_id", "upstream_account_id"); accountID != "" {
 		headers.Set("chatgpt-account-id", accountID)
 	}
 	if originator := chatGPTWebAccountSetting(req, "originator", "chatgpt_originator"); originator != "" {

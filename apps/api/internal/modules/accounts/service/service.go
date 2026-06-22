@@ -102,7 +102,7 @@ func (s *Service) Create(ctx context.Context, req contract.CreateRequest) (contr
 		RuntimeClass:         req.RuntimeClass,
 		CredentialCiphertext: credentialCiphertext,
 		CredentialVersion:    credentialVersionV1,
-		Metadata:             cloneMap(req.Metadata),
+		Metadata:             CanonicalizeAccountMetadata(cloneMap(req.Metadata)),
 		ProxyID:              proxyID,
 		Status:               status,
 		Priority:             priority,
@@ -1116,6 +1116,18 @@ func (s *Service) Update(ctx context.Context, id int, req contract.UpdateRequest
 		account.UpstreamClient = cloneString(*req.UpstreamClient)
 	}
 	account.UpdatedAt = s.clock.Now()
+	return s.persistAccount(ctx, account)
+}
+
+// persistAccount is the single mutation funnel for every ProviderAccount
+// write. It canonicalizes metadata (alias keys → canonical names; see
+// metadata_canonical.go) immediately before handing the row to the store so
+// no legacy alias can leak past the service boundary regardless of which
+// caller (admin Update, batch field patch, refresh worker, health probe,
+// manual pause, …) initiated the write. Callers that build account state
+// in-place must use this path instead of s.store.Update directly.
+func (s *Service) persistAccount(ctx context.Context, account contract.ProviderAccount) (contract.ProviderAccount, error) {
+	account.Metadata = CanonicalizeAccountMetadata(account.Metadata)
 	return s.store.Update(ctx, account)
 }
 
@@ -1437,7 +1449,7 @@ func (s *Service) ProbeAccount(ctx context.Context, id int, prober contract.Acco
 		return contract.AccountHealthSnapshot{}, contract.ProviderAccount{}, err
 	}
 	update.Metadata["last_health_snapshot_id"] = recorded.ID
-	updated, err = s.store.Update(ctx, update)
+	updated, err = s.persistAccount(ctx, update)
 	if err != nil {
 		return contract.AccountHealthSnapshot{}, contract.ProviderAccount{}, err
 	}

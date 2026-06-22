@@ -92,7 +92,12 @@ export function accountMetadataFacts(
   const metadata = account.metadata;
   const facts: AccountMetadataFact[] = [];
 
-  const email = metadataString(metadata, "email") || metadataString(metadata, "codex_email");
+  // Backend canonicalizes metadata at write time (see
+  // apps/api/internal/modules/accounts/service/metadata_canonical.go); the
+  // 000056 backfill migrated existing rows. We read canonical keys only and
+  // do NOT chase alias chains — if the canonical key is missing, the data
+  // genuinely is missing.
+  const email = metadataString(metadata, "email");
   if (email) {
     facts.push({
       key: "email",
@@ -101,7 +106,7 @@ export function accountMetadataFacts(
     });
   }
 
-  const plan = metadataString(metadata, "plan_type") || metadataString(metadata, "codex_plan_type");
+  const plan = metadataString(metadata, "plan_type");
   if (plan) {
     facts.push({
       key: "plan",
@@ -128,7 +133,7 @@ export function accountMetadataFacts(
     });
   }
 
-  const rpm = metadataNumber(metadata, "rpm_override") ?? metadataNumber(metadata, "rpm_limit");
+  const rpm = metadataNumber(metadata, "rpm_limit");
   if (rpm !== null) {
     facts.push({
       key: "rpm",
@@ -137,9 +142,7 @@ export function accountMetadataFacts(
     });
   }
 
-  const org =
-    metadataString(metadata, "organization_id") ||
-    metadataString(metadata, "codex_organization_id");
+  const org = metadataString(metadata, "organization_id");
   if (org) {
     facts.push({
       key: "org",
@@ -148,10 +151,7 @@ export function accountMetadataFacts(
     });
   }
 
-  const upstreamID =
-    metadataString(metadata, "chatgpt_account_id") ||
-    metadataString(metadata, "codex_account_id") ||
-    metadataString(metadata, "chatgpt_user_id");
+  const upstreamID = metadataString(metadata, "upstream_account_id");
   if (upstreamID) {
     facts.push({
       key: "upstream-id",
@@ -208,7 +208,7 @@ export function accountCapacityFacts(
     });
   }
 
-  const rpm = metadataNumber(metadata, "rpm_override") ?? metadataNumber(metadata, "rpm_limit");
+  const rpm = metadataNumber(metadata, "rpm_limit");
   if (rpm !== null) {
     const used = metadataNumber(metadata, "rpm_used");
     facts.push({

@@ -290,11 +290,11 @@ func (s *Server) resolveCodexImportTarget(item *codexImportAccount, defaultBaseU
 		"import_source": "codex_session",
 		"imported_at":   time.Now().UTC().Format(time.RFC3339),
 	}
-	setCodexMetadataIfNotEmpty(metadata, "codex_email", item.email)
-	setCodexMetadataIfNotEmpty(metadata, "codex_account_id", item.accountID)
-	setCodexMetadataIfNotEmpty(metadata, "codex_user_id", item.userID)
-	setCodexMetadataIfNotEmpty(metadata, "codex_plan_type", item.planType)
-	setCodexMetadataIfNotEmpty(metadata, "codex_organization_id", item.organizationID)
+	setCodexMetadataIfNotEmpty(metadata, "email", item.email)
+	setCodexMetadataIfNotEmpty(metadata, "upstream_account_id", item.accountID)
+	setCodexMetadataIfNotEmpty(metadata, "upstream_user_id", item.userID)
+	setCodexMetadataIfNotEmpty(metadata, "plan_type", item.planType)
+	setCodexMetadataIfNotEmpty(metadata, "organization_id", item.organizationID)
 	// Upstream-endpoint hints. Prefer a base_url carried by the session blob
 	// (e.g. a desktop session pointed at a proxy); otherwise seed the
 	// provider/preset default. The codex reverse-proxy adapter has NO implicit
@@ -653,9 +653,9 @@ func (s *Server) buildCodexAccountIndex(ctx context.Context, providerID int) *co
 			continue
 		}
 		keys := buildCodexIdentityKeys(
-			mapString(account.Metadata, "codex_account_id"),
-			mapString(account.Metadata, "codex_user_id"),
-			mapString(account.Metadata, "codex_email"),
+			mapString(account.Metadata, "upstream_account_id"),
+			mapString(account.Metadata, "upstream_user_id"),
+			mapString(account.Metadata, "email"),
 			"",
 		)
 		index.add(account.ID, keys)
