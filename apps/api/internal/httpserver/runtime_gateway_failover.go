@@ -1119,6 +1119,39 @@ func parseCodexHeaderInt(headers http.Header, key string) (int, bool) {
 	return value, true
 }
 
+// anthropicCooldownMetadataUpdates extracts the Anthropic per-resource-type
+// rate-limit headers (requests-remaining, tokens-remaining, requests-reset,
+// tokens-reset, plus the input/output token sub-buckets) from a 429 response
+// and returns them as account-metadata fields. This is the Anthropic
+// counterpart to codexCooldownMetadataUpdates: it captures the fine-grained
+// rate-limit state so the admin panel can display exactly when each bucket
+// resets and how much headroom remains. Returns nil when no recognized
+// Anthropic rate-limit header is present so the caller can skip the write.
+func anthropicCooldownMetadataUpdates(headers http.Header, now time.Time) map[string]any {
+	if headers == nil {
+		return nil
+	}
+	pairs := []struct{ header, key string }{
+		{"anthropic-ratelimit-requests-remaining", "rl_requests_remaining"},
+		{"anthropic-ratelimit-requests-reset", "rl_requests_reset"},
+		{"anthropic-ratelimit-tokens-remaining", "rl_tokens_remaining"},
+		{"anthropic-ratelimit-tokens-reset", "rl_tokens_reset"},
+		{"anthropic-ratelimit-input-tokens-remaining", "rl_input_tokens_remaining"},
+		{"anthropic-ratelimit-output-tokens-remaining", "rl_output_tokens_remaining"},
+	}
+	updates := make(map[string]any)
+	for _, p := range pairs {
+		if v := strings.TrimSpace(headers.Get(p.header)); v != "" {
+			updates[p.key] = v
+		}
+	}
+	if len(updates) == 0 {
+		return nil
+	}
+	updates["rl_updated_at"] = now.UTC().Format(time.RFC3339)
+	return updates
+}
+
 func setRetryAfterFromProviderError(w http.ResponseWriter, err error) {
 	if w == nil || strings.TrimSpace(w.Header().Get("Retry-After")) != "" {
 		return

@@ -624,6 +624,12 @@ func (rt *runtimeState) applyProviderAccountCooldown(ctx context.Context, rec ga
 	for key, value := range codexCooldownMetadataUpdates(rec.Headers, now) {
 		metadata[key] = value
 	}
+	// Fold Anthropic per-resource rate-limit headers (requests-remaining,
+	// tokens-remaining, requests-reset, tokens-reset) so the admin panel can
+	// display fine-grained headroom and reset times (sub2api parity).
+	for key, value := range anthropicCooldownMetadataUpdates(rec.Headers, now) {
+		metadata[key] = value
+	}
 	before := accountAuditSnapshot(account)
 	updated, err := rt.accounts.Update(ctx, *rec.AccountID, accountcontract.UpdateRequest{Metadata: &metadata})
 	if err != nil {
