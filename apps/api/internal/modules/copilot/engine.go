@@ -18,6 +18,11 @@ import (
 // completeness beats token thrift for an operator assistant.
 const runawayStepGuard = 100
 
+// maxResponseBytes caps tool results fed to the model so large list responses
+// (e.g. 1 000 accounts) don't waste tokens. Truncated responses include a hint
+// to use pagination or filters.
+const maxResponseBytes = 32768 // 32 KB
+
 // LLMFunc invokes the configured model with the system prompt, conversation, and
 // tools. It streams content/reasoning fragments via onDelta (kind is "content"
 // or "reasoning") as they arrive, and returns the final assembled response
@@ -43,7 +48,7 @@ func NewEngine(catalog *Catalog) *Engine { return &Engine{catalog: catalog} }
 // returns without a done event; the caller's client resumes by re-sending the
 // history plus an Approval.
 func (e *Engine) Run(ctx context.Context, settings Settings, history []Message, approval *Approval, llm LLMFunc, dispatch DispatchFunc, search SearchFunc, emit func(Event)) ([]Message, error) {
-	system := SystemPrompt(e.catalog, settings.AutoRunReads, search != nil)
+	system := SystemPrompt(e.catalog, settings.AutoRunReads, search != nil, settings.SystemSummary)
 	tools := MetaToolSchemas()
 	if search != nil {
 		tools = append(tools, webSearchToolSchema())
@@ -166,6 +171,9 @@ func (e *Engine) execute(ctx context.Context, dispatch DispatchFunc, method, pat
 	text := strings.TrimSpace(string(respBody))
 	if text == "" {
 		text = "(empty response)"
+	}
+	if len(text) > maxResponseBytes {
+		text = text[:maxResponseBytes] + "\n\n… (response truncated — use pagination or filters to narrow results)"
 	}
 	formatted := fmt.Sprintf("HTTP %d\n%s", status, text)
 	return status, formatted, status >= 400

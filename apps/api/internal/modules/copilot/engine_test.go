@@ -67,7 +67,7 @@ func toolUseResponse(id, name, args string) provideradaptercontract.Conversation
 
 func TestSystemPromptIncludesOperationalGuidance(t *testing.T) {
 	cat := mustCatalog(t)
-	prompt := SystemPrompt(cat, true, false)
+	prompt := SystemPrompt(cat, true, false, "")
 	for _, want := range []string{
 		"get_operation_detail",
 		"Never invent IDs",
@@ -80,7 +80,7 @@ func TestSystemPromptIncludesOperationalGuidance(t *testing.T) {
 	if strings.Contains(prompt, "web_search") {
 		t.Fatalf("web_search guidance must be absent when search is disabled")
 	}
-	if !strings.Contains(SystemPrompt(cat, true, true), "web_search") {
+	if !strings.Contains(SystemPrompt(cat, true, true, ""), "web_search") {
 		t.Fatalf("web_search guidance must appear when search is enabled")
 	}
 }

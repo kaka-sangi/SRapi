@@ -10,13 +10,18 @@ package copilot
 type Settings struct {
 	Enabled           bool
 	Source            string // "account" | "dedicated"
-	ProviderAccountID int
-	Model             string
+	ProviderAccountID      int
+	ProviderAccountGroupID int
+	Model                  string
 	Models            []string
 	DedicatedProtocol string
 	DedicatedBaseURL  string
 	OwnerOnly         bool
 	AutoRunReads      bool
+
+	// SystemSummary is an optional runtime snapshot (account counts, health, etc.)
+	// injected into the system prompt so the model starts with situational awareness.
+	SystemSummary string
 
 	// Web search (optional): when enabled + a key is configured, the engine gains
 	// a web_search tool. WebSearchAPIKeyCiphertext is decrypted by the handler.

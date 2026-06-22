@@ -18,6 +18,7 @@ import {
   Pencil,
   Trash2,
   Zap,
+  Download,
 } from "lucide-react";
 import { FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -60,6 +61,40 @@ function messageKey(message: CopilotMessage, index: number): string {
   if (message.tool_calls?.length) return `call:${message.tool_calls[0].id}`;
   if (message.tool_results?.length) return `result:${message.tool_results[0].tool_call_id}`;
   return `${message.role}:${index}`;
+}
+
+function exportAsMarkdown(messages: CopilotMessage[]): string {
+  const lines: string[] = [];
+  for (const msg of messages) {
+    if (msg.role === "user") {
+      lines.push(`## User\n\n${msg.content ?? ""}\n`);
+    } else if (msg.role === "assistant") {
+      if (msg.reasoning) lines.push(`<details><summary>Thinking</summary>\n\n${msg.reasoning}\n\n</details>\n`);
+      if (msg.content) lines.push(`## Assistant\n\n${msg.content}\n`);
+      if (msg.tool_calls?.length) {
+        for (const tc of msg.tool_calls) {
+          lines.push(`> **Tool call**: \`${tc.name}\`\n> \`\`\`json\n> ${tc.arguments}\n> \`\`\`\n`);
+        }
+      }
+    } else if (msg.role === "tool" && msg.tool_results?.length) {
+      for (const tr of msg.tool_results) {
+        const status = tr.is_error ? "Error" : "OK";
+        lines.push(`> **Result** (${status}):\n> \`\`\`\n> ${tr.content?.slice(0, 500) ?? ""}\n> \`\`\`\n`);
+      }
+    }
+  }
+  return lines.join("\n");
+}
+
+function downloadMarkdown(messages: CopilotMessage[]) {
+  const md = exportAsMarkdown(messages);
+  const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `copilot-${new Date().toISOString().slice(0, 10)}.md`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export function CopilotChat({ models, defaultModel }: { models: string[]; defaultModel: string }) {
@@ -279,7 +314,7 @@ function ConversationSidebar() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { activeId, loadConversation, newConversation, setActiveTitle, onActiveDeleted } = useCopilotSession();
+  const { activeId, loadConversation, newConversation, setActiveTitle, onActiveDeleted, messages } = useCopilotSession();
   const [editing, setEditing] = useState<{ id: number; value: string } | null>(null);
 
   const list = useQuery({
@@ -322,6 +357,16 @@ function ConversationSidebar() {
         <Button variant="outline" size="sm" className="w-full justify-start gap-2" onClick={newConversation}>
           <Plus className="size-4" />
           {t("copilot.newChat")}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start gap-2"
+          onClick={() => downloadMarkdown(messages)}
+          disabled={messages.length === 0}
+        >
+          <Download className="size-4" />
+          {t("copilot.export")}
         </Button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
@@ -396,7 +441,7 @@ function ConversationSidebar() {
 
 function EmptyState({ onPick }: { onPick: (text: string) => void }) {
   const { t } = useLanguage();
-  const examples = [t("copilot.example1"), t("copilot.example2"), t("copilot.example3")];
+  const examples = [t("copilot.example1"), t("copilot.example2"), t("copilot.example3"), t("copilot.example4")];
   return (
     <div className="mx-auto flex h-full max-w-3xl flex-col items-center justify-center gap-5 px-4 text-center">
       <IconBubble tone="accent" size="lg" className="size-14 [&>svg]:size-6">

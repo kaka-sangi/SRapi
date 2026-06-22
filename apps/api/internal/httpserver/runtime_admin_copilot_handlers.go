@@ -8,10 +8,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 
+	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/copilot"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
@@ -85,6 +87,8 @@ func (s *Server) handleAdminCopilotChat(w http.ResponseWriter, r *http.Request) 
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "copilot unavailable", requestID)
 		return
 	}
+
+	settings.SystemSummary = s.buildCopilotSummary(r.Context())
 
 	var body apiopenapi.AdminCopilotChatRequest
 	if err := s.decodeJSONBody(w, r, &body); err != nil {
@@ -197,7 +201,14 @@ func (s *Server) buildCopilotLLM(settings copilot.Settings, ciphertext, override
 			}
 			req.Credential = map[string]any{"api_key": key}
 		} else {
-			account, err := s.runtime.accounts.FindByID(ctx, settings.ProviderAccountID)
+			accountID := settings.ProviderAccountID
+			if settings.ProviderAccountGroupID > 0 {
+				members, merr := s.runtime.accounts.ListGroupMembers(ctx, settings.ProviderAccountGroupID)
+				if merr == nil && len(members) > 0 {
+					accountID = members[rand.Intn(len(members))].AccountID
+				}
+			}
+			account, err := s.runtime.accounts.FindByID(ctx, accountID)
 			if err != nil {
 				return provideradaptercontract.ConversationResponse{}, fmt.Errorf("load provider account: %w", err)
 			}
@@ -492,8 +503,9 @@ func (s *Server) copilotSettings(ctx context.Context) (copilot.Settings, string,
 	return copilot.Settings{
 		Enabled:           c.Enabled,
 		Source:            c.Source,
-		ProviderAccountID: c.ProviderAccountID,
-		Model:             c.Model,
+		ProviderAccountID:      c.ProviderAccountID,
+		ProviderAccountGroupID: c.ProviderAccountGroupID,
+		Model:                  c.Model,
 		Models:            append([]string(nil), c.Models...),
 		DedicatedProtocol: c.DedicatedProtocol,
 		DedicatedBaseURL:  c.DedicatedBaseURL,
@@ -535,10 +547,66 @@ func (s *Server) copilotModelList(ctx context.Context, settings copilot.Settings
 			}
 		}
 	}
+	if settings.Source == "account" && settings.ProviderAccountGroupID > 0 {
+		if members, err := s.runtime.accounts.ListGroupMembers(ctx, settings.ProviderAccountGroupID); err == nil {
+			for _, member := range members {
+				if account, err := s.runtime.accounts.FindByID(ctx, member.AccountID); err == nil {
+					for _, m := range accountSupportedModels(account.Metadata) {
+						add(m)
+					}
+					if protocol == "" {
+						if provider, err := s.runtime.providers.FindByID(ctx, account.ProviderID); err == nil {
+							protocol = provider.Protocol
+						}
+					}
+				}
+			}
+		}
+	}
 	if models == nil {
 		models = []string{}
 	}
 	return models, protocol
+}
+
+// buildCopilotSummary produces a compact text snapshot of the system state for
+// the copilot's system prompt — counts, health, etc. so the model starts with
+// situational awareness and can give more relevant first responses. Best-effort:
+// any error silently yields an empty string.
+func (s *Server) buildCopilotSummary(ctx context.Context) string {
+	var parts []string
+
+	// Accounts summary
+	if accounts, err := s.runtime.accounts.List(ctx); err == nil {
+		total := len(accounts)
+		active, errored, disabled := 0, 0, 0
+		for _, a := range accounts {
+			switch a.Status {
+			case accountcontract.StatusActive:
+				active++
+			case accountcontract.StatusDead, accountcontract.StatusNeedsReauth, accountcontract.StatusSuspended:
+				errored++
+			case accountcontract.StatusDisabled:
+				disabled++
+			}
+		}
+		parts = append(parts, fmt.Sprintf("Accounts: %d total (%d active, %d errored, %d disabled)", total, active, errored, disabled))
+	}
+
+	// Providers
+	if providers, err := s.runtime.providers.List(ctx); err == nil {
+		parts = append(parts, fmt.Sprintf("Providers: %d configured", len(providers)))
+	}
+
+	// Models
+	if models, err := s.runtime.models.List(ctx); err == nil {
+		parts = append(parts, fmt.Sprintf("Models: %d defined", len(models)))
+	}
+
+	if len(parts) == 0 {
+		return ""
+	}
+	return "Current system state:\n" + strings.Join(parts, "\n")
 }
 
 // accountSupportedModels reads the model ids discovered for an account.
@@ -569,7 +637,7 @@ func copilotConfigError(settings copilot.Settings, ciphertext string) string {
 		}
 		return ""
 	}
-	if settings.ProviderAccountID <= 0 {
+	if settings.ProviderAccountID <= 0 && settings.ProviderAccountGroupID <= 0 {
 		return "no provider account selected for the copilot"
 	}
 	return ""

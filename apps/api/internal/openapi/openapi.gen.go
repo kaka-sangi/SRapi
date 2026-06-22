@@ -5251,6 +5251,9 @@ type AdminSettingsCopilot struct {
 	// OwnerOnly Restrict the copilot to owner-role admins.
 	OwnerOnly bool `json:"owner_only"`
 
+	// ProviderAccountGroupId Account group id used when source is "account" (0 = unset). When set, the copilot randomly picks a member account each turn for load distribution.
+	ProviderAccountGroupId int `json:"provider_account_group_id"`
+
 	// ProviderAccountId Provider account id used when source is "account" (0 = unset).
 	ProviderAccountId int `json:"provider_account_id"`
 

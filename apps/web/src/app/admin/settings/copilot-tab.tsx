@@ -1,4 +1,4 @@
-import { useAdminAccounts } from "@/hooks/admin-queries";
+import { useAdminGroups } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,10 +34,10 @@ export function CopilotTab({
   modelOptions: MultiSelectOption[];
 }) {
   const { t } = useLanguage();
-  const accounts = useAdminAccounts();
-  const accountOptions = (accounts.data?.data ?? []).map((a) => ({
-    value: String(a.id),
-    label: a.name,
+  const groups = useAdminGroups();
+  const groupOptions = (groups.data?.data ?? []).map((g) => ({
+    value: String(g.id),
+    label: g.name,
   }));
 
   return (
@@ -75,7 +75,7 @@ export function CopilotTab({
                   onField("dedicated_base_url", "");
                   onField("dedicated_protocol", "");
                 } else {
-                  onField("provider_account_id", 0);
+                  onField("provider_account_group_id", 0);
                 }
               }}
             >
@@ -119,23 +119,23 @@ export function CopilotTab({
 
         {value.source === "account" ? (
           <div>
-            <Label>{t("copilot.fieldAccount")}</Label>
+            <Label>{t("copilot.fieldAccountGroup")}</Label>
             <Select
-              value={value.provider_account_id ? String(value.provider_account_id) : ""}
-              onValueChange={(v) => v && onField("provider_account_id", Number(v))}
+              value={value.provider_account_group_id ? String(value.provider_account_group_id) : ""}
+              onValueChange={(v) => v && onField("provider_account_group_id", Number(v))}
             >
               <SelectTrigger>
-                <SelectValue placeholder={t("copilot.selectAccount")} />
+                <SelectValue placeholder={t("copilot.selectAccountGroup")} />
               </SelectTrigger>
               <SelectContent>
-                {accountOptions.map((opt) => (
+                {groupOptions.map((opt) => (
                   <SelectItem key={opt.value} value={opt.value}>
                     {opt.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <p className="mt-1 text-xs text-srapi-text-tertiary">{t("copilot.fieldAccountHint")}</p>
+            <p className="mt-1 text-xs text-srapi-text-tertiary">{t("copilot.fieldAccountGroupHint")}</p>
           </div>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2">

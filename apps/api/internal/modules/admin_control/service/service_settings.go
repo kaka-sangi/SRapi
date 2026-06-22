@@ -348,6 +348,9 @@ func normalizeAdminSettings(settings admincontrol.AdminSettings) (admincontrol.A
 	if settings.Copilot.ProviderAccountID < 0 {
 		settings.Copilot.ProviderAccountID = 0
 	}
+	if settings.Copilot.ProviderAccountGroupID < 0 {
+		settings.Copilot.ProviderAccountGroupID = 0
+	}
 	settings.Maintenance = normalizeMaintenance(settings.Maintenance)
 	return settings, nil
 }

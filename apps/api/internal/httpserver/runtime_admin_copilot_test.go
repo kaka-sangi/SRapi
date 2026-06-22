@@ -181,6 +181,7 @@ func enableDedicatedCopilot(t *testing.T, handler http.Handler, sessionCookie *h
 		"enabled":                      true,
 		"source":                       "dedicated",
 		"provider_account_id":          0,
+		"provider_account_group_id":    0,
 		"model":                        "gpt-4o",
 		"dedicated_protocol":           "openai-compatible",
 		"dedicated_base_url":           baseURL,

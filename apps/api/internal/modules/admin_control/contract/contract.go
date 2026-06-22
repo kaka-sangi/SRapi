@@ -99,6 +99,7 @@ type AdminSettingsCopilot struct {
 	Enabled                   bool     `json:"enabled"`
 	Source                    string   `json:"source"`
 	ProviderAccountID         int      `json:"provider_account_id"`
+	ProviderAccountGroupID    int      `json:"provider_account_group_id"`
 	Model                     string   `json:"model"`
 	Models                    []string `json:"models"`
 	DedicatedProtocol         string   `json:"dedicated_protocol"`

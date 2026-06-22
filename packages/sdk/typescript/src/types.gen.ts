@@ -4111,6 +4111,10 @@ export type AdminSettingsCopilot = {
      */
     provider_account_id: number;
     /**
+     * Account group id used when source is "account" (0 = unset). When set, the copilot randomly picks a member account each turn for load distribution.
+     */
+    provider_account_group_id: number;
+    /**
      * Default upstream model the copilot calls (e.g. claude-3-5-sonnet, gpt-4o).
      */
     model: string;
@@ -8444,6 +8448,10 @@ export type AdminSettingsCopilotWritable = {
      * Provider account id used when source is "account" (0 = unset).
      */
     provider_account_id: number;
+    /**
+     * Account group id used when source is "account" (0 = unset). When set, the copilot randomly picks a member account each turn for load distribution.
+     */
+    provider_account_group_id: number;
     /**
      * Default upstream model the copilot calls (e.g. claude-3-5-sonnet, gpt-4o).
      */

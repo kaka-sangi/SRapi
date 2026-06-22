@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
@@ -24,12 +24,37 @@ export function CopilotPet() {
   const [open, setOpen] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const { data: cfg } = useAdminCopilotConfig();
-  const { running } = useCopilotSession();
+  const { running, newConversation } = useCopilotSession();
 
-  // The /admin/copilot full page already IS the copilot — don't double up there.
-  if (pathname === ADMIN_ROUTES.copilot) return null;
-  // Only show 小r when the copilot is actually usable.
-  if (!cfg?.enabled || !cfg?.configured) return null;
+  const hidden = pathname === ADMIN_ROUTES.copilot || !cfg?.enabled || !cfg?.configured;
+
+  /* ── Ctrl/Cmd+K → new chat & open panel ── */
+  useEffect(() => {
+    if (hidden) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        newConversation();
+        setOpen(true);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [hidden, newConversation]);
+
+  /* ── Escape → close panel ── */
+  useEffect(() => {
+    if (hidden || !open) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setOpen(false);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [hidden, open]);
+
+  if (hidden) return null;
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={setOpen} modal={false}>

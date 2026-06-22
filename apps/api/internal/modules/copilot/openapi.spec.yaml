@@ -27031,6 +27031,7 @@ components:
         - enabled
         - source
         - provider_account_id
+        - provider_account_group_id
         - model
         - dedicated_protocol
         - dedicated_base_url
@@ -27056,6 +27057,9 @@ components:
         provider_account_id:
           type: integer
           description: Provider account id used when source is "account" (0 = unset).
+        provider_account_group_id:
+          type: integer
+          description: Account group id used when source is "account" (0 = unset). When set, the copilot randomly picks a member account each turn for load distribution.
         model:
           type: string
           description: Default upstream model the copilot calls (e.g. claude-3-5-sonnet, gpt-4o).
