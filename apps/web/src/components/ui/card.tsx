@@ -6,10 +6,10 @@ export const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDi
     <div
       ref={ref}
       className={cn(
-        // Editorial paper card: tactile letterpress depth + warm border.
-        // The transition keeps interactive variants (hover lift) calm and
-        // honest — no shimmer, no glow.
-        "tactile-card rounded-xl border border-srapi-border bg-srapi-card transition-[box-shadow,transform,border-color] duration-200 ease-[var(--ease-out-quint)]",
+        // Modern soft card: warm border + airy shadow, no letterpress inset.
+        // Visual language tuned for hub.linux.do / Claude / ChatGPT grids —
+        // big rounded corners, gentle hover lift, no shimmer, no glow.
+        "tactile-card rounded-2xl border border-srapi-border bg-srapi-card transition-[box-shadow,transform,border-color] duration-200 ease-[var(--ease-out-quint)]",
         className,
       )}
       {...props}

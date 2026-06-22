@@ -40,7 +40,7 @@ export function TopNav({
   }
 
   return (
-    <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-srapi-border bg-srapi-bg/80 px-4 py-3 backdrop-blur-md sm:px-6">
+    <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-srapi-border bg-srapi-bg/85 px-4 py-3.5 backdrop-blur-md sm:px-7">
       <Button
         variant="outline"
         size="icon"
@@ -55,11 +55,11 @@ export function TopNav({
         type="button"
         onClick={openCommand}
         data-tour="search-bar"
-        className="group flex h-9 w-full max-w-sm items-center gap-2.5 rounded-full border border-srapi-border bg-srapi-card/80 px-3.5 text-sm text-srapi-text-secondary shadow-[inset_0_1px_0_0_rgba(255,255,255,0.55)] transition-[border-color,color,background-color,box-shadow] duration-150 ease-[var(--ease-out-quint)] hover:border-srapi-border-strong hover:bg-srapi-card hover:text-srapi-text-primary focus-visible:border-srapi-border-strong"
+        className="group flex h-10 w-full max-w-md items-center gap-2.5 rounded-xl border border-srapi-border bg-srapi-card/85 px-3.5 text-sm text-srapi-text-secondary transition-[border-color,color,background-color,box-shadow] duration-150 ease-[var(--ease-out-quint)] hover:border-srapi-border-strong hover:bg-srapi-card hover:text-srapi-text-primary focus-visible:border-srapi-border-strong"
       >
         <Search className="size-4 text-srapi-text-tertiary transition-colors group-hover:text-srapi-text-secondary" />
         <span className="hidden truncate sm:inline">{t("common.search")}</span>
-        <span className="ml-auto hidden rounded border border-srapi-border bg-srapi-card-muted px-1.5 py-0.5 font-mono text-[10px] tracking-wider text-srapi-text-tertiary sm:inline">
+        <span className="ml-auto hidden rounded-md border border-srapi-border bg-srapi-card-muted px-1.5 py-0.5 font-mono text-[10px] tracking-wider text-srapi-text-tertiary sm:inline">
           ⌘K
         </span>
       </button>
@@ -67,10 +67,10 @@ export function TopNav({
       <div className="ml-auto flex items-center gap-2">
         <span
           className={cn(
-            "hidden items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.18em] sm:inline-flex",
+            "hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium sm:inline-flex",
             live
-              ? "border-srapi-success/30 bg-srapi-success/10 text-srapi-success"
-              : "border-srapi-border bg-srapi-card-muted text-srapi-text-tertiary",
+              ? "bg-srapi-success/10 text-srapi-success"
+              : "bg-srapi-card-muted text-srapi-text-tertiary",
           )}
         >
           <span
@@ -94,7 +94,7 @@ export function TopNav({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="icon" aria-label={user.name}>
-              <span className="font-serif text-sm text-srapi-primary">
+              <span className="text-sm font-semibold text-srapi-primary">
                 {(user.name?.[0] ?? "U").toUpperCase()}
               </span>
             </Button>
@@ -102,7 +102,7 @@ export function TopNav({
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>
               <div className="text-srapi-text-primary">{user.name}</div>
-              <div className="mt-0.5 flex items-center gap-1.5 font-mono text-2xs font-normal text-srapi-text-tertiary">
+              <div className="mt-0.5 flex items-center gap-1.5 text-[11px] font-normal text-srapi-text-tertiary">
                 <UserIcon className="size-3" aria-hidden />
                 {user.email} ·{" "}
                 {user.role === "admin" ? t("nav.sectionAdmin") : t("nav.sectionWorkspace")}

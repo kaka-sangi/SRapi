@@ -88,16 +88,16 @@ function DashboardContent() {
         title={t("dashboard.title")}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1 rounded-lg border border-srapi-border p-0.5">
+            <div className="flex items-center gap-0.5 rounded-xl border border-srapi-border bg-srapi-card/80 p-1">
               {RANGE_PRESETS.map((p) => (
                 <button
                   key={p.key}
                   type="button"
                   onClick={() => setRange(p.key)}
                   className={cn(
-                    "rounded-md px-2.5 py-1 font-mono text-2xs transition-colors",
+                    "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
                     range === p.key
-                      ? "bg-srapi-primary/10 text-srapi-primary"
+                      ? "bg-srapi-accent-soft text-srapi-primary shadow-[0_1px_2px_rgba(26,24,20,0.04)]"
                       : "text-srapi-text-tertiary hover:text-srapi-text-secondary",
                   )}
                 >
@@ -289,8 +289,10 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
       {/* Token trend over the window */}
       <Card className="anim-rise-sm" style={rise(9)}>
         <CardContent>
-          <div className="flex items-center gap-2 font-mono text-2xs uppercase tracking-[0.18em] text-srapi-text-tertiary">
-            <span className="block h-px w-5 bg-srapi-border-strong" aria-hidden />
+          <div className="flex items-center gap-2 text-sm font-semibold text-srapi-text-primary">
+            <span className="grid size-7 place-items-center rounded-lg bg-srapi-accent-soft text-srapi-primary">
+              <LineChart className="size-3.5" />
+            </span>
             {t("dashboard.tokenTrend")}
           </div>
           <div className="mt-4">
@@ -403,11 +405,11 @@ function SnapshotSummary({
             tone={traffic.error_requests > 0 ? "danger" : "success"}
           />
         </div>
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-srapi-border pt-3">
-          <span className="font-mono text-2xs uppercase tracking-[0.18em] text-srapi-text-tertiary">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-srapi-border/70 pt-3">
+          <span className="text-xs font-medium uppercase tracking-[0.14em] text-srapi-text-tertiary">
             {t("dashboard.generatedAt")}
           </span>
-          <span className="font-mono text-2xs text-srapi-text-secondary">
+          <span className="text-xs tabular text-srapi-text-secondary">
             {formatDateTime(generated_at)}
           </span>
         </div>
@@ -433,13 +435,13 @@ function SummaryMetric({
 }) {
   return (
     <div className={cn("min-w-0", className)}>
-      <div className="font-mono text-2xs uppercase tracking-[0.16em] text-srapi-text-tertiary">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
         {label}
       </div>
       <div
         className={cn(
-          "mt-1.5 truncate font-serif text-lg leading-tight tracking-tight text-srapi-text-primary",
-          mono && "font-mono text-xs font-normal",
+          "mt-1.5 truncate text-lg font-semibold leading-tight tracking-tight text-srapi-text-primary",
+          mono && "text-xs font-medium tabular",
         )}
         title={value}
       >
@@ -473,14 +475,16 @@ function AccountHealthOverview({ staggerIndex }: { staggerIndex: number }) {
       <CardContent>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Server className="size-4 text-srapi-text-tertiary" />
-            <span className="font-mono text-2xs uppercase tracking-wide text-srapi-text-tertiary">
+            <span className="grid size-8 place-items-center rounded-xl bg-srapi-accent-soft text-srapi-primary">
+              <Server className="size-4" />
+            </span>
+            <span className="text-sm font-semibold text-srapi-text-primary">
               {t("dashboard.accountHealth")}
             </span>
           </div>
           <a
             href={ADMIN_ROUTES.accounts + "?view=health"}
-            className="text-2xs text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
+            className="rounded-full bg-srapi-card-muted px-3 py-1 text-[11px] font-medium text-srapi-text-secondary transition-colors hover:bg-srapi-accent-soft hover:text-srapi-primary"
           >
             {t("dashboard.viewAll")} &rarr;
           </a>
@@ -592,13 +596,13 @@ function HealthMiniStat({
         ? "bg-srapi-warning"
         : "bg-srapi-error";
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-srapi-border px-3 py-2">
-      <span className={cn("size-2 rounded-full", dotColor, count === 0 && "opacity-30")} />
+    <div className="flex items-center gap-2.5 rounded-xl border border-srapi-border bg-srapi-card/60 px-3.5 py-2.5">
+      <span className={cn("size-2.5 rounded-full", dotColor, count === 0 && "opacity-30")} />
       <div>
-        <div className={cn("font-mono text-sm font-semibold tabular", count === 0 && "text-srapi-text-tertiary")}>
+        <div className={cn("text-base font-semibold tabular text-srapi-text-primary", count === 0 && "text-srapi-text-tertiary")}>
           {count}
         </div>
-        <div className="text-2xs leading-tight text-srapi-text-tertiary">{label}</div>
+        <div className="text-[11px] font-medium leading-tight text-srapi-text-tertiary">{label}</div>
       </div>
     </div>
   );

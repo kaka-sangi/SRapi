@@ -16,29 +16,27 @@ export function PageHeader({
   return (
     <div
       className={cn(
-        // Editorial header: column title, lead, optional toolbar. The bottom
-        // rule is intentionally hairline + warm so the page feels like one
-        // continuous sheet of paper, not a stack of boxes.
-        "relative flex flex-col gap-4 pb-6 sm:flex-row sm:items-end sm:justify-between sm:gap-8",
-        "after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-gradient-to-r after:from-srapi-border-strong after:via-srapi-border after:to-transparent",
+        // Modern SaaS header: bold sans-serif headline + soft subtitle.
+        // No bottom rule (cards below provide their own visual edges) — the
+        // open space between the header and content is the visual rest.
+        "flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-8",
         className,
       )}
     >
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         {eyebrow && (
-          <div className="mb-3 flex items-center gap-2 font-mono text-2xs uppercase tracking-[0.18em] text-srapi-text-tertiary">
-            <span className="block h-px w-6 bg-srapi-border-strong" aria-hidden />
-            <span>{eyebrow}</span>
+          <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-srapi-accent-soft px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] text-srapi-primary">
+            {eyebrow}
           </div>
         )}
         <h1
-          className="font-serif text-3xl leading-[1.08] tracking-tight text-srapi-text-primary sm:text-4xl"
+          className="text-3xl font-semibold leading-tight tracking-tight text-srapi-text-primary sm:text-[2rem]"
           title={title}
         >
           {title}
         </h1>
         {description && (
-          <p className="mt-2.5 max-w-prose text-sm leading-relaxed text-srapi-text-secondary">
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-srapi-text-secondary">
             {description}
           </p>
         )}

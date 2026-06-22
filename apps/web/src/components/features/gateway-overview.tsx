@@ -2,7 +2,20 @@
 
 import type { CSSProperties } from "react";
 import Link from "next/link";
-import { KeyRound, Activity, ArrowUpRight, Gauge, Wallet, LineChart, BarChart3 } from "lucide-react";
+import {
+  KeyRound,
+  Activity,
+  ArrowUpRight,
+  Gauge,
+  Wallet,
+  LineChart,
+  BarChart3,
+  Zap,
+  Hash,
+  Database,
+  CheckCircle2,
+  Coins,
+} from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { useBalance, usePlatformQuotas, useUsageLogs } from "@/hooks/queries";
 import {
@@ -133,10 +146,12 @@ export function GatewayOverview() {
           style={rise(1)}
         >
           <Card className="card-interactive h-full">
-            <CardContent className="flex h-full items-center justify-between gap-4">
+            <CardContent className="flex h-full items-center justify-between gap-4 p-6">
               <div className="min-w-0">
-                <div className="flex items-center gap-2 font-mono text-2xs uppercase text-srapi-text-tertiary">
-                  <Wallet className="size-3.5" />
+                <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-srapi-text-tertiary">
+                  <span className="grid size-8 place-items-center rounded-xl bg-srapi-accent-soft text-srapi-primary">
+                    <Wallet className="size-4" />
+                  </span>
                   {t("dashboard.balance")}
                 </div>
                 <PageQueryState
@@ -144,13 +159,13 @@ export function GatewayOverview() {
                   skeleton={<Skeleton className="mt-3 h-9 w-36" />}
                 >
                   {(data) => (
-                    <div className="mt-2 truncate font-serif text-3xl text-srapi-text-primary tabular">
+                    <div className="mt-3 truncate text-3xl font-semibold tracking-tight text-srapi-text-primary tabular sm:text-[2rem]">
                       {formatMoney(data.balance, data.currency)}
                     </div>
                   )}
                 </PageQueryState>
               </div>
-              <div className="flex shrink-0 items-center gap-1.5 font-mono text-2xs uppercase text-srapi-text-tertiary transition-colors group-hover:text-srapi-primary">
+              <div className="flex shrink-0 items-center gap-1.5 rounded-full bg-srapi-card-muted px-3 py-1 text-[11px] font-medium text-srapi-text-secondary transition-colors group-hover:bg-srapi-accent-soft group-hover:text-srapi-primary">
                 {t("nav.billing")}
                 <ArrowUpRight className="size-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
               </div>
@@ -159,10 +174,12 @@ export function GatewayOverview() {
         </Link>
 
         <Card className="anim-rise-sm h-full" style={rise(2)}>
-          <CardContent className="flex h-full min-w-0 flex-col gap-3.5">
-            <div className="flex items-baseline justify-between gap-3">
-              <div className="flex items-center gap-2 font-mono text-2xs uppercase text-srapi-text-tertiary">
-                <Gauge className="size-3.5" />
+          <CardContent className="flex h-full min-w-0 flex-col gap-3.5 p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-srapi-text-tertiary">
+                <span className="grid size-8 place-items-center rounded-xl bg-srapi-accent-soft text-srapi-primary">
+                  <Gauge className="size-4" />
+                </span>
                 {t("dashboard.platformQuotas")}
               </div>
               <PageQueryState
@@ -170,9 +187,9 @@ export function GatewayOverview() {
                 skeleton={<Skeleton className="h-6 w-16" />}
               >
                 {() => (
-                  <div className="font-serif text-3xl leading-none text-srapi-text-primary tabular">
+                  <div className="text-2xl font-semibold leading-none text-srapi-text-primary tabular sm:text-[1.75rem]">
                     {enabledQuotas.length}
-                    <span className="ml-1.5 align-baseline font-sans text-sm text-srapi-text-tertiary">
+                    <span className="ml-1.5 align-baseline text-sm font-medium text-srapi-text-tertiary">
                       {t("dashboard.quotaPlatforms")}
                     </span>
                   </div>
@@ -194,21 +211,21 @@ export function GatewayOverview() {
                     {t("dashboard.noPlatformQuotas")}
                   </p>
                 ) : (
-                  <ul className="min-w-0 divide-y divide-srapi-border border-t border-srapi-border">
+                  <ul className="min-w-0 divide-y divide-srapi-border/70 border-t border-srapi-border/70">
                     {enabledQuotas.slice(0, 3).map((quota) => {
                       const limit = quotaLimit(quota);
                       const period = quotaPeriod(quota);
                       return (
                         <li
                           key={quota.platform}
-                          className="flex min-w-0 items-baseline justify-between gap-3 py-2"
+                          className="flex min-w-0 items-baseline justify-between gap-3 py-2.5"
                         >
-                          <span className="min-w-0 truncate text-sm text-srapi-text-primary">
+                          <span className="min-w-0 truncate text-sm font-medium text-srapi-text-primary">
                             {quota.platform}
                           </span>
-                          <span className="shrink-0 font-mono text-2xs text-srapi-text-secondary tabular">
+                          <span className="shrink-0 text-xs text-srapi-text-secondary tabular">
                             {period ? (
-                              <span className="mr-1.5 uppercase text-srapi-text-tertiary">
+                              <span className="mr-1.5 rounded-full bg-srapi-card-muted px-1.5 py-0.5 text-[10px] uppercase text-srapi-text-tertiary">
                                 {t(`dashboard.quotaPeriod.${period}`)}
                               </span>
                             ) : null}
@@ -218,7 +235,7 @@ export function GatewayOverview() {
                       );
                     })}
                     {enabledQuotas.length > 3 ? (
-                      <li className="pt-2 font-mono text-2xs uppercase text-srapi-text-tertiary">
+                      <li className="pt-2.5 text-xs font-medium text-srapi-text-tertiary">
                         + {enabledQuotas.length - 3} {t("dashboard.quotaMore")}
                       </li>
                     ) : null}
@@ -263,6 +280,7 @@ export function GatewayOverview() {
                 value={totals.requests}
                 format={compact}
                 spark={reqSpark}
+                icon={<Hash />}
               />
             </div>
             <div className="anim-rise-sm" style={rise(2)}>
@@ -271,6 +289,7 @@ export function GatewayOverview() {
                 label={t("dashboard.successRate")}
                 value={totals.requests > 0 ? totals.successRate : "—"}
                 format={(n) => `${Math.round(n)}%`}
+                icon={<CheckCircle2 />}
               />
             </div>
             <div className="anim-rise-sm" style={rise(3)}>
@@ -279,6 +298,7 @@ export function GatewayOverview() {
                 label={t("dashboard.totalTokens")}
                 value={totals.totalTokens}
                 format={compact}
+                icon={<Activity />}
               />
             </div>
             <div className="anim-rise-sm" style={rise(4)}>
@@ -287,6 +307,7 @@ export function GatewayOverview() {
                 label={t("dashboard.cost")}
                 value={totals.totalCost}
                 format={(n) => fmtCost(n, totals.currency)}
+                icon={<Coins />}
               />
             </div>
           </div>
@@ -326,27 +347,27 @@ export function GatewayOverview() {
                 }
               />
             ) : (
-              <div className="divide-y divide-srapi-border">
+              <div className="divide-y divide-srapi-border/70">
                 {rows.slice(0, 8).map((log, idx) => (
                   <div
                     key={log.request_id}
-                    className="anim-rise-sm flex items-center gap-3 px-5 py-3 transition-colors hover:bg-srapi-card-muted/40"
+                    className="anim-rise-sm flex items-center gap-3 px-6 py-3 transition-colors hover:bg-srapi-card-muted/50"
                     style={{ "--stagger-index": 6 + idx } as CSSProperties}
                   >
-                    <div className="w-24 shrink-0 font-mono text-2xs tabular text-srapi-text-tertiary">
+                    <div className="w-24 shrink-0 text-[12px] tabular text-srapi-text-tertiary">
                       {fmtTime(log.created_at)}
                     </div>
-                    <div className="min-w-0 flex-1 truncate text-sm text-srapi-text-primary">
+                    <div className="min-w-0 flex-1 truncate text-sm font-medium text-srapi-text-primary">
                       {log.model}
                     </div>
                     <QuietBadge
                       status={log.success ? "active" : "error"}
                       label={t(log.success ? "common.success" : "common.failed")}
                     />
-                    <div className="hidden w-20 text-right font-mono text-2xs tabular text-srapi-text-secondary sm:block">
+                    <div className="hidden w-20 text-right text-[12px] tabular text-srapi-text-secondary sm:block">
                       {compact(log.total_tokens)}
                     </div>
-                    <div className="w-20 text-right font-mono text-2xs tabular text-srapi-text-secondary">
+                    <div className="w-20 text-right text-[12px] font-medium tabular text-srapi-text-secondary">
                       {fmtCost(log.cost, log.currency)}
                     </div>
                   </div>
@@ -392,6 +413,7 @@ function ThroughputKpis({
             label={t("dashboard.rpm")}
             value={tp ? tp.rpm : "—"}
             format={formatCompactNumber}
+            icon={<Zap />}
             hint={
               tp
                 ? t("dashboard.peakRpm", { value: formatCompactNumber(tp.peak_rpm) })
@@ -409,6 +431,7 @@ function ThroughputKpis({
             label={t("dashboard.tpm")}
             value={tp ? tp.tpm : "—"}
             format={formatCompactNumber}
+            icon={<Activity />}
             hint={
               tp
                 ? t("dashboard.peakTpm", { value: formatCompactNumber(tp.peak_tpm) })
@@ -426,6 +449,7 @@ function ThroughputKpis({
             label={t("dashboard.cacheHitRate")}
             value={cache ? cache.cache_hit_rate * 100 : "—"}
             format={(n) => `${n.toFixed(1)}%`}
+            icon={<Database />}
             hint={
               cache && Number(cache.cache_cost_saved) > 0
                 ? t("dashboard.cacheSaved", {
@@ -503,7 +527,7 @@ function ModelDistributionCard({ query }: { query: ReturnType<typeof useUserUsag
     <Card className="h-full">
       <CardHeader>
         <CardTitle>{t("dashboard.topModels")}</CardTitle>
-        <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+        <span className="rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-tertiary">
           {t("dashboard.byTokens")}
         </span>
       </CardHeader>
@@ -539,22 +563,22 @@ function ModelDistributionList({ rows }: { rows: UsageModelShare[] }) {
           <div key={row.model}>
             <div className="flex items-baseline justify-between gap-3">
               <span
-                className="min-w-0 truncate font-mono text-2xs text-srapi-text-primary"
+                className="min-w-0 truncate text-[13px] font-medium text-srapi-text-primary"
                 title={row.model}
               >
                 {row.model}
               </span>
-              <span className="shrink-0 font-mono text-2xs text-srapi-text-secondary tabular">
+              <span className="shrink-0 text-xs font-medium text-srapi-text-secondary tabular">
                 {compact(row.total_tokens)}
               </span>
             </div>
-            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-srapi-card-muted">
+            <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-srapi-card-muted">
               <div
-                className="h-full rounded-full bg-srapi-primary"
+                className="h-full rounded-full bg-gradient-to-r from-srapi-primary to-srapi-primary-hover transition-[width] duration-500"
                 style={{ width: `${width}%` }}
               />
             </div>
-            <div className="mt-1 flex items-center justify-between font-mono text-2xs text-srapi-text-tertiary tabular">
+            <div className="mt-1 flex items-center justify-between text-[11px] text-srapi-text-tertiary tabular">
               <span>
                 {compact(row.requests)} req · {fmtCost(Number(row.cost), row.currency)}
               </span>

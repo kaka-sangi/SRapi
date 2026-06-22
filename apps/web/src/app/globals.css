@@ -3,31 +3,35 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ============================================================
-   SRapi 设计系统 · 概念 A · 编辑社论暖纸
-   视觉规范见 docs/FRONTEND_DESIGN_SYSTEM.md
-   排版工程：字阶 / 行高 / 字距三者成套，组件不得散落一次性字号。
+   SRapi 设计系统 · 概念 B · 现代卡片（Claude / ChatGPT / Discourse 卡片化融合）
+   ----------------------------------------------------------------
+   2026·06 重塑：从「编辑社论暖纸」转向「友好现代卡片」。
+   - 背景仍取暖色（Claude 同源奶油白），但收敛对比、减少陶土厚度。
+   - 衬线退居展示场景，UI 主体由 Inter 承担，更接近 Anthropic / OpenAI 控制台。
+   - 卡片由「凸版压凹 + 内高光」改为「柔影 + 浅边」，符合现代 SaaS 视觉重力。
    ============================================================ */
 @theme {
-  /* —— 温润纸张 (Warm Light) —— */
-  --color-srapi-bg: #f9f6f0;
+  /* —— 奶油白纸（Cream Canvas） —— */
+  --color-srapi-bg: #faf7f2;
   --color-srapi-card: #ffffff;
-  --color-srapi-card-muted: #f1ebe4;
-  --color-srapi-text-primary: #1c1a17;
-  --color-srapi-text-secondary: #6e6a5f;
-  --color-srapi-text-tertiary: #9a9384;
-  --color-srapi-border: #e7ddcb;
-  --color-srapi-border-strong: #d8ccb4;
-  --color-srapi-primary: #bf5638;
-  --color-srapi-primary-hover: #a2452b;
-  /* accent — 与 primary 同源的语义别名，用于「强调链接 / 选中态 / 数据高亮」。
-     保留独立 token 以便日后差异化（例如改为深墨蓝形成冷暖对比）。 */
-  --color-srapi-accent: #bf5638;
-  --color-srapi-success: #3f6f3a;
-  --color-srapi-warning: #b07a28;
-  --color-srapi-error: #b3432f;
-  /* 反相按钮（亮=炭黑底） */
-  --color-srapi-invert: #1c1a17;
-  --color-srapi-invert-fg: #f9f6f0;
+  --color-srapi-card-muted: #f2ece2;
+  --color-srapi-card-soft: #f7f2e9;
+  --color-srapi-text-primary: #1a1814;
+  --color-srapi-text-secondary: #5e5a51;
+  --color-srapi-text-tertiary: #8e8778;
+  --color-srapi-border: #ece3d2;
+  --color-srapi-border-strong: #dccdb1;
+  --color-srapi-primary: #c2553b;
+  --color-srapi-primary-hover: #a8472e;
+  /* accent —— 与 primary 同源；语义别名，便于差异化 */
+  --color-srapi-accent: #c2553b;
+  --color-srapi-accent-soft: #f4dccf;
+  --color-srapi-success: #3f7a4a;
+  --color-srapi-warning: #b5852e;
+  --color-srapi-error: #b53d2c;
+  /* 反相主按钮（亮=炭黑） */
+  --color-srapi-invert: #1a1814;
+  --color-srapi-invert-fg: #fbf7ef;
 
   /* 字族（next/font 变量在 layout.tsx 注入 body）
      标题用 Cormorant Garamond（高对比展示衬线，frontend-design / canvas-design 首选）。 */
@@ -70,11 +74,12 @@
   --text-6xl--line-height: 0.98;
   --text-6xl--letter-spacing: -0.032em;
 
-  /* 圆角语言 */
-  --radius-sm: 0.375rem;
-  --radius-md: 0.625rem;
-  --radius-lg: 0.875rem;
-  --radius-xl: 1.125rem;
+  /* 圆角语言（重塑：放大半径，更接近 Claude / ChatGPT / Discourse 卡片）*/
+  --radius-sm: 0.5rem;       /* 8px */
+  --radius-md: 0.75rem;      /* 12px */
+  --radius-lg: 1rem;          /* 16px */
+  --radius-xl: 1.25rem;       /* 20px */
+  --radius-2xl: 1.5rem;       /* 24px — 大卡片 hero */
   --radius-pill: 9999px;
 
   /* 缓动 —— bloom 用于克制进场；spring 系列提供「有存在感」的弹性 */
@@ -97,22 +102,24 @@
 
 /* —— 深邃墨水 (Ink Dark) —— */
 .dark {
-  --color-srapi-bg: #100f0d;
-  --color-srapi-card: #1a1916;
-  --color-srapi-card-muted: #232019;
-  --color-srapi-text-primary: #f1efe9;
-  --color-srapi-text-secondary: #a09a8d;
-  --color-srapi-text-tertiary: #6f6a5f;
-  --color-srapi-border: #2c2a23;
-  --color-srapi-border-strong: #3a372e;
-  --color-srapi-primary: #e07a5f;
+  --color-srapi-bg: #131210;
+  --color-srapi-card: #1c1a17;
+  --color-srapi-card-muted: #25221d;
+  --color-srapi-card-soft: #201d18;
+  --color-srapi-text-primary: #f2efe7;
+  --color-srapi-text-secondary: #a39c8d;
+  --color-srapi-text-tertiary: #6e6859;
+  --color-srapi-border: #2e2b24;
+  --color-srapi-border-strong: #3d392f;
+  --color-srapi-primary: #e2876b;
   --color-srapi-primary-hover: #c96243;
-  --color-srapi-accent: #e07a5f;
-  --color-srapi-success: #5fa564;
+  --color-srapi-accent: #e2876b;
+  --color-srapi-accent-soft: #3a2820;
+  --color-srapi-success: #6cb371;
   --color-srapi-warning: #d6a45a;
   --color-srapi-error: #e2705a;
-  --color-srapi-invert: #f1efe9;
-  --color-srapi-invert-fg: #100f0d;
+  --color-srapi-invert: #f2efe7;
+  --color-srapi-invert-fg: #131210;
 }
 
 html {
@@ -134,15 +141,16 @@ body {
   font-feature-settings: "cv05", "ss01", "calt", "kern";
 }
 
-/* 衬线标题：Cormorant 高对比但纤细，统一给中重字重 + 光学字距，
-   避免小尺寸发虚；超大展示标题可在使用处单独减重。
-   字族显式绑定 next/font 变量 —— 不依赖 Tailwind 的 font-serif 工具类
-   （其 --font-serif 在本项目中解析为空，会回退到无衬线，编辑社论身份因此失效）。 */
+/* 衬线 —— 2026·06 重塑：全局 .font-serif 改用 Inter 半粗 + 紧字距，
+   不再渲染 Cormorant Garamond。这是「全面无衬线」的工程开关，避免逐文件
+   清理 N 处历史代码；保留 Cormorant 字体下载（次级用途仍可经 CSS variable
+   var(--font-serif-display) 显式调用），但默认体验完全对齐 Claude / ChatGPT
+   控制台的现代无衬线身份。 */
 .font-serif {
-  font-family: var(--font-serif-display), "Cormorant Garamond", Georgia, serif;
+  font-family: var(--font-inter), "Inter", system-ui, -apple-system, sans-serif;
   font-weight: 600;
-  font-feature-settings: "kern", "liga", "calt", "swsh";
-  letter-spacing: -0.01em;
+  font-feature-settings: "cv05", "ss01", "calt", "kern";
+  letter-spacing: -0.012em;
 }
 
 /* 数字一律等宽，避免表格 / 指标跳动 */
@@ -300,55 +308,58 @@ textarea:focus-visible,
 }
 
 /* ============================================================
-   §4.1 棉纸物理微杂色纹理（锁定 3.5–4%）
+   §4.1 极轻纸张噪点（克制至 2%，仅暗示纸感不再「纸张身份」）
    ============================================================ */
 .paper-grain::before {
   content: "";
   position: fixed;
   inset: 0;
-  opacity: 0.035;
+  opacity: 0.022;
   pointer-events: none;
   z-index: 0;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 .dark .paper-grain::before {
-  opacity: 0.05;
+  opacity: 0.035;
 }
 
 /* ============================================================
-   §4.2 物理压凹内高光（凸版印刷质感）
+   §4.2 现代柔影卡片（替代 letterpress 内高光）
+   - 取消「内 1px 白色高光环」——它造成卡片像贴在纸上的「凸版印刷」感，
+     与 Claude / ChatGPT 的轻柔卡片语言冲突。
+   - 改用 0/0/0 base + 中距柔影 + 远距大模糊，呈现「漂浮在桌面上」的现代感。
+   - hover 不再「上浮 1px」，改 2px + 阴影加深，让交互态更明确，
+     符合 hub.linux.do 卡片栅格的「点我」反馈。
    ============================================================ */
 .tactile-card {
   box-shadow:
-    0 1px 2px rgba(28, 26, 23, 0.035),
-    0 8px 26px -10px rgba(28, 26, 23, 0.06),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.7);
+    0 1px 2px rgba(26, 24, 20, 0.04),
+    0 4px 14px -6px rgba(26, 24, 20, 0.05);
 }
 .dark .tactile-card {
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.4),
-    0 10px 32px -12px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
+    0 1px 2px rgba(0, 0, 0, 0.45),
+    0 8px 24px -10px rgba(0, 0, 0, 0.45);
 }
 
-/* Interactive cards subtly lift on hover — the move is small (1px) on purpose,
-   the warm shadow does most of the work. */
+/* Interactive cards lift on hover, with a warmer terracotta-tinted shadow
+   that hints at the brand without coloring the surface itself. */
 .card-interactive {
   cursor: pointer;
 }
 .card-interactive:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
   box-shadow:
-    0 2px 4px rgba(28, 26, 23, 0.045),
-    0 16px 36px -12px rgba(28, 26, 23, 0.1),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.78);
+    0 2px 4px rgba(26, 24, 20, 0.05),
+    0 14px 32px -10px rgba(194, 85, 59, 0.18),
+    0 22px 50px -18px rgba(26, 24, 20, 0.12);
   border-color: var(--color-srapi-border-strong);
 }
 .dark .card-interactive:hover {
   box-shadow:
-    0 2px 4px rgba(0, 0, 0, 0.45),
-    0 18px 42px -14px rgba(0, 0, 0, 0.55),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+    0 2px 4px rgba(0, 0, 0, 0.5),
+    0 18px 42px -14px rgba(226, 135, 107, 0.18),
+    0 24px 60px -18px rgba(0, 0, 0, 0.55);
 }
 
 /* ============================================================
@@ -581,48 +592,60 @@ textarea:focus-visible,
 }
 
 /* ============================================================
-   §6.2 可交互卡片（Interactive Card）—— hover 物理抬升 + 阴影加深
-   rest 态沿用 tactile-card；交互态用 spring 上浮，性格「弹」。
+   §6.2 可交互卡片 transition（hover 抬升 + 柔影加深）
+   实际阴影规则定义在 §4.2，这里只统一过渡曲线与 active 回落。
    ============================================================ */
 .card-interactive {
   transition:
-    transform 260ms var(--ease-spring),
+    transform 240ms var(--ease-spring),
     box-shadow 260ms var(--ease-out-quint),
     border-color 200ms ease;
-}
-.card-interactive:hover {
-  transform: translateY(-3px);
-  border-color: var(--color-srapi-border-strong);
-  box-shadow:
-    0 1px 2px rgba(28, 26, 23, 0.04),
-    0 16px 34px -14px rgba(28, 26, 23, 0.18),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.7);
-}
-.dark .card-interactive:hover {
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.4),
-    0 20px 42px -16px rgba(0, 0, 0, 0.62),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
 }
 .card-interactive:active {
   transform: translateY(-1px);
   transition-duration: 120ms;
 }
 
-/* 焦点卡片（focal / raised）—— 比 tactile-card 更强的悬浮深度，
-   用于页面主角：登录卡、特性卡、对话框等。定义在 tactile-card 之后，
-   故同时挂两个类时由 card-raised 接管阴影。 */
+/* 焦点卡片（focal / raised）—— Landing 登录、对话框、关键 hero 卡。
+   阴影比默认 tactile 更深，但仍是柔影语言，不再有 letterpress 内高光。 */
 .card-raised {
   box-shadow:
-    0 1px 2px rgba(28, 26, 23, 0.04),
-    0 18px 40px -16px rgba(28, 26, 23, 0.2),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.72);
+    0 1px 2px rgba(26, 24, 20, 0.05),
+    0 14px 30px -10px rgba(26, 24, 20, 0.12),
+    0 30px 60px -24px rgba(26, 24, 20, 0.18);
 }
 .dark .card-raised {
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.4),
-    0 24px 50px -18px rgba(0, 0, 0, 0.65),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+    0 2px 4px rgba(0, 0, 0, 0.5),
+    0 18px 40px -14px rgba(0, 0, 0, 0.55),
+    0 32px 70px -22px rgba(0, 0, 0, 0.7);
+}
+
+/* ============================================================
+   §6.2b 现代软卡片（card-soft）—— 类 hub.linux.do / Discourse 列表块
+   只用 border 暗示边界，rest 态无阴影，hover 时浅浅浮起。
+   适合：导航卡、分类卡、设置项、frequently-clicked entry 卡。
+   ============================================================ */
+.card-soft {
+  background-color: var(--color-srapi-card);
+  border: 1px solid var(--color-srapi-border);
+  border-radius: var(--radius-lg);
+  transition:
+    transform 220ms var(--ease-spring),
+    box-shadow 220ms var(--ease-out-quint),
+    border-color 180ms ease;
+}
+.card-soft:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-srapi-border-strong);
+  box-shadow:
+    0 2px 4px rgba(26, 24, 20, 0.04),
+    0 10px 26px -8px rgba(194, 85, 59, 0.16);
+}
+.dark .card-soft:hover {
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.45),
+    0 14px 34px -10px rgba(226, 135, 107, 0.18);
 }
 
 /* ============================================================

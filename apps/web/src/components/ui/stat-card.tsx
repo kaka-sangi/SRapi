@@ -55,10 +55,13 @@ function useCountUp(target: number, enabled: boolean, duration = 750): number {
 
 export function StatCardSkeleton({ className }: { className?: string }) {
   return (
-    <Card className={cn("flex flex-col p-5", className)}>
-      <div className="skeleton-shimmer h-3 w-20 rounded bg-srapi-card-muted" />
-      <div className="mt-4 skeleton-shimmer h-8 w-24 rounded bg-srapi-card-muted" />
-      <div className="mt-3 skeleton-shimmer h-2.5 w-16 rounded bg-srapi-card-muted" />
+    <Card className={cn("flex flex-col p-6", className)}>
+      <div className="flex items-center justify-between">
+        <div className="skeleton-shimmer h-3 w-20 rounded bg-srapi-card-muted" />
+        <div className="skeleton-shimmer size-9 rounded-xl bg-srapi-card-muted" />
+      </div>
+      <div className="mt-5 skeleton-shimmer h-9 w-28 rounded bg-srapi-card-muted" />
+      <div className="mt-3 skeleton-shimmer h-2.5 w-20 rounded bg-srapi-card-muted" />
     </Card>
   );
 }
@@ -70,6 +73,7 @@ export function StatCard({
   hint,
   trend,
   spark,
+  icon,
   className,
   style,
   format,
@@ -81,6 +85,8 @@ export function StatCard({
   hint?: React.ReactNode;
   trend?: { dir: "up" | "down"; text: string };
   spark?: number[];
+  /** Optional lucide icon — renders as a soft accent bubble in the top-right. */
+  icon?: React.ReactNode;
   className?: string;
   style?: React.CSSProperties;
   /** Formats the live count-up value; defaults to a rounded integer. */
@@ -93,44 +99,50 @@ export function StatCard({
   return (
     <Card
       className={cn(
-        "group relative flex flex-col overflow-hidden p-5",
-        // A 1px ember accent runs along the top edge — quiet by default,
-        // saturates on hover. Replaces the generic "colored card" trope.
-        "before:pointer-events-none before:absolute before:inset-x-5 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-srapi-border-strong before:to-transparent before:opacity-70 before:transition-opacity before:duration-200 hover:before:via-srapi-primary/45 hover:before:opacity-100",
+        "group relative flex flex-col overflow-hidden p-6",
         className,
       )}
       style={style}
     >
-      <div className="flex items-center justify-between">
-        <span className="font-mono text-2xs uppercase tracking-[0.18em] text-srapi-text-tertiary">
+      <div className="flex items-start justify-between gap-3">
+        <span className="text-xs font-medium uppercase tracking-[0.14em] text-srapi-text-tertiary">
           {label}
         </span>
+        {icon && (
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-srapi-accent-soft text-srapi-primary transition-transform duration-200 group-hover:scale-105 [&>svg]:size-4">
+            {icon}
+          </span>
+        )}
+      </div>
+      <div className="mt-4 flex items-baseline gap-1.5 text-3xl font-semibold leading-none tracking-tight text-srapi-text-primary tabular sm:text-[2.25rem]">
+        <span>{display}</span>
+        {unit && (
+          <span className="text-sm font-medium text-srapi-text-tertiary">{unit}</span>
+        )}
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-2">
+        {hint ? (
+          <div className="text-xs text-srapi-text-tertiary">{hint}</div>
+        ) : (
+          <span aria-hidden />
+        )}
         {trend && (
           <span
             className={cn(
-              "inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 font-mono text-[10px] tabular",
+              "inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-medium tabular",
               trend.dir === "up"
-                ? "border-srapi-success/25 bg-srapi-success/10 text-srapi-success"
-                : "border-srapi-error/25 bg-srapi-error/10 text-srapi-error",
+                ? "bg-srapi-success/12 text-srapi-success"
+                : "bg-srapi-error/12 text-srapi-error",
             )}
           >
             {trend.dir === "up" ? "↑" : "↓"} {trend.text}
           </span>
         )}
       </div>
-      <div className="mt-3 flex items-baseline gap-1.5 font-serif text-[2.5rem] leading-none tracking-tight text-srapi-text-primary tabular">
-        <span>{display}</span>
-        {unit && (
-          <span className="font-sans text-sm font-normal text-srapi-text-tertiary">{unit}</span>
-        )}
-      </div>
       {spark && spark.length >= 2 && (
-        <div className="mt-3.5">
+        <div className="mt-4 border-t border-srapi-border/70 pt-3">
           <Sparkline values={spark} ariaLabel={label} className="h-8" />
         </div>
-      )}
-      {hint && (
-        <div className="mt-2.5 font-mono text-2xs text-srapi-text-tertiary">{hint}</div>
       )}
     </Card>
   );

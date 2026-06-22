@@ -28,10 +28,17 @@ export default function LandingPage() {
       <AmbientCanvas />
 
       {/* top bar — chrome stays static so the toggles are instantly usable */}
-      <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
-        <div className="flex items-baseline gap-2">
-          <span className="font-serif text-2xl leading-none text-srapi-text-primary">{siteName}</span>
-          <span className="font-mono text-2xs text-srapi-text-tertiary">{versionLabel}</span>
+      <header className="relative z-10 mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
+        <div className="flex items-center gap-3">
+          <div className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-srapi-primary to-srapi-primary-hover text-sm font-semibold text-white shadow-[0_4px_12px_-4px_rgba(194,85,59,0.45)]">
+            {siteName.charAt(0)}
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-lg font-semibold tracking-tight text-srapi-text-primary">
+              {siteName}
+            </span>
+            <span className="text-[11px] font-medium text-srapi-text-tertiary">{versionLabel}</span>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <LanguageToggle />
@@ -39,43 +46,46 @@ export default function LandingPage() {
         </div>
       </header>
 
-      {/* centered split: editorial narrative + sign-in card */}
-      <main className="mx-auto flex w-full max-w-6xl flex-1 items-center px-6 py-10">
-        <div className="grid w-full items-center gap-x-20 gap-y-14 lg:grid-cols-2">
-          {/* left — identity only, no operational data */}
-          <div className="max-w-lg">
+      {/* centered split: modern hero + sign-in card */}
+      <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 items-center px-6 py-10">
+        <div className="grid w-full items-center gap-x-16 gap-y-14 lg:grid-cols-[1.05fr_1fr]">
+          {/* left — identity + value props */}
+          <div className="max-w-xl">
             <div
-              className="anim-rise mb-8 flex items-center gap-3 font-mono text-2xs uppercase tracking-[0.18em] text-srapi-text-tertiary"
+              className="anim-rise mb-5 inline-flex items-center gap-2 rounded-full bg-srapi-accent-soft px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-primary"
               style={rise(0)}
             >
-              <span className="anim-rule h-px w-8 origin-left bg-srapi-primary" style={rise(0)} />
+              <span className="size-1.5 rounded-full bg-srapi-primary" />
               {t("login.eyebrow")}
             </div>
             <h1
-              className="anim-rise font-serif text-hero font-medium text-balance text-srapi-text-primary [word-break:keep-all]"
+              className="anim-rise text-balance text-4xl font-semibold leading-[1.08] tracking-tight text-srapi-text-primary sm:text-5xl lg:text-[3.5rem]"
               style={rise(1)}
             >
               {t("login.headlineA")}
               <br />
-              <span className="italic text-srapi-primary">{t("login.headlineB")}</span>
+              <span className="text-srapi-primary">{t("login.headlineB")}</span>
             </h1>
             <p
-              className="anim-rise mt-8 max-w-md text-md leading-relaxed text-srapi-text-secondary"
+              className="anim-rise mt-6 max-w-lg text-base leading-relaxed text-srapi-text-secondary"
               style={rise(2)}
             >
               {siteSubtitle}
             </p>
-            <p
-              className="anim-rise mt-10 border-t border-srapi-border pt-5 font-mono text-2xs leading-relaxed text-srapi-text-tertiary"
+            <div
+              className="anim-rise mt-8 flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px] font-medium text-srapi-text-tertiary"
               style={rise(3)}
             >
-              {t("login.providersLine")}
-            </p>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="size-1.5 rounded-full bg-srapi-success" />
+                {t("login.providersLine")}
+              </span>
+            </div>
           </div>
 
-          {/* right — the one job of this page */}
+          {/* right — the one job of this page, wrapped in a strong soft card */}
           <div className="anim-rise w-full lg:justify-self-end" style={rise(2)}>
-            <div className="mx-auto w-full max-w-sm">
+            <div className="card-raised mx-auto w-full max-w-md rounded-2xl border border-srapi-border bg-srapi-card p-7 sm:p-8">
               <LoginForm />
             </div>
           </div>
@@ -83,12 +93,15 @@ export default function LandingPage() {
       </main>
 
       {/* footer */}
-      <footer className="anim-rise mx-auto w-full max-w-6xl px-6 py-7" style={rise(4)}>
-        <div className="flex items-center justify-between border-t border-srapi-border pt-6 font-mono text-2xs text-srapi-text-tertiary">
+      <footer className="relative z-10 mx-auto w-full max-w-6xl px-6 py-7" style={rise(4)}>
+        <div className="flex items-center justify-between border-t border-srapi-border pt-6 text-[12px] text-srapi-text-tertiary">
           <span>© 2026 {siteName}</span>
           <span className="flex items-center gap-3">
             {site?.doc_url ? (
-              <a href={site.doc_url} className="underline-offset-4 hover:text-srapi-text-secondary hover:underline">
+              <a
+                href={site.doc_url}
+                className="font-medium underline-offset-4 hover:text-srapi-primary hover:underline"
+              >
                 {t("login.docsLink")}
               </a>
             ) : null}
