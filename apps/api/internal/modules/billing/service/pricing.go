@@ -256,7 +256,9 @@ func (s *Service) PriceGatewayCost(req contract.GatewayCostRequest) contract.Gat
 func priceGatewayCost(req contract.GatewayCostRequest) contract.GatewayPricingResult {
 	actualCost := applyRateMultiplier(req.Amount, req.RateMultiplier)
 	billableCost := actualCost
-	if req.Success && strings.EqualFold(strings.TrimSpace(req.AllowanceMode), "allowance") {
+	if !req.Success {
+		billableCost = "0.00000000"
+	} else if strings.EqualFold(strings.TrimSpace(req.AllowanceMode), "allowance") {
 		billableCost = BillableOverageForWindows(actualCost, []AllowanceWindow{
 			{UsedCost: req.DailyUsedCost, Quota: req.DailyAllowanceQuota},
 			{UsedCost: req.WeeklyUsedCost, Quota: req.WeeklyAllowanceQuota},
@@ -465,7 +467,7 @@ func pricingFamilyMatches(requestFamily string, ruleFamily string) bool {
 	if requestFamily == "" || ruleFamily == "" {
 		return false
 	}
-	return requestFamily == ruleFamily || strings.Contains(requestFamily, ruleFamily) || strings.Contains(ruleFamily, requestFamily)
+	return requestFamily == ruleFamily
 }
 
 func normalizePricingFamily(value string) string {

@@ -250,7 +250,7 @@ func pricingRuleMatchesQuery(rule contract.PricingRule, query contract.PricingRu
 
 func pricingFamilyMatches(requestFamily string, ruleFamily string) bool {
 	ruleFamily = strings.ToLower(strings.TrimSpace(ruleFamily))
-	return requestFamily != "" && ruleFamily != "" && (requestFamily == ruleFamily || strings.Contains(requestFamily, ruleFamily) || strings.Contains(ruleFamily, requestFamily))
+	return requestFamily != "" && ruleFamily != "" && requestFamily == ruleFamily
 }
 
 func cloneEntry(value contract.LedgerEntry) contract.LedgerEntry {
