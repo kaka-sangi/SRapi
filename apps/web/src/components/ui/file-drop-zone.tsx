@@ -79,14 +79,14 @@ export function FileDropZone({
         onDragLeave={onDragLeave}
         onDrop={onDrop}
         className={cn(
-          "flex cursor-pointer flex-col items-center gap-2 rounded-2xl border-2 border-dashed p-8 text-center transition-colors",
+          "flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed p-8 text-center transition-colors",
           dragging
             ? "border-srapi-primary bg-srapi-accent-soft"
             : "border-srapi-border bg-srapi-card-muted/30 hover:border-srapi-border-strong hover:bg-srapi-card-muted/50",
           disabled && "pointer-events-none opacity-50",
         )}
       >
-        <span className="grid size-9 place-items-center rounded-xl bg-srapi-accent-soft text-srapi-primary [&>svg]:size-4">
+        <span className="grid size-9 place-items-center rounded-xl bg-srapi-card-muted text-srapi-text-secondary [&>svg]:size-4">
           <Upload />
         </span>
         {hint ? (

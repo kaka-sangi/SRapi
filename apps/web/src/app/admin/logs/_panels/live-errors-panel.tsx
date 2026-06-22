@@ -181,7 +181,7 @@ export function LiveErrorsPanel() {
         description={t("adminLiveErrors.subtitle")}
       />
 
-      <div className="space-y-2 rounded-2xl border border-srapi-border bg-srapi-card p-3">
+      <div className="space-y-2 rounded-xl border border-srapi-border bg-srapi-card p-3">
         {/* Severity chip strip — narrows the live tail to «5xx critical»,
             «4xx error», or «other» with a single click. Sits above the
             general filters because severity is the dominant pivot. */}
@@ -274,7 +274,7 @@ export function LiveErrorsPanel() {
           description={t("adminLiveErrors.emptyBody")}
         />
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-srapi-border bg-srapi-card">
+        <div className="overflow-x-auto rounded-xl border border-srapi-border bg-srapi-card">
           <table className="w-full table-fixed text-left text-sm">
             <thead className="border-b border-srapi-border bg-srapi-card-muted">
               <tr>

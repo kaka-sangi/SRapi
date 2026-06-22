@@ -13,7 +13,7 @@ const badgeVariants = cva(
         success: "bg-srapi-success/12 text-srapi-success",
         warning: "bg-srapi-warning/12 text-srapi-warning",
         danger: "bg-srapi-error/12 text-srapi-error",
-        info: "bg-srapi-accent-soft text-srapi-primary",
+        info: "bg-srapi-card-muted text-srapi-text-secondary",
       },
     },
     defaultVariants: { variant: "neutral" },

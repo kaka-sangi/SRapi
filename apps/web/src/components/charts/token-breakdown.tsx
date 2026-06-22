@@ -99,7 +99,7 @@ export function TokenBreakdown({
                   <span
                     className={cn(
                       s.bar,
-                      "h-3 cursor-pointer transition-[width,filter] duration-500 ease-[var(--ease-out-quint)] hover:brightness-110",
+                      "h-3 cursor-pointer transition-[width,filter] duration-500 ease-out hover:brightness-110",
                     )}
                     style={{
                       width: targetWidth,

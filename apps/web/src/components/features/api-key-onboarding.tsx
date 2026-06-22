@@ -159,7 +159,7 @@ export function ApiKeyOnboarding({
         {steps.map((step, i) => (
           <div
             key={step.title}
-            className="relative overflow-hidden rounded-2xl border border-srapi-border bg-srapi-card-muted/40 p-3"
+            className="relative overflow-hidden rounded-xl border border-srapi-border bg-srapi-card-muted/40 p-3"
           >
             <div className="absolute right-2 top-2">
               <DataPill tone="accent" size="sm">

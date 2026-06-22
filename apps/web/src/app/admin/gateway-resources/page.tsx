@@ -518,7 +518,7 @@ function ResourceKpi({
   // 3-tier hierarchy without needing two separate values from the caller.
   const split = value.match(/^([^/]+)(\/.+)$/);
   return (
-    <Card className="p-5 card-spotlight">
+    <Card className="p-5">
       <div className="flex items-center justify-between gap-3">
         <span className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{label}</span>
         <IconBubble size="sm" tone="accent">
@@ -1096,7 +1096,7 @@ function GatewayEndpointSummaryItem({ row }: { row: GatewayEndpointResourceSumma
   const decisionsHref = adminSchedulerDecisionsHref({ source_endpoint: row.source_endpoint });
   return (
     <Card
-      className="card-interactive p-4"
+      className="p-4"
       title={endpointSummaryTitle(row, t)}
     >
       <div className="grid gap-3">

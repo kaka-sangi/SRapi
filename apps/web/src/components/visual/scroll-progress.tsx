@@ -47,7 +47,7 @@ export function ScrollProgress() {
       className="pointer-events-none fixed inset-x-0 top-0 z-30 h-0.5 bg-transparent"
     >
       <div
-        className="h-full origin-left bg-gradient-to-r from-srapi-primary via-srapi-primary to-srapi-warning shadow-[0_0_6px_color-mix(in_oklab,var(--color-srapi-primary)_60%,transparent)] transition-[transform] duration-150 ease-[var(--ease-out-quint)]"
+        className="h-full origin-left bg-gradient-to-r from-srapi-primary via-srapi-primary to-srapi-warning shadow-[0_0_6px_color-mix(in_oklab,var(--color-srapi-primary)_60%,transparent)] transition-[transform] duration-150 ease-out"
         style={{ transform: `scaleX(${pct / 100})` }}
       />
     </div>

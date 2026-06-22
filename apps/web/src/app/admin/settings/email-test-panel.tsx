@@ -32,7 +32,7 @@ export function EmailTestPanel() {
   }
 
   return (
-    <div className="rounded-2xl border border-srapi-border/70 bg-srapi-card-muted/60 p-4">
+    <div className="rounded-xl border border-srapi-border/70 bg-srapi-card-muted/60 p-4">
       <div className="flex items-center gap-2.5">
         <IconBubble size="sm">
           <Mail />

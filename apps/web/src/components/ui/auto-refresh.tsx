@@ -105,7 +105,7 @@ export function AutoRefreshControl({
             className={cn(
               "relative flex h-8 items-center gap-1.5 overflow-hidden rounded-xl border px-2.5 text-[11px] font-medium transition-colors",
               intervalSec
-                ? "border-transparent bg-srapi-accent-soft text-srapi-primary"
+                ? "border-transparent bg-srapi-card-muted text-srapi-text-secondary"
                 : "border-srapi-border bg-srapi-card text-srapi-text-tertiary hover:text-srapi-text-secondary",
             )}
           >

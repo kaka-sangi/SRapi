@@ -122,7 +122,7 @@ export function UserBalanceHistoryDialog({
         </DialogHeader>
 
         {/* Pinned user header — SectionHero-style summary inside the dialog */}
-        <div className="relative overflow-hidden rounded-2xl border border-srapi-border bg-srapi-card p-5">
+        <div className="relative overflow-hidden rounded-xl border border-srapi-border bg-srapi-card p-5">
           <div className="dot-grid-overlay pointer-events-none absolute right-0 top-0 h-24 w-32 opacity-50" aria-hidden />
           <div className="relative flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -311,7 +311,7 @@ function BalanceHistoryRow({ entry }: { entry: BillingLedgerEntry }) {
 
   return (
     <div
-      className="log-row flex items-start justify-between gap-3 rounded-2xl border border-srapi-border/70 bg-srapi-card p-3 transition-colors hover:bg-srapi-card-muted/50"
+      className="log-row flex items-start justify-between gap-3 rounded-xl border border-srapi-border/70 bg-srapi-card p-3 transition-colors hover:bg-srapi-card-muted/50"
       data-sev={severityStripe}
     >
       <div className="min-w-0">

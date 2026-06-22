@@ -252,7 +252,7 @@ function CustomMenusEditor({
       </div>
       <p className="text-xs text-srapi-text-tertiary">{t("adminSettings.customMenusHint")}</p>
       {value.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-srapi-border/70 bg-srapi-card-muted/40 px-3 py-4 text-sm text-srapi-text-tertiary">
+        <div className="rounded-xl border border-dashed border-srapi-border/70 bg-srapi-card-muted/40 px-3 py-4 text-sm text-srapi-text-tertiary">
           {t("adminSettings.customMenusEmpty")}
         </div>
       ) : (
@@ -415,7 +415,7 @@ function OAuthProviderConfigsEditor({
         {t("adminSettings.oauthProviderConfigsHint")}
       </p>
       {value.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-srapi-border/70 bg-srapi-card-muted/40 px-3 py-4 text-sm text-srapi-text-tertiary">
+        <div className="rounded-xl border border-dashed border-srapi-border/70 bg-srapi-card-muted/40 px-3 py-4 text-sm text-srapi-text-tertiary">
           {t("adminSettings.oauthProviderConfigsEmpty")}
         </div>
       ) : (

@@ -266,7 +266,7 @@ function TrendHoverPopover({
     <div
       role="tooltip"
       aria-hidden
-      className="srapi-anim-pop pointer-events-none absolute z-30 max-w-[14rem] rounded-2xl border border-srapi-border bg-srapi-card p-3 text-xs text-srapi-text-primary shadow-[0_18px_40px_-18px_rgba(26,24,20,0.28),0_8px_24px_-10px_rgba(26,24,20,0.14)]"
+      className="srapi-anim-pop pointer-events-none absolute z-30 max-w-[14rem] rounded-xl border border-srapi-border bg-srapi-card p-3 text-xs text-srapi-text-primary shadow-md"
       style={style}
     >
       {label ? (

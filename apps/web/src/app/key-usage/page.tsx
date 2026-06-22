@@ -155,7 +155,7 @@ function UsageReport({ report }: { report: GatewayUsageResponse }) {
   const { t } = useLanguage();
   const currency = report.usage.currency || report.unit;
   return (
-    <div className="anim-rise mt-6 space-y-4" style={{ "--stagger-index": 0 } as React.CSSProperties}>
+    <div className="mt-6 space-y-4" style={{ "--stagger-index": 0 } as React.CSSProperties}>
       <div className="flex flex-wrap items-center gap-2.5">
         <KeyRound className="size-4 text-srapi-text-tertiary" aria-hidden />
         <span className="font-medium text-srapi-text-primary">{report.api_key_name}</span>

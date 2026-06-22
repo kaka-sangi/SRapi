@@ -17,9 +17,9 @@ export const SheetClose = DialogPrimitive.Close;
 type Side = "left" | "right" | "bottom";
 
 const SIDE_CLASSES: Record<Side, string> = {
-  left: "inset-y-0 left-0 h-full w-80 max-w-[85vw] overflow-y-auto border-r md:rounded-r-2xl srapi-anim-sheet-left",
-  right: "inset-y-0 right-0 h-full w-80 max-w-[85vw] overflow-y-auto border-l md:rounded-l-2xl srapi-anim-sheet-right",
-  bottom: "inset-x-0 bottom-0 max-h-[85dvh] w-full overflow-y-auto rounded-t-2xl border-t srapi-anim-sheet-bottom",
+  left: "inset-y-0 left-0 h-full w-80 max-w-[85vw] overflow-y-auto border-r srapi-anim-sheet-left",
+  right: "inset-y-0 right-0 h-full w-80 max-w-[85vw] overflow-y-auto border-l srapi-anim-sheet-right",
+  bottom: "inset-x-0 bottom-0 max-h-[85dvh] w-full overflow-y-auto rounded-t-xl border-t srapi-anim-sheet-bottom",
 };
 
 export const SheetContent = React.forwardRef<
@@ -27,13 +27,11 @@ export const SheetContent = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { side?: Side }
 >(({ className, children, side = "left", ...props }, ref) => (
   <DialogPrimitive.Portal>
-    {/* Frosted aurora overlay — dark scrim with primary-tinted radial highlight
-        so dialogs feel «lit from behind», not just dim. */}
-    <DialogPrimitive.Overlay className="srapi-anim-fade fixed inset-0 z-50 bg-[radial-gradient(ellipse_at_top,_color-mix(in_oklab,_var(--color-srapi-primary)_18%,_transparent),_rgba(0,0,0,0.55)_60%)] backdrop-blur-[6px]" />
+    <DialogPrimitive.Overlay className="srapi-anim-fade fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "glass-frosted-strong fixed z-50 flex flex-col border-srapi-border shadow-[0_24px_64px_-24px_rgba(28,24,20,0.32),0_12px_32px_-10px_rgba(28,24,20,0.18)]",
+        "fixed z-50 flex flex-col border-srapi-border bg-srapi-card shadow-lg",
         SIDE_CLASSES[side],
         className,
       )}

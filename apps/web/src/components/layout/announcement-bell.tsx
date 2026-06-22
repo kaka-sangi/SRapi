@@ -92,7 +92,7 @@ export function AnnouncementBell() {
             </div>
           ) : items.length === 0 ? (
             <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
-              <span className="grid size-9 place-items-center rounded-xl bg-srapi-accent-soft text-srapi-primary">
+              <span className="grid size-9 place-items-center rounded-xl bg-srapi-card-muted text-srapi-text-secondary">
                 <Bell className="size-4" />
               </span>
               <p className="text-xs text-srapi-text-tertiary">

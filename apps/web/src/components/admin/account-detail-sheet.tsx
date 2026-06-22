@@ -621,7 +621,7 @@ export function AccountDetailSheet({
             {/* ── Tab: Overview ── identity + KPI strip + chips */}
             <TabsContent value="overview">
               {/* KPI strip — 3-tier hierarchy via .metric-* utilities. */}
-              <div className="grid grid-cols-3 gap-2 rounded-2xl border border-srapi-border bg-srapi-card-muted/60 p-3">
+              <div className="grid grid-cols-3 gap-2 rounded-xl border border-srapi-border bg-srapi-card-muted/60 p-3">
                 <DataTooltip
                   title={t("adminAccounts.usageRequests")}
                   primary={formatCompactNumber(todayRequests)}

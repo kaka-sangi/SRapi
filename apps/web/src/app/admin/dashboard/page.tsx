@@ -99,7 +99,7 @@ function DashboardContent() {
                   className={cn(
                     "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
                     range === p.key
-                      ? "bg-srapi-accent-soft text-srapi-primary shadow-[0_1px_2px_rgba(26,24,20,0.04)]"
+                      ? "bg-srapi-card-muted text-srapi-text-secondary shadow-[0_1px_2px_rgba(26,24,20,0.04)]"
                       : "text-srapi-text-tertiary hover:text-srapi-text-secondary",
                   )}
                 >
@@ -121,8 +121,8 @@ function DashboardContent() {
         query={dashboard}
         skeleton={
           <div className="space-y-5">
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
-              {Array.from({ length: 6 }).map((_, i) => (
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-8">
+              {Array.from({ length: 8 }).map((_, i) => (
                 <StatCardSkeleton key={i} />
               ))}
             </div>
@@ -185,10 +185,10 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
           Six tiles fit a single row on xl+ displays so the operator can read the whole
           KPI band without scrolling. Stays 2-up on mobile and 3-up on lg for
           comfortable card sizing. */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-8">
         <div className="anim-rise-sm" style={rise(0)}>
           <StatCard
-            className="card-interactive h-full"
+            className="h-full"
             label={t("dashboard.traffic")}
             value={traffic.total_requests}
             format={formatCompactNumber}
@@ -203,7 +203,7 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
         </div>
         <div className="anim-rise-sm" style={rise(1)}>
           <StatCard
-            className="card-interactive h-full"
+            className="h-full"
             label={t("dashboard.totalTokens")}
             value={tokens.total_tokens}
             format={formatCompactNumber}
@@ -217,7 +217,7 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
         </div>
         <div className="anim-rise-sm" style={rise(2)}>
           <StatCard
-            className="card-interactive h-full"
+            className="h-full"
             label={t("dashboard.cost")}
             value={Number(c.actual_cost)}
             format={(n) => formatMoney(n, c.currency)}
@@ -229,7 +229,7 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
         </div>
         <div className="anim-rise-sm" style={rise(3)}>
           <StatCard
-            className="card-interactive h-full"
+            className="h-full"
             label={t("dashboard.throughput")}
             value={performance.current_rpm}
             format={formatInteger}
@@ -241,7 +241,7 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
         </div>
         <div className="anim-rise-sm" style={rise(4)}>
           <StatCard
-            className="card-interactive h-full"
+            className="h-full"
             label={t("dashboard.latency")}
             value={performance.average_latency_ms}
             format={formatInteger}
@@ -251,7 +251,7 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
         </div>
         <div className="anim-rise-sm" style={rise(5)}>
           <StatCard
-            className="card-interactive h-full"
+            className="h-full"
             label={t("dashboard.users")}
             value={users.active_users}
             format={formatInteger}
@@ -261,7 +261,16 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
             )} ${formatInteger(users.total_users)}`}
           />
         </div>
-        <RealtimeSlotsCard staggerIndex={6} />
+        <div style={rise(6)}>
+          <StatCard
+            className="h-full"
+            label={t("dashboard.errors")}
+            value={errorRate != null ? errorRate * 100 : 0}
+            format={(n) => `${n.toFixed(1)}%`}
+            hint={`${formatCompactNumber(traffic.error_requests)} ${t("dashboard.errors")} / ${formatCompactNumber(traffic.total_requests)} ${t("dashboard.requests")}`}
+          />
+        </div>
+        <RealtimeSlotsCard staggerIndex={7} />
       </div>
 
       {/* Account health overview */}
@@ -292,7 +301,7 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
       <Card className="anim-rise-sm" style={rise(9)}>
         <CardContent>
           <div className="flex items-center gap-2 text-sm font-semibold text-srapi-text-primary">
-            <span className="grid size-7 place-items-center rounded-lg bg-srapi-accent-soft text-srapi-primary">
+            <span className="grid size-7 place-items-center rounded-lg bg-srapi-card-muted text-srapi-text-secondary">
               <LineChart className="size-3.5" />
             </span>
             {t("dashboard.tokenTrend")}
@@ -315,7 +324,7 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
       </Card>
 
       {/* Distributions: by model + by user */}
-      <div className="anim-rise-sm grid gap-4 md:grid-cols-2" style={rise(10)}>
+      <div className="grid gap-4 md:grid-cols-2" style={rise(10)}>
         <Card>
           <CardHeader>
             <CardTitle>
@@ -371,7 +380,7 @@ function SnapshotSummary({
   const windowText = `${formatDateTime(window.start)} - ${formatDateTime(window.end)}`;
 
   return (
-    <SpotlightCard className="anim-rise-sm relative overflow-hidden" style={rise(0)}>
+    <SpotlightCard className="relative overflow-hidden" style={rise(0)}>
       {/* A whisper-thin terracotta seam runs along the top to anchor the
           snapshot band visually without adding chrome. */}
       <div
@@ -477,7 +486,7 @@ function AccountHealthOverview({ staggerIndex }: { staggerIndex: number }) {
       <CardContent>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="grid size-8 place-items-center rounded-xl bg-srapi-accent-soft text-srapi-primary">
+            <span className="grid size-8 place-items-center rounded-xl bg-srapi-card-muted text-srapi-text-secondary">
               <Server className="size-4" />
             </span>
             <span className="text-sm font-semibold text-srapi-text-primary">
@@ -566,7 +575,7 @@ function RealtimeSlotsCard({ staggerIndex }: { staggerIndex: number }) {
   return (
     <div className="anim-rise-sm" style={rise(staggerIndex)}>
       <StatCard
-        className="card-interactive h-full"
+        className="h-full"
         label="Realtime slots"
         value={counters.active_slots}
         format={formatInteger}

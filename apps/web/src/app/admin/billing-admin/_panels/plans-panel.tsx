@@ -400,7 +400,7 @@ function PlanPresetPicker({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl rounded-2xl border border-srapi-border bg-srapi-card p-6 shadow-xl"
+        className="w-full max-w-2xl rounded-xl border border-srapi-border bg-srapi-card p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="space-y-1">
@@ -418,7 +418,7 @@ function PlanPresetPicker({
               type="button"
               onClick={() => onSelect({ ...emptySubscriptionPlanForm(), ...p.form })}
               style={{ "--stagger-index": idx } as React.CSSProperties}
-              className="anim-rise-sm group flex flex-col gap-2 rounded-2xl border border-srapi-border bg-srapi-card p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-srapi-primary/40 hover:bg-srapi-accent-soft/30 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-srapi-primary/40"
+              className="group flex flex-col gap-2 rounded-xl border border-srapi-border bg-srapi-card p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-srapi-primary/40 hover:bg-srapi-accent-soft/30 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-srapi-primary/40"
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="text-base font-semibold tracking-tight text-srapi-text-primary">

@@ -53,7 +53,7 @@ export function SegmentedControl<T extends string>({
               "inline-flex items-center gap-1.5 rounded-lg transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-srapi-primary/40",
               sizeClasses[size],
               active
-                ? "bg-srapi-accent-soft text-srapi-primary shadow-[0_1px_2px_rgba(26,24,20,0.04)]"
+                ? "bg-srapi-card-muted text-srapi-text-secondary shadow-[0_1px_2px_rgba(26,24,20,0.04)]"
                 : "text-srapi-text-tertiary hover:text-srapi-text-secondary",
             )}
           >

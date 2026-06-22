@@ -432,7 +432,7 @@ function OpsOverviewContent() {
                 return (
                   <div
                     key={alert.id}
-                    className="flex flex-col gap-3 rounded-2xl border border-srapi-border bg-srapi-card-muted/40 p-4"
+                    className="flex flex-col gap-3 rounded-xl border border-srapi-border bg-srapi-card-muted/40 p-4"
                   >
                     <div className="flex items-start gap-3">
                       <IconBubble tone={tone} size="md">

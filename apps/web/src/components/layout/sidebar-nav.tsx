@@ -96,21 +96,17 @@ export function SidebarNav({
                   aria-current={active ? "page" : undefined}
                   data-tour={tourTag}
                   className={cn(
-                    // Modern card-style nav with vertical aurora glow stripe on
-                    // active items — replaces the inset 2px terracotta bar with
-                    // a softer, gradient halo that matches the new visual
-                    // language.
-                    "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 transition-[background-color,color,transform] duration-150 ease-[var(--ease-out-quint)]",
+                    "group relative flex items-center gap-3 rounded-lg px-3 py-2 transition-colors duration-150",
                     active
-                      ? "nav-active-glow bg-srapi-accent-soft font-medium text-srapi-primary"
-                      : "text-srapi-text-secondary hover:bg-srapi-card/80 hover:text-srapi-text-primary",
+                      ? "bg-srapi-invert font-medium text-srapi-invert-fg"
+                      : "text-srapi-text-secondary hover:bg-srapi-card-muted hover:text-srapi-text-primary",
                   )}
                 >
                   <Icon
                     className={cn(
                       "size-[18px] shrink-0 transition-colors",
                       active
-                        ? "text-srapi-primary"
+                        ? "text-srapi-invert-fg"
                         : "text-srapi-text-tertiary group-hover:text-srapi-text-secondary",
                     )}
                     aria-hidden
@@ -136,7 +132,7 @@ export function SidebarNav({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={onNavigate}
-                  className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-srapi-text-secondary transition-colors hover:bg-srapi-card/80 hover:text-srapi-text-primary"
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-srapi-text-secondary transition-colors hover:bg-srapi-card-muted hover:text-srapi-text-primary"
                 >
                   <ExternalLink className="size-[18px] shrink-0 text-srapi-text-tertiary" aria-hidden />
                   <span className="truncate">{menu.label}</span>
@@ -146,7 +142,7 @@ export function SidebarNav({
                   key={`${menu.label}-${menu.url}`}
                   href={menu.url}
                   onClick={onNavigate}
-                  className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-srapi-text-secondary transition-colors hover:bg-srapi-card/80 hover:text-srapi-text-primary"
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-srapi-text-secondary transition-colors hover:bg-srapi-card-muted hover:text-srapi-text-primary"
                 >
                   <Link2 className="size-[18px] shrink-0 text-srapi-text-tertiary" aria-hidden />
                   <span className="truncate">{menu.label}</span>
@@ -164,7 +160,7 @@ export function SidebarBrand() {
   const { t } = useLanguage();
   return (
     <div className="group flex items-center gap-3 px-2 pb-1 pt-1">
-      <BrandMark size={38} className="magnetic-icon" />
+      <BrandMark size={38} />
       <div className="min-w-0 leading-tight">
         <div className="text-base font-semibold tracking-tight text-srapi-text-primary">
           {t("common.appName")}

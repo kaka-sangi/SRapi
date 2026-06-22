@@ -35,7 +35,7 @@ export function HeroNumeric({
   return (
     <span
       className={cn(
-        "text-aurora inline-flex items-baseline gap-2 text-5xl font-semibold leading-none tracking-tight tabular sm:text-6xl",
+        "inline-flex items-baseline gap-2 text-4xl font-semibold leading-none tracking-tight tabular text-srapi-text-primary sm:text-5xl",
         className,
       )}
     >

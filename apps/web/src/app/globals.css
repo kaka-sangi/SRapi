@@ -421,25 +421,17 @@ textarea:focus-visible,
 .row-expand > * { overflow: hidden; }
 .row-expand[data-open="true"] { grid-template-rows: 1fr; }
 
-/* Log row severity bar (functional) */
+/* Log row severity indicator — uses border-left instead of ::before
+   because position:relative on <tr> is unreliable in Chromium. */
 .log-row {
-  position: relative;
+  border-left: 2.5px solid var(--color-srapi-border-strong);
   transition: background-color 140ms ease;
 }
-.log-row::before {
-  content: "";
-  position: absolute;
-  inset-block: 6px;
-  inset-inline-start: 0;
-  width: 2.5px;
-  border-radius: 9999px;
-  background: var(--color-srapi-border-strong);
-}
-.log-row[data-sev="info"]::before     { background: var(--color-srapi-border-strong); }
-.log-row[data-sev="success"]::before  { background: var(--color-srapi-success); }
-.log-row[data-sev="warning"]::before  { background: var(--color-srapi-warning); }
-.log-row[data-sev="error"]::before    { background: var(--color-srapi-error); }
-.log-row[data-sev="critical"]::before { background: var(--color-srapi-error); }
+.log-row[data-sev="info"]     { border-left-color: var(--color-srapi-border-strong); }
+.log-row[data-sev="success"]  { border-left-color: var(--color-srapi-success); }
+.log-row[data-sev="warning"]  { border-left-color: var(--color-srapi-warning); }
+.log-row[data-sev="error"]    { border-left-color: var(--color-srapi-error); }
+.log-row[data-sev="critical"] { border-left-color: var(--color-srapi-error); }
 .log-row:hover { background-color: color-mix(in oklab, var(--color-srapi-card-muted) 50%, transparent); }
 
 /* ============================================================

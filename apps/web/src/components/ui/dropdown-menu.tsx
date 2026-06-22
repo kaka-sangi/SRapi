@@ -19,7 +19,7 @@ export const DropdownMenuContent = React.forwardRef<
       sideOffset={sideOffset}
       className={cn(
         // Modern soft popover surface: big radius, hairline border, gentle drop shadow.
-        "srapi-anim-pop z-50 min-w-[10rem] overflow-hidden rounded-2xl border border-srapi-border bg-srapi-card p-1.5 shadow-[0_12px_32px_-12px_rgba(28,24,20,0.18),0_4px_12px_-4px_rgba(28,24,20,0.08)]",
+        "srapi-anim-pop z-50 min-w-[10rem] overflow-hidden rounded-lg border border-srapi-border bg-srapi-card p-1 shadow-md",
         className,
       )}
       {...props}

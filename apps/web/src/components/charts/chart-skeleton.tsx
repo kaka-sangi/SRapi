@@ -208,13 +208,13 @@ export function ChatSkeleton({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "flex h-[70vh] flex-col rounded-2xl border border-srapi-border bg-srapi-card",
+        "flex h-[70vh] flex-col rounded-xl border border-srapi-border bg-srapi-card",
         className,
       )}
     >
       <div className="flex-1 space-y-5 p-6">
         <div className="flex justify-end">
-          <Skeleton className="h-10 w-48 rounded-2xl rounded-tr-sm" />
+          <Skeleton className="h-10 w-48 rounded-xl rounded-tr-sm" />
         </div>
         <div className="space-y-2">
           <Skeleton className="h-4 w-64" />
@@ -222,7 +222,7 @@ export function ChatSkeleton({ className }: { className?: string }) {
           <Skeleton className="h-4 w-40" />
         </div>
         <div className="flex justify-end">
-          <Skeleton className="h-10 w-36 rounded-2xl rounded-tr-sm" />
+          <Skeleton className="h-10 w-36 rounded-xl rounded-tr-sm" />
         </div>
         <div className="space-y-2">
           <Skeleton className="h-4 w-72" />

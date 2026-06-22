@@ -20,14 +20,14 @@ export const DiscoveryCard = React.forwardRef<HTMLDivElement, DiscoveryCardProps
       <Card
         ref={ref}
         className={cn(
-          "card-interactive group h-full",
+          "group h-full",
           tone === "accent" && "border-srapi-primary/30 bg-srapi-accent-soft/30",
           className,
         )}
       >
         <div className="flex flex-col gap-4 p-5">
           <div className="flex items-start justify-between gap-3">
-            <span className="grid size-11 place-items-center rounded-xl bg-srapi-accent-soft text-srapi-primary [&>svg]:size-5 transition-transform duration-200 group-hover:scale-105">
+            <span className="grid size-11 place-items-center rounded-xl bg-srapi-card-muted text-srapi-text-secondary [&>svg]:size-5 transition-transform duration-200 group-hover:scale-105">
               {icon}
             </span>
             {href ? (

@@ -141,7 +141,7 @@ function BalanceTab() {
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Card className="card-raised border-l-4 border-l-srapi-primary">
+      <Card className="border-l-4 border-l-srapi-primary">
         <CardContent>
           <span className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
             {t("billing.currentBalance")}

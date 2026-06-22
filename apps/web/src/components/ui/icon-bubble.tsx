@@ -18,7 +18,7 @@ const sizeClasses: Record<IconBubbleSize, string> = {
 };
 
 const toneClasses: Record<IconBubbleTone, string> = {
-  accent: "bg-srapi-accent-soft text-srapi-primary",
+  accent: "bg-srapi-card-muted text-srapi-text-secondary",
   neutral: "bg-srapi-card-muted text-srapi-text-secondary",
   success: "bg-srapi-success/12 text-srapi-success",
   warning: "bg-srapi-warning/12 text-srapi-warning",

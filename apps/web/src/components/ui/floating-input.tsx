@@ -67,7 +67,7 @@ export function FloatingInput({
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : hint ? hintId : undefined}
           className={cn(
-            "peer h-14 w-full rounded-2xl border bg-srapi-card px-4 pt-5 pb-1 text-base text-srapi-text-primary outline-none transition-colors",
+            "peer h-12 w-full rounded-lg border border-srapi-border bg-transparent px-3 pt-5 pb-1 text-base text-srapi-text-primary outline-none transition-colors",
             "placeholder:text-transparent",
             "focus:border-srapi-primary focus:ring-2 focus:ring-srapi-primary/15",
             "disabled:cursor-not-allowed disabled:opacity-50",

@@ -34,18 +34,7 @@ export function TopNav({
   const router = useRouter();
   const { t } = useLanguage();
   const { open: openCommand } = useCommandPalette();
-  // Reveal a soft aurora seam under the topnav border once the page has
-  // scrolled past the hero — small touch that turns the chrome from «static
-  // strip» into «responsive surface».
-  const [scrolled, setScrolled] = useState(false);
-  useEffect(() => {
-    function onScroll() {
-      setScrolled(window.scrollY > 8);
-    }
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  const scrolled = false;
 
   async function handleSignOut() {
     await apiService.logout();
@@ -55,7 +44,7 @@ export function TopNav({
   return (
     <header
       data-scrolled={scrolled ? "true" : "false"}
-      className="topnav-seam sticky top-0 z-20 flex items-center gap-3 border-b border-srapi-border bg-srapi-bg/85 px-4 py-3.5 backdrop-blur-md sm:px-7"
+      className="sticky top-0 z-20 flex items-center gap-3 border-b border-srapi-border bg-srapi-bg/95 px-4 py-3 backdrop-blur-sm sm:px-7"
     >
       <Button
         variant="outline"
@@ -71,7 +60,7 @@ export function TopNav({
         type="button"
         onClick={openCommand}
         data-tour="search-bar"
-        className="group flex h-10 w-full max-w-md items-center gap-2.5 rounded-xl border border-srapi-border bg-srapi-card/85 px-3.5 text-sm text-srapi-text-secondary transition-[border-color,color,background-color,box-shadow] duration-150 ease-[var(--ease-out-quint)] hover:border-srapi-border-strong hover:bg-srapi-card hover:text-srapi-text-primary focus-visible:border-srapi-border-strong"
+        className="group flex h-9 w-full max-w-md items-center gap-2.5 rounded-lg border border-srapi-border bg-srapi-card/85 px-3 text-sm text-srapi-text-secondary transition-colors duration-150 hover:border-srapi-border-strong hover:text-srapi-text-primary"
       >
         <Search className="size-4 text-srapi-text-tertiary transition-colors group-hover:text-srapi-text-secondary" />
         <span className="hidden truncate sm:inline">{t("common.search")}</span>

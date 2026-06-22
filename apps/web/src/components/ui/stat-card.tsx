@@ -128,12 +128,12 @@ export function StatCard({
               footer={tooltip.footer}
               side="left"
             >
-              <span className="grid size-9 shrink-0 cursor-help place-items-center rounded-xl bg-srapi-accent-soft text-srapi-primary transition-transform duration-200 group-hover:scale-105 [&>svg]:size-4">
+              <span className="grid size-9 shrink-0 cursor-help place-items-center rounded-lg bg-srapi-card-muted text-srapi-text-secondary [&>svg]:size-4">
                 {icon}
               </span>
             </DataTooltip>
           ) : (
-            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-srapi-accent-soft text-srapi-primary transition-transform duration-200 group-hover:scale-105 [&>svg]:size-4">
+            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-srapi-card-muted text-srapi-text-secondary [&>svg]:size-4">
               {icon}
             </span>
           )

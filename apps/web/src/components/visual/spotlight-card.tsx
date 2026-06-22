@@ -35,7 +35,7 @@ export const SpotlightCard = React.forwardRef<
     <Card
       ref={internalRef}
       onMouseMove={handleMove}
-      className={cn("card-spotlight overflow-hidden", className)}
+      className={cn("overflow-hidden", className)}
       {...props}
     >
       {children}

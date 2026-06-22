@@ -1,5 +1,4 @@
 import { cn } from "@/lib/cn";
-import { AuroraBackdrop } from "./aurora-backdrop";
 import { BrandMark } from "./brand-mark";
 
 /**
@@ -46,13 +45,11 @@ export function SectionHero({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-2xl border border-srapi-border bg-srapi-card",
+        "relative overflow-hidden rounded-xl border border-srapi-border bg-srapi-card",
         "px-6 py-7 sm:px-8 sm:py-8",
         className,
       )}
     >
-      <AuroraBackdrop tone="rail" intensity={0.85} />
-      <div className="dot-grid-overlay pointer-events-none absolute right-0 top-0 h-32 w-40 opacity-60" aria-hidden />
 
       <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex min-w-0 items-start gap-4">
@@ -79,7 +76,7 @@ export function SectionHero({
         {(metrics && metrics.length > 0) || actions ? (
           <div className="flex shrink-0 flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-5">
             {metrics && metrics.length > 0 ? (
-              <div className="flex items-center gap-5 rounded-2xl border border-srapi-border bg-srapi-card/80 px-4 py-3 backdrop-blur-sm">
+              <div className="flex items-center gap-5 rounded-xl border border-srapi-border bg-srapi-card/80 px-4 py-3 backdrop-blur-sm">
                 {metrics.map((m, i) => (
                   <div key={i} className="min-w-0">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-srapi-text-tertiary">

@@ -36,7 +36,7 @@ export default function ResetPasswordPage() {
         </div>
       </header>
       <main className="mx-auto flex w-full max-w-6xl flex-1 items-center justify-center px-6 py-10">
-        <div className="animate-bloom w-full max-w-sm">
+        <div className="w-full max-w-sm">
           <ResetForm />
           <p className="mt-4 text-center text-xs font-medium uppercase tracking-[0.12em] text-srapi-text-tertiary">
             {t("authReset.eyebrow")}
@@ -129,7 +129,7 @@ function ResetForm() {
         <Button
           variant={confirmed ? "primary" : "outline"}
           size="lg"
-          className="mt-7 h-11 w-full rounded-xl btn-raise"
+          className="mt-7 h-11 w-full rounded-xl"
           onClick={() => router.replace("/")}
         >
           {t("authReset.backToSignIn")}
@@ -177,7 +177,7 @@ function ResetForm() {
             type="submit"
             variant="primary"
             size="lg"
-            className="h-11 w-full rounded-xl btn-raise"
+            className="h-11 w-full rounded-xl"
             loading={submitting}
             disabled={submitting || password.length < 8}
           >
@@ -214,7 +214,7 @@ function ResetForm() {
           type="submit"
           variant="primary"
           size="lg"
-          className="h-11 w-full rounded-xl btn-raise"
+          className="h-11 w-full rounded-xl"
           loading={submitting}
           disabled={submitting || !emailLooksValid}
         >

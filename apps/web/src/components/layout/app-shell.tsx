@@ -48,8 +48,8 @@ function ShellInner({ children }: { children: React.ReactNode }) {
         <div className="mt-4 flex-1 overflow-y-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar:vertical]:hidden">
           <SidebarNav role={user.role} />
         </div>
-        <div className="mt-3 flex items-center gap-3 rounded-2xl border border-srapi-border bg-srapi-card/85 p-3 shadow-[0_1px_2px_rgba(26,24,20,0.04)]">
-          <div className="grid size-10 place-items-center rounded-xl bg-srapi-accent-soft text-base font-semibold text-srapi-primary">
+        <div className="mt-3 flex items-center gap-3 rounded-xl border border-srapi-border bg-srapi-card/85 p-3 ">
+          <div className="grid size-10 place-items-center rounded-lg bg-srapi-card-muted text-base font-semibold text-srapi-text-primary">
             {(user.name?.[0] ?? "U").toUpperCase()}
           </div>
           <div className="min-w-0 text-xs leading-tight">

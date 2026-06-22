@@ -198,7 +198,7 @@ function CommandPalette({
             event.preventDefault();
             inputRef.current?.focus();
           }}
-          className="srapi-anim-pop tactile-card fixed inset-x-0 top-[14vh] z-50 mx-auto w-[calc(100%-2rem)] max-w-xl overflow-hidden rounded-2xl border border-srapi-border bg-srapi-card"
+          className="srapi-anim-pop fixed inset-x-0 top-[14vh] z-50 mx-auto w-[calc(100%-2rem)] max-w-xl overflow-hidden rounded-lg border border-srapi-border bg-srapi-card shadow-lg"
         >
           <Dialog.Title className="sr-only">{t("common.search")}</Dialog.Title>
           <div className="flex items-center gap-3 border-b border-srapi-border px-4">

@@ -159,7 +159,7 @@ export function OpsNotificationChannelFormDialog({
 
         <form onSubmit={onSubmit} noValidate className="space-y-5">
           {/* Severity-aware preview */}
-          <div className="flex items-start gap-3 rounded-2xl border border-srapi-border bg-srapi-card-muted/60 p-4">
+          <div className="flex items-start gap-3 rounded-xl border border-srapi-border bg-srapi-card-muted/60 p-4">
             <IconBubble tone={tone} size="md">
               <Mail />
             </IconBubble>

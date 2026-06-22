@@ -143,7 +143,7 @@ export function ResultView({
 
         {/* Model names */}
         {result.model_names && result.model_names.length > 0 && (
-          <div className="rounded-2xl border border-srapi-border bg-srapi-card p-5">
+          <div className="rounded-xl border border-srapi-border bg-srapi-card p-5">
             <Label className="mb-3">{t("adminQuickSetup.resultModels")}</Label>
             <div className="flex flex-wrap gap-1.5">
               {result.model_names.map((m) => (

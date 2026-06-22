@@ -43,7 +43,7 @@ export function PlatformGrid({
         >
           <Card
             className={cn(
-              "card-interactive group h-full",
+              "group h-full",
               p.custom && "border-dashed border-srapi-primary/30 bg-srapi-accent-soft/20",
             )}
           >
@@ -53,7 +53,7 @@ export function PlatformGrid({
                   className={cn(
                     "grid size-11 shrink-0 place-items-center rounded-xl font-mono text-xs font-bold tracking-tight transition-transform duration-200 group-hover:scale-105",
                     p.custom
-                      ? "bg-srapi-accent-soft text-srapi-primary"
+                      ? "bg-srapi-card-muted text-srapi-text-secondary"
                       : PLATFORM_ICON_COLORS[p.key] ?? "bg-srapi-card-muted text-srapi-text-secondary",
                   )}
                 >

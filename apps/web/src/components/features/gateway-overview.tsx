@@ -155,10 +155,10 @@ export function GatewayOverview() {
         {/* Balance — hero card with mouse-following spotlight + aurora numerals. */}
         <Link
           href="/billing"
-          className="anim-rise-sm group block focus-visible:outline-none"
+          className="group block focus-visible:outline-none"
           style={rise(1)}
         >
-          <SpotlightCard className="card-interactive h-full">
+          <SpotlightCard className="h-full">
             <CardContent className="flex h-full items-center justify-between gap-4 p-6">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-srapi-text-tertiary">
@@ -176,7 +176,7 @@ export function GatewayOverview() {
                     }
                     footer={t("nav.billing") + " · " + t("dashboard.viewAll")}
                   >
-                    <span className="magnetic-icon grid size-9 place-items-center rounded-xl bg-srapi-accent-soft text-srapi-primary shadow-[0_4px_12px_-4px_rgba(194,85,59,0.35)] cursor-help">
+                    <span className="grid size-9 place-items-center rounded-lg bg-srapi-card-muted text-srapi-text-secondary cursor-help">
                       <Wallet className="size-4" />
                     </span>
                   </DataTooltip>
@@ -204,11 +204,11 @@ export function GatewayOverview() {
           </SpotlightCard>
         </Link>
 
-        <SpotlightCard className="anim-rise-sm h-full" style={rise(2)}>
+        <SpotlightCard className="h-full" style={rise(2)}>
           <CardContent className="flex h-full min-w-0 flex-col gap-3.5 p-6">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-srapi-text-tertiary">
-                <span className="grid size-8 place-items-center rounded-xl bg-srapi-accent-soft text-srapi-primary">
+                <span className="grid size-8 place-items-center rounded-lg bg-srapi-card-muted text-srapi-text-secondary">
                   <Gauge className="size-4" />
                 </span>
                 {t("dashboard.platformQuotas")}
@@ -283,10 +283,10 @@ export function GatewayOverview() {
 
       {/* Usage trend over the last window + model distribution by tokens. */}
       <div className="grid gap-4 lg:grid-cols-5 lg:gap-5">
-        <div className="anim-rise-sm lg:col-span-3" style={rise(1)}>
+        <div className="lg:col-span-3" style={rise(1)}>
           <UsageTrendCard query={trend} />
         </div>
-        <div className="anim-rise-sm lg:col-span-2" style={rise(2)}>
+        <div className="lg:col-span-2" style={rise(2)}>
           <ModelDistributionCard query={models} />
         </div>
       </div>
@@ -413,7 +413,7 @@ export function GatewayOverview() {
                 {rows.slice(0, 8).map((log, idx) => (
                   <div
                     key={log.request_id}
-                    className="anim-rise-sm flex items-center gap-3 px-6 py-3 transition-colors hover:bg-srapi-card-muted/50"
+                    className="flex items-center gap-3 px-6 py-3 transition-colors hover:bg-srapi-card-muted/50"
                     style={{ "--stagger-index": 6 + idx } as CSSProperties}
                   >
                     <div className="w-24 shrink-0 text-[12px] tabular text-srapi-text-tertiary">
@@ -525,7 +525,7 @@ function ThroughputKpis({
           />
         )}
       </div>
-      <div className="anim-rise-sm col-span-2 lg:col-span-1" style={rise(3)}>
+      <div className="col-span-2 lg:col-span-1" style={rise(3)}>
         {cacheLoading ? (
           <StatCardSkeleton className="h-full" />
         ) : (
@@ -589,7 +589,8 @@ function UsageTrendCard({ query }: { query: ReturnType<typeof useUserUsageTrend>
             ) : (
               <TrendChart
                 ariaLabel={t("dashboard.usageTrend")}
-                height={160}
+                height={140}
+                labels={points.map((p: UsageTrendPoint) => p.bucket ? new Date(p.bucket).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "")}
                 series={[
                   {
                     key: "requests",

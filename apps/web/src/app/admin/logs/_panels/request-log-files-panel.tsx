@@ -144,7 +144,7 @@ export function RequestLogFilesPanel() {
         description={t("adminRequestLogFiles.subtitle")}
       />
 
-      <div className="space-y-2 rounded-2xl border border-srapi-border bg-srapi-card p-3">
+      <div className="space-y-2 rounded-xl border border-srapi-border bg-srapi-card p-3">
         {/* Severity chip strip — picks between "all", "error only" or
             "successful" without a checkbox. The legacy errorOnly checkbox is
             still honored server-side; this strip narrows the visible feed. */}
@@ -199,7 +199,7 @@ export function RequestLogFilesPanel() {
           description={t("adminRequestLogFiles.emptyBody")}
         />
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-srapi-border bg-srapi-card">
+        <div className="overflow-x-auto rounded-xl border border-srapi-border bg-srapi-card">
           <table className="w-full table-fixed text-left text-sm">
             <thead className="border-b border-srapi-border bg-srapi-card-muted">
               <tr>

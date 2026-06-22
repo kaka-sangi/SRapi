@@ -1009,7 +1009,7 @@ function SourceChip({
     tone === "error"
       ? "bg-srapi-error/12 text-srapi-error"
       : tone === "info"
-        ? "bg-srapi-accent-soft text-srapi-primary"
+        ? "bg-srapi-card-muted text-srapi-text-secondary"
         : "bg-srapi-card-muted text-srapi-text-secondary";
   return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${className}`}>{label}</span>;
 }

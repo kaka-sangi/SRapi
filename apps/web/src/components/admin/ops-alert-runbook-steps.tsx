@@ -82,7 +82,7 @@ export function OpsAlertRunbookSteps({
                 onClick={() => toggle(step)}
                 aria-pressed={isDone}
                 className={cn(
-                  "card-spotlight group flex w-full items-start gap-2.5 rounded-xl border border-srapi-border bg-srapi-card px-3 py-2 text-left transition-colors hover:border-srapi-border-strong",
+                  "group flex w-full items-start gap-2.5 rounded-xl border border-srapi-border bg-srapi-card px-3 py-2 text-left transition-colors hover:border-srapi-border-strong",
                   isDone && "border-srapi-success/30 bg-srapi-success/5",
                 )}
               >

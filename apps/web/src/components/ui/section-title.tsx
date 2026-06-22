@@ -16,7 +16,7 @@ export const SectionTitle = React.forwardRef<HTMLDivElement, SectionTitleProps>(
     >
       <div className="flex items-center gap-2.5">
         {icon ? (
-          <span className="grid size-8 place-items-center rounded-xl bg-srapi-accent-soft text-srapi-primary [&>svg]:size-4">
+          <span className="grid size-8 place-items-center rounded-xl bg-srapi-card-muted text-srapi-text-secondary [&>svg]:size-4">
             {icon}
           </span>
         ) : null}

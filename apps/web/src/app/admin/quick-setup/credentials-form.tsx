@@ -199,7 +199,7 @@ export function CredentialsForm({
                     className={cn(
                       "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-srapi-primary/40",
                       a === authType
-                        ? "bg-srapi-accent-soft text-srapi-primary shadow-[0_1px_2px_rgba(26,24,20,0.04)]"
+                        ? "bg-srapi-card-muted text-srapi-text-secondary shadow-[0_1px_2px_rgba(26,24,20,0.04)]"
                         : "text-srapi-text-tertiary hover:text-srapi-text-secondary",
                     )}
                   >
@@ -404,7 +404,7 @@ export function CredentialsForm({
                       className={cn(
                         "rounded-full px-3 py-1 font-mono text-xs font-medium transition-colors",
                         selected
-                          ? "bg-srapi-accent-soft text-srapi-primary"
+                          ? "bg-srapi-card-muted text-srapi-text-secondary"
                           : "bg-srapi-card-muted text-srapi-text-tertiary hover:text-srapi-text-secondary",
                       )}
                     >
@@ -421,7 +421,7 @@ export function CredentialsForm({
             </div>
           )}
           {platform.custom && (
-            <div className="rounded-2xl border border-srapi-border bg-srapi-card p-5">
+            <div className="rounded-xl border border-srapi-border bg-srapi-card p-5">
               <Label className="mb-2 block">{t("adminQuickSetup.modelCatalog")}</Label>
               <p className="mb-3 text-xs text-srapi-text-tertiary">
                 {t("adminQuickSetup.modelCatalogHint")}

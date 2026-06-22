@@ -62,7 +62,7 @@ export interface ListPagination {
  * and center their content, so a fresh or sparse list reads as intentional
  * rather than a short card stranded at the top of an otherwise empty page.
  */
-const EMPTY_FILL = "min-h-[55vh] justify-center";
+const EMPTY_FILL = "justify-center";
 
 /**
  * Generic admin resource table. Define columns once per resource; this handles
@@ -146,7 +146,7 @@ export function AdminListView<T>({
     : columns;
 
   return (
-    <Card className="anim-rise-sm overflow-hidden">
+    <Card className="overflow-hidden">
       {toolbar}
       {selection && selection.selected.size > 0 ? (
         <BulkBar
@@ -366,7 +366,7 @@ function ListTable<T>({
                       : undefined
                   }
                   className={cn(
-                    "anim-rise-sm transition-colors",
+                    "transition-colors",
                     sev ? "log-row" : "hover:bg-srapi-card-muted/60",
                     dimRow?.(row) && "opacity-50",
                     isSelected && "bg-srapi-accent-soft",
@@ -464,7 +464,7 @@ function BulkBar({
 }) {
   const { t } = useLanguage();
   return (
-    <div className="anim-rise-sm flex flex-wrap items-center gap-3 border-b border-srapi-border bg-srapi-accent-soft px-4 py-2.5">
+    <div className="flex flex-wrap items-center gap-3 border-b border-srapi-border bg-srapi-accent-soft px-4 py-2.5">
       <span className="text-xs font-medium text-srapi-primary">
         {t("adminCommon.selectedCount", { count })}
       </span>
@@ -498,7 +498,7 @@ function ListSkeleton() {
     ["w-40", "w-24", "w-24", "w-16", "w-8"],
   ];
   return (
-    <div className="min-h-[55vh] p-0">
+    <div className="p-0">
       {/* header row — slightly smaller heights, matches TableHead */}
       <div className="flex items-center gap-4 border-b border-srapi-border px-4 py-3">
         <Skeleton className="h-3 w-28" />
@@ -511,7 +511,7 @@ function ListSkeleton() {
       {ROW_WIDTHS.map(([a, b, c, d, e], i) => (
         <div
           key={i}
-          className="anim-rise-sm flex items-center gap-4 border-b border-srapi-border/50 px-4 py-3.5"
+          className="flex items-center gap-4 border-b border-srapi-border/50 px-4 py-3.5"
           style={{ "--stagger-index": i } as React.CSSProperties}
         >
           <Skeleton className={`h-4 ${a}`} />

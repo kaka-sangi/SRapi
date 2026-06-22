@@ -822,45 +822,46 @@ function UsageCharts() {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <UsageTrendChart
-        series={trends.data?.series ?? []}
-        loading={trends.isLoading}
-        metric={metric}
-        onMetricChange={setMetric}
-        title={tWithFallback("adminUsage.trendTitle", "Usage trend")}
-        metricTokensLabel={t("usage.tokens")}
-        metricCostLabel={t("adminUsage.cost")}
-        emptyLabel={tWithFallback("adminUsage.trendEmpty", "No usage in window")}
-        controls={
-          <>
-            <SegmentedControl
-              size="sm"
-              value={dimension}
-              onChange={(v) => setDimension(v as TrendDimension)}
-              options={TREND_DIMENSIONS.map((dim) => ({
-                value: dim,
-                label: t(TREND_DIMENSION_LABEL_KEY[dim]),
-              }))}
-            />
-            <SegmentedControl
-              size="sm"
-              value={bucket}
-              onChange={(v) => setBucket(v as TrendBucket)}
-              options={TREND_BUCKETS.map((b) => ({
-                value: b,
-                label: tWithFallback(`adminUsage.bucket.${b}`, b === "day" ? "Day" : "Hour"),
-              }))}
-            />
-          </>
-        }
-      />
+          series={trends.data?.series ?? []}
+          loading={trends.isLoading}
+          metric={metric}
+          onMetricChange={setMetric}
+          title={tWithFallback("adminUsage.trendTitle", "Usage trend")}
+          metricTokensLabel={t("usage.tokens")}
+          metricCostLabel={t("adminUsage.cost")}
+          emptyLabel={tWithFallback("adminUsage.trendEmpty", "No usage in window")}
+          controls={
+            <>
+              <SegmentedControl
+                size="sm"
+                value={dimension}
+                onChange={(v) => setDimension(v as TrendDimension)}
+                options={TREND_DIMENSIONS.map((dim) => ({
+                  value: dim,
+                  label: t(TREND_DIMENSION_LABEL_KEY[dim]),
+                }))}
+              />
+              <SegmentedControl
+                size="sm"
+                value={bucket}
+                onChange={(v) => setBucket(v as TrendBucket)}
+                options={TREND_BUCKETS.map((b) => ({
+                  value: b,
+                  label: tWithFallback(`adminUsage.bucket.${b}`, b === "day" ? "Day" : "Hour"),
+                }))}
+              />
+            </>
+          }
+        />
       <UsageErrorDistributionChart
-        items={errorDistribution.data ?? []}
-        loading={errorDistribution.isLoading}
-        title={tWithFallback("adminUsage.errorDistributionTitle", "Error distribution")}
-        emptyLabel={tWithFallback("adminUsage.errorDistributionEmpty", "No errors in window")}
-        totalLabel={tWithFallback("adminUsage.errorsTotal", "errors")}
-        otherLabel={tWithFallback("adminUsage.errorsOther", "Other")}
-      />
+          items={errorDistribution.data ?? []}
+          loading={errorDistribution.isLoading}
+          title={tWithFallback("adminUsage.errorDistributionTitle", "Error distribution")}
+          emptyLabel={tWithFallback("adminUsage.errorDistributionEmpty", "No errors in window")}
+          totalLabel={tWithFallback("adminUsage.errorsTotal", "errors")}
+          otherLabel={tWithFallback("adminUsage.errorsOther", "Other")}
+        />
+      <div className="lg:col-span-2">
       <UsageDistributionChart
         buckets={distribution.data?.buckets ?? []}
         metric={distMetric}
@@ -901,6 +902,7 @@ function UsageCharts() {
           </>
         }
       />
+      </div>
     </div>
   );
 }
@@ -962,7 +964,7 @@ function UsageBreakdown() {
                   {top.slice(0, 4).map((row) => (
                     <div
                       key={row.aggregate_id}
-                      className="rounded-2xl border border-srapi-border/70 bg-srapi-card-muted/40 p-4"
+                      className="rounded-xl border border-srapi-border/70 bg-srapi-card-muted/40 p-4"
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="truncate text-sm font-medium text-srapi-text-primary">{row.aggregate_id}</span>

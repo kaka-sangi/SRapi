@@ -199,7 +199,7 @@ export function CopilotChat({ models, defaultModel }: { models: string[]; defaul
               ) : null}
               {pending ? <PendingActionBanner action={pending} onResolve={resolvePending} disabled={running} /> : null}
               {error ? (
-                <div className="ml-12 flex items-start gap-2 rounded-2xl border border-srapi-error/30 bg-srapi-error/5 px-4 py-3 text-sm text-srapi-error">
+                <div className="ml-12 flex items-start gap-2 rounded-xl border border-srapi-error/30 bg-srapi-error/5 px-4 py-3 text-sm text-srapi-error">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0" />
                   <span className="flex-1">{error}</span>
                   <button
@@ -317,7 +317,7 @@ function ConversationSidebar() {
   const items = list.data ?? [];
 
   return (
-    <div className="hidden w-64 shrink-0 flex-col rounded-2xl border border-srapi-border bg-srapi-card-muted/40 md:flex">
+    <div className="hidden w-64 shrink-0 flex-col rounded-xl border border-srapi-border bg-srapi-card-muted/40 md:flex">
       <div className="p-3">
         <Button variant="outline" size="sm" className="w-full justify-start gap-2" onClick={newConversation}>
           <Plus className="size-4" />
@@ -353,7 +353,7 @@ function ConversationSidebar() {
                     onClick={() => void loadConversation(item.id)}
                     className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm transition-colors ${
                       activeId === item.id
-                        ? "bg-srapi-accent-soft text-srapi-primary font-medium"
+                        ? "bg-srapi-card-muted text-srapi-text-secondary font-medium"
                         : "text-srapi-text-secondary hover:bg-srapi-card-muted/70"
                     }`}
                   >
@@ -478,7 +478,7 @@ function MessageRow({
             </div>
           ) : null}
           {message.content ? (
-            <div className="rounded-2xl bg-srapi-accent-soft px-4 py-3 text-sm leading-relaxed text-srapi-text-primary">
+            <div className="rounded-xl bg-srapi-accent-soft px-4 py-3 text-sm leading-relaxed text-srapi-text-primary">
               {message.content}
             </div>
           ) : null}
@@ -498,7 +498,7 @@ function MessageRow({
       <div className="min-w-0 flex-1 space-y-2">
         {message.reasoning ? <ReasoningBlock text={message.reasoning} /> : null}
         {message.content ? (
-          <div className="rounded-2xl border border-srapi-border bg-srapi-card px-4 py-3 text-sm leading-relaxed text-srapi-text-primary">
+          <div className="rounded-xl border border-srapi-border bg-srapi-card px-4 py-3 text-sm leading-relaxed text-srapi-text-primary">
             <Markdown>{message.content}</Markdown>
           </div>
         ) : null}
@@ -576,7 +576,7 @@ function ToolCallCard({
   const { method, path } = describeCall(call);
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-srapi-border bg-srapi-card-muted/60 text-xs">
+    <div className="overflow-hidden rounded-xl border border-srapi-border bg-srapi-card-muted/60 text-xs">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -742,7 +742,7 @@ function PendingActionBanner({
   const danger = !!action.danger;
   return (
     <div
-      className={`ml-12 rounded-2xl border p-4 ${
+      className={`ml-12 rounded-xl border p-4 ${
         danger ? "border-srapi-error/40 bg-srapi-error/5" : "border-srapi-primary/40 bg-srapi-accent-soft/40"
       }`}
     >

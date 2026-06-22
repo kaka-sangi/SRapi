@@ -227,7 +227,7 @@ export function RateLimitDialog({
                 </span>
               ) : null}
             </p>
-            <div className="flex items-center justify-between rounded-2xl border border-srapi-border bg-srapi-card-muted/40 px-4 py-3">
+            <div className="flex items-center justify-between rounded-xl border border-srapi-border bg-srapi-card-muted/40 px-4 py-3">
               <Label htmlFor="rl-enabled" className="mb-0 flex flex-col gap-0.5">
                 <span className="text-sm font-medium text-srapi-text-primary">
                   {t("adminRateLimit.enabled")}

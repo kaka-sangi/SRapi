@@ -232,7 +232,7 @@ export function CodexImportResultPanel({ result }: { result: CodexSessionImportR
   const { t } = useLanguage();
   const total = result.created + result.updated + result.skipped + result.failed;
   return (
-    <div className="space-y-3 rounded-2xl border border-srapi-border bg-srapi-card-muted p-3.5">
+    <div className="space-y-3 rounded-xl border border-srapi-border bg-srapi-card-muted p-3.5">
       <div className="grid grid-cols-4 gap-2 text-center">
         <CodexStat
           label={t("codexImport.created")}

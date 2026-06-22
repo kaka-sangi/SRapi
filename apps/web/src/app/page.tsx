@@ -64,7 +64,7 @@ export default function LandingPage() {
           {/* left — identity + value props */}
           <div className="max-w-xl">
             <div
-              className="anim-rise mb-5 inline-flex items-center gap-2 rounded-full border border-srapi-border bg-srapi-card/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-srapi-primary backdrop-blur-sm"
+              className="mb-5 inline-flex items-center gap-2 rounded-full border border-srapi-border bg-srapi-card/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-srapi-primary backdrop-blur-sm"
               style={rise(0)}
             >
               <Sparkles className="size-3" aria-hidden />
@@ -72,7 +72,7 @@ export default function LandingPage() {
             </div>
 
             <h1
-              className="anim-rise text-balance text-4xl leading-[1.05] tracking-tight sm:text-5xl lg:text-[3.75rem]"
+              className="text-balance text-4xl leading-[1.05] tracking-tight sm:text-5xl lg:text-[3.75rem]"
               style={rise(1)}
             >
               <span className="font-semibold text-srapi-text-primary">
@@ -83,22 +83,22 @@ export default function LandingPage() {
             </h1>
 
             <p
-              className="anim-rise mt-6 max-w-lg text-base leading-relaxed text-srapi-text-secondary"
+              className="mt-6 max-w-lg text-base leading-relaxed text-srapi-text-secondary"
               style={rise(2)}
             >
               {siteSubtitle}
             </p>
 
             {/* Trust badges row — soft chips with icons */}
-            <div className="anim-rise mt-8 flex flex-wrap gap-2.5" style={rise(3)}>
+            <div className="mt-8 flex flex-wrap gap-2.5" style={rise(3)}>
               <TrustChip icon={<ShieldCheck className="size-3.5" />} label={t("login.providersLine")} />
               <TrustChip icon={<Zap className="size-3.5" />} label="OpenAI · Claude · Gemini" />
             </div>
           </div>
 
           {/* right — login card with mouse-following spotlight */}
-          <div className="anim-rise w-full lg:justify-self-end" style={rise(2)}>
-            <SpotlightCard className="card-raised mx-auto w-full max-w-md rounded-2xl border border-srapi-border bg-srapi-card/95 p-7 backdrop-blur-md sm:p-8">
+          <div className="w-full lg:justify-self-end" style={rise(2)}>
+            <SpotlightCard className="mx-auto w-full max-w-md rounded-xl border border-srapi-border bg-srapi-card/95 p-7 backdrop-blur-md sm:p-8">
               <LoginForm />
             </SpotlightCard>
           </div>

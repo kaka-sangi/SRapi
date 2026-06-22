@@ -52,7 +52,7 @@ export function Composer({
   const { t } = useLanguage();
   const canSend = (input.trim().length > 0 || images.length > 0 || files.length > 0) && !running;
   return (
-    <div className="rounded-2xl border border-srapi-border bg-srapi-card p-2 shadow-sm transition-[box-shadow,border-color] duration-200 focus-within:border-srapi-text-secondary focus-within:shadow-[0_10px_34px_-14px_rgba(28,26,23,0.22)]">
+    <div className="rounded-xl border border-srapi-border bg-srapi-card p-2 shadow-sm transition-colors duration-150 focus-within:border-srapi-border-strong">
       {images.length || files.length ? (
         <div className="flex flex-wrap gap-2 px-1 pb-2 pt-1">
           {images.map((img, idx) => (

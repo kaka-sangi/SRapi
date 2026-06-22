@@ -13,7 +13,7 @@ export interface DataPillProps {
 
 const toneClasses: Record<DataPillTone, string> = {
   neutral: "bg-srapi-card-muted text-srapi-text-tertiary",
-  accent: "bg-srapi-accent-soft text-srapi-primary",
+  accent: "bg-srapi-card-muted text-srapi-text-secondary",
   success: "bg-srapi-success/10 text-srapi-success",
   warning: "bg-srapi-warning/12 text-srapi-warning",
   error: "bg-srapi-error/12 text-srapi-error",

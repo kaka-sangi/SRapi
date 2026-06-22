@@ -25,7 +25,7 @@ ToastViewport.displayName = "ToastViewport";
 
 // Card-raised toast: warm surface, soft shadow, tone shows as a 2px left rule.
 const toastVariants = cva(
-  "srapi-anim-toast tactile-card pointer-events-auto relative flex w-full items-start gap-3 rounded-2xl border border-l-2 border-srapi-border bg-srapi-card p-4 pr-9 shadow-md",
+  "srapi-anim-toast pointer-events-auto relative flex w-full items-start gap-3 rounded-xl border border-l-2 border-srapi-border bg-srapi-card p-4 pr-9 shadow-md",
   {
     variants: {
       tone: {

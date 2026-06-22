@@ -151,7 +151,7 @@ export function GroupMembersDialog({
             </Button>
           </div>
 
-          <div className="rounded-2xl border border-srapi-border bg-srapi-card">
+          <div className="rounded-xl border border-srapi-border bg-srapi-card">
             <div className="border-b border-srapi-border/70 px-4 py-3">
               <SectionTitle
                 icon={<Users />}

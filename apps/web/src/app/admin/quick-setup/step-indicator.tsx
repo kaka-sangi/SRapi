@@ -39,7 +39,7 @@ export function StepIndicator({
             aria-selected={active}
             className={cn(
               "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
-              active && "bg-srapi-accent-soft text-srapi-primary shadow-[0_1px_2px_rgba(26,24,20,0.04)]",
+              active && "bg-srapi-card-muted text-srapi-text-secondary shadow-[0_1px_2px_rgba(26,24,20,0.04)]",
               done && !active && "text-srapi-success",
               !done && !active && "text-srapi-text-tertiary",
             )}

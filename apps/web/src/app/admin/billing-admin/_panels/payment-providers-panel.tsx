@@ -491,7 +491,7 @@ function PaymentPresetPicker({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-2xl border border-srapi-border bg-srapi-card p-6 shadow-xl"
+        className="w-full max-w-lg rounded-xl border border-srapi-border bg-srapi-card p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="space-y-1">
@@ -507,7 +507,7 @@ function PaymentPresetPicker({
               type="button"
               onClick={() => onSelect(preset)}
               style={{ "--stagger-index": idx } as React.CSSProperties}
-              className="anim-rise-sm group flex w-full items-center gap-4 rounded-2xl border border-srapi-border bg-srapi-card px-4 py-3.5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-srapi-primary/40 hover:bg-srapi-accent-soft/30 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-srapi-primary/40"
+              className="group flex w-full items-center gap-4 rounded-xl border border-srapi-border bg-srapi-card px-4 py-3.5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-srapi-primary/40 hover:bg-srapi-accent-soft/30 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-srapi-primary/40"
             >
               <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-srapi-accent-soft text-xs font-semibold uppercase tracking-wider text-srapi-primary">
                 {preset.key.slice(0, 2).toUpperCase()}

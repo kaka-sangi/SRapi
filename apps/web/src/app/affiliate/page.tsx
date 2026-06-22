@@ -153,7 +153,7 @@ function AffiliateContent() {
       />
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="card-raised border-l-4 border-l-srapi-primary">
+        <Card className="border-l-4 border-l-srapi-primary">
           <CardContent className="flex flex-wrap items-start gap-x-8 gap-y-4">
             <div className="flex items-start gap-3">
               <IconBubble tone="accent" size="lg">
@@ -253,7 +253,7 @@ function AffiliateContent() {
                 ))}
               </div>
             ) : (
-              <div className="flex min-h-28 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-srapi-border/70 bg-srapi-card-muted/40 px-4 py-6 text-center">
+              <div className="flex min-h-28 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-srapi-border/70 bg-srapi-card-muted/40 px-4 py-6 text-center">
                 <IconBubble tone="accent">
                   <UserPlus aria-hidden />
                 </IconBubble>

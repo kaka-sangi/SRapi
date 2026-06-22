@@ -440,7 +440,7 @@ export function AccountImportDialog({
                 </div>
               ) : null}
               {batchResult ? (
-                <div className="space-y-3 rounded-2xl border border-srapi-border bg-srapi-card-muted p-3.5">
+                <div className="space-y-3 rounded-xl border border-srapi-border bg-srapi-card-muted p-3.5">
                   <div className="grid grid-cols-2 gap-2 text-center">
                     <ImportStat
                       label={t("codexImport.created")}
@@ -590,7 +590,7 @@ export function AccountImportDialog({
                 </>
               )}
               {crsStep === "result" && crsResult && (
-                <div className="space-y-3 rounded-2xl border border-srapi-border bg-srapi-card-muted p-3.5">
+                <div className="space-y-3 rounded-xl border border-srapi-border bg-srapi-card-muted p-3.5">
                   <div className="grid grid-cols-4 gap-2 text-center">
                     <ImportStat
                       label={t("codexImport.created")}
@@ -907,7 +907,7 @@ function ProviderImportResultPanel({ result }: { result: ProviderAccountImportRe
   const total =
     result.created_count + result.updated_count + result.skipped_count + result.failed_count;
   return (
-    <div className="space-y-3 rounded-2xl border border-srapi-border bg-srapi-card-muted p-3.5">
+    <div className="space-y-3 rounded-xl border border-srapi-border bg-srapi-card-muted p-3.5">
       <div className="grid grid-cols-4 gap-2 text-center">
         <ImportStat
           label={t("codexImport.created")}

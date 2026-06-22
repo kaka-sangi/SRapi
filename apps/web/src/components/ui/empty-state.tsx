@@ -18,7 +18,7 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "mx-auto flex max-w-md flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-srapi-border/70 bg-srapi-card-muted/40 p-8 text-center",
+        "mx-auto flex max-w-md flex-col items-center justify-center gap-3 p-8 text-center",
         className,
       )}
     >

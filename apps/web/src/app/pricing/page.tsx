@@ -134,7 +134,7 @@ function PlanCard({
   return (
     <Card
       className={`flex h-full flex-col ${
-        highlight ? "card-raised border-l-4 border-l-srapi-primary" : ""
+        highlight ? "border-l-4 border-l-srapi-primary" : ""
       }`}
     >
       <CardContent className="flex flex-1 flex-col">

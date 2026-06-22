@@ -211,7 +211,7 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
   return (
     <div className="space-y-4">
       {/* Hero: error class + resolution chip */}
-      <div className="flex items-center justify-between gap-3 rounded-2xl border border-srapi-border bg-srapi-card-muted p-4">
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-srapi-border bg-srapi-card-muted p-4">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
             {t("adminErrorLogs.errorClass")}
@@ -259,7 +259,7 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
         </div>
 
         <TabsContent value="request">
-          <div className="overflow-hidden rounded-2xl border border-srapi-border bg-srapi-card">
+          <div className="overflow-hidden rounded-xl border border-srapi-border bg-srapi-card">
             <InlineDetailGrid sections={requestSections} />
           </div>
         </TabsContent>
@@ -279,7 +279,7 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
                 mono
               />
             ) : null}
-            <div className="overflow-hidden rounded-2xl border border-srapi-border bg-srapi-card">
+            <div className="overflow-hidden rounded-xl border border-srapi-border bg-srapi-card">
               <InlineDetailGrid sections={responseSections} />
             </div>
           </div>
@@ -312,7 +312,7 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
               }}
             />
             {detail.resolved_at || detail.resolved_by_user_id ? (
-              <div className="rounded-2xl border border-srapi-border bg-srapi-card p-4">
+              <div className="rounded-xl border border-srapi-border bg-srapi-card p-4">
                 <InlineDetailGrid
                   sections={[
                     {
@@ -382,7 +382,7 @@ function AttemptHistory({
 }) {
   const { t } = useLanguage();
   return (
-    <div className="rounded-2xl border border-srapi-border bg-srapi-card-muted p-4">
+    <div className="rounded-xl border border-srapi-border bg-srapi-card-muted p-4">
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
           {t("adminErrorLogs.attemptHistory")}
@@ -487,7 +487,7 @@ function ErrorLogTriageSummary({
   if (triage.steps.length === 0 && triage.links.length === 0) return null;
 
   return (
-    <div className="rounded-2xl border border-srapi-border bg-srapi-card-muted p-4">
+    <div className="rounded-xl border border-srapi-border bg-srapi-card-muted p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
@@ -560,7 +560,7 @@ function SystemLogEvidence({
   if (!systemLogHref && !requestEvidenceHref) return null;
 
   return (
-    <div className="rounded-2xl border border-srapi-border bg-srapi-card-muted p-4">
+    <div className="rounded-xl border border-srapi-border bg-srapi-card-muted p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
@@ -698,7 +698,7 @@ function RequestLogEvidence({
   }, []);
 
   return (
-    <div className="rounded-2xl border border-srapi-border bg-srapi-card-muted p-4">
+    <div className="rounded-xl border border-srapi-border bg-srapi-card-muted p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
@@ -805,7 +805,7 @@ function ResolutionEditor({
   );
 
   return (
-    <div className="rounded-2xl border border-srapi-border bg-srapi-card-muted p-4">
+    <div className="rounded-xl border border-srapi-border bg-srapi-card-muted p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <QuietBadge status={resolutionTone(value)} label={resolutionLabel(t, value)} />
         <div className="flex flex-wrap items-center gap-2">
@@ -874,7 +874,7 @@ function EvidenceBlock({
   mono?: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-srapi-border bg-srapi-card-muted p-4">
+    <div className="rounded-xl border border-srapi-border bg-srapi-card-muted p-4">
       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{label}</p>
       <div className="mt-1 flex items-start gap-1.5">
         <p
@@ -931,7 +931,7 @@ function SchedulerDiagnosticSummary({
   ];
 
   return (
-    <div className="rounded-2xl border border-srapi-border bg-srapi-card-muted p-4">
+    <div className="rounded-xl border border-srapi-border bg-srapi-card-muted p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
@@ -990,7 +990,7 @@ function SchedulerDiagnosticSummary({
 function UpstreamErrorDiagnosticSummary({ diagnostic }: { diagnostic: UpstreamErrorDiagnostic }) {
   const { t } = useLanguage();
   return (
-    <div className="rounded-2xl border border-srapi-border bg-srapi-card-muted p-4">
+    <div className="rounded-xl border border-srapi-border bg-srapi-card-muted p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">

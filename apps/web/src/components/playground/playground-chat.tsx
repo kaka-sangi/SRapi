@@ -354,13 +354,13 @@ function EmptyState() {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4 px-4 text-center">
       <div
-        className="anim-rise grid size-14 place-items-center rounded-2xl bg-srapi-accent-soft text-srapi-primary [&>svg]:size-7"
+        className="grid size-14 place-items-center rounded-xl bg-srapi-card-muted text-srapi-text-secondary [&>svg]:size-7"
         style={rise(0)}
       >
         <Bot aria-hidden />
       </div>
       <h2
-        className="anim-rise text-2xl font-semibold tracking-tight text-srapi-text-primary"
+        className="text-2xl font-semibold tracking-tight text-srapi-text-primary"
         style={rise(1)}
       >
         {t("playground.greeting")}
@@ -387,7 +387,7 @@ function MessageRow({
 
   if (message.role === "user") {
     return (
-      <div className="anim-rise-sm flex justify-end gap-2">
+      <div className="flex justify-end gap-2">
         <div className="max-w-[80%] space-y-2">
           {message.images?.length ? (
             <div className="flex flex-wrap justify-end gap-1.5">
@@ -403,7 +403,7 @@ function MessageRow({
             </div>
           ) : null}
           {message.content ? (
-            <div className="rounded-2xl rounded-tr-sm bg-srapi-invert px-3.5 py-2 text-sm text-srapi-invert-fg">
+            <div className="rounded-xl rounded-tr-sm bg-srapi-invert px-3.5 py-2 text-sm text-srapi-invert-fg">
               {message.content}
             </div>
           ) : null}
@@ -415,7 +415,7 @@ function MessageRow({
     );
   }
   return (
-    <div className="anim-rise-sm group flex gap-2">
+    <div className="group flex gap-2">
       <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-srapi-primary/10">
         <Bot className="size-4 text-srapi-primary" />
       </div>

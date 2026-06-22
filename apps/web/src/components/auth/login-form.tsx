@@ -185,7 +185,7 @@ export function LoginForm() {
             type="submit"
             variant="primary"
             size="lg"
-            className="h-11 w-full rounded-xl btn-raise"
+            className="h-11 w-full rounded-xl"
             disabled={submitting || !codeReady}
           >
             <span className="inline-flex items-center gap-2">
@@ -273,7 +273,7 @@ export function LoginForm() {
           type="submit"
           variant="primary"
           size="lg"
-          className="h-11 w-full rounded-xl btn-raise"
+          className="h-11 w-full rounded-xl"
           disabled={submitting || (captcha.required && !captcha.token)}
         >
           <span className="inline-flex items-center gap-2">

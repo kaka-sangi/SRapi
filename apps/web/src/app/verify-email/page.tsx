@@ -37,7 +37,7 @@ export default function VerifyEmailPage() {
 
   return (
     <main className="flex min-h-dvh items-center justify-center px-6 py-10">
-      <div className="animate-bloom w-full max-w-sm">
+      <div className="w-full max-w-sm">
         <Card className="p-8 text-center">
           {state.kind === "verifying" && (
             <>
@@ -57,7 +57,7 @@ export default function VerifyEmailPage() {
                 Your email address has been verified. You can now sign in.
               </p>
               <Link href="/" className="mt-6 block">
-                <Button variant="primary" size="lg" className="h-11 w-full rounded-xl btn-raise">
+                <Button variant="primary" size="lg" className="h-11 w-full rounded-xl">
                   Continue to sign in
                 </Button>
               </Link>

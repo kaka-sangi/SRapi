@@ -264,7 +264,7 @@ export function ResourceFormDialog<TDraft extends object, TBody>({
                 </button>
                 <div
                   className={cn(
-                    "grid overflow-hidden transition-[grid-template-rows] duration-300 ease-[var(--ease-out-quint)]",
+                    "grid overflow-hidden transition-[grid-template-rows] duration-300 ease-out",
                     advancedOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
                   )}
                   inert={!advancedOpen || undefined}

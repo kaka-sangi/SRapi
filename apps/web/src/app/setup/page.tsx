@@ -124,7 +124,7 @@ export default function SetupPage() {
     <div className="relative flex min-h-dvh flex-col">
       <AmbientCanvas />
       <main className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center px-6 py-10">
-        <div className="animate-bloom space-y-6">
+        <div className="space-y-6">
           <div className="space-y-3">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
               {t("setup.eyebrow")}
@@ -174,7 +174,7 @@ export default function SetupPage() {
                   variant="primary"
                   onClick={() => setStep("account")}
                   disabled={apiHealth !== "ok"}
-                  className="h-11 flex-1 rounded-xl btn-raise"
+                  className="h-11 flex-1 rounded-xl"
                 >
                   {t("setup.continueToAccount")}
                 </Button>
@@ -234,7 +234,7 @@ export default function SetupPage() {
                   <Button type="button" variant="ghost" onClick={() => setStep("health")} className="h-11 flex-1 rounded-xl">
                     {t("setup.back")}
                   </Button>
-                  <Button type="submit" variant="primary" loading={submitting} disabled={submitting || !formValid} className="h-11 flex-1 rounded-xl btn-raise">
+                  <Button type="submit" variant="primary" loading={submitting} disabled={submitting || !formValid} className="h-11 flex-1 rounded-xl">
                     <span className="inline-flex items-center gap-2">
                       {t("setup.submit")}
                       {formValid && formDirty && !submitting ? (

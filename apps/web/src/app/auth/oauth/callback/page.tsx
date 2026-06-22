@@ -232,7 +232,7 @@ export default function OAuthCallbackPage() {
                 type="submit"
                 variant="primary"
                 size="lg"
-                className="h-11 w-full rounded-xl btn-raise"
+                className="h-11 w-full rounded-xl"
                 loading={busy}
                 disabled={busy || !bindReady}
               >
@@ -280,7 +280,7 @@ export default function OAuthCallbackPage() {
                 type="submit"
                 variant="primary"
                 size="lg"
-                className="h-11 w-full rounded-xl btn-raise"
+                className="h-11 w-full rounded-xl"
                 loading={busy}
                 disabled={busy || !codeReady}
               >
@@ -351,7 +351,7 @@ export default function OAuthCallbackPage() {
                 type="submit"
                 variant="primary"
                 size="lg"
-                className="h-11 w-full rounded-xl btn-raise"
+                className="h-11 w-full rounded-xl"
                 loading={busy}
                 disabled={busy || !createReady}
               >
@@ -393,7 +393,7 @@ export default function OAuthCallbackPage() {
                   type="submit"
                   variant="primary"
                   size="lg"
-                  className="h-11 w-full rounded-xl btn-raise"
+                  className="h-11 w-full rounded-xl"
                   loading={busy}
                   disabled={busy || !emailLooksValid}
                 >
@@ -423,7 +423,7 @@ export default function OAuthCallbackPage() {
                   type="submit"
                   variant="primary"
                   size="lg"
-                  className="h-11 w-full rounded-xl btn-raise"
+                  className="h-11 w-full rounded-xl"
                   loading={busy}
                   disabled={busy || !tokenReady}
                 >

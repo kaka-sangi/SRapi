@@ -116,7 +116,7 @@ export default function RegisterPage() {
         </div>
       </header>
       <main className="mx-auto flex w-full max-w-6xl flex-1 items-center justify-center px-6 py-10">
-        <div className="animate-bloom w-full max-w-sm">
+        <div className="w-full max-w-sm">
           <Card className="p-7 sm:p-8">
             <h1 className="text-2xl font-semibold tracking-tight text-srapi-text-primary">{t("authRegister.title")}</h1>
             <p className="mt-1.5 text-sm text-srapi-text-secondary">
@@ -213,7 +213,7 @@ export default function RegisterPage() {
                 type="submit"
                 variant="primary"
                 size="lg"
-                className="h-11 w-full rounded-xl btn-raise"
+                className="h-11 w-full rounded-xl"
                 loading={submitting}
                 disabled={submitting || (captcha.required && !captcha.token)}
               >

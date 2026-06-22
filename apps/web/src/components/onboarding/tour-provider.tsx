@@ -173,7 +173,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
               ) : null}
               {/* Popover card */}
               <div
-                className="z-[10002] w-80 rounded-2xl border border-srapi-border bg-srapi-card p-5 shadow-lg"
+                className="z-[10002] w-80 rounded-xl border border-srapi-border bg-srapi-card p-5 shadow-lg"
                 style={popoverStyle}
                 onClick={(e) => e.stopPropagation()}
               >

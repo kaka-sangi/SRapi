@@ -28,7 +28,7 @@ export const TooltipContent = React.forwardRef<
         "srapi-anim-pop z-50",
         variant === "hint"
           ? "max-w-72 rounded-lg border border-srapi-text-primary bg-srapi-text-primary px-2.5 py-1.5 text-xs leading-relaxed text-srapi-bg shadow-md"
-          : "max-w-sm rounded-2xl border border-srapi-border bg-srapi-card p-3.5 text-xs text-srapi-text-primary shadow-[0_18px_40px_-18px_rgba(26,24,20,0.28),0_8px_24px_-10px_rgba(26,24,20,0.14)]",
+          : "max-w-sm rounded-lg border border-srapi-border bg-srapi-card p-3 text-xs text-srapi-text-primary shadow-md",
         className,
       )}
       {...props}

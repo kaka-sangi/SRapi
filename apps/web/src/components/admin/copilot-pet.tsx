@@ -50,7 +50,7 @@ export function CopilotPet() {
 
       <DialogPrimitive.Portal>
         <DialogPrimitive.Content
-          className="srapi-anim-pet-panel card-raised glass-frosted-strong fixed bottom-6 right-6 z-50 flex h-[min(760px,84vh)] w-[min(920px,92vw)] flex-col overflow-hidden rounded-2xl border border-srapi-border outline-none"
+          className="srapi-anim-pet-panel glass-frosted-strong fixed bottom-6 right-6 z-50 flex h-[min(760px,84vh)] w-[min(920px,92vw)] flex-col overflow-hidden rounded-xl border border-srapi-border outline-none"
           onInteractOutside={(e) => e.preventDefault()}
         >
           <DialogPrimitive.Title className="sr-only">
@@ -119,7 +119,7 @@ function ShortcutsList() {
     { label: t("copilot.shortcutNewChat"), keys: ["⌘", "K"] },
   ];
   return (
-    <div className="anim-rise-sm shrink-0 border-b border-srapi-border bg-srapi-card-muted/40 px-4 py-2.5">
+    <div className="shrink-0 border-b border-srapi-border bg-srapi-card-muted/40 px-4 py-2.5">
       <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
         {t("copilot.petShortcuts")}
       </div>

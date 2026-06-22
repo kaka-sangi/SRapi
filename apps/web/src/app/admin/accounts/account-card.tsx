@@ -67,7 +67,7 @@ export function AccountsCardView({
   const { t } = useLanguage();
 
   return (
-    <Card className="anim-rise-sm overflow-hidden">
+    <Card className="overflow-hidden">
       {toolbar}
       {selection && selection.selected.size > 0 ? (
         <AccountBulkBar
@@ -266,10 +266,10 @@ function AccountCard({
   return (
     <article
       className={cn(
-        "group flex flex-col rounded-2xl border border-srapi-border bg-srapi-card shadow-[0_1px_2px_rgba(26,24,20,0.04)] transition-all duration-200",
+        "group flex flex-col rounded-xl border border-srapi-border bg-srapi-card shadow-[0_1px_2px_rgba(26,24,20,0.04)] transition-all duration-200",
         account.status === "disabled" && "opacity-55",
         selected && "border-srapi-primary/50 bg-srapi-accent-soft/40 ring-1 ring-srapi-primary/30",
-        onDetail && "cursor-pointer hover:-translate-y-0.5 hover:border-srapi-border-strong hover:shadow-[0_8px_24px_-12px_rgba(194,85,59,0.18),0_2px_4px_rgba(26,24,20,0.04)]",
+        onDetail && "cursor-pointer hover:border-srapi-border-strong hover:shadow-sm",
       )}
       onClick={(e) => {
         if (!onDetail) return;
@@ -456,7 +456,7 @@ function AccountBulkBar({
 }) {
   const { t } = useLanguage();
   return (
-    <div className="anim-rise-sm flex flex-wrap items-center gap-3 border-b border-srapi-border bg-srapi-card-muted px-4 py-2.5">
+    <div className="flex flex-wrap items-center gap-3 border-b border-srapi-border bg-srapi-card-muted px-4 py-2.5">
       <span className="text-xs font-medium text-srapi-text-secondary">
         {t("adminCommon.selectedCount", { count })}
       </span>
@@ -477,7 +477,7 @@ function AccountCardSkeleton() {
     <div className="min-h-[55vh] p-3">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="rounded-2xl border border-srapi-border bg-srapi-card">
+          <div key={i} className="rounded-xl border border-srapi-border bg-srapi-card">
             <div className="px-5 pt-5 pb-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="space-y-2">
