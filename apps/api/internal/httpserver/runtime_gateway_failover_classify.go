@@ -270,9 +270,20 @@ func upstreamRequestIDFromHeaders(headers http.Header) string {
 	return ""
 }
 
+// maxRetryAfterMillis caps any parsed Retry-After value so a malicious
+// upstream returning an absurd delay (e.g. Retry-After: 31536000) cannot
+// stall the account indefinitely. 5 minutes matches axonhub's
+// MaxRetryAfterDuration.
+const maxRetryAfterMillis = 5 * 60 * 1000
+
+// minRetryAfterMillis is the floor for a positive Retry-After. Values
+// below 1 second are too aggressive for a retry and likely erroneous.
+const minRetryAfterMillis = 1000
+
 // parseRetryAfterMillis parses the Retry-After header (RFC 7231 §7.1.3): either
 // a delta-seconds integer or an HTTP-date. Returns 0 when absent/invalid so the
-// caller falls back to its own backoff schedule.
+// caller falls back to its own backoff schedule. The result is clamped to
+// [minRetryAfterMillis, maxRetryAfterMillis] when positive.
 func parseRetryAfterMillis(headers http.Header) int {
 	if headers == nil {
 		return 0
@@ -281,18 +292,26 @@ func parseRetryAfterMillis(headers http.Header) int {
 	if raw == "" {
 		return 0
 	}
+	var ms int
 	if secs, err := strconv.Atoi(raw); err == nil {
 		if secs < 0 {
 			return 0
 		}
-		return secs * 1000
-	}
-	if t, err := http.ParseTime(raw); err == nil {
+		ms = secs * 1000
+	} else if t, err := http.ParseTime(raw); err == nil {
 		delta := time.Until(t)
 		if delta <= 0 {
 			return 0
 		}
-		return int(delta / time.Millisecond)
+		ms = int(delta / time.Millisecond)
+	} else {
+		return 0
 	}
-	return 0
+	if ms < minRetryAfterMillis {
+		ms = minRetryAfterMillis
+	}
+	if ms > maxRetryAfterMillis {
+		ms = maxRetryAfterMillis
+	}
+	return ms
 }

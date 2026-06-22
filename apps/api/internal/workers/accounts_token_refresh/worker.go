@@ -46,6 +46,11 @@ const (
 	defaultTimeout          = 30 * time.Second
 	shutdownPollInterval    = 10 * time.Millisecond
 	workerName              = "accounts_token_refresh"
+
+	// Keepalive constants: proactively refresh tokens older than 3 days to
+	// prevent refresh-token decay on idle accounts (ported from chatgpt2api).
+	defaultKeepAliveInterval = 3 * 24 * time.Hour // refresh tokens older than 3 days
+	defaultKeepAliveBatch    = 3                   // process 3 accounts per keepalive pass
 )
 
 // Config controls the proactive token-refresh worker.
@@ -270,6 +275,14 @@ func (w *Worker) refreshAndLog(ctx context.Context) {
 			"failed", result.Failed,
 		)
 	}
+
+	// Keepalive pass: proactively refresh idle accounts to prevent
+	// refresh-token decay, even when the access token hasn't expired.
+	if keepAliveCount, err := w.RunKeepalivePass(ctx); err != nil {
+		w.logger.Error("keepalive pass failed", "worker", workerName, "error", err)
+	} else if keepAliveCount > 0 {
+		w.logger.Info("keepalive pass completed", "worker", workerName, "refreshed", keepAliveCount)
+	}
 }
 
 func (w *Worker) refreshPass(ctx context.Context) (Result, error) {
@@ -358,6 +371,89 @@ func (w *Worker) eligibleForRefresh(account accountcontract.ProviderAccount, dea
 		return false
 	}
 	return !account.TokenExpiresAt.After(deadline)
+}
+
+// keepAliveEligible decides whether an account qualifies for a proactive
+// keepalive refresh. The criteria mirror eligibleForRefresh (active, oauth,
+// no pending reauth) but instead of looking at token expiry we look at
+// LastRefreshedAt staleness — and explicitly exclude accounts whose token
+// is already about to expire (the normal pass handles those).
+func (w *Worker) keepAliveEligible(account accountcontract.ProviderAccount, now time.Time, refreshDeadline time.Time) bool {
+	if account.Status != accountcontract.StatusActive {
+		return false
+	}
+	if account.RuntimeClass != accountcontract.RuntimeClassOauthRefresh && account.RuntimeClass != accountcontract.RuntimeClassOauthDeviceCode {
+		return false
+	}
+	if account.NeedsReauthAt != nil {
+		return false
+	}
+	// Skip accounts whose token is about to expire — the normal refresh
+	// pass already picks them up, so a keepalive would be redundant.
+	if account.TokenExpiresAt != nil && !account.TokenExpiresAt.After(refreshDeadline) {
+		return false
+	}
+	// Never refreshed, or refreshed more than keepAliveInterval ago.
+	if account.LastRefreshedAt == nil {
+		return true
+	}
+	return account.LastRefreshedAt.Before(now.Add(-defaultKeepAliveInterval))
+}
+
+// keepAliveCandidates returns accounts that qualify for a proactive keepalive
+// refresh, limited to defaultKeepAliveBatch.
+func (w *Worker) keepAliveCandidates(accounts []accountcontract.ProviderAccount, now time.Time) []accountcontract.ProviderAccount {
+	refreshDeadline := now.Add(w.refreshThreshold)
+	var candidates []accountcontract.ProviderAccount
+	for _, account := range accounts {
+		if w.keepAliveEligible(account, now, refreshDeadline) {
+			candidates = append(candidates, account)
+		}
+		if len(candidates) >= defaultKeepAliveBatch {
+			break
+		}
+	}
+	return candidates
+}
+
+// RunKeepalivePass performs a single keepalive sweep: it picks up to
+// defaultKeepAliveBatch idle accounts and refreshes them to keep their
+// refresh tokens alive, even when their access tokens haven't expired yet.
+func (w *Worker) RunKeepalivePass(ctx context.Context) (int, error) {
+	if w == nil {
+		return 0, nil
+	}
+	accounts, err := w.accounts.List(ctx)
+	if err != nil {
+		return 0, err
+	}
+	now := time.Now().UTC()
+	candidates := w.keepAliveCandidates(accounts, now)
+	if len(candidates) == 0 {
+		return 0, nil
+	}
+
+	adapter := refresherAdapter{refresher: w.refresher, accounts: w.accounts}
+	refreshed := 0
+	for _, account := range candidates {
+		if ctx.Err() != nil {
+			break
+		}
+		refreshCtx, cancel := context.WithTimeout(ctx, w.timeout)
+		outcome, err := w.accounts.RefreshAccessTokenWithOutcome(refreshCtx, account.ID, adapter)
+		cancel()
+		w.recordOutcome(outcome.Class)
+		if err != nil {
+			w.logger.Warn("keepalive refresh failed",
+				"worker", workerName,
+				"account_id", account.ID,
+				"error", err,
+			)
+			continue
+		}
+		refreshed++
+	}
+	return refreshed, nil
 }
 
 // refresherAdapter bridges the reverse_proxy refresher into the accounts

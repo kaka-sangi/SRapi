@@ -30,6 +30,12 @@ var permanentRefreshErrorRegex = regexp.MustCompile(`(?i)invalid_grant|invalid_c
 // outages at the default 5-minute cadence (≈ 25 minutes of failures).
 const refreshFailureThreshold = 5
 
+// newAccountGracePeriod defers needs_reauth for accounts created within the
+// last 10 minutes. Newly-imported accounts often fail their first auth
+// attempt while upstream provisioning completes; flagging them immediately
+// would force unnecessary manual intervention. Ported from chatgpt2api.
+const newAccountGracePeriod = 10 * time.Minute
+
 // maxRefreshErrorLength caps refresh_last_error so a verbose upstream body
 // cannot bloat the row. Long enough for the typical OAuth JSON snippet but
 // short enough to fit comfortably in the admin row.
@@ -220,13 +226,25 @@ func (s *Service) applyRefreshFailure(ctx context.Context, account contract.Prov
 	account.RefreshLastError = message
 	account.UpdatedAt = now
 	class := RefreshOutcomeTransientError
+
+	// Grace period for newly-added accounts: defer needs_reauth for the first
+	// 10 minutes to allow initial provisioning to complete (ported from
+	// chatgpt2api). The failure is still recorded (attempts / last_error) so
+	// operators can see it, but the account is not flagged as hopeless yet.
+	age := now.Sub(account.CreatedAt)
+	withinGracePeriod := !account.CreatedAt.IsZero() && age >= 0 && age < newAccountGracePeriod
+
 	switch {
 	case isPermanentRefreshError(refreshErr):
 		class = RefreshOutcomePermanentError
-		account.NeedsReauthAt = timePtr(now)
+		if !withinGracePeriod {
+			account.NeedsReauthAt = timePtr(now)
+		}
 	case account.RefreshAttempts >= refreshFailureThreshold:
 		class = RefreshOutcomeThresholdExceeded
-		account.NeedsReauthAt = timePtr(now)
+		if !withinGracePeriod {
+			account.NeedsReauthAt = timePtr(now)
+		}
 	}
 	if _, updateErr := s.persistAccount(ctx, account); updateErr != nil {
 		// Surface the original refresh error to the caller; the store error is
