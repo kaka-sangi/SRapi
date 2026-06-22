@@ -1,8 +1,8 @@
 import * as React from "react";
 import { cn } from "@/lib/cn";
 
-export type IconBubbleSize = "sm" | "md" | "lg";
-export type IconBubbleTone = "accent" | "neutral" | "success" | "warning" | "error";
+type IconBubbleSize = "sm" | "md" | "lg";
+type IconBubbleTone = "accent" | "neutral" | "success" | "warning" | "error";
 
 export interface IconBubbleProps {
   children: React.ReactNode;

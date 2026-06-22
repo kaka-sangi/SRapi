@@ -71,7 +71,7 @@ function waitForWidget(globalName: string, timeoutMs = 8000): Promise<WidgetApi>
   });
 }
 
-export function Captcha({
+function Captcha({
   provider,
   siteKey,
   onToken,

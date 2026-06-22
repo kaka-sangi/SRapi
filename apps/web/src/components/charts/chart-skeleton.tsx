@@ -92,7 +92,7 @@ export function BarChartSkeleton({
  * Vertical-bar histogram skeleton — used by latency / throughput shaped
  * surfaces. Renders a row of bars at varying heights with x-axis ghost labels.
  */
-export function HistogramChartSkeleton({
+function HistogramChartSkeleton({
   height = 150,
   bars = 12,
   className,
@@ -136,7 +136,7 @@ export function HistogramChartSkeleton({
  * Donut skeleton — circle + legend rows for percentile distribution / error
  * owner breakdown charts that aren't time-series.
  */
-export function DonutChartSkeleton({
+function DonutChartSkeleton({
   className,
 }: {
   className?: string;

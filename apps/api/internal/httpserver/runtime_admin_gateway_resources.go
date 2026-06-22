@@ -1394,10 +1394,6 @@ func gatewayAccountBlockersForProvider(
 	return out
 }
 
-func accountIsGatewayResourceRoutable(account accountcontract.ProviderAccount, health accountcontract.AccountHealthSnapshot, hasHealth bool, quotaExhausted bool) bool {
-	return accountGatewayRouteBlockers(account, health, hasHealth, quotaExhausted, nil).routable()
-}
-
 func accountGatewayRouteBlockers(account accountcontract.ProviderAccount, health accountcontract.AccountHealthSnapshot, hasHealth bool, quotaExhausted bool, proxyStates map[string]proxyResourceState) gatewayAccountRouteBlockers {
 	blockers := gatewayAccountRouteBlockers{}
 	if account.Status != accountcontract.StatusActive {

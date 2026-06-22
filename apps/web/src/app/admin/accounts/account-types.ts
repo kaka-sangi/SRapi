@@ -22,7 +22,7 @@ export function metadataString(metadata: ProviderAccount["metadata"], key: strin
   return typeof value === "string" ? value.trim() : "";
 }
 
-export function metadataNumber(metadata: ProviderAccount["metadata"], key: string): number | null {
+function metadataNumber(metadata: ProviderAccount["metadata"], key: string): number | null {
   const value = metadata?.[key];
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value !== "string") return null;
@@ -34,7 +34,7 @@ export function metadataNumber(metadata: ProviderAccount["metadata"], key: strin
 
 type Translate = (key: string, vars?: Record<string, string | number>) => string;
 
-export function metadataStringList(metadata: ProviderAccount["metadata"], key: string): string[] {
+function metadataStringList(metadata: ProviderAccount["metadata"], key: string): string[] {
   const value = metadata?.[key];
   if (!Array.isArray(value)) return [];
   return value.map((item) => (typeof item === "string" ? item.trim() : "")).filter(Boolean);
@@ -85,7 +85,7 @@ export interface AccountMetadataFact {
   tone?: "default" | "enabled" | "disabled";
 }
 
-export function accountMetadataFacts(
+function accountMetadataFacts(
   t: Translate,
   account: ProviderAccount,
 ): AccountMetadataFact[] {

@@ -2,7 +2,7 @@ import type { AdminSettingsDraft } from "@/lib/admin-settings-form";
 import { type SettingsTab } from "@/lib/admin-settings-form";
 
 /** Graphical controls for the list/map fields the draft tracks outside `value`. */
-export type SpecialKind =
+type SpecialKind =
   | "tags"
   | "models"
   | "conversion-routes"

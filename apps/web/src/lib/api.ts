@@ -22,9 +22,6 @@ import { usageApi } from './api/usage';
 // Public type surface — re-exported so every type stays importable from
 // "@/lib/api" exactly as before the decomposition.
 export type {
-  ApiRuntimeStatus,
-  LoginResult,
-  SiteConfig,
   CurrentUserAttribute,
 } from './api/types';
 

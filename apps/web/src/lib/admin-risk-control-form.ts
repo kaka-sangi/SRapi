@@ -3,9 +3,9 @@ import type {
   RiskControlMode,
 } from "../../../../packages/sdk/typescript/src/types.gen";
 
-export type RiskControlTab = "basic" | "limits" | "scope";
+type RiskControlTab = "basic" | "limits" | "scope";
 
-export const RISK_CONTROL_TABS: Array<{ id: RiskControlTab; label: string }> = [
+const RISK_CONTROL_TABS: Array<{ id: RiskControlTab; label: string }> = [
   { id: "basic", label: "Basic" },
   { id: "limits", label: "Limits" },
   { id: "scope", label: "Scope" },
@@ -21,12 +21,12 @@ export interface RiskControlFormState {
   blockedIps: string[];
 }
 
-export interface RiskControlSaveConfirmationState {
+interface RiskControlSaveConfirmationState {
   phrase: string;
   confirmation: string;
 }
 
-export const RISK_CONTROL_SAVE_CONFIRMATION_PHRASE = "SAVE RISK CONTROL CONFIG";
+const RISK_CONTROL_SAVE_CONFIRMATION_PHRASE = "SAVE RISK CONTROL CONFIG";
 
 export function createRiskControlForm(config: RiskControlConfig): RiskControlFormState {
   return {
@@ -55,21 +55,21 @@ export function buildRiskControlConfig(form: RiskControlFormState): RiskControlC
   };
 }
 
-export function updateRiskControlForm(
+function updateRiskControlForm(
   form: RiskControlFormState,
   updater: (form: RiskControlFormState) => RiskControlFormState,
 ): RiskControlFormState {
   return updater(form);
 }
 
-export function createRiskControlSaveConfirmation(): RiskControlSaveConfirmationState {
+function createRiskControlSaveConfirmation(): RiskControlSaveConfirmationState {
   return {
     phrase: RISK_CONTROL_SAVE_CONFIRMATION_PHRASE,
     confirmation: "",
   };
 }
 
-export function canConfirmRiskControlSave(
+function canConfirmRiskControlSave(
   state: RiskControlSaveConfirmationState | null,
 ): boolean {
   return Boolean(state && state.confirmation.trim() === state.phrase);

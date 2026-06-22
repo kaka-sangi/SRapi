@@ -1095,10 +1095,6 @@ func (w appWorkers) shutdown(ctx context.Context) error {
 	return errors.Join(collected...)
 }
 
-type dependencyPinger interface {
-	Ping(context.Context) error
-}
-
 type notRequiredPinger struct{}
 
 func (notRequiredPinger) Ping(context.Context) error {

@@ -64,7 +64,7 @@ export interface AdminSettingsDraft {
   emailTemplates: Record<string, string>;
 }
 
-export interface SettingsSaveConfirmationState {
+interface SettingsSaveConfirmationState {
   tab: SettingsTab;
   phrase: string;
   confirmation: string;
@@ -122,7 +122,7 @@ export function materializeSettingsDraft(draft: AdminSettingsDraft): AdminSettin
   };
 }
 
-export function updateSettingsValue(
+function updateSettingsValue(
   draft: AdminSettingsDraft,
   updater: (value: AdminSettings) => AdminSettings,
 ): AdminSettingsDraft {
@@ -150,7 +150,7 @@ export function settingsSaveConfirmationPhrase(tab: SettingsTab): string {
   return `SAVE ${tab.toUpperCase()} SETTINGS`;
 }
 
-export function createSettingsSaveConfirmation(tab: SettingsTab): SettingsSaveConfirmationState {
+function createSettingsSaveConfirmation(tab: SettingsTab): SettingsSaveConfirmationState {
   return {
     tab,
     phrase: settingsSaveConfirmationPhrase(tab),
@@ -158,12 +158,12 @@ export function createSettingsSaveConfirmation(tab: SettingsTab): SettingsSaveCo
   };
 }
 
-export function canConfirmSettingsSave(state: SettingsSaveConfirmationState | null): boolean {
+function canConfirmSettingsSave(state: SettingsSaveConfirmationState | null): boolean {
   return Boolean(state && state.confirmation.trim() === state.phrase);
 }
 
 /** Trim, drop blanks, and dedupe a chip/picker list before persisting. */
-export function cleanList(items: string[] | undefined): string[] {
+function cleanList(items: string[] | undefined): string[] {
   const out: string[] = [];
   for (const item of items ?? []) {
     const trimmed = item.trim();
@@ -173,7 +173,7 @@ export function cleanList(items: string[] | undefined): string[] {
 }
 
 /** Keep only known endpoint conversion routes while preserving display order. */
-export function cleanProtocolConversionRoutes(items: readonly string[] | undefined): ProtocolConversionRoute[] {
+function cleanProtocolConversionRoutes(items: readonly string[] | undefined): ProtocolConversionRoute[] {
   const selected = new Set<string>();
   for (const item of items ?? []) {
     const trimmed = item.trim();

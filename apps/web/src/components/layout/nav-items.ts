@@ -36,7 +36,7 @@ import {
 } from "lucide-react";
 import { ADMIN_ROUTES, USER_ROUTES, USER_HOME_ROUTE } from "@/lib/routes";
 
-export interface NavItem {
+interface NavItem {
   href: string;
   labelKey: string;
   icon: LucideIcon;
@@ -48,7 +48,7 @@ export interface NavSection {
 }
 
 /** Workspace section — the signed-in user's own gateway usage. */
-export const WORKSPACE_SECTION: NavSection = {
+const WORKSPACE_SECTION: NavSection = {
   titleKey: "nav.sectionWorkspace",
   items: [
     { href: USER_HOME_ROUTE, labelKey: "nav.dashboard", icon: LayoutDashboard },
@@ -60,7 +60,7 @@ export const WORKSPACE_SECTION: NavSection = {
 };
 
 /** Account self-service — visible to regular users. */
-export const ACCOUNT_SECTION: NavSection = {
+const ACCOUNT_SECTION: NavSection = {
   titleKey: "nav.sectionAccount",
   items: [
     { href: USER_ROUTES.account, labelKey: "nav.account", icon: CircleUser },
@@ -140,7 +140,7 @@ const ADMIN_SYSTEM_SECTION: NavSection = {
   ],
 };
 
-export const ADMIN_SECTIONS: NavSection[] = [
+const ADMIN_SECTIONS: NavSection[] = [
   ADMIN_OVERVIEW_SECTION,
   ADMIN_GATEWAY_SECTION,
   ADMIN_COMMERCE_SECTION,

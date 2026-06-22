@@ -5,7 +5,7 @@ import type { MultiSelectOption } from "@/components/ui/multi-select";
  * runtime via `Intl.DisplayNames`, so this stays a small code list instead of a
  * hand-maintained bilingual table — names always match the active locale.
  */
-export const COUNTRY_CODES: readonly string[] = [
+const COUNTRY_CODES: readonly string[] = [
   "AD", "AE", "AF", "AG", "AI", "AL", "AM", "AO", "AQ", "AR", "AS", "AT", "AU", "AW", "AX", "AZ",
   "BA", "BB", "BD", "BE", "BF", "BG", "BH", "BI", "BJ", "BL", "BM", "BN", "BO", "BQ", "BR", "BS",
   "BT", "BV", "BW", "BY", "BZ",

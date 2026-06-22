@@ -22,12 +22,12 @@ import type { P } from "./_shared";
 // Response shapes derived straight from the adminApi methods so they always
 // track the generated SDK (the bucket/item types aren't in the sdk-types
 // barrel, so re-export them here for the chart components to consume).
-export type OpsLatencyHistogramData = Awaited<
+type OpsLatencyHistogramData = Awaited<
   ReturnType<typeof adminApi.getOpsLatencyHistogram>
 >;
 export type OpsLatencyBucket = OpsLatencyHistogramData["buckets"][number];
 
-export type OpsErrorDistributionData = Awaited<
+type OpsErrorDistributionData = Awaited<
   ReturnType<typeof adminApi.getOpsErrorDistribution>
 >;
 export type OpsErrorDistributionItem = OpsErrorDistributionData["items"][number];

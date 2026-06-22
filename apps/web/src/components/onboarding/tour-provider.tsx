@@ -232,7 +232,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function useAutoTour(tourId: string, steps: TourStep[], enabled = true) {
+function useAutoTour(tourId: string, steps: TourStep[], enabled = true) {
   const { start } = useTour();
   const hasRun = useRef(false);
 

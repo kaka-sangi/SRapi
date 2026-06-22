@@ -167,14 +167,14 @@ export function useSchedulerDecisions(params?: Parameters<typeof apiService.list
   });
 }
 
-export function useSlos() {
+function useSlos() {
   return useQuery({
     queryKey: queryKeys.slos(),
     queryFn: () => apiService.listSlos(),
   });
 }
 
-export function useSmokeStatus(model = "gpt-4o-mini") {
+function useSmokeStatus(model = "gpt-4o-mini") {
   return useQuery({
     queryKey: queryKeys.smokeStatus(model),
     queryFn: () => apiService.getSmokeStatus(model),

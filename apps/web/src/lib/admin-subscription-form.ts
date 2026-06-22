@@ -12,7 +12,7 @@ import type {
   UserSubscriptionStatus,
 } from "../../../../packages/sdk/typescript/src/types.gen";
 
-export type CostQuotaMode = "hard_cap" | "allowance";
+type CostQuotaMode = "hard_cap" | "allowance";
 
 export interface SubscriptionPlanFormState {
   name: string;
@@ -63,7 +63,7 @@ export interface PricingRuleFormState {
   effectiveToLocal: string;
 }
 
-export interface PricingRuleCreateConfirmationState {
+interface PricingRuleCreateConfirmationState {
   modelLabel: string;
   providerLabel: string;
   phrase: string;
@@ -76,7 +76,7 @@ export const SUBSCRIPTION_PLAN_STATUSES: SubscriptionPlanStatus[] = [
   "archived",
 ];
 
-export const COST_QUOTA_MODES: CostQuotaMode[] = ["hard_cap", "allowance"];
+const COST_QUOTA_MODES: CostQuotaMode[] = ["hard_cap", "allowance"];
 
 // "default" leaves scheduler_strategy unset (gateway default). The rest mirror the
 // Go scheduler registry (apps/api/.../scheduling).
@@ -414,7 +414,7 @@ function optionalNullableIntegerValue(value: unknown, fieldName: string): number
   return optionalIntegerValue(value, fieldName);
 }
 
-export function createPricingRuleConfirmation({
+function createPricingRuleConfirmation({
   modelLabel,
   providerLabel,
 }: {
@@ -429,7 +429,7 @@ export function createPricingRuleConfirmation({
   };
 }
 
-export function canConfirmPricingRuleCreate(
+function canConfirmPricingRuleCreate(
   state: PricingRuleCreateConfirmationState | null,
 ): boolean {
   return Boolean(state && state.confirmation.trim() === state.phrase);

@@ -84,4 +84,4 @@ export const updateApiKeySchema = createApiKeySchema.extend({
     .max(ALLOWED_MODELS_MAX, { message: "Select at most 16 models." }),
 });
 
-export type UpdateApiKeyValues = z.infer<typeof updateApiKeySchema>;
+type UpdateApiKeyValues = z.infer<typeof updateApiKeySchema>;

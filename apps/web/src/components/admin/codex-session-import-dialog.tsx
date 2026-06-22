@@ -36,7 +36,7 @@ import type { CodexSessionImportResult, Id } from "@/lib/sdk-types";
  * or an NDJSON batch) to onboard upstream codex_cli accounts. Decodes the
  * embedded JWT server-side; the browser never sees minted tokens.
  */
-export function CodexSessionImportDialog({
+function CodexSessionImportDialog({
   open,
   onOpenChange,
   providerOptions,

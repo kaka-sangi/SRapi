@@ -18,9 +18,9 @@ import type { LiveUsageLog } from "@/lib/api/types";
 
 const PAGE_SIZE = 100;
 
-export type UsageExportPhase = "idle" | "running" | "done" | "cancelled" | "error";
+type UsageExportPhase = "idle" | "running" | "done" | "cancelled" | "error";
 
-export interface UsageExportProgress {
+interface UsageExportProgress {
   phase: UsageExportPhase;
   /** Rows fetched so far. */
   current: number;

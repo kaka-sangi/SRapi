@@ -1,9 +1,9 @@
 import * as React from "react";
 import { cn } from "@/lib/cn";
 
-export type SegmentedControlSize = "sm" | "md";
+type SegmentedControlSize = "sm" | "md";
 
-export interface SegmentedControlOption<T extends string> {
+interface SegmentedControlOption<T extends string> {
   value: T;
   label: React.ReactNode;
   icon?: React.ReactNode;

@@ -1748,18 +1748,3 @@ func customMenusFromAPI(values []apiopenapi.CustomMenuItem) []admincontrol.Custo
 	return out
 }
 
-func mapsToJsonObjects(values []map[string]any) []apiopenapi.JsonObject {
-	out := make([]apiopenapi.JsonObject, 0, len(values))
-	for _, value := range values {
-		out = append(out, apiopenapi.JsonObject(cloneAnyMap(value)))
-	}
-	return out
-}
-
-func jsonObjectsToMaps(values []apiopenapi.JsonObject) []map[string]any {
-	out := make([]map[string]any, 0, len(values))
-	for _, value := range values {
-		out = append(out, cloneAnyMap(map[string]any(value)))
-	}
-	return out
-}

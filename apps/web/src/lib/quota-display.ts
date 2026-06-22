@@ -3,7 +3,7 @@
 import type { AccountQuotaSnapshot } from "@/lib/sdk-types";
 import { formatDateTime } from "@/lib/admin-format";
 
-export type QuotaWindowKind = "5h" | "7d" | "month" | "other";
+type QuotaWindowKind = "5h" | "7d" | "month" | "other";
 
 export type QuotaDisplayWindow = {
   snapshot: AccountQuotaSnapshot;

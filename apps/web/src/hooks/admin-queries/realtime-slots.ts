@@ -12,7 +12,7 @@ import { queryKeys } from "@/lib/query-keys";
 // Re-exported so consumers (the admin dashboard) can type the counters payload
 // without reaching into the deep generated-SDK relative path or editing the
 // shared lib/sdk-types barrel.
-export type { RealtimeActiveSlot, RealtimeActiveSlotCounters };
+export type { RealtimeActiveSlotCounters };
 
 /**
  * Realtime active-slot snapshot for the admin dashboard.

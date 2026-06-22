@@ -1440,14 +1440,6 @@ func derefMap(value *map[string]interface{}) map[string]any {
 	return out
 }
 
-func optionalMap(value *map[string]interface{}) *map[string]any {
-	if value == nil {
-		return nil
-	}
-	out := derefMap(value)
-	return &out
-}
-
 func optionalCredential(value *map[string]interface{}) *map[string]any {
 	if value == nil {
 		return nil
@@ -1706,8 +1698,6 @@ func cloneInt64Ptr(value *int64) *int64 {
 	return &cloned
 }
 
-func ptrFloat32(value float32) *float32 { return &value }
-
 func cloneFloat32Ptr(value *float32) *float32 {
 	if value == nil {
 		return nil
@@ -1719,8 +1709,6 @@ func cloneFloat32Ptr(value *float32) *float32 {
 func ptrProviderStatus(value providercontract.Status) *providercontract.Status { return &value }
 
 func ptrModelStatus(value modelcontract.Status) *modelcontract.Status { return &value }
-
-func ptrAccountStatus(value accountcontract.Status) *accountcontract.Status { return &value }
 
 func cloneTimePtr(value *time.Time) *time.Time {
 	if value == nil {
@@ -1736,10 +1724,6 @@ func cloneStringPtr(value *string) *string {
 	}
 	cloned := *value
 	return &cloned
-}
-
-func pagination(total int) apiopenapi.Pagination {
-	return apiopenapi.Pagination{Page: 1, PageSize: total, Total: total, HasNext: false}
 }
 
 // paginate applies real pagination to a fully-built list. The admin list pages

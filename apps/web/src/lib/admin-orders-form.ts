@@ -8,7 +8,7 @@ import type {
   UpdateAdminPaymentProviderData,
 } from "../../../../packages/sdk/typescript/src/types.gen";
 
-export const REFUNDABLE_ORDER_STATUSES: PaymentOrderStatus[] = [
+const REFUNDABLE_ORDER_STATUSES: PaymentOrderStatus[] = [
   "paid",
   "fulfilled",
   "partially_refunded",
@@ -133,11 +133,11 @@ export function buildUpdatePaymentProviderBody(
   };
 }
 
-export function sumOrderAmounts(orders: Array<Pick<PaymentOrder, "amount">>): string {
+function sumOrderAmounts(orders: Array<Pick<PaymentOrder, "amount">>): string {
   return sumDecimalStrings(orders.map((order) => order.amount));
 }
 
-export function sumDecimalStrings(values: string[]): string {
+function sumDecimalStrings(values: string[]): string {
   const parsed = values.map(parseDecimalParts);
   const scale = parsed.reduce((max, value) => Math.max(max, value.scale), 0);
   let total = BigInt(0);

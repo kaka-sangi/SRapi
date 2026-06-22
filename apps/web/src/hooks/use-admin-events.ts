@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-export interface AdminEvent {
+interface AdminEvent {
   type: string;
   data: unknown;
 }

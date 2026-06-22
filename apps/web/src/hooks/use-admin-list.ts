@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 
-export type SortDir = "asc" | "desc";
+type SortDir = "asc" | "desc";
 export interface SortState {
   key: string;
   dir: SortDir;
@@ -159,4 +159,4 @@ export function useAdminList(opts?: { pageSize?: number; debounceMs?: number }) 
   );
 }
 
-export type AdminListControls = ReturnType<typeof useAdminList>;
+type AdminListControls = ReturnType<typeof useAdminList>;

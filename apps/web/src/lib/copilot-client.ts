@@ -7,13 +7,13 @@
 
 const CSRF_STORAGE_KEY = "srapi_csrf_token";
 
-export interface CopilotToolCall {
+interface CopilotToolCall {
   id: string;
   name: string;
   arguments: string;
 }
 
-export interface CopilotToolResult {
+interface CopilotToolResult {
   tool_call_id: string;
   content: string;
   is_error?: boolean;
@@ -26,13 +26,13 @@ export interface CopilotImage {
 
 /** A text-file attachment. Frontend-only: folded into `content` on send (the
  * backend has no `files` field), so it works with any model. */
-export interface CopilotFile {
+interface CopilotFile {
   name: string;
   content: string;
   truncated?: boolean;
 }
 
-export type ReasoningEffort = "off" | "low" | "medium" | "high";
+type ReasoningEffort = "off" | "low" | "medium" | "high";
 
 export interface CopilotMessage {
   role: "user" | "assistant" | "tool";
@@ -59,7 +59,7 @@ function foldFileAttachments(message: CopilotMessage): CopilotMessage {
   return { ...rest, content: `${message.content ?? ""}${blocks}`.trim() };
 }
 
-export interface CopilotApproval {
+interface CopilotApproval {
   tool_call_id: string;
   approved: boolean;
 }

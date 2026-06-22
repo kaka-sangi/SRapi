@@ -17,7 +17,7 @@ import { useHoverSync } from "./hover-sync-provider";
  * locally, and a floating mini-popover near the cursor shows date + each
  * series's value at that index (rich-tooltip style, inline render).
  */
-export type TrendTone = "primary" | "secondary" | "success";
+type TrendTone = "primary" | "secondary" | "success";
 export type TrendSeries = {
   key: string;
   label: string;

@@ -1,8 +1,8 @@
 import * as React from "react";
 import { cn } from "@/lib/cn";
 
-export type DataPillTone = "neutral" | "accent" | "success" | "warning" | "error";
-export type DataPillSize = "sm" | "md";
+type DataPillTone = "neutral" | "accent" | "success" | "warning" | "error";
+type DataPillSize = "sm" | "md";
 
 export interface DataPillProps {
   children: React.ReactNode;

@@ -23,7 +23,7 @@ export interface AccountTemplate {
  * first, then reverse-proxy and rerank. Families not listed here (or providers
  * carrying no platform_family) fall through to an unlabeled trailing group.
  */
-export const PLATFORM_FAMILY_ORDER: PlatformFamily[] = [
+const PLATFORM_FAMILY_ORDER: PlatformFamily[] = [
   "anthropic_compatible",
   "gemini_compatible",
   "openai_compatible",
@@ -102,8 +102,8 @@ export function groupProviders(
  * service-account runtime keeps a JSON box but adds a file-upload button so the
  * admin can drop in the downloaded `.json` rather than hand-type it.
  */
-export type CredKind = "password" | "textarea" | "json" | "fields";
-export interface CredFieldSpec {
+type CredKind = "password" | "textarea" | "json" | "fields";
+interface CredFieldSpec {
   key: string; // credential object key the backend reads
   cred: string; // i18n suffix under adminAccounts.cred.* (…Label / …Hint)
   secret?: boolean; // render as a password input

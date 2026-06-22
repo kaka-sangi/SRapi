@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
 
-export type ToastTone = "default" | "success" | "error" | "warning" | "info";
+type ToastTone = "default" | "success" | "error" | "warning" | "info";
 
 interface ToastInput {
   title: string;

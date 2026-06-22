@@ -426,7 +426,7 @@ export function useBatchTestProxies() {
 }
 // Bulk-import — dedupes by name + returns per-row outcome. Cache invalidation
 // is identical to single-row create, so existing list views refresh.
-export function useBatchCreateProxies() {
+function useBatchCreateProxies() {
   return useAdminMutation(
     (proxies: P<typeof adminApi.batchCreateProxies>) => adminApi.batchCreateProxies(proxies),
     ["admin", "proxies"],

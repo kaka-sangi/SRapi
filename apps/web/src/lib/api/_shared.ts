@@ -8,16 +8,16 @@ import type { CurrentUser } from '../srapi-types';
 import { setSessionPresenceCookie, clearSessionPresenceCookie } from '../session-cookie';
 import type { LiveUser } from './types';
 
-export const DEFAULT_PROXY_TARGET = 'http://127.0.0.1:8080';
-export const HEALTH_TIMEOUT_MS = 2500;
-export const USER_STORAGE_KEY = 'srapi_user';
+const DEFAULT_PROXY_TARGET = 'http://127.0.0.1:8080';
+const HEALTH_TIMEOUT_MS = 2500;
+const USER_STORAGE_KEY = 'srapi_user';
 
 export function parseMoneyValue(value: string | number | undefined): number {
   if (typeof value === 'number') return value;
   return parseFloat(value || '0');
 }
 
-export function buildApiUrl(path: string): string {
+function buildApiUrl(path: string): string {
   const normalized = path.startsWith('/') ? path : `/${path}`;
   const configured = configuredApiBaseUrl();
   return configured ? `${configured}${normalized}` : normalized;
@@ -34,7 +34,7 @@ export const configureSDKClient = configureSdkClient;
 
 configureSDKClient();
 
-export async function fetchWithTimeout(url: string, init: RequestInit = {}, timeoutMs = HEALTH_TIMEOUT_MS): Promise<Response> {
+async function fetchWithTimeout(url: string, init: RequestInit = {}, timeoutMs = HEALTH_TIMEOUT_MS): Promise<Response> {
   const controller = new AbortController();
   const timeout = globalThis.setTimeout(() => controller.abort(), timeoutMs);
   try {

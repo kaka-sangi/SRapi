@@ -10,7 +10,7 @@ const HoverSyncContext = React.createContext<HoverSyncValue>({
   setIndex: () => {},
 });
 
-export interface HoverSyncProviderProps {
+interface HoverSyncProviderProps {
   scope?: string;
   children: React.ReactNode;
 }
@@ -22,7 +22,7 @@ export interface HoverSyncProviderProps {
  * `scope` is currently a hint for future multi-scope nesting; today a single
  * context entry is shared per provider instance.
  */
-export function HoverSyncProvider({ scope, children }: HoverSyncProviderProps) {
+function HoverSyncProvider({ scope, children }: HoverSyncProviderProps) {
   const [index, setIndex] = React.useState<number | null>(null);
   void scope; // reserved for future per-scope routing
   const value = React.useMemo<HoverSyncValue>(() => ({ index, setIndex }), [index]);

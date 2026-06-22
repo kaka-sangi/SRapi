@@ -276,22 +276,6 @@ func providerScopedCapabilityKeys() []string {
 	}
 }
 
-func dedupeCapabilityDescriptors(values []capabilitiescontract.Descriptor) []capabilitiescontract.Descriptor {
-	if len(values) == 0 {
-		return nil
-	}
-	seen := map[string]capabilitiescontract.Descriptor{}
-	for _, value := range values {
-		seen[value.Key] = value
-	}
-	out := make([]capabilitiescontract.Descriptor, 0, len(seen))
-	for _, value := range seen {
-		out = append(out, value)
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Key < out[j].Key })
-	return out
-}
-
 func schedulerRuntimeState(metadata map[string]any) schedulercontract.RuntimeState {
 	now := time.Now().UTC()
 	quotaRemainingRatio := metadataOptionalFloat(metadata, "remaining_ratio", "quota_remaining_ratio")

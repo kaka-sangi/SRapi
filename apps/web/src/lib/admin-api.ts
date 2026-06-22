@@ -29,15 +29,10 @@ import { usersApi } from "./admin-api/users";
 // "@/lib/admin-api" exactly as before the decomposition.
 export type {
   AdminListResult,
-  AdminTimeRange,
   CircuitBreakerEntry,
-  CRSPreviewRequest,
-  CRSPreviewAccount,
   CRSPreviewResult,
-  CRSSyncRequest,
   CRSSyncResult,
   CacheStatsEntry,
-  AdminUnsupportedSurface,
 } from "./admin-api/types";
 
 export function adminErrorMessage(error: unknown): string {
@@ -89,6 +84,6 @@ export const adminApi = {
   ...backupSnapshotsApi,
 };
 
-export function statusQuery(status: string): { status?: UserStatus | AnnouncementStatus | string } {
+function statusQuery(status: string): { status?: UserStatus | AnnouncementStatus | string } {
   return status === "all" ? {} : { status };
 }

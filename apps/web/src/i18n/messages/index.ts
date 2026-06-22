@@ -4,7 +4,7 @@ import { zh } from "./zh";
 export type Locale = "en" | "zh";
 
 export const DEFAULT_LOCALE: Locale = "zh";
-export const LOCALES: Locale[] = ["zh", "en"];
+const LOCALES: Locale[] = ["zh", "en"];
 
 type Dict = Record<string, string>;
 
@@ -43,4 +43,4 @@ export function translate(
   return applyVariables(value, vars);
 }
 
-export { registry };
+// registry is internal — not re-exported

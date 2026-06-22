@@ -27,7 +27,7 @@ export interface CRSPreviewRequest {
   password: string;
 }
 
-export interface CRSPreviewAccount {
+interface CRSPreviewAccount {
   crs_account_id: string;
   kind: string;
   name: string;
@@ -71,7 +71,7 @@ export interface CacheStatsEntry {
   hit_rate: string;
 }
 
-export interface AdminUnsupportedSurface {
+interface AdminUnsupportedSurface {
   title: string;
   contractPath?: string;
   reason: string;

@@ -102,7 +102,7 @@ export function applyModelScopeSelection(
   };
 }
 
-export function providerScopeLabel(scope: Record<string, unknown>, providers: Provider[]): string {
+function providerScopeLabel(scope: Record<string, unknown>, providers: Provider[]): string {
   const providerId = typeof scope.provider_id === "string" ? scope.provider_id : "";
   if (!providerId) {
     return "All providers";
@@ -110,7 +110,7 @@ export function providerScopeLabel(scope: Record<string, unknown>, providers: Pr
   return providers.find((provider) => provider.id === providerId)?.display_name ?? providerId;
 }
 
-export function modelScopeLabel(scope: Record<string, unknown>, models: Model[]): string {
+function modelScopeLabel(scope: Record<string, unknown>, models: Model[]): string {
   const canonicalName = typeof scope.canonical_name === "string" ? scope.canonical_name : "";
   if (canonicalName) {
     return models.find((model) => model.canonical_name === canonicalName)?.display_name ?? canonicalName;

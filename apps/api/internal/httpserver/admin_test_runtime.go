@@ -454,17 +454,6 @@ func accountTestMissingRequirements(provider providercontract.Provider, account 
 	return missing
 }
 
-func upstreamBaseURLForTest(provider providercontract.Provider, account accountcontract.ProviderAccount) string {
-	for _, values := range []map[string]any{account.Metadata, provider.ConfigSchema, provider.Capabilities} {
-		for _, key := range []string{"base_url", "upstream_base_url", "openai_base_url"} {
-			if value := mapString(values, key); value != "" {
-				return value
-			}
-		}
-	}
-	return ""
-}
-
 func mapString(values map[string]any, key string) string {
 	if values == nil {
 		return ""

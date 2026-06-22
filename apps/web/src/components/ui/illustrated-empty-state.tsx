@@ -1,7 +1,7 @@
 import * as React from "react";
 import { cn } from "@/lib/cn";
 
-export type IllustrationKey =
+type IllustrationKey =
   | "logs"
   | "accounts"
   | "users"

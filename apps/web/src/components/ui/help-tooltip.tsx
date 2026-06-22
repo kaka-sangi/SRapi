@@ -4,7 +4,7 @@ import { HelpCircle } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { cn } from "@/lib/cn";
 
-export function HelpTooltip({
+function HelpTooltip({
   content,
   side = "top",
   className,

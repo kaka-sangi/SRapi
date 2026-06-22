@@ -36,7 +36,7 @@ export function enumOptions(values: readonly string[]): { value: string; label: 
   return values.map((value) => ({ value, label: value }));
 }
 
-export type FieldType =
+type FieldType =
   | "text"
   | "password"
   | "textarea"

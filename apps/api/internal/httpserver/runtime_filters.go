@@ -695,12 +695,6 @@ func setSSEResponseHeaders(w http.ResponseWriter) {
 	h.Set("X-Accel-Buffering", "no")
 }
 
-func writeSSEJSON(w http.ResponseWriter, payload any) {
-	setSSEResponseHeaders(w)
-	writeSSEJSONAny(w, payload)
-	writeSSEDone(w)
-}
-
 func writeSSEJSONChunks(w http.ResponseWriter, payloads []map[string]any) {
 	setSSEResponseHeaders(w)
 	for _, payload := range payloads {

@@ -164,7 +164,7 @@ export type SiteConfig = {
   maintenance: SiteMaintenanceSummary;
 };
 
-export type SiteMaintenanceSummary = {
+type SiteMaintenanceSummary = {
   enabled: boolean;
   message?: string;
   expected_recovery_at?: string;

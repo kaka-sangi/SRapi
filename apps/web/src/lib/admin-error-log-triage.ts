@@ -17,7 +17,7 @@ export type ErrorLogTriageLinkKind =
   | "schedulerDecision"
   | "accountHealth";
 
-export interface ErrorLogTriageLink {
+interface ErrorLogTriageLink {
   kind: ErrorLogTriageLinkKind;
   href: string;
 }

@@ -30,7 +30,7 @@ import type { PaymentOrder } from "@/lib/sdk-types";
  * The component polls the order while pending (3s, via usePaymentOrderStatus)
  * and switches to settled/failed UI when the webhook lands.
  */
-export type CheckoutRedirectVariant = "inline" | "card";
+type CheckoutRedirectVariant = "inline" | "card";
 
 export interface CheckoutRedirectProps {
   order: PaymentOrder;
@@ -202,7 +202,7 @@ type CheckoutShape =
 // Picks the right rendering shape from what the backend stored in order
 // metadata + provider_snapshot. Centralised so /billing, /pricing and
 // /payment/result agree on the rule.
-export function detectCheckoutShape(order: PaymentOrder): CheckoutShape {
+function detectCheckoutShape(order: PaymentOrder): CheckoutShape {
   const meta = (order.metadata ?? {}) as Record<string, unknown>;
   const snap = (order.provider_snapshot ?? {}) as Record<string, unknown>;
   const provider = typeof snap.provider === "string" ? snap.provider.toLowerCase() : "";

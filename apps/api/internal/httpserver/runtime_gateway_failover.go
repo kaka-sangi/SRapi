@@ -252,23 +252,12 @@ func (s *Server) writeProviderGatewayErrorForCandidate(w http.ResponseWriter, er
 	writeGatewayError(w, response.Status, errorType, response.Message, errorClass)
 }
 
-func (s *Server) writeGeminiProviderGatewayError(w http.ResponseWriter, err error) {
-	s.writeGeminiProviderGatewayErrorForCandidate(w, err, nil)
-}
-
 func (s *Server) writeGeminiProviderGatewayErrorForCandidate(w http.ResponseWriter, err error, candidate *schedulercontract.Candidate) {
 	errorClass, upstreamStatus, _ := providerGatewayError(err)
 	response := s.gatewayPublicErrorResponse(err, errorClass, upstreamStatus, candidate)
 	s.forwardProviderErrorHeaders(w, err)
 	setRetryAfterFromProviderError(w, err)
 	writeGeminiGatewayError(w, response.Status, geminiStatusForGatewayErrorClass(errorClass, response.Status), response.Message)
-}
-
-// gatewayPublicMessage decides the caller-facing message. Global admin-managed
-// error-passthrough rules take precedence; when no rule matches it falls back to
-// the per-account / per-provider metadata behavior in gatewayProviderPublicMessage.
-func (s *Server) gatewayPublicMessage(err error, errorClass string, upstreamStatus int, candidate *schedulercontract.Candidate) string {
-	return s.gatewayPublicErrorResponse(err, errorClass, upstreamStatus, candidate).Message
 }
 
 type gatewayPublicErrorResponse struct {
@@ -622,9 +611,7 @@ NextCandidate:
 		// excluded set so the scheduler skips them. The asynchronous
 		// metadata write to cooldown_until is the source of truth — this
 		// cooldown is a per-process synchronous accelerator.
-		for _, id := range s.runtime.gatewayCooldownedAccountIDs(canonical.CanonicalModel) {
-			attemptReq.ExcludedAccountIDs = append(attemptReq.ExcludedAccountIDs, id)
-		}
+		attemptReq.ExcludedAccountIDs = append(attemptReq.ExcludedAccountIDs, s.runtime.gatewayCooldownedAccountIDs(canonical.CanonicalModel)...)
 
 		// The first selection waits briefly for a concurrency slot when every
 		// account is saturated; failover attempts (after a real failure) schedule
@@ -1427,15 +1414,6 @@ func gatewayProviderErrorMessageKeywordAllowed(metadata map[string]any, message 
 		return !hasFilter
 	}
 	return true
-}
-
-func gatewayProviderErrorMessageAllowed(candidate schedulercontract.Candidate, errorClass string, upstreamStatus int, message string) bool {
-	for _, metadata := range gatewayProviderGatewayMetadata(candidate) {
-		if gatewayProviderErrorMetadataAllowed(metadata, errorClass, upstreamStatus, message) {
-			return true
-		}
-	}
-	return false
 }
 
 func gatewayProviderErrorMetadataStatus(metadata map[string]any, upstreamStatus int) (int, bool) {

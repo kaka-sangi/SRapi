@@ -32,7 +32,7 @@ export interface AnnouncementFormState {
   endsAt: string;
 }
 
-export interface AnnouncementDeleteState {
+interface AnnouncementDeleteState {
   id: string;
   title: string;
   confirmation: string;
@@ -106,7 +106,7 @@ function localInputToIso(value: string): string | null {
   return d.toISOString();
 }
 
-export function deleteStateFromAnnouncement(announcement: Announcement): AnnouncementDeleteState {
+function deleteStateFromAnnouncement(announcement: Announcement): AnnouncementDeleteState {
   return {
     id: announcement.id,
     title: announcement.title,
@@ -114,7 +114,7 @@ export function deleteStateFromAnnouncement(announcement: Announcement): Announc
   };
 }
 
-export function canDeleteAnnouncement(state: AnnouncementDeleteState | null): boolean {
+function canDeleteAnnouncement(state: AnnouncementDeleteState | null): boolean {
   return Boolean(state && state.confirmation.trim() === state.title);
 }
 

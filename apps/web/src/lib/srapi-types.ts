@@ -70,7 +70,7 @@ export interface UsageLogSummary {
   currency: string;
 }
 
-export interface AvailableModelPricingSummary {
+interface AvailableModelPricingSummary {
   billing_mode: "token" | "per_request" | "image";
   currency: string;
   input_price_per_million_tokens: string;
@@ -132,13 +132,13 @@ export interface SchedulerDecisionSummary {
   logs: string[];
 }
 
-export interface SchedulerRejectReasonSummary {
+interface SchedulerRejectReasonSummary {
   account_id?: string;
   account: string;
   reason: string;
 }
 
-export interface SchedulerScoreSummary {
+interface SchedulerScoreSummary {
   account_id?: string;
   account: string;
   score: number;

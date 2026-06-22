@@ -2,7 +2,7 @@ import type { CreateRoleRequest, Role, UpdateRoleRequest } from "@/lib/sdk-types
 
 /** SRapi's bootstrap roles — immutable, so the UI hides edit/delete for them
  * (the backend also rejects modifying them). */
-export const BUILT_IN_ROLES = ["owner", "admin", "operator", "user"];
+const BUILT_IN_ROLES = ["owner", "admin", "operator", "user"];
 
 export function isBuiltInRole(name: string): boolean {
   return BUILT_IN_ROLES.includes(name);

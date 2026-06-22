@@ -48,7 +48,7 @@ export interface PromoCodeFormState {
   expiresAtLocal: string;
 }
 
-export interface PromoDeleteState {
+interface PromoDeleteState {
   id: string;
   code: string;
   confirmation: string;
@@ -174,7 +174,7 @@ export function buildPromoCodeBody(
   return body;
 }
 
-export function redeemDisableStateFromCode(code: RedeemCode): RedeemDisableState {
+function redeemDisableStateFromCode(code: RedeemCode): RedeemDisableState {
   return { ids: [code.id], label: code.code, confirmation: "" };
 }
 
@@ -187,15 +187,15 @@ export function redeemDisableStateFromSelection(codes: RedeemCode[]): RedeemDisa
   };
 }
 
-export function canConfirmRedeemDisable(state: RedeemDisableState | null): boolean {
+function canConfirmRedeemDisable(state: RedeemDisableState | null): boolean {
   return Boolean(state?.ids.length && state.confirmation.trim() === state.label);
 }
 
-export function promoDeleteStateFromCode(promo: PromoCode): PromoDeleteState {
+function promoDeleteStateFromCode(promo: PromoCode): PromoDeleteState {
   return { id: promo.id, code: promo.code, confirmation: "" };
 }
 
-export function canDeletePromoCode(state: PromoDeleteState | null): boolean {
+function canDeletePromoCode(state: PromoDeleteState | null): boolean {
   return Boolean(state?.id && state.confirmation.trim() === state.code);
 }
 

@@ -91,7 +91,7 @@ export function accountFormFromAccount(account: ProviderAccount): AdminAccountFo
   };
 }
 
-export function parseJsonObject(value: string, fieldName: string): Record<string, unknown> {
+function parseJsonObject(value: string, fieldName: string): Record<string, unknown> {
   let parsed: unknown;
   try {
     parsed = JSON.parse(value || "{}") as unknown;
@@ -149,7 +149,7 @@ function normalizeRiskLevel(value: string | null | undefined): AccountRiskLevel 
     : "normal";
 }
 
-export function diffAccountGroupIds(currentGroupIds: Id[], nextGroupIds: Id[]) {
+function diffAccountGroupIds(currentGroupIds: Id[], nextGroupIds: Id[]) {
   const current = new Set(currentGroupIds);
   const next = new Set(nextGroupIds);
   return {
@@ -158,7 +158,7 @@ export function diffAccountGroupIds(currentGroupIds: Id[], nextGroupIds: Id[]) {
   };
 }
 
-export interface AccountProxyBindingConfirmationState {
+interface AccountProxyBindingConfirmationState {
   accountId: Id;
   accountName: string;
   currentProxyId: string;
@@ -168,21 +168,21 @@ export interface AccountProxyBindingConfirmationState {
   confirmation: string;
 }
 
-export interface AccountModelDiscoveryConfirmationState {
+interface AccountModelDiscoveryConfirmationState {
   accountId: Id;
   accountName: string;
   phrase: string;
   confirmation: string;
 }
 
-export interface AccountBatchStatusConfirmationState {
+interface AccountBatchStatusConfirmationState {
   accountIds: Id[];
   status: ProviderAccountStatus;
   phrase: string;
   confirmation: string;
 }
 
-export function createAccountProxyBindingConfirmation({
+function createAccountProxyBindingConfirmation({
   account,
   currentProxyId,
   nextProxyId,
@@ -204,13 +204,13 @@ export function createAccountProxyBindingConfirmation({
   };
 }
 
-export function canConfirmAccountProxyBinding(
+function canConfirmAccountProxyBinding(
   state: AccountProxyBindingConfirmationState | null,
 ): boolean {
   return Boolean(state && state.confirmation.trim() === state.phrase);
 }
 
-export function createAccountModelDiscoveryConfirmation(
+function createAccountModelDiscoveryConfirmation(
   account: Pick<ProviderAccount, "id" | "name">,
 ): AccountModelDiscoveryConfirmationState {
   return {
@@ -221,7 +221,7 @@ export function createAccountModelDiscoveryConfirmation(
   };
 }
 
-export function canConfirmAccountModelDiscovery(
+function canConfirmAccountModelDiscovery(
   state: AccountModelDiscoveryConfirmationState | null,
 ): boolean {
   return Boolean(state && state.confirmation.trim() === state.phrase);
@@ -415,7 +415,7 @@ function numberValue(value: unknown): number | undefined {
   return undefined;
 }
 
-export function buildBatchUpdateAccountsBody({
+function buildBatchUpdateAccountsBody({
   accountIds,
   status,
 }: {
@@ -445,7 +445,7 @@ export function buildBatchAccountActionBody({
   return { account_ids: ids, action };
 }
 
-export function createAccountBatchStatusConfirmation({
+function createAccountBatchStatusConfirmation({
   accountIds,
   status,
 }: {
@@ -461,7 +461,7 @@ export function createAccountBatchStatusConfirmation({
   };
 }
 
-export function canConfirmAccountBatchStatus(
+function canConfirmAccountBatchStatus(
   state: AccountBatchStatusConfirmationState | null,
 ): boolean {
   return Boolean(state && state.confirmation.trim() === state.phrase);

@@ -15,9 +15,9 @@ import type { UsageLog } from "@/lib/sdk-types";
 // that this becomes painful, the right move is a streaming/paged export
 // endpoint, not making the client work harder.
 
-export type AdminUsageExportPhase = "idle" | "running" | "done" | "error";
+type AdminUsageExportPhase = "idle" | "running" | "done" | "error";
 
-export interface AdminUsageExportState {
+interface AdminUsageExportState {
   phase: AdminUsageExportPhase;
   rows: number;
   error?: string;
@@ -52,7 +52,7 @@ const COLUMNS: CsvColumn<UsageLog>[] = [
   { header: "currency", value: (l) => l.currency },
 ];
 
-export interface AdminUsageExportRange {
+interface AdminUsageExportRange {
   // Optional ISO timestamps forwarded as ?start=&end= so the CSV honours the
   // window preset / explicit range the operator has applied to the table.
   start?: string;

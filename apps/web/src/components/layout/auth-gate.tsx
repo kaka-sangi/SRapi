@@ -141,4 +141,4 @@ export function AuthGate({
   return <CurrentUserContext.Provider value={user}>{children}</CurrentUserContext.Provider>;
 }
 
-export { apiService };
+

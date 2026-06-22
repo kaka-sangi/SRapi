@@ -6,9 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 )
@@ -300,10 +298,3 @@ func ShouldDedupChatCompletion(body map[string]any) bool {
 	}
 }
 
-// gatewayDedupTrimContent is a small helper for tests that compare body keys
-// case-insensitively when probing headers — not exported.
-func gatewayDedupTrimContent(s string) string { return strings.TrimSpace(s) }
-
-// errGatewayDedupComputeFailed surfaces compute() panics translated into
-// errors. Owners that panic must convert via recover so followers don't block.
-var errGatewayDedupComputeFailed = errors.New("gateway dedup: compute failed")

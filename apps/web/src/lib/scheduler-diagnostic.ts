@@ -1,4 +1,4 @@
-export interface SchedulerRejectReasonCount {
+interface SchedulerRejectReasonCount {
   reason: string;
   count: number;
 }

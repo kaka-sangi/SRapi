@@ -1,6 +1,6 @@
 import type { CacheStatsEntry, CircuitBreakerEntry } from "@/lib/admin-api";
 
-export type DiagnosticsTone = "active" | "limited" | "disabled" | "error";
+type DiagnosticsTone = "active" | "limited" | "disabled" | "error";
 
 export interface DiagnosticSummary {
   tone: DiagnosticsTone;

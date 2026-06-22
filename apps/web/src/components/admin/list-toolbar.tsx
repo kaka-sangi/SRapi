@@ -126,7 +126,7 @@ const DEFAULT_SEVERITY_OPTIONS: Array<{ value: string; label: string }> = [
  * surfaces `undefined` to the consumer so a single filter param drives the
  * query state.
  */
-export function ToolbarSeverityFilter({
+function ToolbarSeverityFilter({
   value,
   onChange,
   options = DEFAULT_SEVERITY_OPTIONS,

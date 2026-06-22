@@ -22,7 +22,7 @@ export const DEFAULT_PLAYGROUND_PARAMS: PlaygroundParams = {
   maxTokens: "",
 };
 
-export function playgroundParamsDirty(params: PlaygroundParams): boolean {
+function playgroundParamsDirty(params: PlaygroundParams): boolean {
   return (
     params.system.trim() !== "" || params.temperature.trim() !== "" || params.maxTokens.trim() !== ""
   );

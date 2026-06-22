@@ -25,16 +25,16 @@ import type { P } from "./_shared";
 // Response shapes derived straight from the adminApi methods so they always
 // track the generated SDK. The trend point/series and error-bucket types aren't
 // in the sdk-types barrel, so re-export them here for the chart components.
-export type UsageTrendsData = Awaited<ReturnType<typeof adminApi.getUsageTrends>>;
+type UsageTrendsData = Awaited<ReturnType<typeof adminApi.getUsageTrends>>;
 export type UsageTrendSeries = UsageTrendsData["series"][number];
-export type UsageTrendPoint = UsageTrendSeries["points"][number];
+type UsageTrendPoint = UsageTrendSeries["points"][number];
 
-export type UsageErrorDistributionData = Awaited<
+type UsageErrorDistributionData = Awaited<
   ReturnType<typeof adminApi.getUsageErrorDistribution>
 >;
 export type UsageErrorBucketItem = UsageErrorDistributionData[number];
 
-export type UsageDistributionData = Awaited<
+type UsageDistributionData = Awaited<
   ReturnType<typeof adminApi.getUsageDistribution>
 >;
 export type UsageDistributionBucketItem = UsageDistributionData["buckets"][number];

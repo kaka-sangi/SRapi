@@ -12,7 +12,7 @@ export function useAdminModels(params?: P<typeof adminApi.listModels>) {
   });
 }
 
-export function useAdminModelMappings(params?: P<typeof adminApi.listModelMappingsAll>) {
+function useAdminModelMappings(params?: P<typeof adminApi.listModelMappingsAll>) {
   return useQuery({
     queryKey: queryKeys.admin.modelMappings(params),
     queryFn: () => adminApi.listModelMappingsAll(params),

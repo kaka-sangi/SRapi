@@ -82,7 +82,7 @@ export function formatDate(value: string | null | undefined): string {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date);
 }
 
-export function statusBadgeVariant(status: string | null | undefined): BadgeProps["variant"] {
+function statusBadgeVariant(status: string | null | undefined): BadgeProps["variant"] {
   const normalized = (status || "").toLowerCase();
 
   if (
@@ -149,7 +149,7 @@ export function safeJson(value: unknown): string {
   }
 }
 
-export function clampPercent(value: number): number {
+function clampPercent(value: number): number {
   if (!Number.isFinite(value)) {
     return 0;
   }

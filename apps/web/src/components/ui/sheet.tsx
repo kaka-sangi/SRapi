@@ -11,8 +11,8 @@ import { cn } from "@/lib/cn";
  * bottom sheet (side="bottom").
  */
 export const Sheet = DialogPrimitive.Root;
-export const SheetTrigger = DialogPrimitive.Trigger;
-export const SheetClose = DialogPrimitive.Close;
+const SheetTrigger = DialogPrimitive.Trigger;
+const SheetClose = DialogPrimitive.Close;
 
 type Side = "left" | "right" | "bottom";
 

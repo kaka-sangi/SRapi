@@ -34,7 +34,7 @@ export const PROVIDER_PROTOCOLS: ProviderProtocol[] = [
 
 export const RESOURCE_STATUSES: ResourceStatus[] = ["active", "disabled", "pending", "archived"];
 
-export type ProviderEndpointCapabilityMode = "auto" | "on" | "off";
+type ProviderEndpointCapabilityMode = "auto" | "on" | "off";
 
 const ENDPOINT_CAPABILITY_KEYS = {
   chatCompletionsCapability: "chat_completions",
