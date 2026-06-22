@@ -45,7 +45,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
           reads as «two surfaces» rather than «one folded sheet». */}
       <aside className="sticky top-0 hidden h-dvh w-[272px] shrink-0 flex-col border-r border-srapi-border bg-srapi-card-muted/70 px-3.5 pb-4 pt-4 lg:flex">
         <SidebarBrand />
-        <div className="mt-4 flex-1 overflow-y-auto pr-1 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1">
+        <div className="mt-4 flex-1 overflow-y-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar:vertical]:hidden">
           <SidebarNav role={user.role} />
         </div>
         <div className="mt-3 flex items-center gap-3 rounded-2xl border border-srapi-border bg-srapi-card/85 p-3 shadow-[0_1px_2px_rgba(26,24,20,0.04)]">

@@ -83,7 +83,7 @@ export function AnnouncementBell() {
           ) : null}
         </div>
 
-        <div className="max-h-[min(24rem,60vh)] overflow-y-auto [scrollbar-width:thin]">
+        <div className="max-h-[min(24rem,60vh)] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar:vertical]:hidden">
           {query.isLoading ? (
             <div className="space-y-2 p-3">
               {Array.from({ length: 3 }).map((_, i) => (

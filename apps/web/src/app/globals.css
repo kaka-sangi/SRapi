@@ -2,16 +2,7 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* ============================================================
-   SRapi 设计系统 · 概念 B · 现代卡片（Claude / ChatGPT / Discourse 卡片化融合）
-   ----------------------------------------------------------------
-   2026·06 重塑：从「编辑社论暖纸」转向「友好现代卡片」。
-   - 背景仍取暖色（Claude 同源奶油白），但收敛对比、减少陶土厚度。
-   - 衬线退居展示场景，UI 主体由 Inter 承担，更接近 Anthropic / OpenAI 控制台。
-   - 卡片由「凸版压凹 + 内高光」改为「柔影 + 浅边」，符合现代 SaaS 视觉重力。
-   ============================================================ */
 @theme {
-  /* —— 奶油白纸（Cream Canvas） —— */
   --color-srapi-bg: #faf7f2;
   --color-srapi-card: #ffffff;
   --color-srapi-card-muted: #f2ece2;
@@ -23,91 +14,64 @@
   --color-srapi-border-strong: #dccdb1;
   --color-srapi-primary: #c2553b;
   --color-srapi-primary-hover: #a8472e;
-  /* accent —— 与 primary 同源；语义别名，便于差异化 */
   --color-srapi-accent: #c2553b;
   --color-srapi-accent-soft: #f4dccf;
   --color-srapi-success: #3f7a4a;
   --color-srapi-warning: #b5852e;
   --color-srapi-error: #b53d2c;
-  /* 反相主按钮（亮=炭黑） */
   --color-srapi-invert: #1a1814;
   --color-srapi-invert-fg: #fbf7ef;
 
-  /* 字族（next/font 变量在 layout.tsx 注入 body）
-     标题用 Cormorant Garamond（高对比展示衬线，frontend-design / canvas-design 首选）。 */
   --font-serif: var(--font-serif-display), "Cormorant Garamond", Georgia, serif;
   --font-sans: var(--font-inter), "Inter", system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), "JetBrains Mono", monospace;
 
-  /* —— 字阶（size / line-height / letter-spacing 三件套）——
-     正文下限 12px；11px 仅限 mono 大写小标签。 */
-  --text-2xs: 0.6875rem;            /* 11px */
+  --text-2xs: 0.6875rem;
   --text-2xs--line-height: 1.45;
   --text-2xs--letter-spacing: 0.04em;
-  --text-xs: 0.75rem;               /* 12px */
+  --text-xs: 0.75rem;
   --text-xs--line-height: 1.5;
-  --text-sm: 0.8125rem;             /* 13px */
+  --text-sm: 0.8125rem;
   --text-sm--line-height: 1.55;
-  --text-base: 0.875rem;            /* 14px */
+  --text-base: 0.875rem;
   --text-base--line-height: 1.62;
-  --text-md: 1rem;                  /* 16px */
+  --text-md: 1rem;
   --text-md--line-height: 1.6;
-  --text-lg: 1.125rem;              /* 18px */
+  --text-lg: 1.125rem;
   --text-lg--line-height: 1.5;
   --text-lg--letter-spacing: -0.005em;
-  --text-xl: 1.375rem;              /* 22px */
+  --text-xl: 1.375rem;
   --text-xl--line-height: 1.35;
   --text-xl--letter-spacing: -0.01em;
-  --text-2xl: 1.75rem;              /* 28px */
+  --text-2xl: 1.75rem;
   --text-2xl--line-height: 1.2;
   --text-2xl--letter-spacing: -0.018em;
-  --text-3xl: 2.125rem;             /* 34px */
+  --text-3xl: 2.125rem;
   --text-3xl--line-height: 1.14;
   --text-3xl--letter-spacing: -0.022em;
-  --text-4xl: 3rem;                 /* 48px */
+  --text-4xl: 3rem;
   --text-4xl--line-height: 1.05;
   --text-4xl--letter-spacing: -0.025em;
-  --text-5xl: 4rem;                 /* 64px — dramatic hero contrast */
+  --text-5xl: 4rem;
   --text-5xl--line-height: 1.0;
   --text-5xl--letter-spacing: -0.03em;
-  --text-6xl: 5rem;                 /* 80px */
+  --text-6xl: 5rem;
   --text-6xl--line-height: 0.98;
   --text-6xl--letter-spacing: -0.032em;
 
-  /* 圆角语言 */
-  --radius-sm: 0.25rem;       /* 4px */
-  --radius-md: 0.5rem;        /* 8px */
-  --radius-lg: 0.625rem;      /* 10px */
-  --radius-xl: 0.75rem;       /* 12px */
-  --radius-2xl: 1rem;         /* 16px — 大卡片 hero */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
   --radius-pill: 9999px;
 
-  /* 缓动 —— bloom 用于克制进场；spring 系列提供「有存在感」的弹性 */
-  --ease-bloom: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);       /* 强减速，进场默认 */
-  --ease-spring: cubic-bezier(0.34, 1.4, 0.5, 1);          /* 轻微 overshoot（hover / 交互） */
-  --ease-spring-bounce: cubic-bezier(0.34, 1.56, 0.64, 1); /* 明显回弹（强调动作） */
-
-  /* 流体展示字阶（masthead）—— 随视口连续缩放，消除 sm: 断点处的字号跳变。
-     桌面封顶 4.5rem：在叙事列宽内让「一个入口，接入」保持单行，不再把动词「接入」挤成孤行。 */
   --text-hero: clamp(2.75rem, 1.6rem + 4.6vw, 4.5rem);
   --text-hero--line-height: 1.04;
   --text-hero--letter-spacing: -0.028em;
-
-  /* —— Aurora 渐变色调（landing / dashboard hero、empty state 装饰、
-     spotlight 卡片的 mouse-following 高光、活动态侧栏垂直光带）—— */
-  --aurora-primary: color-mix(in oklab, var(--color-srapi-primary) 35%, transparent);
-  --aurora-warm:    color-mix(in oklab, var(--color-srapi-warning) 28%, transparent);
-  --aurora-cool:    color-mix(in oklab, var(--color-srapi-success) 22%, transparent);
-  --aurora-ivory:   color-mix(in oklab, #f8e1c8 26%, transparent);
-
-  /* 高度阶梯（elevation）—— 从浅到深的统一阴影语言，配合 .card-interactive */
-  --shadow-e1: 0 1px 2px rgba(28, 26, 23, 0.04);
-  --shadow-e2: 0 2px 6px -2px rgba(28, 26, 23, 0.06), 0 8px 24px -10px rgba(28, 26, 23, 0.1);
-  --shadow-e3: 0 10px 26px -8px rgba(28, 26, 23, 0.14), 0 22px 48px -16px rgba(28, 26, 23, 0.12);
 }
 
-/* —— 深邃墨水 (Ink Dark) —— */
+/* Dark */
 .dark {
   --color-srapi-bg: #131210;
   --color-srapi-card: #1c1a17;
@@ -131,10 +95,7 @@
 
 html {
   color-scheme: light;
-  /* 平滑滚动 —— 配合 ScrollProgress 让长表/日志页的滚动体验更跟手；
-     prefers-reduced-motion 在 §9.2 处统一关闭。 */
   scroll-behavior: smooth;
-  /* 隐藏滚动条（Firefox 标准属性） */
   scrollbar-width: none;
 }
 html.dark {
@@ -153,11 +114,6 @@ body {
   font-feature-settings: "cv05", "ss01", "calt", "kern";
 }
 
-/* 衬线 —— 2026·06 重塑：全局 .font-serif 改用 Inter 半粗 + 紧字距，
-   不再渲染 Cormorant Garamond。这是「全面无衬线」的工程开关，避免逐文件
-   清理 N 处历史代码；保留 Cormorant 字体下载（次级用途仍可经 CSS variable
-   var(--font-serif-display) 显式调用），但默认体验完全对齐 Claude / ChatGPT
-   控制台的现代无衬线身份。 */
 .font-serif {
   font-family: var(--font-inter), "Inter", system-ui, -apple-system, sans-serif;
   font-weight: 600;
@@ -165,7 +121,6 @@ body {
   letter-spacing: -0.012em;
 }
 
-/* 数字一律等宽，避免表格 / 指标跳动 */
 .font-mono {
   font-family: var(--font-jetbrains), "JetBrains Mono", ui-monospace, monospace;
 }
@@ -175,38 +130,30 @@ body {
   font-feature-settings: "tnum", "zero", "ss03";
 }
 
-/* 暖色对焦环（禁止系统亮蓝）— 仅键盘聚焦时显示的克制细环，非点击高亮 */
+/* Focus ring */
 *:focus-visible {
   outline: none;
   box-shadow:
     0 0 0 1.5px var(--color-srapi-bg),
     0 0 0 3px color-mix(in srgb, var(--color-srapi-primary) 32%, transparent);
 }
-/* 聚焦态【不】统一设置 border-radius。Tailwind 的 rounded-* 工具类位于 @layer 内，
-   任何非分层规则（哪怕 :where() 零特异度）都会盖过它，强设圆角会把输入框/下拉的圆角
-   压成方框（这正是「点击输入框变方框」bug 的根因）。焦点环用 box-shadow，本就会自动
-   贴合元素自身圆角，无需也不应再设 radius。 */
-/* 鼠标点击不应留下聚焦环（部分元素如复选框默认会在点击后命中 :focus-visible） */
 input:focus:not(:focus-visible),
 button:focus:not(:focus-visible),
 [role="button"]:focus:not(:focus-visible),
 [role="checkbox"]:focus:not(:focus-visible) {
   box-shadow: none;
 }
-/* 文本输入框 / 文本域 / 下拉触发器用「边框变深」表达聚焦，不再叠加暖色环——
-   否则深色边框外再套一圈赤陶色看起来像红框/报错。环留给按钮、链接、复选框。 */
 input:not([type="checkbox"]):not([type="radio"]):focus-visible,
 textarea:focus-visible,
 [role="combobox"]:focus-visible {
   box-shadow: none;
 }
 
-/* 选区 */
 ::selection {
   background: color-mix(in srgb, var(--color-srapi-primary) 22%, transparent);
 }
 
-/* —— 浮层动效（自带,不依赖 tailwindcss-animate）—— */
+/* Overlay animations (functional — dialogs, sheets, toasts, pet) */
 @keyframes srapi-fade-in { from { opacity: 0 } to { opacity: 1 } }
 @keyframes srapi-fade-out { from { opacity: 1 } to { opacity: 0 } }
 @keyframes srapi-pop-in {
@@ -236,7 +183,6 @@ textarea:focus-visible,
 .srapi-anim-dialog[data-state="open"] { animation: srapi-dialog-in 190ms cubic-bezier(0.16, 1, 0.3, 1) backwards }
 .srapi-anim-dialog[data-state="closed"] { animation: srapi-dialog-out 140ms ease-in backwards }
 
-/* 边缘抽屉（Sheet）滑入 */
 @keyframes srapi-sheet-left-in { from { transform: translateX(-100%) } to { transform: translateX(0) } }
 @keyframes srapi-sheet-left-out { from { transform: translateX(0) } to { transform: translateX(-100%) } }
 @keyframes srapi-sheet-right-in { from { transform: translateX(100%) } to { transform: translateX(0) } }
@@ -251,7 +197,6 @@ textarea:focus-visible,
 .srapi-anim-sheet-bottom[data-state="open"] { animation: srapi-sheet-bottom-in 260ms cubic-bezier(0.16, 1, 0.3, 1) backwards }
 .srapi-anim-sheet-bottom[data-state="closed"] { animation: srapi-sheet-bottom-out 210ms ease-in backwards }
 
-/* Toast：从右侧滑入 / 滑出，滑动手势跟随手指（Radix data-swipe 变量） */
 @keyframes srapi-toast-in {
   from { opacity: 0; transform: translateX(16px) }
   to { opacity: 1; transform: translateX(0) }
@@ -266,10 +211,9 @@ textarea:focus-visible,
 .srapi-anim-toast[data-swipe="cancel"] { transform: translateX(0); transition: transform 200ms ease-out }
 .srapi-anim-toast[data-swipe="end"] { animation: srapi-toast-out 200ms ease-out }
 
-/* Toast progress bar countdown */
 @keyframes toast-progress { from { transform: scaleX(1) } to { transform: scaleX(0) } }
 
-/* 小r 宠物：浮层从右下角弹出 / 收回；待机呼吸 + 眨眼 */
+/* Pet */
 @keyframes srapi-pet-in {
   from { opacity: 0; transform: translateY(14px) scale(0.82) }
   to { opacity: 1; transform: none }
@@ -305,7 +249,7 @@ textarea:focus-visible,
   .srapi-pet-blink { animation: none !important }
 }
 
-/* 滚动条：隐藏竖向，保留横向 */
+/* Scrollbar: hide vertical, keep horizontal */
 ::-webkit-scrollbar:vertical {
   width: 0;
   display: none;
@@ -322,64 +266,7 @@ textarea:focus-visible,
   background: transparent;
 }
 
-/* ============================================================
-   §4.1 极轻纸张噪点（克制至 2%，仅暗示纸感不再「纸张身份」）
-   ============================================================ */
-.paper-grain::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  opacity: 0.022;
-  pointer-events: none;
-  z-index: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-.dark .paper-grain::before {
-  opacity: 0.035;
-}
-
-/* ============================================================
-   §4.2 现代柔影卡片（替代 letterpress 内高光）
-   - 取消「内 1px 白色高光环」——它造成卡片像贴在纸上的「凸版印刷」感，
-     与 Claude / ChatGPT 的轻柔卡片语言冲突。
-   - 改用 0/0/0 base + 中距柔影 + 远距大模糊，呈现「漂浮在桌面上」的现代感。
-   - hover 不再「上浮 1px」，改 2px + 阴影加深，让交互态更明确，
-     符合 hub.linux.do 卡片栅格的「点我」反馈。
-   ============================================================ */
-.tactile-card {
-  box-shadow:
-    0 1px 2px rgba(26, 24, 20, 0.04),
-    0 4px 14px -6px rgba(26, 24, 20, 0.05);
-}
-.dark .tactile-card {
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.45),
-    0 8px 24px -10px rgba(0, 0, 0, 0.45);
-}
-
-/* Interactive cards lift on hover, with a warmer terracotta-tinted shadow
-   that hints at the brand without coloring the surface itself. */
-.card-interactive {
-  cursor: pointer;
-}
-.card-interactive:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    0 2px 4px rgba(26, 24, 20, 0.05),
-    0 14px 32px -10px rgba(194, 85, 59, 0.18),
-    0 22px 50px -18px rgba(26, 24, 20, 0.12);
-  border-color: var(--color-srapi-border-strong);
-}
-.dark .card-interactive:hover {
-  box-shadow:
-    0 2px 4px rgba(0, 0, 0, 0.5),
-    0 18px 42px -14px rgba(226, 135, 107, 0.18),
-    0 24px 60px -18px rgba(0, 0, 0, 0.55);
-}
-
-/* ============================================================
-   §4.3 物理仪表型 Quota 轨道（1px 刻度针）
-   ============================================================ */
+/* Quota rail (functional) */
 .quota-rail {
   position: relative;
   height: 1px;
@@ -392,7 +279,7 @@ textarea:focus-visible,
   width: 1px;
   height: 13px;
   background: var(--color-srapi-primary);
-  transition: left 0.5s var(--ease-bloom);
+  transition: left 0.5s ease;
 }
 .quota-rail .quota-notch[data-level="warn"] {
   background: var(--color-srapi-warning);
@@ -401,9 +288,7 @@ textarea:focus-visible,
   background: var(--color-srapi-error);
 }
 
-/* ============================================================
-   §5 流式打字游标
-   ============================================================ */
+/* Streaming cursor (functional) */
 .stream-cursor {
   display: inline-block;
   width: 3px;
@@ -414,13 +299,8 @@ textarea:focus-visible,
   animation: stream-blink 0.85s ease-in-out infinite;
 }
 @keyframes stream-blink {
-  0%,
-  100% {
-    opacity: 0.2;
-  }
-  50% {
-    opacity: 1;
-  }
+  0%, 100% { opacity: 0.2 }
+  50% { opacity: 1 }
 }
 .stream-line {
   white-space: pre-wrap;
@@ -429,162 +309,7 @@ textarea:focus-visible,
   margin: 3px 0;
 }
 
-/* ============================================================
-   §6 黄金阻尼进场（Editorial Bloom）+ 交错阶梯
-   ============================================================ */
-.animate-bloom {
-  opacity: 0;
-  animation: editorial-bloom 700ms var(--ease-bloom) forwards;
-}
-@keyframes editorial-bloom {
-  from {
-    opacity: 0;
-    transform: translateY(16px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-.bloom-delay-1 {
-  animation-delay: 90ms;
-}
-.bloom-delay-2 {
-  animation-delay: 180ms;
-}
-.bloom-delay-3 {
-  animation-delay: 270ms;
-}
-
-/* ============================================================
-   §6.1 弹性进场（Spring Rise）+ 可编排交错（stagger）
-   比 bloom 位移更大、带轻微 overshoot 回落 —— 「有存在感」的动效性格。
-   编排次序用 --stagger-index：style={{ ["--stagger-index"]: n }}
-   ============================================================ */
-@keyframes spring-rise {
-  0% {
-    opacity: 0;
-    transform: translateY(26px) scale(0.985);
-  }
-  55% {
-    opacity: 1;
-  }
-  72% {
-    transform: translateY(-4px) scale(1.004); /* overshoot —— 这一帧让它「弹」 */
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-.anim-rise {
-  opacity: 0;
-  animation: spring-rise 660ms var(--ease-out-quint) both;
-  animation-delay: calc(var(--stagger-index, 0) * 85ms);
-}
-
-/* eyebrow 小标尺：进场时从左「抽出」生长，与文字错峰 */
-@keyframes rule-grow {
-  from {
-    transform: scaleX(0);
-  }
-  to {
-    transform: scaleX(1);
-  }
-}
-.anim-rule {
-  transform-origin: left center;
-  animation: rule-grow 720ms var(--ease-spring) both;
-  animation-delay: calc(var(--stagger-index, 0) * 85ms + 140ms);
-}
-
-/* 行 / 消息 / 卡片网格等密集场景用的轻量进场（位移更小、更快、交错更紧） */
-@keyframes rise-sm {
-  0% {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.anim-rise-sm {
-  opacity: 0;
-  animation: rise-sm 460ms var(--ease-out-quint) both;
-  animation-delay: calc(var(--stagger-index, 0) * 45ms);
-}
-
-/* 校验失败的轻微横向抖动 —— 把注意力拉回表单（配合滚动到首个错误字段） */
-@keyframes form-shake {
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-  15% {
-    transform: translateX(-7px);
-  }
-  30% {
-    transform: translateX(6px);
-  }
-  45% {
-    transform: translateX(-4px);
-  }
-  60% {
-    transform: translateX(3px);
-  }
-  75% {
-    transform: translateX(-2px);
-  }
-}
-.anim-shake {
-  animation: form-shake 380ms ease-in-out;
-}
-
-/* 页面级进场 —— 挂在 AppShell 的 <main> 上，每次进入整页柔和淡入。
-   纯 opacity（不带位移），与各区块自己的 rise/stagger 零冲突地叠加。 */
-@keyframes page-enter {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-.anim-page {
-  animation: page-enter 300ms var(--ease-out-quint) both;
-}
-
-/* 实心按钮 hover 物理抬升（primary / accent / danger 挂 .btn-raise；
-   过渡曲线由 Button 基类的 transition 提供，这里只声明目标态）。 */
-.btn-raise:hover:not(:disabled) {
-  transform: translateY(-1.5px);
-  box-shadow: 0 6px 18px -6px rgba(28, 26, 23, 0.4);
-}
-.dark .btn-raise:hover:not(:disabled) {
-  box-shadow: 0 7px 20px -7px rgba(0, 0, 0, 0.6);
-}
-.btn-raise:active:not(:disabled) {
-  transform: translateY(0) scale(0.97); /* 按下：落回并轻微下压 */
-}
-
-/* 图标 / 标记弹入（复制成功的对勾等小细节） */
-@keyframes pop-in {
-  from {
-    opacity: 0;
-    transform: scale(0.4);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-.anim-pop-in {
-  animation: pop-in 240ms var(--ease-spring-bounce);
-}
-
-/* 骨架微光扫过 —— 比单纯的透明度脉冲更有「正在加载」的高级质感。
-   挂在 .skeleton-shimmer 上（含 overflow 裁剪，光带贴合圆角）。 */
+/* Skeleton loading (functional) */
 .skeleton-shimmer {
   position: relative;
   overflow: hidden;
@@ -601,71 +326,39 @@ textarea:focus-visible,
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
 }
 @keyframes skeleton-shimmer {
-  100% {
-    transform: translateX(100%);
-  }
+  100% { transform: translateX(100%) }
+}
+.skeleton-pulse {
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.55 }
+  50% { opacity: 1 }
 }
 
-/* ============================================================
-   §6.2 可交互卡片 transition（hover 抬升 + 柔影加深）
-   实际阴影规则定义在 §4.2，这里只统一过渡曲线与 active 回落。
-   ============================================================ */
-.card-interactive {
-  transition:
-    transform 240ms var(--ease-spring),
-    box-shadow 260ms var(--ease-out-quint),
-    border-color 200ms ease;
+/* Form validation shake (functional) */
+@keyframes form-shake {
+  0%, 100% { transform: translateX(0) }
+  15% { transform: translateX(-7px) }
+  30% { transform: translateX(6px) }
+  45% { transform: translateX(-4px) }
+  60% { transform: translateX(3px) }
+  75% { transform: translateX(-2px) }
 }
-.card-interactive:active {
-  transform: translateY(-1px);
-  transition-duration: 120ms;
+.anim-shake {
+  animation: form-shake 380ms ease-in-out;
 }
 
-/* 焦点卡片（focal / raised）—— Landing 登录、对话框、关键 hero 卡。
-   阴影比默认 tactile 更深，但仍是柔影语言，不再有 letterpress 内高光。 */
-.card-raised {
-  box-shadow:
-    0 1px 2px rgba(26, 24, 20, 0.05),
-    0 14px 30px -10px rgba(26, 24, 20, 0.12),
-    0 30px 60px -24px rgba(26, 24, 20, 0.18);
+/* Icon pop-in (functional — copy confirmation etc.) */
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.4) }
+  to { opacity: 1; transform: scale(1) }
 }
-.dark .card-raised {
-  box-shadow:
-    0 2px 4px rgba(0, 0, 0, 0.5),
-    0 18px 40px -14px rgba(0, 0, 0, 0.55),
-    0 32px 70px -22px rgba(0, 0, 0, 0.7);
+.anim-pop-in {
+  animation: pop-in 240ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* ============================================================
-   §6.2b 现代软卡片（card-soft）—— 类 hub.linux.do / Discourse 列表块
-   只用 border 暗示边界，rest 态无阴影，hover 时浅浅浮起。
-   适合：导航卡、分类卡、设置项、frequently-clicked entry 卡。
-   ============================================================ */
-.card-soft {
-  background-color: var(--color-srapi-card);
-  border: 1px solid var(--color-srapi-border);
-  border-radius: var(--radius-lg);
-  transition:
-    transform 220ms var(--ease-spring),
-    box-shadow 220ms var(--ease-out-quint),
-    border-color 180ms ease;
-}
-.card-soft:hover {
-  transform: translateY(-2px);
-  border-color: var(--color-srapi-border-strong);
-  box-shadow:
-    0 2px 4px rgba(26, 24, 20, 0.04),
-    0 10px 26px -8px rgba(194, 85, 59, 0.16);
-}
-.dark .card-soft:hover {
-  box-shadow:
-    0 2px 4px rgba(0, 0, 0, 0.45),
-    0 14px 34px -10px rgba(226, 135, 107, 0.18);
-}
-
-/* ============================================================
-   §6.3 排版细节：标题平衡断行 / 正文优化孤字
-   ============================================================ */
+/* Typography */
 :where(h1, h2, h3) {
   text-wrap: balance;
 }
@@ -673,152 +366,7 @@ textarea:focus-visible,
   text-wrap: pretty;
 }
 
-/* 骨架脉冲 */
-.skeleton-pulse {
-  animation: skeleton-pulse 1.4s ease-in-out infinite;
-}
-@keyframes skeleton-pulse {
-  0%,
-  100% {
-    opacity: 0.55;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
-/* ============================================================
-   §7 Aurora 视觉语汇（2026·06 重塑·B 阶段）
-   ----------------------------------------------------------------
-   把 SRapi 从「干净 SaaS 模板」推到「有设计机敏度」——
-   Aurora 多色径向渐变 blob、spotlight 鼠标追光、glass 磨砂、
-   渐变文字、活动态垂直光带、滚动渐变接缝。
-   所有动效尊重 prefers-reduced-motion（见 §9.2）。
-   ============================================================ */
-
-/* §7.1 Aurora 漂移 —— blob 缓慢翻转，模拟极光层流 */
-@keyframes srapi-aurora-drift {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-  33%      { transform: translate3d(3%, -5%, 0) scale(1.06); }
-  66%      { transform: translate3d(-4%, 4%, 0) scale(0.94); }
-}
-@keyframes srapi-aurora-pulse {
-  0%, 100% { opacity: 0.55; }
-  50%      { opacity: 0.85; }
-}
-.aurora-drift {
-  animation: srapi-aurora-drift 28s ease-in-out infinite;
-  will-change: transform;
-}
-.aurora-drift-slow {
-  animation: srapi-aurora-drift 42s ease-in-out infinite reverse;
-  will-change: transform;
-}
-.aurora-pulse {
-  animation: srapi-aurora-pulse 14s ease-in-out infinite;
-}
-
-/* §7.2 渐变文字 —— hero 数字 / 大标题口音色。Webkit 全家通用。 */
-.text-aurora {
-  background-image: linear-gradient(
-    100deg,
-    var(--color-srapi-text-primary) 0%,
-    var(--color-srapi-primary) 55%,
-    var(--color-srapi-warning) 100%
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-.dark .text-aurora {
-  background-image: linear-gradient(
-    100deg,
-    var(--color-srapi-text-primary) 0%,
-    var(--color-srapi-primary) 55%,
-    #ffd9a8 100%
-  );
-}
-
-/* §7.3 Spotlight 卡片 —— 鼠标追踪径向高光，配合 SpotlightCard 组件 */
-.card-spotlight {
-  position: relative;
-  isolation: isolate;
-}
-.card-spotlight::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 320ms var(--ease-out-quint);
-  background: radial-gradient(
-    420px circle at var(--spot-x, 50%) var(--spot-y, 50%),
-    color-mix(in oklab, var(--color-srapi-primary) 16%, transparent),
-    transparent 58%
-  );
-  z-index: 1;
-  border-radius: inherit;
-}
-.card-spotlight:hover::before { opacity: 1; }
-.card-spotlight > * { position: relative; z-index: 2; }
-
-/* §7.4 玻璃磨砂层 —— 给 dialog 背景 / 抽屉头 / 浮层用 */
-.glass-frosted {
-  background: color-mix(in oklab, var(--color-srapi-card) 78%, transparent);
-  backdrop-filter: saturate(140%) blur(14px);
-  -webkit-backdrop-filter: saturate(140%) blur(14px);
-}
-.glass-frosted-strong {
-  background: color-mix(in oklab, var(--color-srapi-card) 88%, transparent);
-  backdrop-filter: saturate(160%) blur(22px);
-  -webkit-backdrop-filter: saturate(160%) blur(22px);
-}
-
-/* §7.5 侧栏活动项垂直光带 —— 在活动 nav 链接的左缘画一段渐变高光 */
-.nav-active-glow {
-  position: relative;
-}
-.nav-active-glow::before {
-  content: "";
-  position: absolute;
-  left: -2px;
-  top: 22%;
-  bottom: 22%;
-  width: 3px;
-  border-radius: 9999px;
-  background: linear-gradient(
-    180deg,
-    transparent,
-    var(--color-srapi-primary) 35%,
-    var(--color-srapi-warning) 75%,
-    transparent
-  );
-  box-shadow: 0 0 12px 0 color-mix(in oklab, var(--color-srapi-primary) 50%, transparent);
-}
-
-/* §7.6 TopNav 渐变接缝 —— 滚动时给顶栏底部加一道极细的暖色渐变线 */
-.topnav-seam {
-  position: relative;
-}
-.topnav-seam::after {
-  content: "";
-  position: absolute;
-  inset-inline: 0;
-  bottom: -1px;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in oklab, var(--color-srapi-primary) 38%, transparent) 30%,
-    color-mix(in oklab, var(--color-srapi-warning) 30%, transparent) 70%,
-    transparent
-  );
-  opacity: 0;
-  transition: opacity 240ms ease;
-}
-.topnav-seam[data-scrolled="true"]::after { opacity: 1; }
-
-/* §7.7 Bento 网格 —— Tailwind 难以表达的「12 单位 + 命名跨度」 */
+/* Bento grid (functional layout) */
 .bento {
   display: grid;
   gap: 1.25rem;
@@ -843,14 +391,7 @@ textarea:focus-visible,
   .bento > * { grid-column: span 2; }
 }
 
-/* §7.8 Magnetic icon —— icon-bubble hover 时被父元素轻微「吸住」抬升 */
-.magnetic-icon {
-  transition: transform 220ms var(--ease-spring);
-}
-.group:hover .magnetic-icon { transform: translateY(-2px) scale(1.06); }
-
-/* §7.9b 数据层级对比 —— 让一屏里「主指标 / 次要指标 / 参考数」一眼有别。
-   单纯靠字号区分太弱，加 font-weight + color token 三档对比。 */
+/* Metric typography (functional) */
 .metric-primary {
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -871,16 +412,16 @@ textarea:focus-visible,
 .metric-strong-warn { color: var(--color-srapi-warning); font-weight: 600; font-variant-numeric: tabular-nums; }
 .metric-strong-bad  { color: var(--color-srapi-error);   font-weight: 600; font-variant-numeric: tabular-nums; }
 
-/* 行内 hover 详情 —— 表格/日志行展开容器，配合 detail-row-open data-attr */
+/* Row expand (functional) */
 .row-expand {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows 220ms var(--ease-out-quint);
+  transition: grid-template-rows 220ms ease;
 }
 .row-expand > * { overflow: hidden; }
 .row-expand[data-open="true"] { grid-template-rows: 1fr; }
 
-/* 日志行 severity 左色条 —— 不靠背景填充，只靠 2.5px 左条 + 浅 hover */
+/* Log row severity bar (functional) */
 .log-row {
   position: relative;
   transition: background-color 140ms ease;
@@ -898,65 +439,63 @@ textarea:focus-visible,
 .log-row[data-sev="success"]::before  { background: var(--color-srapi-success); }
 .log-row[data-sev="warning"]::before  { background: var(--color-srapi-warning); }
 .log-row[data-sev="error"]::before    { background: var(--color-srapi-error); }
-.log-row[data-sev="critical"]::before { background: var(--color-srapi-error); box-shadow: 0 0 12px 0 color-mix(in oklab, var(--color-srapi-error) 55%, transparent); }
+.log-row[data-sev="critical"]::before { background: var(--color-srapi-error); }
 .log-row:hover { background-color: color-mix(in oklab, var(--color-srapi-card-muted) 50%, transparent); }
 
-/* §7.9 Decorative dot grid —— admin hero band 角落留白处的细节装饰 */
-.dot-grid-overlay {
-  background-image: radial-gradient(
-    color-mix(in oklab, var(--color-srapi-primary) 22%, transparent) 1px,
-    transparent 1px
-  );
-  background-size: 14px 14px;
-  background-position: 0 0;
-  mask-image: linear-gradient(135deg, black, transparent 65%);
-  -webkit-mask-image: linear-gradient(135deg, black, transparent 65%);
-}
-
 /* ============================================================
-   §9.2 Reduced Motion
+   Stripped decorative classes — kept as safe no-ops so
+   components referencing them don't break.
    ============================================================ */
+.paper-grain::before { display: none; }
+.tactile-card {}
+.card-interactive { cursor: pointer; }
+.card-raised {}
+.card-soft {
+  background-color: var(--color-srapi-card);
+  border: 1px solid var(--color-srapi-border);
+  border-radius: var(--radius-lg);
+}
+.card-spotlight { position: relative; }
+.card-spotlight::before { display: none; }
+.glass-frosted {
+  background: var(--color-srapi-card);
+}
+.glass-frosted-strong {
+  background: var(--color-srapi-card);
+}
+.text-aurora {
+  color: var(--color-srapi-primary);
+}
+.nav-active-glow {
+  position: relative;
+}
+.nav-active-glow::before {
+  content: "";
+  position: absolute;
+  left: -2px;
+  top: 22%;
+  bottom: 22%;
+  width: 2.5px;
+  border-radius: 9999px;
+  background: var(--color-srapi-primary);
+}
+.topnav-seam {}
+.topnav-seam::after { display: none; }
+.dot-grid-overlay { background: none; }
+.magnetic-icon {}
+.btn-raise {}
+.animate-bloom { opacity: 1; }
+.anim-rise { opacity: 1; }
+.anim-rise-sm { opacity: 1; }
+.anim-rule { opacity: 1; }
+.anim-page { opacity: 1; }
+
+/* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  .animate-bloom,
-  .anim-rise,
-  .anim-rise-sm,
-  .anim-rule,
-  .anim-shake,
-  .anim-page,
-  .anim-pop-in {
-    animation: none;
-    opacity: 1;
-    transform: none;
-  }
-  .card-interactive:hover,
-  .btn-raise:hover:not(:disabled),
-  .btn-raise:active:not(:disabled) {
-    transform: none;
-  }
-  .aurora-drift,
-  .aurora-drift-slow,
-  .aurora-pulse,
-  .magnetic-icon {
-    animation: none !important;
-    transform: none !important;
-  }
-  .group:hover .magnetic-icon { transform: none; }
   html { scroll-behavior: auto; }
   .row-expand { transition: none; }
-  .stream-cursor {
-    animation: none;
-    opacity: 0.6;
-  }
-  .skeleton-pulse {
-    animation: none;
-  }
-  .skeleton-shimmer::after {
-    animation: none;
-    opacity: 0;
-  }
-  *,
-  *::before,
-  *::after {
-    scroll-behavior: auto !important;
-  }
+  .stream-cursor { animation: none; opacity: 0.6; }
+  .skeleton-pulse { animation: none; }
+  .skeleton-shimmer::after { animation: none; opacity: 0; }
+  *, *::before, *::after { scroll-behavior: auto !important; }
 }
