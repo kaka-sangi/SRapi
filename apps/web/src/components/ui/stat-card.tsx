@@ -4,6 +4,7 @@ import * as React from "react";
 import { cn } from "@/lib/cn";
 import { Card } from "./card";
 import { Sparkline } from "@/components/charts/sparkline";
+import { DataTooltip, type DataTooltipRow } from "./data-tooltip";
 
 /**
  * Count a number up from its previous value to `target` on a rAF loop
@@ -66,6 +67,13 @@ export function StatCardSkeleton({ className }: { className?: string }) {
   );
 }
 
+export interface StatCardTooltip {
+  title?: React.ReactNode;
+  primary?: React.ReactNode;
+  rows?: DataTooltipRow[];
+  footer?: React.ReactNode;
+}
+
 export function StatCard({
   label,
   value,
@@ -74,6 +82,7 @@ export function StatCard({
   trend,
   spark,
   icon,
+  tooltip,
   className,
   style,
   format,
@@ -87,6 +96,8 @@ export function StatCard({
   spark?: number[];
   /** Optional lucide icon — renders as a soft accent bubble in the top-right. */
   icon?: React.ReactNode;
+  /** When provided, hovering the icon bubble reveals a rich data popover. */
+  tooltip?: StatCardTooltip;
   className?: string;
   style?: React.CSSProperties;
   /** Formats the live count-up value; defaults to a rounded integer. */
@@ -109,9 +120,23 @@ export function StatCard({
           {label}
         </span>
         {icon && (
-          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-srapi-accent-soft text-srapi-primary transition-transform duration-200 group-hover:scale-105 [&>svg]:size-4">
-            {icon}
-          </span>
+          tooltip ? (
+            <DataTooltip
+              title={tooltip.title ?? label}
+              primary={tooltip.primary}
+              rows={tooltip.rows}
+              footer={tooltip.footer}
+              side="left"
+            >
+              <span className="grid size-9 shrink-0 cursor-help place-items-center rounded-xl bg-srapi-accent-soft text-srapi-primary transition-transform duration-200 group-hover:scale-105 [&>svg]:size-4">
+                {icon}
+              </span>
+            </DataTooltip>
+          ) : (
+            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-srapi-accent-soft text-srapi-primary transition-transform duration-200 group-hover:scale-105 [&>svg]:size-4">
+              {icon}
+            </span>
+          )
         )}
       </div>
       <div className="mt-4 flex items-baseline gap-1.5 text-3xl font-semibold leading-none tracking-tight text-srapi-text-primary tabular sm:text-[2.25rem]">

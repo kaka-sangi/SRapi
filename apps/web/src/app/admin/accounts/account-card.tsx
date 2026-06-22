@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DataPill } from "@/components/ui/data-pill";
+import { DataTooltip } from "@/components/ui/data-tooltip";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Pagination } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -239,18 +240,36 @@ function AccountCard({
     ? t("adminAccounts.proxyConfigured")
     : t("adminAccounts.noProxy");
   const groups = account.group_ids ?? [];
-  const visibleGroups = groups.slice(0, 3).map((id) => groupNameById.get(String(id)) ?? `#${id}`);
-  const extraGroupCount = Math.max(0, groups.length - visibleGroups.length);
+  const groupNames = groups.map((id) => groupNameById.get(String(id)) ?? `#${id}`);
   const hasTodayUsage = Boolean(today && today.requests > 0);
   const hasIdentity = identity.primary !== account.name || identity.secondary.length > 0;
   const routeLabel = `P${account.priority ?? 0} / W${account.weight ?? 1}`;
+  // Pre-compute «more details» bag for the "+N" pill that opens a DataTooltip
+  // listing every secondary fact (capacity, profile, all groups, endpoints,
+  // identity secondaries). Visible pills stay minimal — modelPolicy / proxy
+  // / route only — for a clean card.
+  const detailRows = [
+    ...endpointFacts.map((f) => ({
+      label: f.label,
+      value: f.value,
+      tone: (f.tone === "enabled" ? "success" : "muted") as "success" | "muted",
+    })),
+    ...capacityFacts.map((f) => ({ label: f.label, value: f.value, tone: "muted" as const })),
+    ...profileFacts.map((f) => ({ label: f.label, value: f.value, tone: "muted" as const })),
+    ...identity.secondary.map((v) => ({ label: t("adminAccounts.identityLabel") ?? "Identity", value: v, tone: "muted" as const })),
+    ...groupNames.map((n) => ({ label: t("nav.adminGroups") ?? "Group", value: n, tone: "muted" as const })),
+  ];
+  const detailCount = detailRows.length;
+
+  // Today summary numeric for hierarchy
+  const todayTokens = today ? (today.total_tokens || today.input_tokens + today.output_tokens) : 0;
   return (
     <article
       className={cn(
-        "rounded-2xl border border-srapi-border bg-srapi-card shadow-[0_1px_2px_rgba(26,24,20,0.04)] transition-colors",
+        "group flex flex-col rounded-2xl border border-srapi-border bg-srapi-card shadow-[0_1px_2px_rgba(26,24,20,0.04)] transition-all duration-200",
         account.status === "disabled" && "opacity-55",
-        selected && "border-srapi-primary/50 bg-srapi-card-muted",
-        onDetail && "cursor-pointer hover:border-srapi-border-strong",
+        selected && "border-srapi-primary/50 bg-srapi-accent-soft/40 ring-1 ring-srapi-primary/30",
+        onDetail && "cursor-pointer hover:-translate-y-0.5 hover:border-srapi-border-strong hover:shadow-[0_8px_24px_-12px_rgba(194,85,59,0.18),0_2px_4px_rgba(26,24,20,0.04)]",
       )}
       onClick={(e) => {
         if (!onDetail) return;
@@ -259,158 +278,170 @@ function AccountCard({
         onDetail();
       }}
     >
-      {/* Header */}
-      <div className="flex items-start gap-3 px-5 pt-5 pb-3">
+      {/* §1 Header — name + provider + identity (single tight stack) */}
+      <div className="flex items-start gap-3 px-5 pt-5 pb-4">
         {onSelect ? (
           <Checkbox
             aria-label="select row"
             checked={selected}
             onChange={() => onSelect()}
-            className="mt-0.5"
+            className="mt-1"
           />
         ) : null}
         <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="truncate text-sm font-semibold tracking-tight text-srapi-text-primary">
-              {account.name}
-            </h3>
+          <div className="flex items-start justify-between gap-3">
+            <h3 className="metric-primary truncate text-base">{account.name}</h3>
             <div className="shrink-0">{actions}</div>
           </div>
-          <div className="mt-1.5 flex min-w-0 items-center gap-1.5">
-            <span className="truncate text-xs text-srapi-text-secondary">{providerName}</span>
-            <span className="shrink-0 text-srapi-border">·</span>
-            <span className="truncate text-[11px] text-srapi-text-tertiary">
+          <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-srapi-text-secondary">
+            <span className="truncate font-medium">{providerName}</span>
+            <span className="text-srapi-border-strong">·</span>
+            <span className="metric-tertiary truncate text-[11px]">
               {runtimeClassLabel(t, account.runtime_class)}
             </span>
-          </div>
-          {hasIdentity ? (
-            <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]">
-              <span
-                className="min-w-0 max-w-[13rem] truncate text-srapi-text-secondary"
-                title={identity.primary}
-              >
-                {identity.primary}
-              </span>
-              {identity.secondary.slice(0, 2).map((item) => (
-                <span
-                  key={item}
-                  className="max-w-[8rem] truncate text-srapi-text-tertiary"
-                  title={item}
+            {hasIdentity ? (
+              <>
+                <span className="text-srapi-border-strong">·</span>
+                <DataTooltip
+                  title={t("adminAccounts.identityLabel") ?? "Identity"}
+                  primary={identity.primary}
+                  rows={identity.secondary.map((v) => ({ label: "Alt", value: v, tone: "muted" as const }))}
                 >
-                  {item}
-                </span>
-              ))}
-            </div>
-          ) : null}
-          <div className="mt-2.5 flex flex-wrap gap-1.5">
-            <DataPill tone="neutral">{modelPolicy}</DataPill>
-            {endpointFacts.map((fact) => (
-              <DataPill
-                key={fact.key}
-                tone={fact.tone === "enabled" ? "success" : "error"}
-                className="whitespace-nowrap"
-              >
-                <span title={`${fact.label}: ${fact.value}`}>
-                  {fact.label}: {fact.value}
-                </span>
-              </DataPill>
-            ))}
-            <DataPill tone="neutral">{proxyLabel}</DataPill>
-            <DataPill tone="neutral">{routeLabel}</DataPill>
-            {visibleGroups.length > 0 ? (
-              visibleGroups.map((name) => (
-                <DataPill
-                  key={name}
-                  tone="neutral"
-                  className="max-w-[7rem] truncate"
-                >
-                  <span title={name}>{name}</span>
-                </DataPill>
-              ))
-            ) : (
-              <DataPill tone="neutral">{t("adminAccounts.ungrouped")}</DataPill>
-            )}
-            {extraGroupCount > 0 ? (
-              <DataPill tone="neutral">+{extraGroupCount}</DataPill>
+                  <span className="metric-tertiary max-w-[10rem] cursor-help truncate text-[11px] underline decoration-srapi-border-strong decoration-dotted underline-offset-2">
+                    {identity.primary}
+                  </span>
+                </DataTooltip>
+              </>
             ) : null}
-            {[...capacityFacts, ...profileFacts].slice(0, 4).map((fact) => (
-              <DataPill
-                key={fact.key}
-                tone="neutral"
-                className="max-w-[10rem] truncate"
-              >
-                <span title={`${fact.label}: ${fact.value}`}>
-                  {fact.label}: {fact.value}
-                </span>
-              </DataPill>
-            ))}
+          </div>
+          {/* status row inline — pure pip + label, kept compact */}
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+            {status}
+            {account.risk_level ? (
+              <DataPill tone="warning" size="sm">{account.risk_level}</DataPill>
+            ) : null}
+            <TokenExpiryChip account={account} />
           </div>
         </div>
       </div>
 
-      {/* Status row */}
-      <div className="flex min-w-0 flex-wrap items-center gap-2 border-t border-srapi-border/60 px-5 py-3">
-        {status}
-        <AccountHealthCell health={health} investigationHref={investigationHref} />
-        <AccountQuotaCell health={health} />
-        {account.risk_level ? (
-          <DataPill tone="neutral" size="sm">{account.risk_level}</DataPill>
-        ) : null}
-        <TokenExpiryInline account={account} />
-      </div>
-
-      {/* Metrics */}
-      <div className="grid gap-px border-t border-srapi-border/60 bg-srapi-border/30 sm:grid-cols-3">
-        <div className="bg-srapi-card px-5 py-3">
-          <div className="mb-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
-            {t("adminAccounts.healthTitle")}
-          </div>
-          <AccountHealthCell health={health} investigationHref={investigationHref} />
-        </div>
-        <div className="bg-srapi-card px-5 py-3">
-          <div className="mb-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
-            {t("adminAccounts.quotaTitle")}
-          </div>
-          <AccountQuotaCell health={health} />
-        </div>
-        <div className="bg-srapi-card px-5 py-3">
-          <div className="mb-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
-            {t("adminAccounts.today")}
-          </div>
-          {hasTodayUsage && today ? (
-            <div className="flex min-w-0 flex-col gap-0.5 text-xs tabular">
-              <span className="truncate text-base font-semibold tracking-tight text-srapi-text-primary">
-                {formatCompactNumber(today.requests)}{" "}
-                <span className="text-xs font-normal text-srapi-text-tertiary">
-                  {t("adminAccounts.usageRequests").toLowerCase()}
-                </span>
-              </span>
-              <span className="truncate text-srapi-text-secondary">
-                {formatCompactNumber(
-                  today.total_tokens || today.input_tokens + today.output_tokens,
-                )}{" "}
-                {t("adminAccounts.usageTokens").toLowerCase()}
-              </span>
-              <span className="truncate text-srapi-text-tertiary">
-                {formatMoney(today.cost, today.currency)} · {formatPercent(today.success_rate)}
-              </span>
+      {/* §2 KPI strip — 3 columns, each with DataTooltip revealing details */}
+      <div className="grid grid-cols-3 divide-x divide-srapi-border/50 border-y border-srapi-border/60 bg-srapi-card-muted/40">
+        {/* Health */}
+        <DataTooltip
+          title={t("adminAccounts.healthTitle")}
+          primary={health ? `${Math.round((health.success_rate ?? 0) * 100)}%` : "—"}
+          rows={
+            health
+              ? [
+                  { label: "Circuit", value: health.circuit_state, tone: health.circuit_state === "open" ? "error" : health.circuit_state === "half-open" ? "warning" : "success" },
+                  { label: "p50", value: `${Math.round(health.latency_p50_ms ?? 0)} ms` },
+                  ...(health.error_class ? [{ label: "Last error", value: health.error_class, tone: "error" as const }] : []),
+                ]
+              : undefined
+          }
+        >
+          <div className="cursor-help px-4 py-3">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
+              {t("adminAccounts.healthTitle")}
             </div>
-          ) : (
-            <span className="text-xs text-srapi-text-tertiary">
-              {t("adminAccounts.todayIdle")}
-            </span>
-          )}
-        </div>
+            <div className="mt-1">
+              <AccountHealthCell health={health} investigationHref={investigationHref} />
+            </div>
+          </div>
+        </DataTooltip>
+        {/* Quota */}
+        <DataTooltip
+          title={t("adminAccounts.quotaTitle")}
+          primary={health ? `${Math.round((health.quota_remaining_ratio ?? 0) * 100)}%` : "—"}
+          rows={
+            health?.quota_exhausted
+              ? [{ label: "Status", value: "Exhausted", tone: "error" as const }]
+              : undefined
+          }
+          footer={(health?.quota_windows ?? []).length > 0 ? `${(health!.quota_windows ?? []).length} window(s)` : undefined}
+        >
+          <div className="cursor-help px-4 py-3">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
+              {t("adminAccounts.quotaTitle")}
+            </div>
+            <div className="mt-1">
+              <AccountQuotaCell health={health} />
+            </div>
+          </div>
+        </DataTooltip>
+        {/* Today */}
+        <DataTooltip
+          title={t("adminAccounts.today")}
+          primary={hasTodayUsage && today ? formatCompactNumber(today.requests) + " req" : t("adminAccounts.todayIdle")}
+          rows={
+            hasTodayUsage && today
+              ? [
+                  { label: "Tokens", value: formatCompactNumber(todayTokens) },
+                  { label: "Cost", value: formatMoney(today.cost, today.currency) },
+                  { label: "Success", value: formatPercent(today.success_rate), tone: today.success_rate >= 0.95 ? "success" : today.success_rate >= 0.8 ? "warning" : "error" },
+                ]
+              : undefined
+          }
+        >
+          <div className="cursor-help px-4 py-3">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
+              {t("adminAccounts.today")}
+            </div>
+            <div className="mt-1 flex min-w-0 items-baseline gap-1.5 text-xs tabular">
+              {hasTodayUsage && today ? (
+                <>
+                  <span className="metric-primary text-sm">
+                    {formatCompactNumber(today.requests)}
+                  </span>
+                  <span className="metric-tertiary text-[11px]">
+                    {formatMoney(today.cost, today.currency)}
+                  </span>
+                </>
+              ) : (
+                <span className="metric-tertiary text-[11px]">
+                  {t("adminAccounts.todayIdle")}
+                </span>
+              )}
+            </div>
+          </div>
+        </DataTooltip>
+      </div>
+
+      {/* §3 Chip strip — minimal: modelPolicy + proxy + routeLabel + groups + «+N more» */}
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5 px-5 py-3 mt-auto">
+        <DataPill tone="neutral" size="sm" className="max-w-[10rem] truncate">{modelPolicy}</DataPill>
+        <DataPill tone="neutral" size="sm">{routeLabel}</DataPill>
+        <DataPill tone={account.proxy_id ? "accent" : "neutral"} size="sm">{proxyLabel}</DataPill>
+        {groupNames.length === 0 ? (
+          <DataPill tone="neutral" size="sm">{t("adminAccounts.ungrouped")}</DataPill>
+        ) : groupNames.length <= 2 ? (
+          groupNames.map((name) => (
+            <DataPill key={name} tone="neutral" size="sm" className="max-w-[7rem] truncate">{name}</DataPill>
+          ))
+        ) : (
+          <DataTooltip
+            title={t("nav.adminGroups") ?? "Groups"}
+            primary={groupNames.length + " groups"}
+            rows={groupNames.map((n) => ({ label: "·", value: n, tone: "muted" as const }))}
+          >
+            <DataPill tone="accent" size="sm" className="cursor-help">
+              {groupNames.length} groups
+            </DataPill>
+          </DataTooltip>
+        )}
+        {detailCount > 0 ? (
+          <DataTooltip
+            title={t("adminAccounts.detailsTitle") ?? "Details"}
+            rows={detailRows}
+          >
+            <DataPill tone="neutral" size="sm" className="cursor-help">
+              +{detailCount} more
+            </DataPill>
+          </DataTooltip>
+        ) : null}
       </div>
     </article>
-  );
-}
-
-function TokenExpiryInline({ account }: { account: ProviderAccount }) {
-  return (
-    <span className="ml-auto">
-      <TokenExpiryChip account={account} />
-    </span>
   );
 }
 

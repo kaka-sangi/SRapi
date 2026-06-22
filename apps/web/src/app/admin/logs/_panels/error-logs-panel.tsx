@@ -12,6 +12,7 @@ import { ErrorLogDetailDialog } from "@/components/admin/error-log-detail-dialog
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Input } from "@/components/ui/input";
 import { AutoRefreshControl } from "@/components/ui/auto-refresh";
 import { QuietBadge, type QuietStatus } from "@/components/ui/quiet-badge";
@@ -407,6 +408,15 @@ export function ErrorLogsPanel() {
         minWidth={900}
         isFiltered={isFiltered}
         onClearFilters={list.clearFilters}
+        // Severity stripe at the row's leading edge — turns the table into a
+        // glanceable feed: 5xx → red, 429/4xx → amber, transient → grey.
+        rowSeverity={(e) => {
+          const code = e.status_code ?? null;
+          if (code !== null && code >= 500) return "critical";
+          if (code !== null && code >= 400) return "error";
+          if (e.error_phase === "network") return "warning";
+          return "info";
+        }}
         toolbar={
           <>
             <ErrorFingerprintStrip
@@ -427,6 +437,25 @@ export function ErrorLogsPanel() {
                 }
               }}
             />
+            {/* Severity quick-filter — one click jump to «only 5xx», «only 4xx»,
+                or back to all. The narrow strip is faster to read than the
+                «Status» dropdown 9 rows down the toolbar. */}
+            <div className="flex items-center gap-3 border-b border-srapi-border/60 bg-srapi-card-muted/40 px-4 py-2">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
+                Severity
+              </span>
+              <SegmentedControl
+                value={list.filters.status === "5xx" ? "5xx" : list.filters.status === "4xx" ? "4xx" : "all"}
+                onChange={(v) => list.setFilter("status", v === "all" ? undefined : v)}
+                options={[
+                  { value: "all", label: "All" },
+                  { value: "5xx", label: "5xx critical" },
+                  { value: "4xx", label: "4xx error" },
+                ]}
+                size="sm"
+                ariaLabel="severity quick filter"
+              />
+            </div>
             <ListToolbar>
               <SearchInput
                 value={list.searchInput}

@@ -34,6 +34,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SectionHero } from "@/components/visual/section-hero";
 import { SpotlightCard } from "@/components/visual/spotlight-card";
 import { HeroNumeric } from "@/components/visual/hero-numeric";
+import { DataTooltip } from "@/components/ui/data-tooltip";
 import { TrendChart } from "@/components/charts/trend-chart";
 import { ChartEmpty } from "@/components/charts/chart-empty";
 import { DialogListSkeleton, TrendChartSkeleton, BarChartSkeleton } from "@/components/charts/chart-skeleton";
@@ -161,9 +162,24 @@ export function GatewayOverview() {
             <CardContent className="flex h-full items-center justify-between gap-4 p-6">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-srapi-text-tertiary">
-                  <span className="magnetic-icon grid size-9 place-items-center rounded-xl bg-srapi-accent-soft text-srapi-primary shadow-[0_4px_12px_-4px_rgba(194,85,59,0.35)]">
-                    <Wallet className="size-4" />
-                  </span>
+                  <DataTooltip
+                    title={t("dashboard.balance")}
+                    primary={balanceData ? formatMoney(balanceData.balance, balanceData.currency) : "—"}
+                    rows={
+                      balanceData
+                        ? [
+                            { label: t("dashboard.cost"), value: fmtCost(totals.totalCost, totals.currency) },
+                            { label: t("dashboard.requests"), value: compact(totals.requests) },
+                            { label: t("dashboard.successRate"), value: totals.requests > 0 ? `${Math.round(totals.successRate)}%` : "—", tone: totals.successRate >= 95 ? "success" : totals.successRate >= 80 ? "warning" : "error" },
+                          ]
+                        : undefined
+                    }
+                    footer={t("nav.billing") + " · " + t("dashboard.viewAll")}
+                  >
+                    <span className="magnetic-icon grid size-9 place-items-center rounded-xl bg-srapi-accent-soft text-srapi-primary shadow-[0_4px_12px_-4px_rgba(194,85,59,0.35)] cursor-help">
+                      <Wallet className="size-4" />
+                    </span>
+                  </DataTooltip>
                   {t("dashboard.balance")}
                 </div>
                 <PageQueryState
@@ -296,6 +312,14 @@ export function GatewayOverview() {
                 format={compact}
                 spark={reqSpark}
                 icon={<Hash />}
+                tooltip={{
+                  primary: compact(totals.requests),
+                  rows: [
+                    { label: t("dashboard.successRate"), value: totals.requests > 0 ? `${Math.round(totals.successRate)}%` : "—", tone: totals.successRate >= 95 ? "success" : totals.successRate >= 80 ? "warning" : "error" },
+                    { label: "Recent " + logs.length, value: logs.length + " 行", tone: "muted" },
+                  ],
+                  footer: "最近 " + TREND_DAYS + " 天本人请求总数",
+                }}
               />
             </div>
             <div className="anim-rise-sm" style={rise(2)}>
@@ -305,6 +329,14 @@ export function GatewayOverview() {
                 value={totals.requests > 0 ? totals.successRate : "—"}
                 format={(n) => `${Math.round(n)}%`}
                 icon={<CheckCircle2 />}
+                tooltip={{
+                  primary: totals.requests > 0 ? `${Math.round(totals.successRate)}%` : "—",
+                  rows: [
+                    { label: "Total req", value: compact(totals.requests) },
+                    { label: "Errors", value: compact(totals.requests - Math.round((totals.successRate / 100) * totals.requests)), tone: "error" },
+                  ],
+                  footer: totals.successRate >= 95 ? "健康" : totals.successRate >= 80 ? "需关注" : "异常 — 请检查上游",
+                }}
               />
             </div>
             <div className="anim-rise-sm" style={rise(3)}>
@@ -314,6 +346,13 @@ export function GatewayOverview() {
                 value={totals.totalTokens}
                 format={compact}
                 icon={<Activity />}
+                tooltip={{
+                  primary: compact(totals.totalTokens),
+                  rows: [
+                    { label: "Avg / req", value: totals.requests > 0 ? compact(Math.round(totals.totalTokens / totals.requests)) : "—" },
+                    { label: "Cost", value: fmtCost(totals.totalCost, totals.currency), tone: "muted" },
+                  ],
+                }}
               />
             </div>
             <div className="anim-rise-sm" style={rise(4)}>
@@ -323,6 +362,14 @@ export function GatewayOverview() {
                 value={totals.totalCost}
                 format={(n) => fmtCost(n, totals.currency)}
                 icon={<Coins />}
+                tooltip={{
+                  primary: fmtCost(totals.totalCost, totals.currency),
+                  rows: [
+                    { label: "$ / req", value: totals.requests > 0 ? fmtCost(totals.totalCost / totals.requests, totals.currency) : "—" },
+                    { label: "Tokens", value: compact(totals.totalTokens), tone: "muted" },
+                  ],
+                  footer: "实际计入余额扣减的金额",
+                }}
               />
             </div>
           </div>
@@ -429,6 +476,18 @@ function ThroughputKpis({
             value={tp ? tp.rpm : "—"}
             format={formatCompactNumber}
             icon={<Zap />}
+            tooltip={
+              tp
+                ? {
+                    primary: formatCompactNumber(tp.rpm) + " req/min",
+                    rows: [
+                      { label: t("dashboard.peak") ?? "Peak", value: formatCompactNumber(tp.peak_rpm) + " RPM" },
+                      { label: "Tokens/min", value: formatCompactNumber(tp.tpm), tone: "muted" },
+                    ],
+                    footer: t("dashboard.usageTrend"),
+                  }
+                : undefined
+            }
             hint={
               tp
                 ? t("dashboard.peakRpm", { value: formatCompactNumber(tp.peak_rpm) })
@@ -447,6 +506,17 @@ function ThroughputKpis({
             value={tp ? tp.tpm : "—"}
             format={formatCompactNumber}
             icon={<Activity />}
+            tooltip={
+              tp
+                ? {
+                    primary: formatCompactNumber(tp.tpm) + " tok/min",
+                    rows: [
+                      { label: t("dashboard.peak") ?? "Peak", value: formatCompactNumber(tp.peak_tpm) + " TPM" },
+                      { label: "Req/min", value: formatCompactNumber(tp.rpm), tone: "muted" },
+                    ],
+                  }
+                : undefined
+            }
             hint={
               tp
                 ? t("dashboard.peakTpm", { value: formatCompactNumber(tp.peak_tpm) })
@@ -465,6 +535,21 @@ function ThroughputKpis({
             value={cache ? cache.cache_hit_rate * 100 : "—"}
             format={(n) => `${n.toFixed(1)}%`}
             icon={<Database />}
+            tooltip={
+              cache
+                ? {
+                    primary: `${(cache.cache_hit_rate * 100).toFixed(1)}%`,
+                    rows: [
+                      { label: "Cache read", value: formatCompactNumber(cache.cache_read_tokens) },
+                      { label: "Total input", value: formatCompactNumber(cache.total_input_tokens), tone: "muted" },
+                      ...(Number(cache.cache_cost_saved) > 0
+                        ? [{ label: "Saved", value: formatMoney(cache.cache_cost_saved, cache.currency), tone: "success" as const }]
+                        : []),
+                    ],
+                    footer: "Prompt-cache hit rate · 越高越好",
+                  }
+                : undefined
+            }
             hint={
               cache && Number(cache.cache_cost_saved) > 0
                 ? t("dashboard.cacheSaved", {

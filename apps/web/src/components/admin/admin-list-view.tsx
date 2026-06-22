@@ -79,6 +79,8 @@ export function AdminListView<T>({
   minWidth = 640,
   rowActions,
   dimRow,
+  rowClassName,
+  rowSeverity,
   toolbar,
   sort,
   onSort,
@@ -100,6 +102,10 @@ export function AdminListView<T>({
   minWidth?: number;
   rowActions?: (row: T) => React.ReactNode;
   dimRow?: (row: T) => boolean;
+  /** Extra className applied per row (mainly for log panels' severity left stripe). */
+  rowClassName?: (row: T) => string | undefined;
+  /** Higher-level: maps to data-sev="info|success|warning|error|critical" used by .log-row */
+  rowSeverity?: (row: T) => "info" | "success" | "warning" | "error" | "critical" | undefined;
   toolbar?: React.ReactNode;
   sort?: SortState;
   onSort?: (key: string) => void;
@@ -162,6 +168,8 @@ export function AdminListView<T>({
               minWidth={minWidth}
               rowActions={rowActions}
               dimRow={dimRow}
+              rowClassName={rowClassName}
+              rowSeverity={rowSeverity}
               sort={sort}
               onSort={onSort}
               selection={selection}
@@ -193,6 +201,8 @@ function ListTable<T>({
   minWidth,
   rowActions,
   dimRow,
+  rowClassName,
+  rowSeverity,
   sort,
   onSort,
   selection,
@@ -203,6 +213,8 @@ function ListTable<T>({
   minWidth: number;
   rowActions?: (row: T) => React.ReactNode;
   dimRow?: (row: T) => boolean;
+  rowClassName?: (row: T) => string | undefined;
+  rowSeverity?: (row: T) => "info" | "success" | "warning" | "error" | "critical" | undefined;
   sort?: SortState;
   onSort?: (key: string) => void;
   selection?: ListSelection;
@@ -273,14 +285,17 @@ function ListTable<T>({
             const isSelected = selection?.selected.has(id) ?? false;
             // Cap stagger at 12 so a 100-row page doesn't waterfall for seconds.
             const stagger = Math.min(idx, 12);
+            const sev = rowSeverity?.(row);
             return (
               <TableRow
                 key={id}
+                data-sev={sev}
                 className={cn(
                   "anim-rise-sm transition-colors",
-                  "hover:bg-srapi-card-muted/60",
+                  sev ? "log-row" : "hover:bg-srapi-card-muted/60",
                   dimRow?.(row) && "opacity-50",
                   isSelected && "bg-srapi-accent-soft",
+                  rowClassName?.(row),
                 )}
                 style={{ "--stagger-index": stagger } as React.CSSProperties}
               >

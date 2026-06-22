@@ -131,6 +131,11 @@
 
 html {
   color-scheme: light;
+  /* 平滑滚动 —— 配合 ScrollProgress 让长表/日志页的滚动体验更跟手；
+     prefers-reduced-motion 在 §9.2 处统一关闭。 */
+  scroll-behavior: smooth;
+  /* 防止键盘导航时滚动条出现回跳 —— 主流浏览器现已支持 */
+  scrollbar-gutter: stable;
 }
 html.dark {
   color-scheme: dark;
@@ -841,6 +846,58 @@ textarea:focus-visible,
 }
 .group:hover .magnetic-icon { transform: translateY(-2px) scale(1.06); }
 
+/* §7.9b 数据层级对比 —— 让一屏里「主指标 / 次要指标 / 参考数」一眼有别。
+   单纯靠字号区分太弱，加 font-weight + color token 三档对比。 */
+.metric-primary {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-srapi-text-primary);
+}
+.metric-secondary {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-srapi-text-secondary);
+}
+.metric-tertiary {
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-srapi-text-tertiary);
+}
+.metric-strong-good { color: var(--color-srapi-success); font-weight: 600; font-variant-numeric: tabular-nums; }
+.metric-strong-warn { color: var(--color-srapi-warning); font-weight: 600; font-variant-numeric: tabular-nums; }
+.metric-strong-bad  { color: var(--color-srapi-error);   font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* 行内 hover 详情 —— 表格/日志行展开容器，配合 detail-row-open data-attr */
+.row-expand {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 220ms var(--ease-out-quint);
+}
+.row-expand > * { overflow: hidden; }
+.row-expand[data-open="true"] { grid-template-rows: 1fr; }
+
+/* 日志行 severity 左色条 —— 不靠背景填充，只靠 2.5px 左条 + 浅 hover */
+.log-row {
+  position: relative;
+  transition: background-color 140ms ease;
+}
+.log-row::before {
+  content: "";
+  position: absolute;
+  inset-block: 6px;
+  inset-inline-start: 0;
+  width: 2.5px;
+  border-radius: 9999px;
+  background: var(--color-srapi-border-strong);
+}
+.log-row[data-sev="info"]::before     { background: var(--color-srapi-border-strong); }
+.log-row[data-sev="success"]::before  { background: var(--color-srapi-success); }
+.log-row[data-sev="warning"]::before  { background: var(--color-srapi-warning); }
+.log-row[data-sev="error"]::before    { background: var(--color-srapi-error); }
+.log-row[data-sev="critical"]::before { background: var(--color-srapi-error); box-shadow: 0 0 12px 0 color-mix(in oklab, var(--color-srapi-error) 55%, transparent); }
+.log-row:hover { background-color: color-mix(in oklab, var(--color-srapi-card-muted) 50%, transparent); }
+
 /* §7.9 Decorative dot grid —— admin hero band 角落留白处的细节装饰 */
 .dot-grid-overlay {
   background-image: radial-gradient(
@@ -881,6 +938,8 @@ textarea:focus-visible,
     transform: none !important;
   }
   .group:hover .magnetic-icon { transform: none; }
+  html { scroll-behavior: auto; }
+  .row-expand { transition: none; }
   .stream-cursor {
     animation: none;
     opacity: 0.6;

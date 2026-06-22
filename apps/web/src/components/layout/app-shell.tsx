@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { AuthGate, useAuthUser } from "./auth-gate";
 import { SidebarNav, SidebarBrand } from "./sidebar-nav";
 import { TopNav } from "./top-nav";
@@ -9,6 +8,8 @@ import { CommandPaletteProvider } from "./command-palette";
 import { TourProvider } from "@/components/onboarding/tour-provider";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { CopilotPet } from "@/components/admin/copilot-pet";
+import { PageTransition } from "@/components/visual/page-transition";
+import { ScrollProgress } from "@/components/visual/scroll-progress";
 import { useRuntimeStatus } from "@/hooks/queries";
 
 /**
@@ -31,28 +32,14 @@ export function AppShell({
 
 function ShellInner({ children }: { children: React.ReactNode }) {
   const user = useAuthUser();
-  const pathname = usePathname();
   const [navOpen, setNavOpen] = useState(false);
   const runtime = useRuntimeStatus();
   const live = runtime.data?.connected ?? false;
 
-  const pageRef = useRef<HTMLDivElement>(null);
-  const prevPath = useRef(pathname);
-  useEffect(() => {
-    if (prevPath.current !== pathname) {
-      prevPath.current = pathname;
-      const mm = window.matchMedia("(prefers-reduced-motion: reduce)");
-      if (!mm.matches && pageRef.current) {
-        pageRef.current.animate(
-          [{ opacity: 0 }, { opacity: 1 }],
-          { duration: 180, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
-        );
-      }
-    }
-  }, [pathname]);
-
   return (
     <div className="flex min-h-dvh w-full">
+      {/* Top-of-viewport scroll progress — only renders for tall pages */}
+      <ScrollProgress />
       {/* Desktop sidebar — wider, brighter, soft-card user pill at the bottom.
           The right edge is a clean 1px rule (no inset glow trick) so the page
           reads as «two surfaces» rather than «one folded sheet». */}
@@ -88,12 +75,11 @@ function ShellInner({ children }: { children: React.ReactNode }) {
           <div className="flex min-w-0 flex-1 flex-col">
             <TopNav user={user} onOpenNav={() => setNavOpen(true)} live={live} />
             <main className="flex-1">
-              <div
-                ref={pageRef}
-                className="anim-page mx-auto w-full max-w-[1360px] space-y-8 px-5 py-7 sm:px-8 sm:py-9 lg:px-10"
-              >
-                {children}
-              </div>
+              <PageTransition>
+                <div className="mx-auto w-full max-w-[1360px] space-y-8 px-5 py-7 sm:px-8 sm:py-9 lg:px-10">
+                  {children}
+                </div>
+              </PageTransition>
             </main>
           </div>
         </TourProvider>
