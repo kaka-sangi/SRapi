@@ -1,0 +1,500 @@
+# Encrypted egress proxy definitions, batch operations, and testing
+ProxyDefinitionType:
+  type: string
+  description: Proxy transport type. Use socks5h when DNS resolution must happen through the proxy.
+  enum:
+    - http
+    - https
+    - socks5
+    - socks5h
+
+ProxyDefinitionStatus:
+  type: string
+  enum:
+    - active
+    - disabled
+
+ProxyFallbackMode:
+  type: string
+  description: Runtime behavior when an active proxy is past expires_at.
+  enum:
+    - none
+    - direct
+    - proxy
+
+ProxyDefinition:
+  type: object
+  required:
+    - id
+    - name
+    - type
+    - status
+    - url_configured
+    - created_at
+    - updated_at
+    - probe_success_count
+    - probe_failure_count
+    - last_probe_latency_ms
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    name:
+      type: string
+    type:
+      $ref: "#/ProxyDefinitionType"
+    status:
+      $ref: "#/ProxyDefinitionStatus"
+    url_configured:
+      type: boolean
+      description: True when an encrypted proxy URL is stored. Raw URLs are never returned.
+    metadata:
+      $ref: "common.yaml#/JsonObject"
+    country_code:
+      type: string
+      maxLength: 2
+      nullable: true
+      description: ISO-3166-1 alpha-2 country code, operator-supplied.
+    country_name:
+      type: string
+      nullable: true
+      description: Display name for the country, snapshotted at write time.
+    expires_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: Optional operator-defined expiry. Expired active proxies follow fallback_mode.
+    fallback_mode:
+      $ref: "#/ProxyFallbackMode"
+    backup_proxy_id:
+      type: string
+      nullable: true
+      description: Proxy definition id used when fallback_mode is proxy.
+    last_probed_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: Last time the proxy probe worker tested this proxy.
+    probe_success_count:
+      type: integer
+      minimum: 0
+      description: Successful probes since the last counter reset (rolling ~7-day window — counters reset weekly, NOT a strict trailing-7d window).
+    probe_failure_count:
+      type: integer
+      minimum: 0
+      description: Failed probes since the last counter reset.
+    last_probe_latency_ms:
+      type: integer
+      minimum: 0
+      description: Latency of the most recent successful probe in milliseconds. 0 if no successful probe yet.
+    probe_success_pct_7d:
+      type: integer
+      minimum: 0
+      maximum: 100
+      nullable: true
+      description: Rolling availability percentage. Null when never probed since last reset.
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+    updated_at:
+      $ref: "common.yaml#/Timestamp"
+
+CreateProxyDefinitionRequest:
+  type: object
+  required:
+    - name
+    - type
+    - url
+  properties:
+    name:
+      type: string
+      minLength: 1
+    type:
+      $ref: "#/ProxyDefinitionType"
+    url:
+      type: string
+      format: uri
+      writeOnly: true
+      description: Proxy URL with credentials if needed. Stored encrypted and never returned.
+    status:
+      $ref: "#/ProxyDefinitionStatus"
+    metadata:
+      $ref: "common.yaml#/JsonObject"
+    country_code:
+      type: string
+      maxLength: 2
+      nullable: true
+      description: ISO-3166-1 alpha-2 country code, operator-supplied.
+    country_name:
+      type: string
+      nullable: true
+      description: Localized display name for the country, snapshotted at write time.
+    expires_at:
+      type: string
+      format: date-time
+      description: Optional operator-defined expiry. Past values force fallback immediately.
+    fallback_mode:
+      $ref: "#/ProxyFallbackMode"
+    backup_proxy_id:
+      $ref: "common.yaml#/Id"
+
+UpdateProxyDefinitionRequest:
+  type: object
+  minProperties: 1
+  properties:
+    name:
+      type: string
+      minLength: 1
+    type:
+      $ref: "#/ProxyDefinitionType"
+    url:
+      type: string
+      format: uri
+      writeOnly: true
+      description: Replacement proxy URL. Omit to keep the existing encrypted URL.
+    status:
+      $ref: "#/ProxyDefinitionStatus"
+    metadata:
+      $ref: "common.yaml#/JsonObject"
+    country_code:
+      type: string
+      maxLength: 2
+      nullable: true
+      description: ISO-3166-1 alpha-2 country code, operator-supplied.
+    country_name:
+      type: string
+      nullable: true
+      description: Localized display name for the country, snapshotted at write time.
+    expires_at:
+      type: string
+      format: date-time
+      description: Replacement expiry. Omit to keep the existing value.
+    clear_expires_at:
+      type: boolean
+      description: Clears expires_at when true.
+    fallback_mode:
+      $ref: "#/ProxyFallbackMode"
+    backup_proxy_id:
+      $ref: "common.yaml#/Id"
+    clear_backup_proxy_id:
+      type: boolean
+      description: Clears backup_proxy_id when true. Non-proxy fallback modes also clear it.
+
+SnapshotProxyDefinition:
+  type: object
+  required:
+    - name
+    - type
+    - status
+    - url_configured
+  properties:
+    name:
+      type: string
+      minLength: 1
+    type:
+      $ref: "#/ProxyDefinitionType"
+    status:
+      $ref: "#/ProxyDefinitionStatus"
+    url_configured:
+      type: boolean
+      description: True when an encrypted proxy URL exists in the source environment. Raw URLs are never exported.
+    metadata:
+      $ref: "common.yaml#/JsonObject"
+    country_code:
+      type: string
+      maxLength: 2
+      nullable: true
+      description: ISO-3166-1 alpha-2 country code, operator-supplied.
+    country_name:
+      type: string
+      nullable: true
+      description: Localized display name for the country, snapshotted at write time.
+    expires_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: Optional operator-defined expiry.
+    fallback_mode:
+      $ref: "#/ProxyFallbackMode"
+    backup_proxy_name:
+      type: string
+      nullable: true
+      description: Proxy definition name used when fallback_mode is proxy. Prefer this in config imports because proxy ids are environment-local.
+
+ImportProxyDefinition:
+  type: object
+  required:
+    - name
+    - type
+  properties:
+    name:
+      type: string
+      minLength: 1
+    type:
+      $ref: "#/ProxyDefinitionType"
+    url:
+      type: string
+      format: uri
+      writeOnly: true
+      description: Proxy URL with credentials if needed. Required to create a proxy that does not already exist; omit to keep an existing encrypted URL.
+    status:
+      $ref: "#/ProxyDefinitionStatus"
+    metadata:
+      $ref: "common.yaml#/JsonObject"
+    country_code:
+      type: string
+      maxLength: 2
+      nullable: true
+      description: ISO-3166-1 alpha-2 country code, operator-supplied.
+    country_name:
+      type: string
+      nullable: true
+      description: Localized display name for the country, snapshotted at write time.
+    expires_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: Optional operator-defined expiry.
+    fallback_mode:
+      $ref: "#/ProxyFallbackMode"
+    backup_proxy_name:
+      type: string
+      nullable: true
+      description: Proxy definition name used when fallback_mode is proxy. Prefer this in config imports because proxy ids are environment-local.
+
+BatchCreateProxiesRequest:
+  type: object
+  required:
+    - proxies
+  properties:
+    proxies:
+      type: array
+      minItems: 1
+      maxItems: 200
+      items:
+        $ref: "#/CreateProxyDefinitionRequest"
+
+BatchCreateProxiesSkippedRow:
+  type: object
+  required:
+    - index
+    - name
+    - reason
+  properties:
+    index:
+      type: integer
+      description: Zero-based index in the request `proxies` array.
+    name:
+      type: string
+    reason:
+      type: string
+      example: duplicate_name
+
+BatchCreateProxiesErrorRow:
+  type: object
+  required:
+    - index
+    - message
+  properties:
+    index:
+      type: integer
+    message:
+      type: string
+
+BatchCreateProxiesResult:
+  type: object
+  required:
+    - created_count
+    - created
+    - skipped
+    - errors
+  properties:
+    created_count:
+      type: integer
+      description: Number of new proxies actually inserted.
+    created:
+      type: array
+      items:
+        $ref: "#/ProxyDefinition"
+    skipped:
+      type: array
+      description: Rows that hit a soft-skip rule (e.g. duplicate name) — not errors.
+      items:
+        $ref: "#/BatchCreateProxiesSkippedRow"
+    errors:
+      type: array
+      description: Rows that hard-failed validation. The other rows still apply.
+      items:
+        $ref: "#/BatchCreateProxiesErrorRow"
+
+BatchCreateProxiesResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/BatchCreateProxiesResult"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+TestProxyRequest:
+  type: object
+  properties:
+    target_url:
+      type: string
+      description: Optional URL to probe. Defaults to a small, dependable HTTPS endpoint when omitted.
+
+ProxyTestResult:
+  type: object
+  required:
+    - ok
+    - latency_ms
+    - status_code
+    - error_class
+    - target_url
+  properties:
+    ok:
+      type: boolean
+      description: True when the upstream returned a 2xx within the timeout.
+    latency_ms:
+      type: integer
+      minimum: 0
+      description: Wall-clock latency of the probe in ms (0 when the request didn't get far enough to time).
+    status_code:
+      type: integer
+      minimum: 0
+      description: HTTP status of the upstream, when one was received. 0 when the transport failed before headers.
+    error_class:
+      type: string
+      description: |
+        Empty when ok=true. Otherwise one of: bad_proxy_url, bad_target_url,
+        timeout, transport_error, bad_status.
+    target_url:
+      type: string
+      description: URL that was actually probed (echoed back so the UI can show the resolved default).
+
+ProxyTestResultResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/ProxyTestResult"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+BatchTestProxiesRequest:
+  type: object
+  required:
+    - proxy_ids
+  properties:
+    proxy_ids:
+      type: array
+      minItems: 1
+      maxItems: 200
+      items:
+        $ref: "common.yaml#/Id"
+
+ProxyBatchTestRow:
+  type: object
+  required:
+    - proxy_id
+    - result
+  properties:
+    proxy_id:
+      $ref: "common.yaml#/Id"
+    result:
+      $ref: "#/ProxyTestResult"
+
+BatchTestProxiesResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/ProxyBatchTestRow"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+BatchDeleteProxiesRequest:
+  type: object
+  required:
+    - proxy_ids
+  properties:
+    proxy_ids:
+      type: array
+      minItems: 1
+      maxItems: 500
+      items:
+        $ref: "common.yaml#/Id"
+
+BatchDeleteProxiesErrorRow:
+  type: object
+  required:
+    - id
+    - message
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    message:
+      type: string
+
+BatchDeleteProxiesResult:
+  type: object
+  required:
+    - deleted_count
+    - deleted_ids
+    - errors
+  properties:
+    deleted_count:
+      type: integer
+    deleted_ids:
+      type: array
+      items:
+        $ref: "common.yaml#/Id"
+    errors:
+      type: array
+      description: Per-id failures (e.g. proxy not found). Other ids still succeeded.
+      items:
+        $ref: "#/BatchDeleteProxiesErrorRow"
+
+BatchDeleteProxiesResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/BatchDeleteProxiesResult"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+ProxyDefinitionResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/ProxyDefinition"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+ProxyDefinitionListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/ProxyDefinition"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"

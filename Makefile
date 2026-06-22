@@ -119,29 +119,29 @@ openapi-bundle:
 	@mkdir -p $(dir $(OPENAPI_BUNDLE))
 	npx --yes @redocly/cli bundle $(OPENAPI) --output $(OPENAPI_BUNDLE)
 
-openapi-codegen:
+openapi-codegen: openapi-bundle
 	@mkdir -p $(dir $(OPENAPI_GO_OUTPUT))
-	cd $(API_DIR) && $(OAPI_CODEGEN) -generate types,std-http -package openapi -o internal/openapi/openapi.gen.go ../../$(OPENAPI)
-	cp $(OPENAPI) $(OPENAPI_COPILOT_SPEC)
+	cd $(API_DIR) && $(OAPI_CODEGEN) -generate types,std-http -package openapi -o internal/openapi/openapi.gen.go ../../$(OPENAPI_BUNDLE)
+	cp $(OPENAPI_BUNDLE) $(OPENAPI_COPILOT_SPEC)
 
-openapi-codegen-check:
+openapi-codegen-check: openapi-bundle
 	@set -e; \
 	tmp="$$(mktemp)"; \
-	(cd $(API_DIR) && $(OAPI_CODEGEN) -generate types,std-http -package openapi -o "$$tmp" ../../$(OPENAPI)); \
+	(cd $(API_DIR) && $(OAPI_CODEGEN) -generate types,std-http -package openapi -o "$$tmp" ../../$(OPENAPI_BUNDLE)); \
 	cmp -s "$$tmp" "$(OPENAPI_GO_OUTPUT)" || (echo "$(OPENAPI_GO_OUTPUT) is out of date; run make openapi-codegen" >&2; rm -f "$$tmp"; exit 1); \
 	rm -f "$$tmp"
-	@cmp -s "$(OPENAPI)" "$(OPENAPI_COPILOT_SPEC)" || (echo "$(OPENAPI_COPILOT_SPEC) is out of date; run make openapi-codegen" >&2; exit 1)
+	@cmp -s "$(OPENAPI_BUNDLE)" "$(OPENAPI_COPILOT_SPEC)" || (echo "$(OPENAPI_COPILOT_SPEC) is out of date; run make openapi-codegen" >&2; exit 1)
 
 openapi-admin-coverage-check:
 	$(ADMIN_OPENAPI_COVERAGE_CHECK)
 
-openapi-ts-codegen:
-	$(OPENAPI_TS) -i $(OPENAPI) -o $(OPENAPI_TS_OUTPUT) -c @hey-api/client-fetch -p @hey-api/typescript @hey-api/sdk --no-log-file
+openapi-ts-codegen: openapi-bundle
+	$(OPENAPI_TS) -i $(OPENAPI_BUNDLE) -o $(OPENAPI_TS_OUTPUT) -c @hey-api/client-fetch -p @hey-api/typescript @hey-api/sdk --no-log-file
 
-openapi-ts-codegen-check:
+openapi-ts-codegen-check: openapi-bundle
 	@set -e; \
 	tmp="$$(mktemp -d)"; \
-	$(OPENAPI_TS) -i $(OPENAPI) -o "$$tmp/typescript" -c @hey-api/client-fetch -p @hey-api/typescript @hey-api/sdk --no-log-file; \
+	$(OPENAPI_TS) -i $(OPENAPI_BUNDLE) -o "$$tmp/typescript" -c @hey-api/client-fetch -p @hey-api/typescript @hey-api/sdk --no-log-file; \
 	diff -qr "$$tmp/typescript" "$(OPENAPI_TS_OUTPUT)" >/dev/null || (echo "$(OPENAPI_TS_OUTPUT) is out of date; run make openapi-ts-codegen" >&2; rm -rf "$$tmp"; exit 1); \
 	rm -rf "$$tmp"
 

@@ -20,6 +20,10 @@ func main() {
 	flag.Parse()
 
 	logger := platformlogger.New()
+	if err := config.PreloadConfigFile(os.Getenv("SRAPI_CONFIG_FILE")); err != nil {
+		logger.Error("failed to load config file", "error", err)
+		os.Exit(1)
+	}
 	cfg := config.Load()
 	if err := cfg.Validate(); err != nil {
 		logger.Error("invalid configuration", "error", err)

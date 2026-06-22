@@ -1,0 +1,243 @@
+# Risk control configuration and content safety moderation
+RiskControlMode:
+  type: string
+  enum:
+    - monitor
+    - enforce
+
+RiskControlConfig:
+  type: object
+  required:
+    - enabled
+    - mode
+    - max_failed_requests_per_minute
+    - max_cost_per_day
+    - cooldown_seconds
+    - blocked_countries
+    - blocked_ips
+  properties:
+    enabled:
+      type: boolean
+    mode:
+      $ref: "#/RiskControlMode"
+    max_failed_requests_per_minute:
+      type: integer
+      minimum: 0
+    max_cost_per_day:
+      type: string
+      pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+    cooldown_seconds:
+      type: integer
+      minimum: 0
+    blocked_countries:
+      type: array
+      items:
+        type: string
+    blocked_ips:
+      type: array
+      items:
+        type: string
+
+RiskControlConfigResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/RiskControlConfig"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+RiskControlStatus:
+  type: object
+  required:
+    - enabled
+    - mode
+    - active_blocks
+    - recent_events
+    - evaluated_at
+  properties:
+    enabled:
+      type: boolean
+    mode:
+      $ref: "#/RiskControlMode"
+    active_blocks:
+      type: integer
+      minimum: 0
+    recent_events:
+      type: integer
+      minimum: 0
+    evaluated_at:
+      $ref: "common.yaml#/Timestamp"
+
+RiskControlStatusResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/RiskControlStatus"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+RiskControlLog:
+  type: object
+  required:
+    - id
+    - level
+    - action
+    - reason
+    - created_at
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    level:
+      type: string
+      enum:
+        - info
+        - warn
+        - block
+    action:
+      type: string
+    reason:
+      type: string
+    subject:
+      type: string
+      nullable: true
+    metadata:
+      $ref: "common.yaml#/JsonObject"
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+
+RiskControlLogListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/RiskControlLog"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+ContentSafetyMode:
+  type: string
+  enum:
+    - monitor
+    - enforce
+
+ContentSafetyConfig:
+  type: object
+  required:
+    - enabled
+    - mode
+    - redact_pii
+    - block_pii
+    - block_prompt_injection
+    - block_custom_keywords
+    - custom_keywords
+    - model_scopes
+    - moderation
+  properties:
+    enabled:
+      type: boolean
+    mode:
+      $ref: "#/ContentSafetyMode"
+    redact_pii:
+      type: boolean
+    block_pii:
+      type: boolean
+    block_prompt_injection:
+      type: boolean
+    block_custom_keywords:
+      type: boolean
+    custom_keywords:
+      type: array
+      items:
+        type: string
+    model_scopes:
+      type: array
+      description: Canonical model names or prefix scopes ending in '*'. Empty means all models.
+      items:
+        type: string
+    moderation:
+      $ref: "#/ContentSafetyModerationConfig"
+
+ContentSafetyModerationConfig:
+  type: object
+  description: >-
+    Upstream classification pass that runs after the local regex/keyword
+    scan. Only the OpenAI Moderation contract is wired today; future
+    providers register under the `provider` key once their client lands.
+    The API key is encrypted at rest; the wire schema exposes only a
+    write-only `api_key` and a read-only `api_key_configured` indicator.
+  required:
+    - enabled
+    - provider
+    - model
+    - base_url
+    - block_on_flag
+    - categories
+    - timeout_ms
+    - cache_ttl_seconds
+    - api_key_configured
+  properties:
+    enabled:
+      type: boolean
+      description: Master switch for the upstream moderation pass.
+    provider:
+      type: string
+      enum:
+        - openai
+      description: Upstream classifier vendor. Only `openai` is supported today.
+    model:
+      type: string
+      description: Upstream model id (e.g. `omni-moderation-latest`).
+    base_url:
+      type: string
+      description: HTTPS base URL for OpenAI-compatible deployments.
+    block_on_flag:
+      type: boolean
+      description: When mode is `enforce`, refuse the request once the upstream returns flagged or a category exceeds its threshold.
+    categories:
+      type: object
+      additionalProperties:
+        type: number
+        minimum: 0
+        maximum: 1
+      description: Per-category minimum score in [0, 1] to flag. Empty falls back to the upstream `flagged` boolean.
+    timeout_ms:
+      type: integer
+      minimum: 250
+      maximum: 30000
+      description: HTTP call timeout for the upstream moderation request.
+    cache_ttl_seconds:
+      type: integer
+      minimum: 0
+      maximum: 604800
+      description: In-process LRU TTL; 0 disables the cache.
+    api_key:
+      type: string
+      writeOnly: true
+      description: API key for the upstream moderation provider. Write-only; supplied to set or rotate the key and never returned. Omit to keep the stored key.
+    api_key_configured:
+      type: boolean
+      description: True when a moderation API key is stored.
+
+ContentSafetyConfigResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/ContentSafetyConfig"
+    request_id:
+      $ref: "common.yaml#/RequestId"

@@ -1,0 +1,695 @@
+# Audit logs, error logs, request evidence, and request log files
+ErrorLog:
+  type: object
+  required:
+    - id
+    - request_id
+    - created_at
+    - user_id
+    - api_key_id
+    - model
+    - source_endpoint
+    - source_protocol
+    - target_protocol
+    - latency_ms
+    - input_tokens
+    - output_tokens
+    - attempt_no
+    - usage_estimated
+    - resolved
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+    user_id:
+      $ref: "common.yaml#/Id"
+    api_key_id:
+      $ref: "common.yaml#/Id"
+    account_id:
+      type: string
+      nullable: true
+    provider_id:
+      type: string
+      nullable: true
+    model:
+      type: string
+    source_endpoint:
+      type: string
+    source_protocol:
+      type: string
+    target_protocol:
+      type: string
+    error_class:
+      type: string
+      nullable: true
+    error_message:
+      type: string
+      nullable: true
+      description: Verbatim upstream error message (sub2api parity).
+    error_body_excerpt:
+      type: string
+      nullable: true
+      description: Compacted upstream error envelope.
+    status_code:
+      type: integer
+      nullable: true
+      description: Upstream HTTP status code (omitted when no HTTP response).
+    upstream_request_id:
+      type: string
+      nullable: true
+      description: Upstream provider request id (x-request-id / openai-request-id).
+    error_phase:
+      type: string
+      nullable: true
+      description: request | auth | routing | upstream | network | internal
+    error_owner:
+      type: string
+      nullable: true
+      description: client | provider | platform
+    error_source:
+      type: string
+      nullable: true
+      description: client_request | upstream_http | gateway
+    resolved:
+      type: boolean
+      description: Operator acknowledgement flag.
+    resolved_by:
+      type: string
+      nullable: true
+    resolved_at:
+      $ref: "common.yaml#/Timestamp"
+      nullable: true
+    upstream_errors:
+      type: array
+      nullable: true
+      items:
+        $ref: "#/UpstreamErrorEvent"
+    latency_ms:
+      type: integer
+      minimum: 0
+    input_tokens:
+      type: integer
+      minimum: 0
+    output_tokens:
+      type: integer
+      minimum: 0
+    attempt_no:
+      type: integer
+      minimum: 1
+    usage_estimated:
+      type: boolean
+
+UpstreamErrorEvent:
+  type: object
+  description: |
+    One failed candidate attempt within a gateway request's failover history
+    (sub2api ops_upstream_error_events parity).
+  required:
+    - at_unix_ms
+    - attempt_no
+    - account_name
+    - upstream_status_code
+    - upstream_request_id
+    - upstream_url
+    - kind
+    - message
+    - body_excerpt
+  properties:
+    at_unix_ms:
+      type: integer
+      format: int64
+    attempt_no:
+      type: integer
+    account_id:
+      type: string
+      nullable: true
+    account_name:
+      type: string
+    upstream_status_code:
+      type: integer
+    upstream_request_id:
+      type: string
+    upstream_url:
+      type: string
+    kind:
+      type: string
+      description: http_error | request_error | retry_exhausted | failover
+    message:
+      type: string
+    body_excerpt:
+      type: string
+
+ErrorLogListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/ErrorLog"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+RequestLogFileDescriptor:
+  type: object
+  required:
+    - name
+    - size
+    - created_at
+    - request_id
+    - is_error_only
+  properties:
+    name:
+      type: string
+      description: On-disk filename such as request-<unix_ms>-<request_id>.log.
+    size:
+      type: integer
+      format: int64
+      minimum: 0
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+    request_id:
+      type: string
+    is_error_only:
+      type: boolean
+    user_id:
+      type: string
+      description: User identifier captured in REQUEST INFO, when present.
+    api_key_id:
+      type: string
+      description: API key identifier captured in REQUEST INFO, when present.
+    account_id:
+      type: string
+      description: Provider account identifier captured in REQUEST INFO, when present.
+    source_protocol:
+      type: string
+      description: Gateway protocol captured in REQUEST INFO, such as openai-compatible.
+    source_endpoint:
+      type: string
+      description: Source endpoint captured in REQUEST INFO.
+    started_at:
+      $ref: "common.yaml#/Timestamp"
+    success:
+      type: boolean
+      description: Final outcome parsed from the SUMMARY section, when present.
+    status_code:
+      type: integer
+      minimum: 100
+      maximum: 599
+      description: Final upstream or gateway status parsed from SUMMARY.
+    error_class:
+      type: string
+      description: Error class parsed from SUMMARY for failed requests.
+    latency_ms:
+      type: integer
+      minimum: 0
+      description: Request latency parsed from SUMMARY.
+    attempt_count:
+      type: integer
+      minimum: 0
+      description: Highest numbered outbound REQUEST section observed in the captured dump.
+    response_count:
+      type: integer
+      minimum: 0
+      description: Count of upstream RESPONSE sections observed in the captured dump.
+    has_summary:
+      type: boolean
+      description: Whether the descriptor parser found a SUMMARY section.
+
+RequestLogFileListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/RequestLogFileDescriptor"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+RequestLogFileResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/RequestLogFileDescriptor"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+RequestEvidenceKind:
+  type: string
+  enum:
+    - success
+    - error
+    - unknown
+
+RequestEvidenceSource:
+  type: string
+  enum:
+    - usage
+    - ops_error
+    - request_dump
+    - system_log
+    - scheduler_decision
+
+RequestEvidenceRow:
+  type: object
+  required:
+    - kind
+    - evidence_source
+    - created_at
+    - request_id
+    - has_usage_log
+    - has_ops_error_log
+    - has_request_dump
+    - has_system_log
+    - has_scheduler_decision
+    - request_dump_count
+    - request_dump_error_count
+    - system_log_count
+    - scheduler_decision_count
+  properties:
+    kind:
+      $ref: "#/RequestEvidenceKind"
+    evidence_source:
+      $ref: "#/RequestEvidenceSource"
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+    request_id:
+      type: string
+    usage_log_id:
+      $ref: "common.yaml#/Id"
+    ops_error_log_id:
+      $ref: "common.yaml#/Id"
+    user_id:
+      $ref: "common.yaml#/Id"
+    api_key_id:
+      $ref: "common.yaml#/Id"
+    account_id:
+      type: string
+    provider_id:
+      type: string
+    source_protocol:
+      type: string
+    source_endpoint:
+      type: string
+    target_protocol:
+      type: string
+    model:
+      type: string
+    status_code:
+      type: integer
+      minimum: 100
+      maximum: 599
+    success:
+      type: boolean
+    error_class:
+      type: string
+    error_message:
+      type: string
+      description: Bounded, redacted upstream error message when available.
+    error_phase:
+      type: string
+    error_owner:
+      type: string
+    error_source:
+      type: string
+    upstream_request_id:
+      type: string
+    stream_completion_state:
+      type: string
+      enum: [completed, interrupted, idle_timeout, failed, unknown]
+      description: |
+        Low-cardinality terminal state for gateway streaming requests when
+        available from ops_error_logs. Empty when the request was not
+        streamed or the state was not observed.
+    attempt_no:
+      type: integer
+      minimum: 1
+    latency_ms:
+      type: integer
+      minimum: 0
+    input_tokens:
+      type: integer
+      minimum: 0
+    output_tokens:
+      type: integer
+      minimum: 0
+    total_tokens:
+      type: integer
+      minimum: 0
+    usage_estimated:
+      type: boolean
+    resolution:
+      type: string
+      enum: [open, investigating, resolved, muted]
+    has_usage_log:
+      type: boolean
+    has_ops_error_log:
+      type: boolean
+    has_request_dump:
+      type: boolean
+    has_system_log:
+      type: boolean
+    has_scheduler_decision:
+      type: boolean
+    request_dump_count:
+      type: integer
+      minimum: 0
+    request_dump_error_count:
+      type: integer
+      minimum: 0
+    system_log_count:
+      type: integer
+      minimum: 0
+    scheduler_decision_count:
+      type: integer
+      minimum: 0
+    scheduler_decision_id:
+      $ref: "common.yaml#/Id"
+      description: Latest scheduler decision linked to this request evidence row.
+    scheduler_candidate_count:
+      type: integer
+      minimum: 0
+    scheduler_rejected_count:
+      type: integer
+      minimum: 0
+    scheduler_strategy:
+      type: string
+    scheduler_selection_rationale:
+      type: string
+      description: Non-sensitive scheduler explanation from the latest linked decision.
+    latest_request_dump_name:
+      type: string
+    latest_request_dump_created_at:
+      $ref: "common.yaml#/Timestamp"
+
+RequestEvidenceListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/RequestEvidenceRow"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+RequestEvidenceSummary:
+  type: object
+  required:
+    - kind
+    - primary_source
+    - attempt_count
+    - usage_log_count
+    - ops_error_log_count
+    - request_dump_count
+    - request_dump_error_count
+    - scheduler_decision_count
+    - has_usage_log
+    - has_ops_error_log
+    - has_request_dump
+    - has_scheduler_decision
+  properties:
+    kind:
+      $ref: "#/RequestEvidenceKind"
+    primary_source:
+      $ref: "#/RequestEvidenceSource"
+    attempt_count:
+      type: integer
+      minimum: 0
+    usage_log_count:
+      type: integer
+      minimum: 0
+    ops_error_log_count:
+      type: integer
+      minimum: 0
+    request_dump_count:
+      type: integer
+      minimum: 0
+    request_dump_error_count:
+      type: integer
+      minimum: 0
+    scheduler_decision_count:
+      type: integer
+      minimum: 0
+    has_usage_log:
+      type: boolean
+    has_ops_error_log:
+      type: boolean
+    has_request_dump:
+      type: boolean
+    has_scheduler_decision:
+      type: boolean
+    scheduler_decision_id:
+      $ref: "common.yaml#/Id"
+      description: Latest scheduler decision linked to the investigated request.
+    scheduler_candidate_count:
+      type: integer
+      minimum: 0
+    scheduler_rejected_count:
+      type: integer
+      minimum: 0
+    scheduler_strategy:
+      type: string
+    scheduler_selection_rationale:
+      type: string
+      description: Non-sensitive scheduler explanation from the latest linked decision.
+    latency_ms:
+      type: integer
+      minimum: 0
+      description: Sum of known attempt latencies for the request.
+    input_tokens:
+      type: integer
+      minimum: 0
+    output_tokens:
+      type: integer
+      minimum: 0
+    total_tokens:
+      type: integer
+      minimum: 0
+    status_code:
+      type: integer
+      minimum: 100
+      maximum: 599
+    error_class:
+      type: string
+    error_message:
+      type: string
+    error_phase:
+      type: string
+    error_owner:
+      type: string
+    error_source:
+      type: string
+    upstream_request_id:
+      type: string
+    stream_completion_state:
+      type: string
+      enum: [completed, interrupted, idle_timeout, failed, unknown]
+      description: |
+        Latest low-cardinality terminal state among linked gateway
+        streaming attempts when available.
+
+RequestEvidenceDumpDescriptor:
+  type: object
+  required:
+    - name
+    - created_at
+    - size_bytes
+    - request_id
+    - is_error_only
+    - attempt_count
+    - response_count
+    - has_summary
+  properties:
+    name:
+      type: string
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+    size_bytes:
+      type: integer
+      format: int64
+      minimum: 0
+    request_id:
+      type: string
+    is_error_only:
+      type: boolean
+    user_id:
+      type: string
+    api_key_id:
+      type: string
+    account_id:
+      type: string
+    source_protocol:
+      type: string
+    source_endpoint:
+      type: string
+    started_at:
+      $ref: "common.yaml#/Timestamp"
+    success:
+      type: boolean
+    status_code:
+      type: integer
+      minimum: 100
+      maximum: 599
+    error_class:
+      type: string
+    latency_ms:
+      type: integer
+      minimum: 0
+    attempt_count:
+      type: integer
+      minimum: 0
+    response_count:
+      type: integer
+      minimum: 0
+    has_summary:
+      type: boolean
+
+RequestEvidenceSystemLogSummary:
+  type: object
+  required:
+    - total_count
+    - level_counts
+  properties:
+    total_count:
+      type: integer
+      minimum: 0
+      description: Total sanitized system logs linked to this exact request id.
+    level_counts:
+      type: object
+      additionalProperties:
+        type: integer
+        minimum: 0
+    latest_level:
+      $ref: "ops.yaml#/OpsSystemLogLevel"
+    latest_message:
+      type: string
+    latest_source:
+      type: string
+    latest_at:
+      $ref: "common.yaml#/Timestamp"
+
+RequestEvidenceDetailResponse:
+  type: object
+  required:
+    - evidence_request_id
+    - summary
+    - attempts
+    - request_dumps
+    - system_log_summary
+    - system_logs
+    - request_id
+  properties:
+    evidence_request_id:
+      type: string
+      description: Exact gateway request id being investigated.
+    summary:
+      $ref: "#/RequestEvidenceSummary"
+    attempts:
+      type: array
+      items:
+        $ref: "#/RequestEvidenceRow"
+    request_dumps:
+      type: array
+      items:
+        $ref: "#/RequestEvidenceDumpDescriptor"
+    system_log_summary:
+      $ref: "#/RequestEvidenceSystemLogSummary"
+    system_logs:
+      type: array
+      description: Latest sanitized system logs linked to this exact request id.
+      items:
+        $ref: "ops.yaml#/OpsSystemLog"
+    first_seen_at:
+      $ref: "common.yaml#/Timestamp"
+    last_seen_at:
+      $ref: "common.yaml#/Timestamp"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+DeleteRequestLogFileResponse:
+  type: object
+  required:
+    - success
+    - request_id
+  properties:
+    success:
+      type: boolean
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AuditLog:
+  type: object
+  required:
+    - id
+    - action
+    - resource_type
+    - resource_id
+    - before
+    - after
+    - ip
+    - user_agent
+    - trace_id
+    - created_at
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    actor_user_id:
+      type: string
+      nullable: true
+    action:
+      type: string
+    resource_type:
+      type: string
+    resource_id:
+      type: string
+    before:
+      $ref: "common.yaml#/JsonObject"
+    after:
+      $ref: "common.yaml#/JsonObject"
+    ip:
+      type: string
+    user_agent:
+      type: string
+    trace_id:
+      type: string
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+
+AuditLogListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/AuditLog"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"

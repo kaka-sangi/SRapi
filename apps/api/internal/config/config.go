@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -314,6 +316,41 @@ type ObservabilityConfig struct {
 	OTLPInsecure     bool
 	TraceSampleRatio float64
 	BatchTimeout     time.Duration
+}
+
+// PreloadConfigFile reads a YAML config file and sets any keys as environment
+// variables IF they are not already set. This lets a config file provide
+// defaults while real environment variables take precedence.
+//
+// The YAML should be a flat map of env-var-name to value:
+//
+//	DATABASE_HOST: localhost
+//	DATABASE_PORT: "5432"
+//	SRAPI_MASTER_KEY: my-secret-key
+//
+// Call this before Load().
+func PreloadConfigFile(path string) error {
+	if path == "" {
+		return nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("config: read %s: %w", path, err)
+	}
+	var values map[string]any
+	if err := yaml.Unmarshal(data, &values); err != nil {
+		return fmt.Errorf("config: parse %s: %w", path, err)
+	}
+	for key, val := range values {
+		if _, exists := os.LookupEnv(key); exists {
+			continue
+		}
+		os.Setenv(key, fmt.Sprint(val))
+	}
+	return nil
 }
 
 func Load() Config {

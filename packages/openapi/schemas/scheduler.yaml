@@ -1,0 +1,885 @@
+# Request scheduler strategies, simulations, and replays
+SchedulerDecision:
+  type: object
+  required:
+    - id
+    - request_id
+    - attempt_no
+    - user_id
+    - api_key_id
+    - source_protocol
+    - source_endpoint
+    - target_protocol
+    - model
+    - strategy
+    - strategy_version
+    - strategy_config_hash
+    - candidate_count
+    - rejected_count
+    - scores
+    - reject_reasons
+    - strategy_weights
+    - compatibility_warnings
+    - selection_rationale
+    - sticky_hit
+    - cache_affinity_hit
+    - estimated_cost
+    - currency
+    - created_at
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+    attempt_no:
+      type: integer
+      minimum: 1
+    user_id:
+      $ref: "common.yaml#/Id"
+    api_key_id:
+      $ref: "common.yaml#/Id"
+    source_protocol:
+      type: string
+    source_endpoint:
+      type: string
+    target_protocol:
+      type: string
+    model:
+      type: string
+    strategy:
+      type: string
+      enum:
+        - balanced
+        - cost_saver
+        - latency_first
+        - quota_protect
+        - sticky_first
+        - cache_affinity_first
+        - premium_quality
+    strategy_version:
+      type: string
+    strategy_config_hash:
+      type: string
+    fallback_from_decision_id:
+      type: string
+      nullable: true
+    selected_provider_id:
+      type: string
+      nullable: true
+    selected_account_id:
+      type: string
+      nullable: true
+    candidate_count:
+      type: integer
+      minimum: 0
+    rejected_count:
+      type: integer
+      minimum: 0
+    scores:
+      $ref: "common.yaml#/JsonObject"
+    reject_reasons:
+      $ref: "common.yaml#/JsonObject"
+    strategy_weights:
+      $ref: "common.yaml#/JsonObject"
+    compatibility_warnings:
+      type: array
+      items:
+        type: string
+      default: []
+    selection_rationale:
+      type: string
+      description: Non-sensitive scheduler explanation for why the selected account won, or why no account was selected.
+    sticky_hit:
+      type: boolean
+    cache_affinity_hit:
+      type: boolean
+    estimated_cost:
+      type: string
+    currency:
+      type: string
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+
+SchedulerDecisionListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/SchedulerDecision"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+SchedulerOverview:
+  type: object
+  required:
+    - total_decisions
+    - selected_decisions
+    - failed_decisions
+    - success_rate
+    - average_latency_ms
+    - sticky_hit_count
+    - cache_affinity_hit_count
+    - strategy_counts
+  properties:
+    total_decisions:
+      type: integer
+      minimum: 0
+    selected_decisions:
+      type: integer
+      minimum: 0
+    failed_decisions:
+      type: integer
+      minimum: 0
+    success_rate:
+      type: number
+      minimum: 0
+      maximum: 1
+    average_latency_ms:
+      type: integer
+      minimum: 0
+    sticky_hit_count:
+      type: integer
+      minimum: 0
+    cache_affinity_hit_count:
+      type: integer
+      minimum: 0
+    strategy_counts:
+      $ref: "common.yaml#/JsonObject"
+
+SchedulerOverviewResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/SchedulerOverview"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+SchedulerStrategy:
+  type: object
+  required:
+    - id
+    - name
+    - version
+    - status
+    - scope_type
+    - config_hash
+    - config
+    - weights
+    - source
+    - created_at
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    name:
+      $ref: "#/SchedulerStrategyName"
+    version:
+      type: string
+      example: v1
+    status:
+      $ref: "#/SchedulerStrategyStatus"
+    scope_type:
+      $ref: "#/SchedulerStrategyScopeType"
+    scope_id:
+      $ref: "common.yaml#/Id"
+      nullable: true
+    description:
+      type: string
+    config_hash:
+      type: string
+    config:
+      $ref: "common.yaml#/JsonObject"
+    weights:
+      $ref: "#/SchedulerStrategyWeights"
+    source:
+      type: string
+      enum:
+        - seed
+        - database
+    created_by:
+      $ref: "common.yaml#/Id"
+      nullable: true
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+    activated_at:
+      type: string
+      format: date-time
+      nullable: true
+    deprecated_at:
+      type: string
+      format: date-time
+      nullable: true
+
+SchedulerStrategyResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/SchedulerStrategy"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+SchedulerStrategyListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/SchedulerStrategy"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+SchedulerStrategyName:
+  type: string
+  enum:
+    - balanced
+    - cost_saver
+    - latency_first
+    - quota_protect
+    - sticky_first
+    - cache_affinity_first
+    - premium_quality
+
+SchedulerStrategyStatus:
+  type: string
+  enum:
+    - active
+    - draft
+    - deprecated
+
+SchedulerStrategyScopeType:
+  type: string
+  enum:
+    - global
+    - api_key
+    - account_group
+    - user
+
+SchedulerStrategyWeights:
+  type: object
+  additionalProperties:
+    type: number
+    minimum: 0
+    maximum: 1
+  example:
+    health: 0.3
+    quota: 0.2
+    latency: 0.15
+    sticky: 0.1
+    cache: 0.1
+    cost: 0.1
+    fairness: 0.05
+    quality: 0
+
+SchedulerStrategyMutationRequest:
+  type: object
+  required:
+    - name
+    - version
+    - status
+    - scope_type
+    - weights
+  properties:
+    name:
+      $ref: "#/SchedulerStrategyName"
+    version:
+      type: string
+      minLength: 1
+      maxLength: 64
+    status:
+      $ref: "#/SchedulerStrategyStatus"
+    scope_type:
+      $ref: "#/SchedulerStrategyScopeType"
+    scope_id:
+      $ref: "common.yaml#/Id"
+      nullable: true
+    description:
+      type: string
+      maxLength: 512
+      default: ""
+    config:
+      $ref: "common.yaml#/JsonObject"
+    weights:
+      $ref: "#/SchedulerStrategyWeights"
+
+SchedulerSimulationStickyStrength:
+  type: string
+  enum:
+    - none
+    - soft
+    - hard
+
+SchedulerSimulationRuntimeState:
+  type: object
+  properties:
+    quota_exhausted:
+      type: boolean
+      default: false
+    health_score:
+      type: number
+      minimum: 0
+      maximum: 1
+      nullable: true
+    quota_remaining_ratio:
+      type: number
+      minimum: 0
+      maximum: 1
+      nullable: true
+    latency_p95_ms:
+      type: integer
+      minimum: 0
+      nullable: true
+    circuit_open:
+      type: boolean
+      default: false
+    cooldown_active:
+      type: boolean
+      default: false
+    current_concurrency:
+      type: integer
+      minimum: 0
+      default: 0
+    rpm_used:
+      type: integer
+      minimum: 0
+      default: 0
+    tpm_used:
+      type: integer
+      minimum: 0
+      default: 0
+
+SchedulerSimulationLimits:
+  type: object
+  properties:
+    max_concurrency:
+      type: integer
+      minimum: 0
+      nullable: true
+    rpm_limit:
+      type: integer
+      minimum: 0
+      nullable: true
+    tpm_limit:
+      type: integer
+      minimum: 0
+      nullable: true
+
+SchedulerSimulationCandidate:
+  type: object
+  required:
+    - account_id
+    - provider_id
+  properties:
+    account_id:
+      $ref: "common.yaml#/Id"
+    account_status:
+      $ref: "accounts.yaml#/ProviderAccountStatus"
+      default: active
+    account_runtime_class:
+      $ref: "accounts.yaml#/RuntimeClass"
+      default: api_key
+    account_weight:
+      type: number
+      minimum: 0
+      default: 1
+    account_risk_level:
+      type: string
+      nullable: true
+    account_has_credential:
+      type: boolean
+      default: true
+    account_metadata:
+      $ref: "common.yaml#/JsonObject"
+    provider_id:
+      $ref: "common.yaml#/Id"
+    provider_status:
+      $ref: "common.yaml#/ResourceStatus"
+      default: active
+    provider_protocol:
+      $ref: "models.yaml#/ProviderProtocol"
+      default: openai-compatible
+    provider_capabilities:
+      $ref: "common.yaml#/JsonObject"
+    provider_config:
+      $ref: "common.yaml#/JsonObject"
+    mapping_id:
+      $ref: "common.yaml#/Id"
+      nullable: true
+    model_id:
+      $ref: "common.yaml#/Id"
+      nullable: true
+    mapping_status:
+      $ref: "common.yaml#/ResourceStatus"
+      default: active
+    upstream_model_name:
+      type: string
+    pricing_override:
+      $ref: "common.yaml#/JsonObject"
+    effective_capabilities:
+      type: array
+      items:
+        $ref: "models.yaml#/CapabilityDescriptor"
+      default: []
+    runtime_state:
+      $ref: "#/SchedulerSimulationRuntimeState"
+    limits:
+      $ref: "#/SchedulerSimulationLimits"
+
+SchedulerSimulationProfile:
+  type: object
+  required:
+    - request_id
+    - user_id
+    - api_key_id
+    - source_endpoint
+    - model
+    - candidates
+  properties:
+    request_id:
+      $ref: "common.yaml#/RequestId"
+    attempt_no:
+      type: integer
+      minimum: 1
+      default: 1
+    user_id:
+      $ref: "common.yaml#/Id"
+    api_key_id:
+      $ref: "common.yaml#/Id"
+    source_protocol:
+      type: string
+      default: openai-compatible
+    source_endpoint:
+      type: string
+    target_protocol:
+      type: string
+    model:
+      type: string
+    model_alias:
+      type: string
+    fallback_models:
+      type: array
+      items:
+        type: string
+      default: []
+    session_affinity_key:
+      type: string
+      writeOnly: true
+    session_affinity_source:
+      type: string
+    user_tier:
+      type: string
+      enum:
+        - free
+        - standard
+        - pro
+        - admin
+      default: free
+    user_balance_insufficient:
+      type: boolean
+      default: false
+    estimated_input_tokens:
+      type: integer
+      minimum: 0
+      default: 0
+    estimated_output_tokens:
+      type: integer
+      minimum: 0
+      default: 0
+    estimated_cost:
+      type: string
+      default: "0.00000000"
+    currency:
+      type: string
+      default: USD
+    pricing_rule_id:
+      $ref: "common.yaml#/Id"
+      nullable: true
+    pricing_source:
+      type: string
+    pricing_estimated:
+      type: boolean
+      default: false
+    is_stream:
+      type: boolean
+      default: false
+    sticky_account_id:
+      $ref: "common.yaml#/Id"
+      nullable: true
+    sticky_strength:
+      $ref: "#/SchedulerSimulationStickyStrength"
+      default: none
+    warnings:
+      type: array
+      items:
+        type: string
+      default: []
+    request_capabilities:
+      type: array
+      items:
+        $ref: "models.yaml#/CapabilityDescriptor"
+      default: []
+    excluded_account_ids:
+      type: array
+      items:
+        $ref: "common.yaml#/Id"
+      default: []
+    candidates:
+      type: array
+      minItems: 1
+      items:
+        $ref: "#/SchedulerSimulationCandidate"
+
+SchedulerSimulationRequest:
+  type: object
+  required:
+    - request
+    - shadow_strategy
+  properties:
+    current_strategy:
+      $ref: "#/SchedulerStrategyName"
+    shadow_strategy:
+      $ref: "#/SchedulerStrategyName"
+    shadow_rollout_percent:
+      type: number
+      minimum: 0
+      maximum: 100
+      nullable: true
+      description: Optional deterministic gray-release percentage for previewing whether this request would use the shadow strategy.
+    rollout_key:
+      type: string
+      writeOnly: true
+      description: Optional stable bucketing key. Defaults to request.request_id when omitted.
+    request:
+      $ref: "#/SchedulerSimulationProfile"
+
+SchedulerSimulationDecision:
+  type: object
+  required:
+    - error
+    - request_id
+    - attempt_no
+    - user_id
+    - api_key_id
+    - source_protocol
+    - source_endpoint
+    - target_protocol
+    - model
+    - strategy
+    - strategy_version
+    - strategy_config_hash
+    - candidate_count
+    - rejected_count
+    - scores
+    - reject_reasons
+    - strategy_weights
+    - compatibility_warnings
+    - sticky_hit
+    - cache_affinity_hit
+    - estimated_cost
+    - currency
+    - created_at
+  properties:
+    error:
+      type: string
+      description: Empty when the simulated strategy selected an account.
+    request_id:
+      $ref: "common.yaml#/RequestId"
+    attempt_no:
+      type: integer
+      minimum: 1
+    user_id:
+      $ref: "common.yaml#/Id"
+    api_key_id:
+      $ref: "common.yaml#/Id"
+    source_protocol:
+      type: string
+    source_endpoint:
+      type: string
+    target_protocol:
+      type: string
+    model:
+      type: string
+    strategy:
+      $ref: "#/SchedulerStrategyName"
+    strategy_version:
+      type: string
+    strategy_config_hash:
+      type: string
+    selected_provider_id:
+      type: string
+      nullable: true
+    selected_account_id:
+      type: string
+      nullable: true
+    candidate_count:
+      type: integer
+      minimum: 0
+    rejected_count:
+      type: integer
+      minimum: 0
+    scores:
+      $ref: "common.yaml#/JsonObject"
+    reject_reasons:
+      $ref: "common.yaml#/JsonObject"
+    strategy_weights:
+      $ref: "common.yaml#/JsonObject"
+    compatibility_warnings:
+      type: array
+      items:
+        type: string
+      default: []
+    sticky_hit:
+      type: boolean
+    cache_affinity_hit:
+      type: boolean
+    estimated_cost:
+      type: string
+    currency:
+      type: string
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+
+SchedulerSimulationDiff:
+  type: object
+  required:
+    - winner_changed
+    - final_score_delta
+    - cost_score_delta
+    - latency_score_delta
+    - quality_score_delta
+    - risk_penalty_delta
+  properties:
+    winner_changed:
+      type: boolean
+    current_selected_account_id:
+      type: string
+      nullable: true
+    shadow_selected_account_id:
+      type: string
+      nullable: true
+    current_selected_provider_id:
+      type: string
+      nullable: true
+    shadow_selected_provider_id:
+      type: string
+      nullable: true
+    final_score_delta:
+      type: number
+    cost_score_delta:
+      type: number
+    latency_score_delta:
+      type: number
+    quality_score_delta:
+      type: number
+    risk_penalty_delta:
+      type: number
+
+SchedulerSimulationRollout:
+  type: object
+  required:
+    - enabled
+    - percent
+    - bucket
+    - shadow_selected
+    - key_hash
+  properties:
+    enabled:
+      type: boolean
+      description: True when shadow_rollout_percent was supplied in the request.
+    percent:
+      type: number
+      minimum: 0
+      maximum: 100
+    bucket:
+      type: number
+      minimum: 0
+      maximum: 100
+      description: Stable deterministic bucket for the rollout key, in the range [0, 100).
+    shadow_selected:
+      type: boolean
+      description: True when bucket is inside the supplied shadow rollout percentage.
+    key_hash:
+      type: string
+      description: SHA-256 hash of the rollout key; the raw key is never returned.
+
+SchedulerSimulationResult:
+  type: object
+  required:
+    - dry_run
+    - current
+    - shadow
+    - diff
+    - rollout
+  properties:
+    dry_run:
+      type: boolean
+    current:
+      $ref: "#/SchedulerSimulationDecision"
+    shadow:
+      $ref: "#/SchedulerSimulationDecision"
+    diff:
+      $ref: "#/SchedulerSimulationDiff"
+    rollout:
+      $ref: "#/SchedulerSimulationRollout"
+
+SchedulerSimulationResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/SchedulerSimulationResult"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+SchedulerReplayRequest:
+  type: object
+  required:
+    - shadow_strategy
+  properties:
+    current_strategy:
+      $ref: "#/SchedulerStrategyName"
+      description: Defaults to the original snapshot strategy when omitted.
+    shadow_strategy:
+      $ref: "#/SchedulerStrategyName"
+    shadow_rollout_percent:
+      type: number
+      minimum: 0
+      maximum: 100
+      nullable: true
+      description: Optional deterministic gray-release percentage preview for each replayed request.
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 500
+      default: 100
+    since:
+      type: string
+      format: date-time
+      nullable: true
+    until:
+      type: string
+      format: date-time
+      nullable: true
+    model:
+      type: string
+    request_id:
+      type: string
+
+SchedulerReplayItem:
+  type: object
+  required:
+    - snapshot_id
+    - decision_id
+    - request_id
+    - attempt_no
+    - created_at
+    - original_strategy
+    - current
+    - shadow
+    - diff
+    - rollout
+  properties:
+    snapshot_id:
+      $ref: "common.yaml#/Id"
+    decision_id:
+      $ref: "common.yaml#/Id"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+    attempt_no:
+      type: integer
+      minimum: 1
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+    original_strategy:
+      $ref: "#/SchedulerStrategyName"
+    original_selected_account_id:
+      type: string
+      nullable: true
+    current:
+      $ref: "#/SchedulerSimulationDecision"
+    shadow:
+      $ref: "#/SchedulerSimulationDecision"
+    diff:
+      $ref: "#/SchedulerSimulationDiff"
+    rollout:
+      $ref: "#/SchedulerSimulationRollout"
+
+SchedulerReplayResult:
+  type: object
+  required:
+    - dry_run
+    - requested
+    - replayed
+    - skipped
+    - winner_changed
+    - current_win_counts
+    - shadow_win_counts
+    - average_final_score_delta
+    - average_cost_score_delta
+    - average_latency_score_delta
+    - average_quality_score_delta
+    - average_risk_penalty_delta
+    - items
+  properties:
+    dry_run:
+      type: boolean
+    requested:
+      type: integer
+      minimum: 0
+    replayed:
+      type: integer
+      minimum: 0
+    skipped:
+      type: integer
+      minimum: 0
+    winner_changed:
+      type: integer
+      minimum: 0
+    current_win_counts:
+      $ref: "common.yaml#/JsonObject"
+    shadow_win_counts:
+      $ref: "common.yaml#/JsonObject"
+    average_final_score_delta:
+      type: number
+    average_cost_score_delta:
+      type: number
+    average_latency_score_delta:
+      type: number
+    average_quality_score_delta:
+      type: number
+    average_risk_penalty_delta:
+      type: number
+    items:
+      type: array
+      items:
+        $ref: "#/SchedulerReplayItem"
+
+SchedulerReplayResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/SchedulerReplayResult"
+    request_id:
+      $ref: "common.yaml#/RequestId"

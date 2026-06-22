@@ -1,0 +1,857 @@
+# Model/group rate limits, TLS profiles, payload rules, error passthrough, and configuration import/export
+UserPlatformQuota:
+  type: object
+  required:
+    - user_id
+    - platform
+    - currency
+    - enabled
+    - created_at
+    - updated_at
+  properties:
+    user_id:
+      type: integer
+      format: int64
+    platform:
+      type: string
+    daily_limit:
+      type: string
+      nullable: true
+    weekly_limit:
+      type: string
+      nullable: true
+    monthly_limit:
+      type: string
+      nullable: true
+    currency:
+      type: string
+    enabled:
+      type: boolean
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+UpsertUserPlatformQuotaRequest:
+  type: object
+  required:
+    - platform
+  properties:
+    platform:
+      type: string
+    daily_limit:
+      type: string
+      nullable: true
+    weekly_limit:
+      type: string
+      nullable: true
+    monthly_limit:
+      type: string
+      nullable: true
+    currency:
+      type: string
+    enabled:
+      type: boolean
+UserPlatformQuotaResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/UserPlatformQuota"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+UserPlatformQuotaListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/UserPlatformQuota"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+ModelRateLimit:
+  type: object
+  required:
+    - model_id
+    - rpm_limit
+    - tpm_limit
+    - max_concurrency
+    - enabled
+    - created_at
+    - updated_at
+  properties:
+    model_id:
+      type: integer
+      format: int64
+    rpm_limit:
+      type: integer
+      format: int64
+      minimum: 0
+    tpm_limit:
+      type: integer
+      format: int64
+      minimum: 0
+    max_concurrency:
+      type: integer
+      format: int64
+      minimum: 0
+    enabled:
+      type: boolean
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+UpsertModelRateLimitRequest:
+  type: object
+  required:
+    - model_id
+  properties:
+    model_id:
+      type: integer
+      format: int64
+    rpm_limit:
+      type: integer
+      format: int64
+      minimum: 0
+    tpm_limit:
+      type: integer
+      format: int64
+      minimum: 0
+    max_concurrency:
+      type: integer
+      format: int64
+      minimum: 0
+    enabled:
+      type: boolean
+ModelRateLimitResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/ModelRateLimit"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+ModelRateLimitListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/ModelRateLimit"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+UpsertGroupRateLimitRequest:
+  type: object
+  required:
+    - account_group_id
+  properties:
+    account_group_id:
+      type: integer
+      format: int64
+    rpm_limit:
+      type: integer
+      format: int64
+      minimum: 0
+    tpm_limit:
+      type: integer
+      format: int64
+      minimum: 0
+    max_concurrency:
+      type: integer
+      format: int64
+      minimum: 0
+    enabled:
+      type: boolean
+GroupRateLimitResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "accounts.yaml#/AccountGroupRateLimit"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+GroupRateLimitListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "accounts.yaml#/AccountGroupRateLimit"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+TLSProfile:
+  type: object
+  required:
+    - id
+    - name
+    - tls_template
+    - http_version_policy
+    - user_agent
+    - extra_headers
+    - enabled
+    - created_at
+    - updated_at
+  properties:
+    id:
+      type: integer
+      format: int64
+    name:
+      type: string
+    tls_template:
+      type: string
+    http_version_policy:
+      type: string
+    user_agent:
+      type: string
+    extra_headers:
+      type: object
+      additionalProperties:
+        type: string
+    enabled:
+      type: boolean
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+CreateTLSProfileRequest:
+  type: object
+  required:
+    - name
+  properties:
+    name:
+      type: string
+    tls_template:
+      type: string
+    http_version_policy:
+      type: string
+    user_agent:
+      type: string
+    extra_headers:
+      type: object
+      additionalProperties:
+        type: string
+    enabled:
+      type: boolean
+UpdateTLSProfileRequest:
+  type: object
+  properties:
+    name:
+      type: string
+    tls_template:
+      type: string
+    http_version_policy:
+      type: string
+    user_agent:
+      type: string
+    extra_headers:
+      type: object
+      additionalProperties:
+        type: string
+    enabled:
+      type: boolean
+TLSProfileResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/TLSProfile"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+TLSProfileListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/TLSProfile"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+PayloadRule:
+  type: object
+  required:
+    - id
+    - name
+    - enabled
+    - priority
+    - action
+    - match_model
+    - match_protocol
+    - params
+    - created_at
+    - updated_at
+  properties:
+    id:
+      type: integer
+      format: int64
+    name:
+      type: string
+    enabled:
+      type: boolean
+    priority:
+      type: integer
+      format: int64
+    action:
+      type: string
+      enum:
+        - default
+        - override
+        - filter
+    match_model:
+      type: string
+    match_protocol:
+      type: string
+    params:
+      type: object
+      additionalProperties: true
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+CreatePayloadRuleRequest:
+  type: object
+  required:
+    - name
+    - action
+    - params
+  properties:
+    name:
+      type: string
+    enabled:
+      type: boolean
+    priority:
+      type: integer
+      format: int64
+    action:
+      type: string
+      enum:
+        - default
+        - override
+        - filter
+    match_model:
+      type: string
+    match_protocol:
+      type: string
+    params:
+      type: object
+      additionalProperties: true
+UpdatePayloadRuleRequest:
+  type: object
+  properties:
+    name:
+      type: string
+    enabled:
+      type: boolean
+    priority:
+      type: integer
+      format: int64
+    action:
+      type: string
+      enum:
+        - default
+        - override
+        - filter
+    match_model:
+      type: string
+    match_protocol:
+      type: string
+    params:
+      type: object
+      additionalProperties: true
+PayloadRuleResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/PayloadRule"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+PayloadRuleListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/PayloadRule"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+ErrorPassthroughRule:
+  type: object
+  required:
+    - id
+    - name
+    - enabled
+    - priority
+    - action
+    - status_codes
+    - classes
+    - keywords
+    - created_at
+    - updated_at
+  properties:
+    id:
+      type: integer
+      format: int64
+    name:
+      type: string
+    enabled:
+      type: boolean
+    priority:
+      type: integer
+      format: int64
+    action:
+      type: string
+      enum:
+        - expose
+        - mask
+    status_codes:
+      type: array
+      items:
+        type: integer
+        format: int64
+    classes:
+      type: array
+      items:
+        type: string
+    keywords:
+      type: array
+      items:
+        type: string
+    response_status:
+      type: integer
+      format: int64
+      nullable: true
+      description: Optional downstream HTTP status returned when this rule matches. Use 0 in update requests to clear the override.
+    response_code:
+      type: integer
+      format: int64
+      nullable: true
+      description: Alias of response_status for compatibility with sub2api-style imports.
+    custom_message:
+      type: string
+      description: Optional downstream error message returned when this rule matches. Empty string clears the override.
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+CreateErrorPassthroughRuleRequest:
+  type: object
+  required:
+    - name
+    - action
+  properties:
+    name:
+      type: string
+    enabled:
+      type: boolean
+    priority:
+      type: integer
+      format: int64
+    action:
+      type: string
+      enum:
+        - expose
+        - mask
+    status_codes:
+      type: array
+      items:
+        type: integer
+        format: int64
+    classes:
+      type: array
+      items:
+        type: string
+    keywords:
+      type: array
+      items:
+        type: string
+    response_status:
+      type: integer
+      format: int64
+      nullable: true
+    response_code:
+      type: integer
+      format: int64
+      nullable: true
+      description: Alias of response_status for compatibility with sub2api-style imports.
+    custom_message:
+      type: string
+UpdateErrorPassthroughRuleRequest:
+  type: object
+  properties:
+    name:
+      type: string
+    enabled:
+      type: boolean
+    priority:
+      type: integer
+      format: int64
+    action:
+      type: string
+      enum:
+        - expose
+        - mask
+    status_codes:
+      type: array
+      items:
+        type: integer
+        format: int64
+    classes:
+      type: array
+      items:
+        type: string
+    keywords:
+      type: array
+      items:
+        type: string
+    response_status:
+      type: integer
+      format: int64
+      nullable: true
+      description: Set to a 100-599 status, or 0 to clear the override.
+    response_code:
+      type: integer
+      format: int64
+      nullable: true
+      description: Alias of response_status for compatibility with sub2api-style imports.
+    custom_message:
+      type: string
+      description: Set to a non-empty message, or empty string to clear the override.
+ErrorPassthroughRuleResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/ErrorPassthroughRule"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+ErrorPassthroughRuleListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/ErrorPassthroughRule"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+SnapshotModelRateLimit:
+  type: object
+  required:
+    - model_id
+    - model_name
+    - rpm_limit
+    - tpm_limit
+    - max_concurrency
+    - enabled
+  properties:
+    model_id:
+      type: integer
+      format: int64
+    model_name:
+      type: string
+    rpm_limit:
+      type: integer
+      format: int64
+    tpm_limit:
+      type: integer
+      format: int64
+    max_concurrency:
+      type: integer
+      format: int64
+    enabled:
+      type: boolean
+SnapshotGroupRateLimit:
+  type: object
+  required:
+    - account_group_id
+    - account_group_name
+    - rpm_limit
+    - tpm_limit
+    - max_concurrency
+    - enabled
+  properties:
+    account_group_id:
+      type: integer
+      format: int64
+    account_group_name:
+      type: string
+    rpm_limit:
+      type: integer
+      format: int64
+    tpm_limit:
+      type: integer
+      format: int64
+    max_concurrency:
+      type: integer
+      format: int64
+    enabled:
+      type: boolean
+ConfigSnapshotResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      type: object
+      required:
+        - snapshot_version
+        - generated_at
+      properties:
+        snapshot_version:
+          type: string
+        generated_at:
+          type: string
+          format: date-time
+        providers:
+          type: array
+          items:
+            $ref: "models.yaml#/Provider"
+        models:
+          type: array
+          items:
+            $ref: "models.yaml#/Model"
+        account_groups:
+          type: array
+          items:
+            $ref: "accounts.yaml#/AccountGroup"
+        subscription_plans:
+          type: array
+          items:
+            $ref: "billing.yaml#/SubscriptionPlan"
+        pricing_rules:
+          type: array
+          items:
+            $ref: "billing.yaml#/PricingRule"
+        payload_rules:
+          type: array
+          items:
+            $ref: "#/CreatePayloadRuleRequest"
+        proxies:
+          type: array
+          items:
+            $ref: "proxies.yaml#/SnapshotProxyDefinition"
+        scheduled_test_plans:
+          type: array
+          items:
+            $ref: "ops.yaml#/ImportScheduledTestPlan"
+        model_rate_limits:
+          type: array
+          items:
+            $ref: "#/SnapshotModelRateLimit"
+        group_rate_limits:
+          type: array
+          items:
+            $ref: "#/SnapshotGroupRateLimit"
+        error_passthrough_rules:
+          type: array
+          items:
+            $ref: "#/ErrorPassthroughRule"
+        tls_profiles:
+          type: array
+          items:
+            $ref: "#/TLSProfile"
+        user_attribute_definitions:
+          type: array
+          items:
+            $ref: "users.yaml#/UserAttributeDefinition"
+        settings:
+          $ref: "admin.yaml#/AdminSettings"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+ImportModelRateLimit:
+  type: object
+  required:
+    - model_name
+  properties:
+    model_name:
+      type: string
+    rpm_limit:
+      type: integer
+      format: int64
+    tpm_limit:
+      type: integer
+      format: int64
+    max_concurrency:
+      type: integer
+      format: int64
+    enabled:
+      type: boolean
+ImportGroupRateLimit:
+  type: object
+  required:
+    - account_group_name
+  properties:
+    account_group_name:
+      type: string
+    rpm_limit:
+      type: integer
+      format: int64
+    tpm_limit:
+      type: integer
+      format: int64
+    max_concurrency:
+      type: integer
+      format: int64
+    enabled:
+      type: boolean
+ConfigImportRequest:
+  type: object
+  properties:
+    tls_profiles:
+      type: array
+      items:
+        $ref: "#/CreateTLSProfileRequest"
+    user_attribute_definitions:
+      type: array
+      items:
+        $ref: "users.yaml#/CreateUserAttributeDefinitionRequest"
+    error_passthrough_rules:
+      type: array
+      items:
+        $ref: "#/CreateErrorPassthroughRuleRequest"
+    payload_rules:
+      type: array
+      items:
+        $ref: "#/CreatePayloadRuleRequest"
+    proxies:
+      type: array
+      items:
+        $ref: "proxies.yaml#/ImportProxyDefinition"
+    scheduled_test_plans:
+      type: array
+      items:
+        $ref: "ops.yaml#/ImportScheduledTestPlan"
+    model_rate_limits:
+      type: array
+      items:
+        $ref: "#/ImportModelRateLimit"
+    group_rate_limits:
+      type: array
+      items:
+        $ref: "#/ImportGroupRateLimit"
+ImportSectionResult:
+  type: object
+  required:
+    - created
+    - updated
+  properties:
+    created:
+      type: integer
+      format: int64
+    updated:
+      type: integer
+      format: int64
+ImportRemapResult:
+  type: object
+  required:
+    - created
+    - updated
+    - skipped
+  properties:
+    created:
+      type: integer
+      format: int64
+    updated:
+      type: integer
+      format: int64
+    skipped:
+      type: integer
+      format: int64
+ConfigImportResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      type: object
+      required:
+        - dry_run
+        - tls_profiles
+        - user_attribute_definitions
+        - error_passthrough_rules
+        - payload_rules
+        - proxies
+        - scheduled_test_plans
+        - model_rate_limits
+        - group_rate_limits
+      properties:
+        dry_run:
+          type: boolean
+        tls_profiles:
+          $ref: "#/ImportSectionResult"
+        user_attribute_definitions:
+          $ref: "#/ImportSectionResult"
+        error_passthrough_rules:
+          $ref: "#/ImportSectionResult"
+        payload_rules:
+          $ref: "#/ImportSectionResult"
+        proxies:
+          $ref: "#/ImportRemapResult"
+        scheduled_test_plans:
+          $ref: "#/ImportRemapResult"
+        model_rate_limits:
+          $ref: "#/ImportRemapResult"
+        group_rate_limits:
+          $ref: "#/ImportRemapResult"
+    request_id:
+      $ref: "common.yaml#/RequestId"

@@ -1,0 +1,63 @@
+# SRapi configuration file
+# Set SRAPI_CONFIG_FILE=/path/to/config.yaml to load.
+# Environment variables always take precedence over values here.
+
+# --- Server ---
+# SERVER_HOST: "0.0.0.0"
+# SERVER_PORT: "8080"
+# SERVER_MODE: release
+# SRAPI_VERSION: "0.1.0"
+
+# --- Storage ---
+# STORAGE_BACKEND: postgres
+
+# --- Database ---
+# DATABASE_HOST: localhost
+# DATABASE_PORT: "5432"
+# DATABASE_DBNAME: srapi
+# DATABASE_USER: srapi
+# DATABASE_PASSWORD: ""
+# DATABASE_SSLMODE: disable
+
+# --- Redis ---
+# REDIS_HOST: localhost
+# REDIS_PORT: "6379"
+# REDIS_PASSWORD: ""
+
+# --- Security ---
+# JWT_SECRET: change-me-to-a-strong-random-string
+# SRAPI_MASTER_KEY: change-me-to-a-strong-random-string
+# TOTP_ENCRYPTION_KEY: change-me-to-a-strong-random-string
+# API_KEY_PEPPER: change-me-to-a-strong-random-string
+
+# --- Bootstrap ---
+# BOOTSTRAP_ADMIN_EMAIL: admin@srapi.local
+# BOOTSTRAP_ADMIN_PASSWORD: change-me
+# BOOTSTRAP_ADMIN_NAME: Admin
+
+# --- Gateway ---
+# GATEWAY_REQUEST_TIMEOUT_SECONDS: "600"
+# GATEWAY_STREAM_IDLE_TIMEOUT_SECONDS: "120"
+# GATEWAY_REQUIRE_POSITIVE_BALANCE: "true"
+
+# --- Email ---
+# EMAIL_SMTP_HOST: smtp.example.com
+# EMAIL_SMTP_PORT: "587"
+# EMAIL_SMTP_USERNAME: ""
+# EMAIL_SMTP_PASSWORD: ""
+# EMAIL_SMTP_FROM: noreply@example.com
+# EMAIL_SMTP_FROM_NAME: SRapi
+# EMAIL_SMTP_USE_TLS: "true"
+# EMAIL_PUBLIC_BASE_URL: https://app.example.com
+
+# --- Observability ---
+# OTEL_SERVICE_NAME: srapi
+# OTEL_ENVIRONMENT: production
+# OTEL_TRACES_ENABLED: "false"
+# OTEL_EXPORTER_OTLP_ENDPOINT: localhost:4317
+
+# --- Captcha ---
+# CAPTCHA_ENABLED: "false"
+# CAPTCHA_PROVIDER: turnstile
+# CAPTCHA_SECRET_KEY: ""
+# CAPTCHA_SITE_KEY: ""

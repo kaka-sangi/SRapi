@@ -1,0 +1,517 @@
+# Affiliate invite codes, rules, ledger entries, and withdrawals
+AffiliateRelationshipStatus:
+  type: string
+  enum:
+    - active
+    - disabled
+
+AffiliateLedgerEntryType:
+  type: string
+  enum:
+    - accrue
+    - transfer_to_balance
+    - withdraw
+    - refund_compensation
+    - manual_adjustment
+
+AffiliateLedgerEntryStatus:
+  type: string
+  enum:
+    - pending
+    - settled
+    - canceled
+    - compensated
+
+AffiliateInviteCodeStatus:
+  type: string
+  enum:
+    - active
+    - disabled
+    - expired
+
+AffiliateRuleStatus:
+  type: string
+  enum:
+    - active
+    - disabled
+    - archived
+
+AffiliateRuleTriggerType:
+  type: string
+  enum:
+    - payment_paid
+
+AffiliateInviteCode:
+  type: object
+  required:
+    - id
+    - user_id
+    - code
+    - status
+    - created_at
+    - updated_at
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    user_id:
+      $ref: "common.yaml#/Id"
+    code:
+      type: string
+    status:
+      $ref: "#/AffiliateInviteCodeStatus"
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+    updated_at:
+      $ref: "common.yaml#/Timestamp"
+    expires_at:
+      type: string
+      format: date-time
+      nullable: true
+
+CreateAffiliateInviteCodeRequest:
+  type: object
+  properties:
+    code:
+      type: string
+      minLength: 4
+      maxLength: 80
+      description: Optional custom code. When omitted, SRapi generates one.
+    expires_at:
+      type: string
+      format: date-time
+      nullable: true
+
+AffiliateInviteCodeResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/AffiliateInviteCode"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AffiliateInviteCodeListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/AffiliateInviteCode"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AffiliateRule:
+  type: object
+  required:
+    - id
+    - name
+    - status
+    - trigger_type
+    - rate
+    - fixed_amount
+    - currency
+    - max_rebate_amount
+    - metadata
+    - created_at
+    - updated_at
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    name:
+      type: string
+    status:
+      $ref: "#/AffiliateRuleStatus"
+    trigger_type:
+      $ref: "#/AffiliateRuleTriggerType"
+    rate:
+      type: string
+    fixed_amount:
+      type: string
+    currency:
+      type: string
+    max_rebate_amount:
+      type: string
+    valid_from:
+      type: string
+      format: date-time
+      nullable: true
+    valid_to:
+      type: string
+      format: date-time
+      nullable: true
+    metadata:
+      $ref: "common.yaml#/JsonObject"
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+    updated_at:
+      $ref: "common.yaml#/Timestamp"
+
+CreateAffiliateRuleRequest:
+  type: object
+  required:
+    - name
+    - trigger_type
+  properties:
+    name:
+      type: string
+    status:
+      $ref: "#/AffiliateRuleStatus"
+    trigger_type:
+      $ref: "#/AffiliateRuleTriggerType"
+    rate:
+      type: string
+      default: "0.00000000"
+    fixed_amount:
+      type: string
+      default: "0.00000000"
+    currency:
+      type: string
+      default: USD
+    max_rebate_amount:
+      type: string
+      default: "0.00000000"
+    valid_from:
+      type: string
+      format: date-time
+      nullable: true
+    valid_to:
+      type: string
+      format: date-time
+      nullable: true
+    metadata:
+      $ref: "common.yaml#/JsonObject"
+
+UpdateAffiliateRuleRequest:
+  type: object
+  properties:
+    name:
+      type: string
+    status:
+      $ref: "#/AffiliateRuleStatus"
+    trigger_type:
+      $ref: "#/AffiliateRuleTriggerType"
+    rate:
+      type: string
+    fixed_amount:
+      type: string
+    currency:
+      type: string
+    max_rebate_amount:
+      type: string
+    valid_from:
+      type: string
+      format: date-time
+      nullable: true
+    valid_to:
+      type: string
+      format: date-time
+      nullable: true
+    metadata:
+      $ref: "common.yaml#/JsonObject"
+
+AffiliateRuleResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/AffiliateRule"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AffiliateRuleListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/AffiliateRule"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AffiliateInviteRecord:
+  type: object
+  required:
+    - id
+    - inviter_user_id
+    - invitee_user_id
+    - invite_code_id
+    - status
+    - created_at
+    - updated_at
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    inviter_user_id:
+      $ref: "common.yaml#/Id"
+    invitee_user_id:
+      $ref: "common.yaml#/Id"
+    invite_code_id:
+      $ref: "common.yaml#/Id"
+    status:
+      $ref: "#/AffiliateRelationshipStatus"
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+    updated_at:
+      $ref: "common.yaml#/Timestamp"
+    first_paid_at:
+      type: string
+      format: date-time
+      nullable: true
+
+AffiliateInviteRecordListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/AffiliateInviteRecord"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AffiliateLedgerEntry:
+  type: object
+  required:
+    - id
+    - user_id
+    - related_user_id
+    - type
+    - amount
+    - currency
+    - status
+    - reference_id
+    - metadata
+    - created_at
+    - updated_at
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    user_id:
+      $ref: "common.yaml#/Id"
+    related_user_id:
+      $ref: "common.yaml#/Id"
+    payment_order_id:
+      $ref: "common.yaml#/Id"
+      nullable: true
+    subscription_id:
+      $ref: "common.yaml#/Id"
+      nullable: true
+    type:
+      $ref: "#/AffiliateLedgerEntryType"
+    amount:
+      type: string
+    currency:
+      type: string
+    status:
+      $ref: "#/AffiliateLedgerEntryStatus"
+    reference_id:
+      type: string
+    metadata:
+      $ref: "common.yaml#/JsonObject"
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+    updated_at:
+      $ref: "common.yaml#/Timestamp"
+    settled_at:
+      type: string
+      format: date-time
+      nullable: true
+
+AffiliateLedgerEntryListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/AffiliateLedgerEntry"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AffiliateLedgerEntryResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/AffiliateLedgerEntry"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AffiliateCurrencySummary:
+  type: object
+  required:
+    - currency
+    - available_balance
+    - accrued_amount
+    - refund_compensated_amount
+    - transferred_to_balance_amount
+    - withdrawn_amount
+    - manual_adjustment_amount
+  properties:
+    currency:
+      type: string
+    available_balance:
+      type: string
+      description: Decimal string affiliate balance available for transfer.
+    accrued_amount:
+      type: string
+    refund_compensated_amount:
+      type: string
+    transferred_to_balance_amount:
+      type: string
+    withdrawn_amount:
+      type: string
+    manual_adjustment_amount:
+      type: string
+
+AffiliateSummary:
+  type: object
+  required:
+    - user_id
+    - balances
+    - invite_codes
+    - invited_count
+  properties:
+    user_id:
+      $ref: "common.yaml#/Id"
+    balances:
+      type: array
+      items:
+        $ref: "#/AffiliateCurrencySummary"
+    invite_codes:
+      type: array
+      items:
+        $ref: "#/AffiliateInviteCode"
+    invited_count:
+      type: integer
+      minimum: 0
+
+AffiliateSummaryResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/AffiliateSummary"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AffiliateTransferToBalanceRequest:
+  type: object
+  required:
+    - amount
+  properties:
+    amount:
+      type: string
+      description: Decimal string amount to move from affiliate balance into gateway balance.
+    currency:
+      type: string
+      default: USD
+
+AffiliateWithdrawalRequest:
+  type: object
+  required:
+    - amount
+  properties:
+    amount:
+      type: string
+      description: Decimal string amount to withdraw from affiliate balance.
+    currency:
+      type: string
+      default: USD
+    destination:
+      type: string
+      description: Optional withdrawal destination label or account reference.
+
+AdminAffiliateWithdrawalDecisionRequest:
+  type: object
+  properties:
+    reason:
+      type: string
+      description: Optional admin note recorded on the withdrawal ledger metadata.
+
+AdminAffiliateManualAdjustmentRequest:
+  type: object
+  required:
+    - user_id
+    - amount
+    - reason
+  properties:
+    user_id:
+      $ref: "common.yaml#/Id"
+    amount:
+      type: string
+      description: Decimal string amount to adjust. Positive credits balance; negative debits balance.
+    currency:
+      type: string
+      default: USD
+    reason:
+      type: string
+      minLength: 1
+    reference_id:
+      type: string
+      description: Optional admin-supplied idempotency reference.
+    metadata:
+      $ref: "common.yaml#/JsonObject"
+
+AffiliateTransferToBalanceResult:
+  type: object
+  required:
+    - applied
+    - affiliate_ledger
+    - billing_ledger_id
+    - balance_before
+    - balance_after
+  properties:
+    applied:
+      type: boolean
+    reason:
+      type: string
+    affiliate_ledger:
+      $ref: "#/AffiliateLedgerEntry"
+    billing_ledger_id:
+      $ref: "common.yaml#/Id"
+    balance_before:
+      type: string
+    balance_after:
+      type: string
+
+AffiliateTransferToBalanceResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/AffiliateTransferToBalanceResult"
+    request_id:
+      $ref: "common.yaml#/RequestId"

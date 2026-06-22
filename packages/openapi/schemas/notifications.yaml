@@ -1,0 +1,614 @@
+# Notification preferences, contacts, email templates, and announcements
+NotificationUnsubscribeRequest:
+  type: object
+  required:
+    - token
+  properties:
+    token:
+      type: string
+      minLength: 1
+
+NotificationUnsubscribe:
+  type: object
+  required:
+    - event
+    - done
+  properties:
+    event:
+      type: string
+      enum:
+        - balance.low
+        - subscription.expiry_reminder
+        - account.quota_alert
+    done:
+      type: boolean
+
+NotificationUnsubscribeResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/NotificationUnsubscribe"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+NotificationPreferenceEventName:
+  type: string
+  enum:
+    - balance.low
+    - subscription.expiry_reminder
+    - account.quota_alert
+
+NotificationPreference:
+  type: object
+  required:
+    - event
+    - label
+    - description
+    - category
+    - subscribed
+  properties:
+    event:
+      $ref: "#/NotificationPreferenceEventName"
+    label:
+      type: string
+    description:
+      type: string
+    category:
+      type: string
+    subscribed:
+      type: boolean
+      description: True when the current user is subscribed to this optional notification event.
+    updated_at:
+      $ref: "common.yaml#/Timestamp"
+      nullable: true
+
+NotificationPreferenceUpdate:
+  type: object
+  required:
+    - event
+    - subscribed
+  properties:
+    event:
+      $ref: "#/NotificationPreferenceEventName"
+    subscribed:
+      type: boolean
+
+UpdateNotificationPreferencesRequest:
+  type: object
+  required:
+    - preferences
+  properties:
+    preferences:
+      type: array
+      minItems: 1
+      items:
+        $ref: "#/NotificationPreferenceUpdate"
+
+NotificationPreferenceListResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/NotificationPreference"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+NotificationContact:
+  type: object
+  required:
+    - id
+    - email
+    - email_hash
+    - verified
+    - disabled
+    - created_at
+    - updated_at
+  properties:
+    id:
+      type: string
+    email:
+      type: string
+      format: email
+    email_hash:
+      type: string
+      description: SHA-256 hash of the normalized contact email.
+    verified:
+      type: boolean
+    disabled:
+      type: boolean
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+    updated_at:
+      $ref: "common.yaml#/Timestamp"
+    verified_at:
+      $ref: "common.yaml#/Timestamp"
+      nullable: true
+
+NotificationContactListResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/NotificationContact"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+NotificationContactVerificationRequest:
+  type: object
+  required:
+    - email
+  properties:
+    email:
+      type: string
+      format: email
+      maxLength: 254
+
+NotificationContactVerificationAccepted:
+  type: object
+  required:
+    - accepted
+    - contact
+    - verification_sent
+  properties:
+    accepted:
+      type: boolean
+    contact:
+      $ref: "#/NotificationContact"
+    verification_sent:
+      type: boolean
+    expires_at:
+      $ref: "common.yaml#/Timestamp"
+      nullable: true
+
+NotificationContactVerificationResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/NotificationContactVerificationAccepted"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+NotificationContactConfirmRequest:
+  type: object
+  required:
+    - token
+  properties:
+    token:
+      type: string
+      minLength: 1
+
+UpdateNotificationContactRequest:
+  type: object
+  required:
+    - disabled
+  properties:
+    disabled:
+      type: boolean
+
+NotificationContactResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/NotificationContact"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+NotificationEmailTemplateEventName:
+  type: string
+  enum:
+    - auth.password_reset
+    - auth.email_verification
+    - auth.oauth_pending_email_completion
+    - notification.contact_verification
+    - balance.low
+    - subscription.expiry_reminder
+    - account.quota_alert
+
+NotificationEmailTemplateEvent:
+  type: object
+  required:
+    - event
+    - label
+    - description
+    - category
+    - optional
+    - placeholders
+  properties:
+    event:
+      $ref: "#/NotificationEmailTemplateEventName"
+    label:
+      type: string
+    description:
+      type: string
+    category:
+      type: string
+    optional:
+      type: boolean
+      description: True when recipients may unsubscribe from this event.
+    placeholders:
+      type: array
+      items:
+        type: string
+      default: []
+
+NotificationEmailTemplate:
+  type: object
+  required:
+    - event
+    - subject
+    - html
+    - is_custom
+    - placeholders
+  properties:
+    event:
+      $ref: "#/NotificationEmailTemplateEventName"
+    subject:
+      type: string
+      minLength: 1
+      maxLength: 200
+    html:
+      type: string
+      minLength: 1
+      maxLength: 30000
+    is_custom:
+      type: boolean
+    placeholders:
+      type: array
+      items:
+        type: string
+      default: []
+
+NotificationEmailTemplateList:
+  type: object
+  required:
+    - events
+    - templates
+    - placeholders
+  properties:
+    events:
+      type: array
+      items:
+        $ref: "#/NotificationEmailTemplateEvent"
+      default: []
+    templates:
+      type: array
+      items:
+        $ref: "#/NotificationEmailTemplate"
+      default: []
+    placeholders:
+      type: array
+      items:
+        type: string
+      default: []
+
+NotificationEmailTemplateResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/NotificationEmailTemplate"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+NotificationEmailTemplateListResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/NotificationEmailTemplateList"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+UpdateNotificationEmailTemplateRequest:
+  type: object
+  required:
+    - subject
+    - html
+  properties:
+    subject:
+      type: string
+      minLength: 1
+      maxLength: 200
+    html:
+      type: string
+      minLength: 1
+      maxLength: 30000
+
+PreviewNotificationEmailTemplateRequest:
+  type: object
+  required:
+    - event
+    - subject
+    - html
+  properties:
+    event:
+      $ref: "#/NotificationEmailTemplateEventName"
+    subject:
+      type: string
+      maxLength: 200
+      description: Template subject to preview. Empty string uses the saved or built-in subject.
+    html:
+      type: string
+      maxLength: 30000
+      description: Template HTML to preview. Empty string uses the saved or built-in HTML.
+    variables:
+      type: object
+      additionalProperties:
+        type: string
+      default: {}
+
+NotificationEmailTemplatePreview:
+  type: object
+  required:
+    - subject
+    - html
+  properties:
+    subject:
+      type: string
+    html:
+      type: string
+
+NotificationEmailTemplatePreviewResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/NotificationEmailTemplatePreview"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AnnouncementStatus:
+  type: string
+  enum:
+    - draft
+    - published
+    - archived
+
+AnnouncementSeverity:
+  type: string
+  enum:
+    - info
+    - warning
+    - critical
+
+AnnouncementAudience:
+  type: string
+  enum:
+    - all
+    - users
+    - admins
+
+AnnouncementSegment:
+  type: object
+  description: >-
+    One AND-group of audience conditions. An announcement is delivered when
+    it has no segments (audience-only) or any segment matches the recipient.
+    Within a segment every non-empty condition must match.
+  properties:
+    roles:
+      type: array
+      items:
+        type: string
+      description: Match users holding any of these roles (e.g. owner, admin, user).
+    user_ids:
+      type: array
+      items:
+        $ref: "common.yaml#/Id"
+      description: Match these specific user ids.
+    email_domains:
+      type: array
+      items:
+        type: string
+      description: Match users whose email domain is in this list (case-insensitive).
+
+AnnouncementReader:
+  type: object
+  required:
+    - user_id
+    - read_at
+  properties:
+    user_id:
+      $ref: "common.yaml#/Id"
+    read_at:
+      $ref: "common.yaml#/Timestamp"
+
+AnnouncementReadStatus:
+  type: object
+  required:
+    - announcement_id
+    - total
+    - readers
+  properties:
+    announcement_id:
+      $ref: "common.yaml#/Id"
+    total:
+      type: integer
+      description: Number of recent readers returned (capped).
+    readers:
+      type: array
+      items:
+        $ref: "#/AnnouncementReader"
+
+AnnouncementReadStatusResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/AnnouncementReadStatus"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+Announcement:
+  type: object
+  required:
+    - id
+    - title
+    - content
+    - status
+    - severity
+    - audience
+    - created_at
+    - updated_at
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    title:
+      type: string
+      minLength: 1
+      maxLength: 200
+    content:
+      type: string
+      minLength: 1
+    status:
+      $ref: "#/AnnouncementStatus"
+    severity:
+      $ref: "#/AnnouncementSeverity"
+    audience:
+      $ref: "#/AnnouncementAudience"
+    segments:
+      type: array
+      items:
+        $ref: "#/AnnouncementSegment"
+      description: Optional audience-targeting segments that refine the audience.
+    starts_at:
+      $ref: "common.yaml#/Timestamp"
+      nullable: true
+    ends_at:
+      $ref: "common.yaml#/Timestamp"
+      nullable: true
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+    updated_at:
+      $ref: "common.yaml#/Timestamp"
+
+CreateAnnouncementRequest:
+  type: object
+  required:
+    - title
+    - content
+  properties:
+    title:
+      type: string
+      minLength: 1
+      maxLength: 200
+    content:
+      type: string
+      minLength: 1
+    status:
+      $ref: "#/AnnouncementStatus"
+    severity:
+      $ref: "#/AnnouncementSeverity"
+    audience:
+      $ref: "#/AnnouncementAudience"
+    segments:
+      type: array
+      items:
+        $ref: "#/AnnouncementSegment"
+      description: Optional audience-targeting segments that refine the audience.
+    starts_at:
+      $ref: "common.yaml#/Timestamp"
+      nullable: true
+    ends_at:
+      $ref: "common.yaml#/Timestamp"
+      nullable: true
+
+UpdateAnnouncementRequest:
+  allOf:
+    - $ref: "#/CreateAnnouncementRequest"
+
+AnnouncementResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/Announcement"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AnnouncementListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/Announcement"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+UserAnnouncement:
+  type: object
+  required:
+    - announcement
+    - read
+  properties:
+    announcement:
+      $ref: "#/Announcement"
+    read:
+      type: boolean
+    read_at:
+      $ref: "common.yaml#/Timestamp"
+      nullable: true
+
+UserAnnouncementResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/UserAnnouncement"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+UserAnnouncementListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - unread
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/UserAnnouncement"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    unread:
+      type: integer
+      minimum: 0
+    request_id:
+      $ref: "common.yaml#/RequestId"

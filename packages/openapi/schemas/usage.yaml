@@ -1,0 +1,1000 @@
+# Usage aggregates, trends, throughput, model share, and account health
+DashboardModelDistribution:
+  type: object
+  required:
+    - model
+    - request_count
+    - token_count
+    - cost
+    - currency
+  properties:
+    model:
+      type: string
+    request_count:
+      type: integer
+      minimum: 0
+    token_count:
+      type: integer
+      minimum: 0
+    cost:
+      type: string
+      pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+    currency:
+      type: string
+
+DashboardTrendPoint:
+  type: object
+  required:
+    - bucket_start
+    - request_count
+    - token_count
+    - cost
+  properties:
+    bucket_start:
+      $ref: "common.yaml#/Timestamp"
+    request_count:
+      type: integer
+      minimum: 0
+    token_count:
+      type: integer
+      minimum: 0
+    cost:
+      type: string
+      pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+
+DashboardUserUsageTrend:
+  type: object
+  required:
+    - user_id
+    - request_count
+    - token_count
+    - cost
+  properties:
+    user_id:
+      $ref: "common.yaml#/Id"
+    email:
+      type: string
+      nullable: true
+    request_count:
+      type: integer
+      minimum: 0
+    token_count:
+      type: integer
+      minimum: 0
+    cost:
+      type: string
+      pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+
+UsageCleanupRequest:
+  type: object
+  description: >-
+    Bounded filter for operator on-demand usage-record cleanup. At least one
+    of model, start or end must be supplied so a cleanup can never match the
+    entire table by accident.
+  properties:
+    model:
+      type: string
+      description: Canonical model name; matched case-insensitively.
+    start:
+      $ref: "common.yaml#/Timestamp"
+    end:
+      $ref: "common.yaml#/Timestamp"
+    dry_run:
+      type: boolean
+      default: false
+    max_delete:
+      type: integer
+      minimum: 1
+      maximum: 10000
+      default: 1000
+
+UsageCleanupResult:
+  type: object
+  required:
+    - matched
+    - deleted
+    - dry_run
+    - max_delete
+    - limited
+  properties:
+    matched:
+      type: integer
+      minimum: 0
+    deleted:
+      type: integer
+      minimum: 0
+    dry_run:
+      type: boolean
+    max_delete:
+      type: integer
+      minimum: 1
+      maximum: 10000
+    limited:
+      type: boolean
+
+UsageCleanupResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/UsageCleanupResult"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+UsageAggregateDimension:
+  type: string
+  enum:
+    - day
+    - model
+    - user
+    - account
+
+UsageAggregate:
+  type: object
+  required:
+    - aggregate_type
+    - aggregate_id
+    - request_count
+    - success_count
+    - error_count
+    - input_tokens
+    - output_tokens
+    - cached_tokens
+    - total_tokens
+    - total_cost
+    - currency
+  properties:
+    aggregate_type:
+      $ref: "#/UsageAggregateDimension"
+    aggregate_id:
+      type: string
+    request_count:
+      type: integer
+      minimum: 0
+    success_count:
+      type: integer
+      minimum: 0
+    error_count:
+      type: integer
+      minimum: 0
+    input_tokens:
+      type: integer
+      minimum: 0
+    output_tokens:
+      type: integer
+      minimum: 0
+    cached_tokens:
+      type: integer
+      minimum: 0
+    total_tokens:
+      type: integer
+      minimum: 0
+    total_cost:
+      type: string
+    input_cost:
+      type: string
+    output_cost:
+      type: string
+    cache_read_cost:
+      type: string
+    cache_write_cost:
+      type: string
+    currency:
+      type: string
+
+UsageAggregateListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/UsageAggregate"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+UsageExport:
+  type: object
+  required:
+    - generated_at
+    - logs
+    - daily
+    - by_model
+    - by_user
+    - by_account
+  properties:
+    generated_at:
+      $ref: "common.yaml#/Timestamp"
+    logs:
+      type: array
+      items:
+        $ref: "#/UsageLog"
+    daily:
+      type: array
+      items:
+        $ref: "#/UsageAggregate"
+    by_model:
+      type: array
+      items:
+        $ref: "#/UsageAggregate"
+    by_user:
+      type: array
+      items:
+        $ref: "#/UsageAggregate"
+    by_account:
+      type: array
+      items:
+        $ref: "#/UsageAggregate"
+
+UsageExportResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/UsageExport"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AccountHealthSnapshot:
+  type: object
+  required:
+    - account_id
+    - provider_id
+    - runtime_class
+    - status
+    - success_rate
+    - error_rate
+    - latency_p50_ms
+    - latency_p95_ms
+    - quota_remaining_ratio
+    - quota_exhausted
+    - rate_limit_count
+    - timeout_count
+    - circuit_state
+    - snapshot_at
+  properties:
+    account_id:
+      $ref: "common.yaml#/Id"
+    provider_id:
+      $ref: "common.yaml#/Id"
+    runtime_class:
+      $ref: "accounts.yaml#/RuntimeClass"
+    status:
+      type: string
+    error_class:
+      type: string
+      nullable: true
+    success_rate:
+      type: number
+      minimum: 0
+      maximum: 1
+    error_rate:
+      type: number
+      minimum: 0
+      maximum: 1
+    latency_p50_ms:
+      type: integer
+      minimum: 0
+    latency_p95_ms:
+      type: integer
+      minimum: 0
+    quota_remaining_ratio:
+      type: number
+      minimum: 0
+      maximum: 1
+    quota_exhausted:
+      type: boolean
+    quota_windows:
+      type: array
+      description: Latest per-window quota snapshots for this account, when available.
+      items:
+        $ref: "#/AccountQuotaSnapshot"
+    rate_limit_count:
+      type: integer
+      minimum: 0
+    timeout_count:
+      type: integer
+      minimum: 0
+    cooldown_until:
+      type: string
+      format: date-time
+      nullable: true
+    cooldown_reason:
+      type: string
+      nullable: true
+    circuit_state:
+      type: string
+    snapshot_at:
+      $ref: "common.yaml#/Timestamp"
+
+AccountHealthResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/AccountHealthSnapshot"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AccountHealthSummaryResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/AccountHealthSnapshot"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AccountQuotaSnapshot:
+  type: object
+  required:
+    - account_id
+    - provider_id
+    - quota_type
+    - remaining
+    - used
+    - quota_limit
+    - remaining_ratio
+    - snapshot_at
+  properties:
+    account_id:
+      $ref: "common.yaml#/Id"
+    provider_id:
+      $ref: "common.yaml#/Id"
+    quota_type:
+      type: string
+    remaining:
+      type: string
+    used:
+      type: string
+    quota_limit:
+      type: string
+    remaining_ratio:
+      type: number
+      minimum: 0
+    reset_at:
+      type: string
+      format: date-time
+      nullable: true
+    snapshot_at:
+      $ref: "common.yaml#/Timestamp"
+
+AccountQuotaListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/AccountQuotaSnapshot"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+UsageLog:
+  type: object
+  required:
+    - id
+    - request_id
+    - attempt_no
+    - user_id
+    - api_key_id
+    - source_protocol
+    - source_endpoint
+    - model
+    - input_tokens
+    - output_tokens
+    - cached_tokens
+    - total_tokens
+    - usage_estimated
+    - latency_ms
+    - success
+    - cost
+    - currency
+    - compatibility_warnings
+    - created_at
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+    attempt_no:
+      type: integer
+      minimum: 1
+    user_id:
+      $ref: "common.yaml#/Id"
+    api_key_id:
+      $ref: "common.yaml#/Id"
+    provider_id:
+      type: string
+      nullable: true
+    account_id:
+      type: string
+      nullable: true
+    source_protocol:
+      type: string
+    source_endpoint:
+      type: string
+    target_protocol:
+      type: string
+    model:
+      type: string
+    input_tokens:
+      type: integer
+      minimum: 0
+    output_tokens:
+      type: integer
+      minimum: 0
+    cached_tokens:
+      type: integer
+      minimum: 0
+    cache_creation_tokens:
+      type: integer
+      minimum: 0
+      description: Prompt-cache write (creation) tokens, billed at the cache-write rate.
+    total_tokens:
+      type: integer
+      minimum: 0
+    usage_estimated:
+      type: boolean
+    latency_ms:
+      type: integer
+      minimum: 0
+    success:
+      type: boolean
+    error_class:
+      type: string
+      nullable: true
+    cost:
+      type: string
+    actual_cost:
+      type: string
+    billable_cost:
+      type: string
+    rate_multiplier:
+      type: string
+    input_cost:
+      type: string
+    output_cost:
+      type: string
+    cache_read_cost:
+      type: string
+    cache_write_cost:
+      type: string
+    requested_model:
+      type: string
+    upstream_model:
+      type: string
+    billing_mode:
+      $ref: "billing.yaml#/BillingMode"
+    currency:
+      type: string
+    compatibility_warnings:
+      type: array
+      items:
+        type: string
+      default: []
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+
+UsageLogListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/UsageLog"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+UsageThroughput:
+  type: object
+  required:
+    - rpm
+    - tpm
+    - peak_rpm
+    - peak_tpm
+    - total_requests
+    - total_tokens
+    - window_minutes
+  properties:
+    rpm:
+      type: number
+    tpm:
+      type: number
+    peak_rpm:
+      type: number
+    peak_tpm:
+      type: number
+    total_requests:
+      type: integer
+      minimum: 0
+    total_tokens:
+      type: integer
+      minimum: 0
+    window_minutes:
+      type: integer
+      minimum: 0
+
+UsageThroughputResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/UsageThroughput"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+UsageModelShare:
+  type: object
+  required:
+    - model
+    - requests
+    - input_tokens
+    - output_tokens
+    - total_tokens
+    - cost
+    - currency
+  properties:
+    model:
+      type: string
+    requests:
+      type: integer
+      minimum: 0
+    input_tokens:
+      type: integer
+      minimum: 0
+    output_tokens:
+      type: integer
+      minimum: 0
+    total_tokens:
+      type: integer
+      minimum: 0
+    cost:
+      type: string
+    currency:
+      type: string
+
+UsageModelShareListResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/UsageModelShare"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+UsageTrendPoint:
+  type: object
+  required:
+    - bucket
+    - requests
+    - input_tokens
+    - output_tokens
+    - cost
+    - currency
+  properties:
+    bucket:
+      type: string
+    requests:
+      type: integer
+      minimum: 0
+    input_tokens:
+      type: integer
+      minimum: 0
+    output_tokens:
+      type: integer
+      minimum: 0
+    cost:
+      type: string
+    currency:
+      type: string
+
+UsageTrendPointListResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/UsageTrendPoint"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+UsageCacheMetrics:
+  type: object
+  required:
+    - cache_read_tokens
+    - cache_creation_tokens
+    - total_input_tokens
+    - cache_hit_rate
+    - cache_cost_saved
+    - currency
+  properties:
+    cache_read_tokens:
+      type: integer
+      minimum: 0
+    cache_creation_tokens:
+      type: integer
+      minimum: 0
+    total_input_tokens:
+      type: integer
+      minimum: 0
+    cache_hit_rate:
+      type: number
+    cache_cost_saved:
+      type: string
+    currency:
+      type: string
+
+UsageCacheMetricsResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/UsageCacheMetrics"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AccountUsageWindow:
+  type: object
+  required:
+    - window
+    - requests
+    - input_tokens
+    - output_tokens
+    - total_tokens
+    - cost
+    - currency
+    - success_count
+    - error_count
+  properties:
+    window:
+      type: string
+      example: "5h"
+    requests:
+      type: integer
+      minimum: 0
+    input_tokens:
+      type: integer
+      minimum: 0
+    output_tokens:
+      type: integer
+      minimum: 0
+    total_tokens:
+      type: integer
+      minimum: 0
+    cost:
+      type: string
+    currency:
+      type: string
+    success_count:
+      type: integer
+      minimum: 0
+    error_count:
+      type: integer
+      minimum: 0
+    first_request_at:
+      type: string
+      format: date-time
+      allOf:
+        - $ref: "common.yaml#/Timestamp"
+      nullable: true
+      description: UTC timestamp of the oldest request included in this rolling window. Null when the window has no traffic.
+    last_request_at:
+      type: string
+      format: date-time
+      allOf:
+        - $ref: "common.yaml#/Timestamp"
+      nullable: true
+      description: UTC timestamp of the newest request included in this rolling window. Null when the window has no traffic.
+
+AccountUsageWindowsResult:
+  type: object
+  required:
+    - account_id
+    - windows
+  properties:
+    account_id:
+      $ref: "common.yaml#/Id"
+    windows:
+      type: array
+      items:
+        $ref: "#/AccountUsageWindow"
+
+AccountUsageDailyPoint:
+  type: object
+  required:
+    - date
+    - requests
+    - input_tokens
+    - output_tokens
+    - cost
+    - currency
+  properties:
+    date:
+      type: string
+    requests:
+      type: integer
+      minimum: 0
+    input_tokens:
+      type: integer
+      minimum: 0
+    output_tokens:
+      type: integer
+      minimum: 0
+    cost:
+      type: string
+    currency:
+      type: string
+
+AccountUsageToday:
+  type: object
+  required:
+    - requests
+    - input_tokens
+    - output_tokens
+    - total_tokens
+    - cost
+    - currency
+    - success_count
+    - error_count
+    - success_rate
+  properties:
+    requests:
+      type: integer
+      minimum: 0
+    input_tokens:
+      type: integer
+      minimum: 0
+    output_tokens:
+      type: integer
+      minimum: 0
+    total_tokens:
+      type: integer
+      minimum: 0
+    cost:
+      type: string
+    currency:
+      type: string
+    success_count:
+      type: integer
+      minimum: 0
+    error_count:
+      type: integer
+      minimum: 0
+    success_rate:
+      type: number
+
+AccountUsageTodayWithID:
+  allOf:
+    - $ref: "#/AccountUsageToday"
+    - type: object
+      required:
+        - account_id
+      properties:
+        account_id:
+          $ref: "common.yaml#/Id"
+
+BatchAccountUsageTodayResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/AccountUsageTodayWithID"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+UserSpendingToday:
+  type: object
+  required:
+    - user_id
+    - requests
+    - input_tokens
+    - output_tokens
+    - total_tokens
+    - cost
+    - currency
+    - success_count
+    - error_count
+    - success_rate
+  properties:
+    user_id:
+      $ref: "common.yaml#/Id"
+    requests:
+      type: integer
+      minimum: 0
+    input_tokens:
+      type: integer
+      minimum: 0
+    output_tokens:
+      type: integer
+      minimum: 0
+    total_tokens:
+      type: integer
+      minimum: 0
+    cost:
+      type: string
+    currency:
+      type: string
+    success_count:
+      type: integer
+      minimum: 0
+    error_count:
+      type: integer
+      minimum: 0
+    success_rate:
+      type: number
+      minimum: 0
+      maximum: 1
+
+BatchUserSpendingTodayResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/UserSpendingToday"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+UsageTrendSeriesPoint:
+  type: object
+  required:
+    - bucket
+    - requests
+    - input_tokens
+    - output_tokens
+    - cost
+    - currency
+  properties:
+    bucket:
+      type: string
+    requests:
+      type: integer
+      minimum: 0
+    input_tokens:
+      type: integer
+      minimum: 0
+    output_tokens:
+      type: integer
+      minimum: 0
+    cost:
+      type: string
+    currency:
+      type: string
+
+UsageTrendSeries:
+  type: object
+  required:
+    - label
+    - points
+  properties:
+    label:
+      type: string
+    points:
+      type: array
+      items:
+        $ref: "#/UsageTrendSeriesPoint"
+
+UsageTrendSeriesResult:
+  type: object
+  required:
+    - dimension
+    - bucket
+    - series
+  properties:
+    dimension:
+      type: string
+    bucket:
+      type: string
+    series:
+      type: array
+      items:
+        $ref: "#/UsageTrendSeries"
+
+UsageErrorBucket:
+  type: object
+  required:
+    - error_class
+    - count
+    - percentage
+  properties:
+    error_class:
+      type: string
+    count:
+      type: integer
+      minimum: 0
+    percentage:
+      type: number
+
+UsageDistributionResult:
+  type: object
+  required:
+    - dimension
+    - metric
+    - buckets
+  properties:
+    dimension:
+      type: string
+    metric:
+      type: string
+    buckets:
+      type: array
+      items:
+        $ref: "#/UsageDistributionBucket"
+
+UsageDistributionBucket:
+  type: object
+  required:
+    - label
+    - requests
+    - input_tokens
+    - output_tokens
+    - total_tokens
+    - cost
+    - currency
+    - percentage
+  properties:
+    label:
+      type: string
+    requests:
+      type: integer
+      minimum: 0
+    input_tokens:
+      type: integer
+      minimum: 0
+    output_tokens:
+      type: integer
+      minimum: 0
+    total_tokens:
+      type: integer
+      minimum: 0
+    cost:
+      type: string
+    currency:
+      type: string
+    percentage:
+      type: number

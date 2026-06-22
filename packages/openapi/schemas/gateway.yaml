@@ -1,0 +1,740 @@
+# Gateway resource readiness, pricing coverage, and provider/model/route status
+GatewayProviderResourceStatus:
+  type: string
+  enum:
+    - ready
+    - limited
+    - blocked
+
+GatewayProviderResourceReason:
+  type: string
+  enum:
+    - provider_disabled
+    - no_active_models
+    - no_model_mappings
+    - no_active_accounts
+    - no_routable_accounts
+    - proxy_attention
+    - no_api_keys
+    - pricing_uncovered
+
+GatewayResourceFixArea:
+  type: string
+  enum:
+    - providers
+    - models
+    - model_mappings
+    - accounts
+    - proxies
+    - api_keys
+    - pricing
+    - endpoints
+
+GatewayResourceFixSeverity:
+  type: string
+  enum:
+    - critical
+    - warning
+    - info
+
+GatewayResourceFix:
+  type: object
+  required:
+    - severity
+    - area
+    - reason
+    - count
+    - href
+  properties:
+    severity:
+      $ref: "#/GatewayResourceFixSeverity"
+    area:
+      $ref: "#/GatewayResourceFixArea"
+    reason:
+      $ref: "#/GatewayProviderResourceReason"
+    count:
+      type: integer
+      minimum: 0
+      description: Number of resource rows or affected accounts represented by this fix item.
+    href:
+      type: string
+      description: Admin console route that lets the operator fix or investigate the issue.
+
+GatewayAccountBlockers:
+  type: object
+  required:
+    - inactive
+    - health
+    - quota
+    - proxy
+  properties:
+    inactive:
+      type: integer
+      minimum: 0
+      description: Accounts under this provider that are not active and therefore cannot be scheduled.
+    health:
+      type: integer
+      minimum: 0
+      description: Active accounts blocked by health status or an open circuit.
+    quota:
+      type: integer
+      minimum: 0
+      description: Active accounts blocked by exhausted runtime quota.
+    proxy:
+      type: integer
+      minimum: 0
+      description: Active accounts blocked by a missing, disabled, expired, or otherwise unavailable proxy binding.
+
+GatewayResourceTrafficLastError:
+  type: object
+  required:
+    - occurred_at
+  properties:
+    occurred_at:
+      type: string
+      format: date-time
+      description: Time of the most recent failed gateway request.
+    request_id:
+      type: string
+      nullable: true
+    error_class:
+      type: string
+      nullable: true
+    error_phase:
+      type: string
+      nullable: true
+    error_owner:
+      type: string
+      nullable: true
+    status_code:
+      type: integer
+      nullable: true
+      description: Final upstream or gateway HTTP status when available.
+    upstream_request_id:
+      type: string
+      nullable: true
+    message:
+      type: string
+      nullable: true
+      description: Bounded upstream or gateway error message safe for inline operator display.
+
+GatewayResourceTraffic:
+  type: object
+  required:
+    - window_seconds
+    - request_count
+    - error_count
+    - success_rate
+  properties:
+    window_seconds:
+      type: integer
+      minimum: 1
+      description: Rolling runtime usage window used for the traffic counters.
+    request_count:
+      type: integer
+      minimum: 0
+      description: Gateway requests observed in the rolling window.
+    error_count:
+      type: integer
+      minimum: 0
+      description: Failed gateway requests observed in the rolling window.
+    success_rate:
+      type: number
+      format: float
+      minimum: 0
+      maximum: 1
+      description: Successful requests divided by request_count. Zero when request_count is zero.
+    last_request_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: Most recent gateway request observed for this resource.
+    last_error:
+      $ref: "#/GatewayResourceTrafficLastError"
+      nullable: true
+      description: Most recent failed gateway request observed in the rolling window.
+
+GatewayProviderResourceRow:
+  type: object
+  required:
+    - provider
+    - total_accounts
+    - routable_accounts
+    - attention_accounts
+    - account_blockers
+    - proxied_accounts
+    - proxy_attention_accounts
+    - active_model_mappings
+    - api_key_count
+    - scoped_key_count
+    - traffic
+    - status
+    - reasons
+  properties:
+    provider:
+      $ref: "models.yaml#/Provider"
+    total_accounts:
+      type: integer
+      minimum: 0
+    routable_accounts:
+      type: integer
+      minimum: 0
+    attention_accounts:
+      type: integer
+      minimum: 0
+    account_blockers:
+      $ref: "#/GatewayAccountBlockers"
+    proxied_accounts:
+      type: integer
+      minimum: 0
+    proxy_attention_accounts:
+      type: integer
+      minimum: 0
+    active_model_mappings:
+      type: integer
+      minimum: 0
+    api_key_count:
+      type: integer
+      minimum: 0
+    scoped_key_count:
+      type: integer
+      minimum: 0
+    traffic:
+      $ref: "#/GatewayResourceTraffic"
+    status:
+      $ref: "#/GatewayProviderResourceStatus"
+    reasons:
+      type: array
+      items:
+        $ref: "#/GatewayProviderResourceReason"
+
+GatewayEndpointResourceRow:
+  type: object
+  required:
+    - key
+    - source_endpoint
+    - routable_accounts
+    - candidate_accounts
+    - unsupported_accounts
+    - unavailable_model_accounts
+    - status
+  properties:
+    key:
+      type: string
+      enum:
+        - chat_completions
+        - responses
+        - responses_websocket
+        - responses_compact
+        - responses_input_items
+        - messages
+        - anthropic_count_tokens
+        - gemini_generate_content
+        - gemini_count_tokens
+        - embeddings
+        - image_generations
+        - image_edits
+        - image_variations
+        - videos
+        - audio_transcriptions
+        - audio_speech
+        - moderations
+        - rerank
+        - realtime_websocket
+    source_endpoint:
+      type: string
+      description: Gateway route or route template represented by this endpoint readiness row.
+    routable_accounts:
+      type: integer
+      minimum: 0
+    candidate_accounts:
+      type: integer
+      minimum: 0
+      description: Active, provider-routable accounts considered for this model route before endpoint capability and model availability filters.
+    unsupported_accounts:
+      type: integer
+      minimum: 0
+      description: Candidate accounts whose effective capabilities do not include this endpoint.
+    unavailable_model_accounts:
+      type: integer
+      minimum: 0
+      description: Candidate accounts whose effective model mapping is blocked by excluded_models or supported_models metadata.
+    status:
+      $ref: "#/GatewayProviderResourceStatus"
+
+GatewayEndpointResourceSummaryRow:
+  type: object
+  required:
+    - key
+    - source_endpoint
+    - ready_models
+    - models
+    - ready_routes
+    - routes
+    - routable_account_routes
+    - candidate_account_routes
+    - unsupported_account_routes
+    - unavailable_model_account_routes
+    - traffic
+    - status
+  properties:
+    key:
+      type: string
+      enum:
+        - chat_completions
+        - responses
+        - responses_websocket
+        - responses_compact
+        - responses_input_items
+        - messages
+        - anthropic_count_tokens
+        - gemini_generate_content
+        - gemini_count_tokens
+        - embeddings
+        - image_generations
+        - image_edits
+        - image_variations
+        - videos
+        - audio_transcriptions
+        - audio_speech
+        - moderations
+        - rerank
+        - realtime_websocket
+    source_endpoint:
+      type: string
+      description: Gateway route or route template represented by this endpoint readiness row.
+    ready_models:
+      type: integer
+      minimum: 0
+      description: Active model rows with at least one routable account for this endpoint.
+    models:
+      type: integer
+      minimum: 0
+      description: Active model rows evaluated for this endpoint.
+    ready_routes:
+      type: integer
+      minimum: 0
+      description: Active model-provider route rows with at least one routable account for this endpoint.
+    routes:
+      type: integer
+      minimum: 0
+      description: Active model-provider route rows evaluated for this endpoint.
+    routable_account_routes:
+      type: integer
+      minimum: 0
+      description: Sum of routable account-route observations across active model-provider route rows.
+    candidate_account_routes:
+      type: integer
+      minimum: 0
+      description: Sum of candidate account-route observations before endpoint capability and model availability filters.
+    unsupported_account_routes:
+      type: integer
+      minimum: 0
+      description: Sum of account-route observations whose effective capabilities do not include this endpoint.
+    unavailable_model_account_routes:
+      type: integer
+      minimum: 0
+      description: Sum of account-route observations whose effective model mapping is blocked by excluded_models or supported_models metadata.
+    traffic:
+      $ref: "#/GatewayResourceTraffic"
+    status:
+      $ref: "#/GatewayProviderResourceStatus"
+
+GatewayPricingCoverageStatus:
+  type: string
+  enum:
+    - priced
+    - estimated_zero
+    - error
+
+GatewayPricingCoverageSource:
+  type: string
+  enum:
+    - mapping_override
+    - pricing_rule
+    - default_zero
+    - pricing_error
+
+GatewayPricingCoverage:
+  type: object
+  required:
+    - status
+    - source
+    - priced_routes
+    - total_routes
+  properties:
+    status:
+      $ref: "#/GatewayPricingCoverageStatus"
+    source:
+      $ref: "#/GatewayPricingCoverageSource"
+    pricing_rule_id:
+      type: integer
+      minimum: 1
+      nullable: true
+    priced_routes:
+      type: integer
+      minimum: 0
+    total_routes:
+      type: integer
+      minimum: 0
+    currency:
+      type: string
+    billing_mode:
+      $ref: "billing.yaml#/BillingMode"
+
+GatewayModelResourceRow:
+  type: object
+  required:
+    - model
+    - active_providers
+    - active_model_mappings
+    - routable_accounts
+    - endpoints
+    - pricing
+    - api_key_count
+    - scoped_key_count
+    - traffic
+    - status
+    - reasons
+  properties:
+    model:
+      $ref: "models.yaml#/Model"
+    active_providers:
+      type: integer
+      minimum: 0
+    active_model_mappings:
+      type: integer
+      minimum: 0
+    routable_accounts:
+      type: integer
+      minimum: 0
+    endpoints:
+      type: array
+      items:
+        $ref: "#/GatewayEndpointResourceRow"
+    pricing:
+      $ref: "#/GatewayPricingCoverage"
+    api_key_count:
+      type: integer
+      minimum: 0
+    scoped_key_count:
+      type: integer
+      minimum: 0
+    traffic:
+      $ref: "#/GatewayResourceTraffic"
+    status:
+      $ref: "#/GatewayProviderResourceStatus"
+    reasons:
+      type: array
+      items:
+        $ref: "#/GatewayProviderResourceReason"
+
+GatewayRouteResourceRow:
+  type: object
+  required:
+    - model
+    - provider
+    - mapping_id
+    - upstream_model
+    - routable_accounts
+    - endpoints
+    - pricing
+    - api_key_count
+    - scoped_key_count
+    - traffic
+    - status
+    - reasons
+  properties:
+    model:
+      $ref: "models.yaml#/Model"
+    provider:
+      $ref: "models.yaml#/Provider"
+    mapping_id:
+      $ref: "common.yaml#/Id"
+    upstream_model:
+      type: string
+    routable_accounts:
+      type: integer
+      minimum: 0
+    endpoints:
+      type: array
+      items:
+        $ref: "#/GatewayEndpointResourceRow"
+    pricing:
+      $ref: "#/GatewayPricingCoverage"
+    api_key_count:
+      type: integer
+      minimum: 0
+    scoped_key_count:
+      type: integer
+      minimum: 0
+    traffic:
+      $ref: "#/GatewayResourceTraffic"
+    status:
+      $ref: "#/GatewayProviderResourceStatus"
+    reasons:
+      type: array
+      items:
+        $ref: "#/GatewayProviderResourceReason"
+
+GatewayResourceSummary:
+  type: object
+  required:
+    - providers
+    - active_providers
+    - active_models
+    - active_model_mappings
+    - active_api_keys
+    - active_accounts
+    - routable_accounts
+    - active_proxies
+    - available_proxies
+    - expired_proxies
+    - proxied_accounts
+    - proxy_attention_accounts
+    - scoped_api_keys
+    - fixes
+    - rows
+    - model_rows
+    - route_rows
+    - endpoint_rows
+  properties:
+    providers:
+      type: integer
+      minimum: 0
+    active_providers:
+      type: integer
+      minimum: 0
+    active_models:
+      type: integer
+      minimum: 0
+    active_model_mappings:
+      type: integer
+      minimum: 0
+    active_api_keys:
+      type: integer
+      minimum: 0
+    active_accounts:
+      type: integer
+      minimum: 0
+    routable_accounts:
+      type: integer
+      minimum: 0
+    active_proxies:
+      type: integer
+      minimum: 0
+    available_proxies:
+      type: integer
+      minimum: 0
+    expired_proxies:
+      type: integer
+      minimum: 0
+    proxied_accounts:
+      type: integer
+      minimum: 0
+    proxy_attention_accounts:
+      type: integer
+      minimum: 0
+    scoped_api_keys:
+      type: integer
+      minimum: 0
+    fixes:
+      type: array
+      items:
+        $ref: "#/GatewayResourceFix"
+    rows:
+      type: array
+      items:
+        $ref: "#/GatewayProviderResourceRow"
+    model_rows:
+      type: array
+      items:
+        $ref: "#/GatewayModelResourceRow"
+    route_rows:
+      type: array
+      items:
+        $ref: "#/GatewayRouteResourceRow"
+    endpoint_rows:
+      type: array
+      items:
+        $ref: "#/GatewayEndpointResourceSummaryRow"
+
+GatewayResourceSummaryResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/GatewayResourceSummary"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AdminQuickMapModelsRequest:
+  type: object
+  required:
+    - provider_id
+    - models
+  properties:
+    provider_id:
+      $ref: "common.yaml#/Id"
+    models:
+      type: array
+      minItems: 1
+      uniqueItems: true
+      items:
+        type: string
+        minLength: 1
+
+AdminQuickMapModelsResult:
+  type: object
+  required:
+    - models_created
+    - mappings_created
+    - warnings
+  properties:
+    models_created:
+      type: integer
+      minimum: 0
+    mappings_created:
+      type: integer
+      minimum: 0
+    warnings:
+      type: array
+      items:
+        type: string
+      default: []
+
+AdminQuickMapModelsResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/AdminQuickMapModelsResult"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AvailableModelStatus:
+  type: string
+  enum:
+    - available
+    - limited
+    - unavailable
+
+AvailableModelPricing:
+  type: object
+  required:
+    - billing_mode
+    - currency
+    - input_price_per_million_tokens
+    - output_price_per_million_tokens
+    - cache_read_price_per_million_tokens
+    - cache_write_price_per_million_tokens
+    - per_request_price
+    - source
+  properties:
+    billing_mode:
+      $ref: "billing.yaml#/BillingMode"
+    currency:
+      type: string
+    input_price_per_million_tokens:
+      type: string
+    output_price_per_million_tokens:
+      type: string
+    cache_read_price_per_million_tokens:
+      type: string
+    cache_write_price_per_million_tokens:
+      type: string
+    per_request_price:
+      type: string
+    source:
+      type: string
+      enum:
+        - pricing_rule
+        - mapping_override
+        - default_zero
+
+AvailableModelChannel:
+  type: object
+  required:
+    - provider_id
+    - provider_name
+    - provider_display_name
+    - adapter_type
+    - protocol
+    - upstream_model
+    - status
+    - active_account_count
+    - total_account_count
+    - pricing
+  properties:
+    provider_id:
+      $ref: "common.yaml#/Id"
+    provider_name:
+      type: string
+    provider_display_name:
+      type: string
+    adapter_type:
+      type: string
+    protocol:
+      type: string
+    upstream_model:
+      type: string
+    status:
+      $ref: "#/AvailableModelStatus"
+    active_account_count:
+      type: integer
+      minimum: 0
+    total_account_count:
+      type: integer
+      minimum: 0
+    pricing:
+      $ref: "#/AvailableModelPricing"
+
+AvailableModel:
+  type: object
+  required:
+    - id
+    - name
+    - status
+    - channels
+  properties:
+    id:
+      type: string
+    name:
+      type: string
+    family:
+      type: string
+      nullable: true
+    status:
+      $ref: "#/AvailableModelStatus"
+    context_window:
+      type: integer
+      nullable: true
+    max_output_tokens:
+      type: integer
+      nullable: true
+    channels:
+      type: array
+      items:
+        $ref: "#/AvailableModelChannel"
+      default: []
+
+AvailableModelListResponse:
+  type: object
+  required:
+    - data
+    - generated_at
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/AvailableModel"
+      default: []
+    generated_at:
+      $ref: "common.yaml#/Timestamp"
+    request_id:
+      $ref: "common.yaml#/RequestId"

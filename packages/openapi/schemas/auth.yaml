@@ -1,0 +1,1237 @@
+# Authentication, sessions, API keys, OAuth, TOTP, and site configuration
+AuthIdentityProvider:
+  type: string
+  enum:
+    - email
+    - oidc
+    - github
+    - google
+    - linuxdo
+    - wechat
+    - dingtalk
+
+PendingOAuthIntent:
+  type: string
+  enum:
+    - login
+    - bind_current_user
+
+OAuthPendingNextStep:
+  type: string
+  enum:
+    - email_completion_required
+    - bind_existing_login_required
+    - create_account_required
+    - ready_for_login
+    - bind_current_user_required
+
+OAuthPendingProfile:
+  type: object
+  required:
+    - resolved_email
+    - display_name
+    - email_verified
+    - avatar_url
+  properties:
+    resolved_email:
+      type: string
+      description: Normalized email claim retained from the provider when present and syntactically safe.
+    display_name:
+      type: string
+      description: Display-safe provider profile name.
+    email_verified:
+      type: boolean
+    avatar_url:
+      type: string
+      description: Display-safe provider profile image URL.
+
+PendingOAuthAction:
+  type: object
+  required:
+    - token
+    - expires_at
+  properties:
+    token:
+      type: string
+      minLength: 16
+      description: Short-lived signed action token bound to the current pending OAuth cookie. It is not a session token and cannot be reused with another pending cookie.
+    expires_at:
+      $ref: "common.yaml#/Timestamp"
+
+OAuthPendingSession:
+  type: object
+  required:
+    - intent
+    - provider
+    - provider_key
+    - subject_hint
+    - redirect
+    - profile
+    - next_step
+    - existing_account_bindable
+    - expires_at
+  properties:
+    intent:
+      $ref: "#/PendingOAuthIntent"
+    provider:
+      $ref: "#/AuthIdentityProvider"
+    provider_key:
+      type: string
+      description: Stable provider instance key used for this pending flow.
+    subject_hint:
+      type: string
+      description: Display-safe provider subject hint. Raw provider subjects and hashes are never returned.
+    redirect:
+      type: string
+      description: Bound local console continuation path.
+    profile:
+      $ref: "#/OAuthPendingProfile"
+    next_step:
+      $ref: "#/OAuthPendingNextStep"
+    existing_account_bindable:
+      type: boolean
+      description: True when the retained provider email matches an active local account that can continue through the bind-existing-login flow.
+    create_account_action:
+      $ref: "#/PendingOAuthAction"
+    expires_at:
+      $ref: "common.yaml#/Timestamp"
+
+OAuthPendingSessionResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/OAuthPendingSession"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+CurrentUserAuthIdentity:
+  type: object
+  required:
+    - user_id
+    - provider
+    - provider_key
+    - external
+    - email_verified
+    - can_unbind
+    - created_at
+    - updated_at
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+      nullable: true
+      description: Persistent identity id for external identities. Local email identity is derived and has no persistent id.
+    user_id:
+      $ref: "common.yaml#/Id"
+    provider:
+      $ref: "#/AuthIdentityProvider"
+    provider_key:
+      type: string
+      description: Stable provider instance key, such as `local` or an OIDC issuer.
+    subject_hint:
+      type: string
+      description: Display-safe subject hint. The raw upstream subject is never returned.
+    display_name:
+      type: string
+    email:
+      type: string
+      format: email
+    email_verified:
+      type: boolean
+    avatar_url:
+      type: string
+      description: Upstream profile avatar URL suggested by a verified external identity, when retained for display.
+    external:
+      type: boolean
+    verified_at:
+      type: string
+      format: date-time
+      nullable: true
+    last_used_at:
+      type: string
+      format: date-time
+      nullable: true
+    can_unbind:
+      type: boolean
+    unbind_blocked_by:
+      type: string
+      description: Machine-readable reason when unbinding this identity is blocked.
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+    updated_at:
+      $ref: "common.yaml#/Timestamp"
+
+CurrentUserAuthIdentityListResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/CurrentUserAuthIdentity"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+OAuthProviderConfig:
+  type: object
+  required:
+    - provider
+    - provider_key
+    - display_name
+    - client_id
+    - authorize_url
+    - redirect_uri
+    - scopes
+  properties:
+    provider:
+      $ref: "#/AuthIdentityProvider"
+    provider_key:
+      type: string
+      description: Stable provider instance key. Defaults to provider name for single-instance providers.
+    display_name:
+      type: string
+      description: Non-secret label shown in console settings.
+    client_id:
+      type: string
+      description: Public OAuth client id. Client secrets are not exposed in admin settings.
+    authorize_url:
+      type: string
+      format: uri
+      description: HTTPS provider authorization endpoint without query or fragment.
+    token_url:
+      type: string
+      format: uri
+      description: Optional provider token endpoint for callback completion. HTTPS is required except localhost development. v1 supports public clients with token_auth_method=none.
+    userinfo_url:
+      type: string
+      format: uri
+      description: Optional provider UserInfo/profile endpoint for callback completion. HTTPS is required except localhost development.
+    token_auth_method:
+      type: string
+      description: Token endpoint client authentication method. v1 accepts none so client secrets stay outside Admin Settings.
+      enum:
+        - none
+      default: none
+    redirect_uri:
+      type: string
+      format: uri
+      description: Registered callback URI. HTTP is accepted only for localhost development.
+    scopes:
+      type: array
+      description: Provider scopes sent as a space-delimited authorization request parameter.
+      items:
+        type: string
+
+UpdateCurrentUserProfileRequest:
+  type: object
+  required:
+    - name
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 120
+      description: Current user's display name.
+
+LoginRequest:
+  type: object
+  required:
+    - email
+    - password
+  properties:
+    email:
+      type: string
+      format: email
+    password:
+      type: string
+      format: password
+      minLength: 8
+
+PendingOAuthBindCurrentUserRequest:
+  type: object
+  description: Optional preferences applied while binding a pending external identity to the current console user. Omitting the body is equivalent to all preferences disabled.
+  properties:
+    adopt_display_name:
+      type: boolean
+      default: false
+      description: When true, adopt the provider-returned display name as the account display name if the provider supplied a present, valid name. Provider avatar URLs are never adopted automatically because SRapi avatars use a controlled upload/storage model.
+
+PendingOAuthBindLoginRequest:
+  type: object
+  required:
+    - email
+    - password
+  properties:
+    email:
+      type: string
+      format: email
+      description: Existing console account email to authenticate before binding the pending external identity.
+    password:
+      type: string
+      format: password
+      minLength: 8
+    adopt_display_name:
+      type: boolean
+      default: false
+      description: When true, adopt the provider-returned display name onto the authenticated account after a successful bind, if the provider supplied a present, valid name. Provider avatar URLs are never adopted automatically because SRapi avatars use a controlled upload/storage model.
+
+PendingOAuthBindLoginTwoFactorRequest:
+  type: object
+  required:
+    - challenge_id
+    - code
+  properties:
+    challenge_id:
+      type: string
+      minLength: 16
+      description: Pending OAuth bind-login two-factor challenge returned by `bindPendingOAuthLogin`.
+    code:
+      type: string
+      minLength: 6
+      maxLength: 32
+      description: Six-digit TOTP code or one recovery code.
+
+PendingOAuthEmailCompletionRequest:
+  type: object
+  required:
+    - email
+  properties:
+    email:
+      type: string
+      format: email
+      description: Email address the user wants to prove for an OAuth pending session that lacks a provider email.
+
+ConfirmPendingOAuthEmailCompletionRequest:
+  type: object
+  required:
+    - token
+  properties:
+    token:
+      type: string
+      minLength: 16
+      description: High-entropy pending OAuth email-completion token delivered by email. It must be submitted with the same pending OAuth cookie.
+
+PendingOAuthEmailCompletionAccepted:
+  type: object
+  required:
+    - accepted
+    - expires_at
+  properties:
+    accepted:
+      type: boolean
+    expires_at:
+      $ref: "common.yaml#/Timestamp"
+
+PendingOAuthEmailCompletionAcceptedResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/PendingOAuthEmailCompletionAccepted"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+PendingOAuthCreateAccountRequest:
+  type: object
+  required:
+    - email
+    - password
+    - action_token
+  properties:
+    email:
+      type: string
+      format: email
+      description: New console account email. For v1 this must match the verified email retained in the pending OAuth session.
+    name:
+      type: string
+      minLength: 1
+      description: Optional local display name. Defaults to the provider display name or email.
+    password:
+      type: string
+      format: password
+      minLength: 8
+    action_token:
+      type: string
+      minLength: 16
+      description: Pending OAuth create-account action token returned by `getPendingOAuthSession`.
+
+RegisterRequest:
+  type: object
+  required:
+    - email
+    - name
+    - password
+  properties:
+    email:
+      type: string
+      format: email
+    name:
+      type: string
+      minLength: 1
+    password:
+      type: string
+      format: password
+      minLength: 8
+    invite_code:
+      type: string
+      minLength: 1
+      description: Optional affiliate invite code to bind to the new account.
+    attributes:
+      type: array
+      description: Current-user attribute values required at registration when enabled definitions are marked required.
+      items:
+        $ref: "users.yaml#/UserAttributeValueInput"
+
+PasswordlessRequest:
+  type: object
+  required:
+    - email
+  properties:
+    email:
+      type: string
+      format: email
+    name:
+      type: string
+      minLength: 1
+    invite_code:
+      type: string
+    attributes:
+      type: array
+      items:
+        $ref: "users.yaml#/UserAttributeValueInput"
+
+PasswordlessLoginRequest:
+  type: object
+  required:
+    - token
+  properties:
+    token:
+      type: string
+      minLength: 1
+
+SiteConfig:
+  type: object
+  required:
+    - site_name
+    - site_subtitle
+    - logo_url
+    - version_label
+    - contact_info
+    - doc_url
+    - custom_menus
+    - user_agreement
+    - privacy_policy
+    - maintenance
+  properties:
+    site_name:
+      type: string
+    logo_url:
+      type: string
+    site_subtitle:
+      type: string
+    version_label:
+      type: string
+    contact_info:
+      type: string
+    doc_url:
+      type: string
+    custom_menus:
+      type: array
+      items:
+        $ref: "common.yaml#/CustomMenuItem"
+    user_agreement:
+      type: string
+    privacy_policy:
+      type: string
+    maintenance:
+      $ref: "#/SiteMaintenanceSummary"
+
+SiteMaintenanceSummary:
+  type: object
+  description: >-
+    Compact summary of the maintenance flag suitable for unauthenticated
+    consumption. When disabled only `enabled` is present; when enabled
+    the message and an optional expected recovery timestamp are surfaced
+    so callers can render banners and Retry-After hints.
+  required:
+    - enabled
+  properties:
+    enabled:
+      type: boolean
+    message:
+      type: string
+    expected_recovery_at:
+      $ref: "common.yaml#/Timestamp"
+      nullable: true
+
+SiteConfigResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/SiteConfig"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+SetupStatus:
+  type: object
+  required:
+    - needs_setup
+  properties:
+    needs_setup:
+      type: boolean
+      description: True until an owner/admin account exists; the console shows the first-run setup wizard while true.
+
+SetupStatusResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/SetupStatus"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+CompleteSetupRequest:
+  type: object
+  required:
+    - email
+    - name
+    - password
+  properties:
+    email:
+      type: string
+      format: email
+    name:
+      type: string
+      minLength: 1
+      maxLength: 100
+    password:
+      type: string
+      format: password
+      minLength: 8
+      maxLength: 200
+
+RequestPasswordResetRequest:
+  type: object
+  required:
+    - email
+  properties:
+    email:
+      type: string
+      format: email
+
+ConfirmPasswordResetRequest:
+  type: object
+  required:
+    - token
+    - new_password
+  properties:
+    token:
+      type: string
+      minLength: 1
+    new_password:
+      type: string
+      format: password
+      minLength: 8
+
+PasswordResetAccepted:
+  type: object
+  required:
+    - accepted
+  properties:
+    accepted:
+      type: boolean
+
+PasswordResetAcceptedResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/PasswordResetAccepted"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+RequestEmailVerificationRequest:
+  type: object
+  required:
+    - email
+  properties:
+    email:
+      type: string
+      format: email
+
+ConfirmEmailVerificationRequest:
+  type: object
+  required:
+    - token
+  properties:
+    token:
+      type: string
+      minLength: 1
+
+EmailVerificationAccepted:
+  type: object
+  required:
+    - accepted
+  properties:
+    accepted:
+      type: boolean
+
+EmailVerificationAcceptedResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/EmailVerificationAccepted"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+ChangeCurrentUserPasswordRequest:
+  type: object
+  required:
+    - current_password
+    - new_password
+  properties:
+    current_password:
+      type: string
+      format: password
+      minLength: 8
+    new_password:
+      type: string
+      format: password
+      minLength: 8
+
+LoginTwoFactorRequest:
+  type: object
+  required:
+    - challenge_id
+    - code
+  properties:
+    challenge_id:
+      type: string
+      minLength: 16
+    code:
+      type: string
+      minLength: 6
+      maxLength: 32
+      description: Six-digit TOTP code or one recovery code.
+
+LoginTwoFactorRequired:
+  type: object
+  required:
+    - required
+    - challenge_id
+    - expires_at
+  properties:
+    required:
+      type: boolean
+      enum:
+        - true
+    challenge_id:
+      type: string
+    expires_at:
+      $ref: "common.yaml#/Timestamp"
+
+LoginTwoFactorRequiredResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/LoginTwoFactorRequired"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+SessionData:
+  type: object
+  required:
+    - user
+    - csrf_token
+    - expires_at
+  properties:
+    user:
+      $ref: "users.yaml#/User"
+    csrf_token:
+      type: string
+      description: Token to send as X-CSRF-Token for console writes.
+    expires_at:
+      $ref: "common.yaml#/Timestamp"
+
+LoginResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/SessionData"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+TOTPStatus:
+  type: object
+  required:
+    - enabled
+    - pending_setup
+  properties:
+    enabled:
+      type: boolean
+    pending_setup:
+      type: boolean
+
+TOTPStatusResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/TOTPStatus"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+TOTPSetup:
+  type: object
+  required:
+    - enabled
+    - secret
+    - otp_auth_url
+  properties:
+    enabled:
+      type: boolean
+    secret:
+      type: string
+      description: Base32 TOTP secret returned once for enrollment.
+    otp_auth_url:
+      type: string
+      format: uri
+
+TOTPSetupResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/TOTPSetup"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+TOTPVerifyRequest:
+  type: object
+  required:
+    - code
+  properties:
+    code:
+      type: string
+      minLength: 6
+      maxLength: 32
+      description: Six-digit TOTP code or one recovery code.
+
+TOTPEnableResult:
+  type: object
+  required:
+    - enabled
+    - recovery_codes
+  properties:
+    enabled:
+      type: boolean
+    recovery_codes:
+      type: array
+      items:
+        type: string
+      minItems: 1
+
+TOTPEnableResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/TOTPEnableResult"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+ApiKeyStatus:
+  type: string
+  enum:
+    - active
+    - disabled
+    - expired
+
+ApiKey:
+  type: object
+  required:
+    - id
+    - name
+    - prefix
+    - status
+    - scopes
+    - allowed_models
+    - group_ids
+    - allowed_ips
+    - denied_ips
+    - created_at
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    name:
+      type: string
+    prefix:
+      type: string
+      description: Public key prefix for lookup, never sufficient for authentication.
+      example: sk_live_abcd1234
+    status:
+      $ref: "#/ApiKeyStatus"
+    scopes:
+      type: array
+      items:
+        type: string
+    allowed_models:
+      type: array
+      items:
+        type: string
+    group_ids:
+      type: array
+      items:
+        $ref: "common.yaml#/Id"
+    rpm_limit:
+      type: integer
+      nullable: true
+      minimum: 0
+    tpm_limit:
+      type: integer
+      nullable: true
+      minimum: 0
+    concurrency_limit:
+      type: integer
+      nullable: true
+      minimum: 0
+    request_limit_5h:
+      type: integer
+      nullable: true
+      minimum: 0
+      description: Max requests allowed per 5-hour window for this key.
+    request_limit_1d:
+      type: integer
+      nullable: true
+      minimum: 0
+      description: Max requests allowed per 1-day window for this key.
+    request_limit_7d:
+      type: integer
+      nullable: true
+      minimum: 0
+      description: Max requests allowed per 7-day window for this key.
+    cost_quota:
+      type: string
+      nullable: true
+      description: Lifetime USD spend quota for this key. Empty means uncapped.
+      example: "10.00000000"
+    cost_used:
+      type: string
+      description: Lifetime billable USD spend recorded for this key.
+      example: "1.25000000"
+    cost_limit_5h:
+      type: string
+      nullable: true
+      description: Max billable USD spend allowed per 5-hour window.
+      example: "2.00000000"
+    cost_used_5h:
+      type: string
+      description: Billable USD spend recorded in the current 5-hour window.
+      example: "0.50000000"
+    cost_limit_1d:
+      type: string
+      nullable: true
+      description: Max billable USD spend allowed per 1-day window.
+      example: "5.00000000"
+    cost_used_1d:
+      type: string
+      description: Billable USD spend recorded in the current 1-day window.
+      example: "1.00000000"
+    cost_limit_7d:
+      type: string
+      nullable: true
+      description: Max billable USD spend allowed per 7-day window.
+      example: "20.00000000"
+    cost_used_7d:
+      type: string
+      description: Billable USD spend recorded in the current 7-day window.
+      example: "4.50000000"
+    allowed_ips:
+      type: array
+      items:
+        type: string
+      description: >-
+        Client IPs or CIDRs permitted to use this key. Empty means all IPs
+        are allowed. Enforced against the request client IP; requires a
+        trusted reverse proxy that overwrites X-Forwarded-For.
+    denied_ips:
+      type: array
+      items:
+        type: string
+      description: Client IPs or CIDRs blocked from using this key. Takes precedence over allowed_ips.
+    expires_at:
+      type: string
+      format: date-time
+      nullable: true
+    last_used_at:
+      type: string
+      format: date-time
+      nullable: true
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+    user_id:
+      $ref: "common.yaml#/Id"
+    user_email:
+      type: string
+      description: Owner email; populated only on admin (cross-user) responses.
+
+CreateApiKeyRequest:
+  type: object
+  required:
+    - name
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 100
+    scopes:
+      type: array
+      items:
+        type: string
+      default:
+        - gateway:invoke
+    allowed_models:
+      type: array
+      items:
+        type: string
+      default: []
+    group_ids:
+      type: array
+      items:
+        $ref: "common.yaml#/Id"
+      default: []
+    rpm_limit:
+      type: integer
+      nullable: true
+      minimum: 0
+    tpm_limit:
+      type: integer
+      nullable: true
+      minimum: 0
+    concurrency_limit:
+      type: integer
+      nullable: true
+      minimum: 0
+    request_limit_5h:
+      type: integer
+      nullable: true
+      minimum: 0
+    request_limit_1d:
+      type: integer
+      nullable: true
+      minimum: 0
+    request_limit_7d:
+      type: integer
+      nullable: true
+      minimum: 0
+    cost_quota:
+      type: string
+      nullable: true
+      description: Lifetime USD spend quota for this key. Empty means uncapped.
+    cost_limit_5h:
+      type: string
+      nullable: true
+      description: Max billable USD spend allowed per 5-hour window.
+    cost_limit_1d:
+      type: string
+      nullable: true
+      description: Max billable USD spend allowed per 1-day window.
+    cost_limit_7d:
+      type: string
+      nullable: true
+      description: Max billable USD spend allowed per 7-day window.
+    allowed_ips:
+      type: array
+      items:
+        type: string
+      default: []
+    denied_ips:
+      type: array
+      items:
+        type: string
+      default: []
+    expires_at:
+      type: string
+      format: date-time
+      nullable: true
+
+AdminUpdateApiKeyRequest:
+  type: object
+  required:
+    - status
+  properties:
+    status:
+      $ref: "#/ApiKeyStatus"
+    cost_quota:
+      type: string
+      nullable: true
+    cost_limit_5h:
+      type: string
+      nullable: true
+    cost_limit_1d:
+      type: string
+      nullable: true
+    cost_limit_7d:
+      type: string
+      nullable: true
+
+UpdateApiKeyRequest:
+  type: object
+  minProperties: 1
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 100
+    status:
+      $ref: "#/ApiKeyStatus"
+    scopes:
+      type: array
+      items:
+        type: string
+    allowed_models:
+      type: array
+      items:
+        type: string
+    group_ids:
+      type: array
+      items:
+        $ref: "common.yaml#/Id"
+    rpm_limit:
+      type: integer
+      nullable: true
+      minimum: 0
+    tpm_limit:
+      type: integer
+      nullable: true
+      minimum: 0
+    concurrency_limit:
+      type: integer
+      nullable: true
+      minimum: 0
+    request_limit_5h:
+      type: integer
+      nullable: true
+      minimum: 0
+    request_limit_1d:
+      type: integer
+      nullable: true
+      minimum: 0
+    request_limit_7d:
+      type: integer
+      nullable: true
+      minimum: 0
+    cost_quota:
+      type: string
+      nullable: true
+    cost_limit_5h:
+      type: string
+      nullable: true
+    cost_limit_1d:
+      type: string
+      nullable: true
+    cost_limit_7d:
+      type: string
+      nullable: true
+    allowed_ips:
+      type: array
+      items:
+        type: string
+    denied_ips:
+      type: array
+      items:
+        type: string
+    expires_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: >-
+        New expiry timestamp. When present the key expiry is updated; omit
+        to leave the current expiry unchanged.
+
+ApiKeySecretData:
+  type: object
+  required:
+    - api_key
+    - plaintext_key
+  properties:
+    api_key:
+      $ref: "#/ApiKey"
+    plaintext_key:
+      type: string
+      description: Full plaintext API key. This value is never returned again.
+      example: sk_live_abcd1234_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+ApiKeyListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/ApiKey"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+CreateApiKeyResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/ApiKeySecretData"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+ApiKeyResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/ApiKey"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+DeleteApiKeyResponse:
+  type: object
+  required:
+    - ok
+    - request_id
+  properties:
+    ok:
+      type: boolean
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+EnabledOAuthProvider:
+  type: object
+  required:
+    - provider
+    - provider_key
+    - display_name
+  properties:
+    provider:
+      $ref: "#/AuthIdentityProvider"
+    provider_key:
+      type: string
+      description: Stable provider instance key; pass back as the provider_key query param when starting authorization.
+    display_name:
+      type: string
+      description: Non-secret label to render on the sign-in button.
+
+EnabledOAuthProviderListResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/EnabledOAuthProvider"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+CaptchaConfig:
+  type: object
+  required:
+    - enabled
+    - provider
+    - site_key
+  properties:
+    enabled:
+      type: boolean
+      description: Whether human-verification is enforced on auth endpoints.
+    provider:
+      type: string
+      description: Captcha provider widget to render (turnstile | hcaptcha | recaptcha).
+    site_key:
+      type: string
+      description: Public site key for the provider widget. Empty when captcha is unconfigured. Never secret.
+
+CaptchaConfigResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/CaptchaConfig"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+CaptchaSettings:
+  type: object
+  required:
+    - managed
+    - enabled
+    - provider
+    - site_key
+    - secret_key_configured
+    - verify_url
+  properties:
+    managed:
+      type: boolean
+      description: When true, admin settings override environment captcha config.
+    enabled:
+      type: boolean
+    provider:
+      type: string
+      enum: [turnstile, hcaptcha, recaptcha]
+    site_key:
+      type: string
+    secret_key:
+      type: string
+      writeOnly: true
+    secret_key_configured:
+      type: boolean
+      readOnly: true
+    verify_url:
+      type: string
+
+CaptchaSettingsResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/CaptchaSettings"
+    request_id:
+      $ref: "common.yaml#/RequestId"

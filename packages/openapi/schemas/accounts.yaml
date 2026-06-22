@@ -1,0 +1,2342 @@
+# Provider accounts, account groups, batch operations, and OAuth credentials
+ProviderOAuthConfig:
+  type: object
+  required:
+    - provider_id
+    - provider_name
+    - config
+  properties:
+    provider_id:
+      $ref: "common.yaml#/Id"
+    provider_name:
+      type: string
+    config:
+      $ref: "#/AccountOAuthProviderConfig"
+
+ProviderOAuthConfigResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/ProviderOAuthConfig"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AdminAccountManualPauseRequest:
+  type: object
+  required:
+    - until
+  properties:
+    until:
+      $ref: "common.yaml#/Timestamp"
+      description: >-
+        RFC3339 wall-clock instant at which the pause auto-expires. Must
+        be strictly in the future; the server clamps the comparison to
+        its own clock so client-side drift cannot bypass the check.
+    reason:
+      type: string
+      maxLength: 200
+      description: >-
+        Optional operator-supplied free-form context surfaced to other
+        operators (e.g. "investigating slow upstream", "rotating proxy").
+        Trimmed and truncated server-side.
+
+AdminAccountTestRequest:
+  type: object
+  properties:
+    mode:
+      type: string
+      enum:
+        - default
+        - live
+        - responses_compact
+      default: default
+      description: Use `live` for a real upstream round-trip; default only validates local configuration.
+    model:
+      type: string
+      description: Optional registered canonical model name or alias for live/compact probes.
+    model_id:
+      type: string
+      description: Backward-compatible alias for `model`.
+    prompt:
+      type: string
+      maxLength: 4000
+      description: Optional user prompt for live/compact probes. When omitted, SRapi uses a minimal OK probe.
+
+RuntimeClass:
+  type: string
+  enum:
+    - api_key
+    - oauth_refresh
+    - oauth_device_code
+    - web_session_cookie
+    - cli_client_token
+    - custom_reverse_proxy
+    - service_account_json
+
+PlatformFamily:
+  type: string
+  description: Upstream protocol/platform family a provider preset belongs to.
+  enum:
+    - openai_compatible
+    - anthropic_compatible
+    - gemini_compatible
+    - bedrock_anthropic
+    - xai_compatible
+    - reverse_proxy_antigravity
+    - rerank_compatible
+
+ProviderAccountStatus:
+  type: string
+  enum:
+    - active
+    - disabled
+    - needs_reauth
+    - suspended
+    - dead
+    - archived
+
+AccountGroupStatus:
+  type: string
+  enum:
+    - active
+    - disabled
+
+AccountGroup:
+  type: object
+  required:
+    - id
+    - name
+    - description
+    - provider_scope
+    - model_scope
+    - strategy_hint
+    - status
+    - rate_multiplier
+    - created_at
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    name:
+      type: string
+      minLength: 1
+    description:
+      type: string
+    provider_scope:
+      $ref: "common.yaml#/JsonObject"
+    model_scope:
+      $ref: "common.yaml#/JsonObject"
+    strategy_hint:
+      type: string
+      example: balanced
+    status:
+      $ref: "#/AccountGroupStatus"
+    rate_multiplier:
+      type: string
+      description: |
+        Decimal multiplier applied to per-request usage charges for
+        accounts in this group (discount: < 1.0; markup: > 1.0). Default
+        "1.00000000". See modules/accounts/service.go for normalisation.
+      example: "1.00000000"
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+
+CreateAccountGroupRequest:
+  type: object
+  required:
+    - name
+  properties:
+    name:
+      type: string
+      minLength: 1
+    description:
+      type: string
+      default: ""
+    provider_scope:
+      $ref: "common.yaml#/JsonObject"
+    model_scope:
+      $ref: "common.yaml#/JsonObject"
+    strategy_hint:
+      type: string
+      example: balanced
+    status:
+      $ref: "#/AccountGroupStatus"
+    rate_multiplier:
+      type: string
+      description: Optional rate multiplier. Defaults to "1.00000000" when omitted.
+      example: "1.00000000"
+
+UpdateAccountGroupRequest:
+  type: object
+  minProperties: 1
+  properties:
+    name:
+      type: string
+      minLength: 1
+    description:
+      type: string
+    provider_scope:
+      $ref: "common.yaml#/JsonObject"
+    model_scope:
+      $ref: "common.yaml#/JsonObject"
+    strategy_hint:
+      type: string
+    status:
+      $ref: "#/AccountGroupStatus"
+    rate_multiplier:
+      type: string
+      description: Optional decimal multiplier; pass to update the per-group rate.
+      example: "0.80000000"
+
+AccountGroupResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/AccountGroup"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AccountGroupListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/AccountGroup"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AccountGroupMember:
+  type: object
+  required:
+    - id
+    - account_id
+    - account_group_id
+    - created_at
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    account_id:
+      $ref: "common.yaml#/Id"
+    account_group_id:
+      $ref: "common.yaml#/Id"
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+
+AccountGroupMemberResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/AccountGroupMember"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AccountGroupMemberListResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/AccountGroupMember"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+ProviderAccount:
+  type: object
+  required:
+    - id
+    - provider_id
+    - name
+    - runtime_class
+    - status
+    - priority
+    - weight
+    - group_ids
+    - created_at
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    provider_id:
+      $ref: "common.yaml#/Id"
+    name:
+      type: string
+    runtime_class:
+      $ref: "#/RuntimeClass"
+    upstream_client:
+      type: string
+      nullable: true
+      example: claude_code_cli
+    proxy_id:
+      type: string
+      nullable: true
+      description: Registered proxy definition id when this account is bound to one.
+    status:
+      $ref: "#/ProviderAccountStatus"
+    priority:
+      type: integer
+      default: 0
+    weight:
+      type: number
+      minimum: 0
+      default: 1
+    risk_level:
+      type: string
+      nullable: true
+    group_ids:
+      type: array
+      items:
+        $ref: "common.yaml#/Id"
+      default: []
+    metadata:
+      allOf:
+        - $ref: "common.yaml#/JsonObject"
+      description: >
+        Free-form per-account configuration. Recognized convention keys
+        (no schema migration; read at scheduling time):
+        `base_url` (override the upstream base URL);
+        `supported_models` (string array — exact-match inclusion whitelist of
+        upstream model names this account may serve; absent = serve all);
+        `excluded_models` (string array of `*` wildcard patterns — exclude any
+        catalog or upstream model name matching a pattern; takes precedence
+        over `supported_models` and hides the model from `/v1/models` when
+        every serving account excludes it);
+        `model_mapping` (object mapping a canonical catalog model name to a
+        per-account upstream model name override).
+    token_expires_at:
+      type: string
+      format: date-time
+      allOf:
+        - $ref: "common.yaml#/Timestamp"
+      nullable: true
+      description: >
+        Wall-clock expiry of the OAuth access token, snapshotted from the
+        credential after the last successful refresh. Null when the
+        account has never been refreshed or the credential carries no
+        expires_at. OAuth runtime classes only.
+    last_refreshed_at:
+      type: string
+      format: date-time
+      allOf:
+        - $ref: "common.yaml#/Timestamp"
+      nullable: true
+      description: Time of the most recent successful OAuth refresh.
+    needs_reauth_at:
+      type: string
+      format: date-time
+      allOf:
+        - $ref: "common.yaml#/Timestamp"
+      nullable: true
+      description: >
+        Set when refresh has become hopeless (permanent OAuth error such
+        as invalid_grant, OR refresh_attempts >= 5). The proactive
+        refresh worker skips accounts with this set so the upstream is
+        not hammered; an operator must re-bind the account to clear it.
+    refresh_attempts:
+      type: integer
+      default: 0
+      description: Consecutive refresh-failure count; reset to 0 on a success.
+    refresh_last_error:
+      type: string
+      description: Most recent refresh error message (truncated to 500 chars).
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+
+CreateProviderAccountRequest:
+  type: object
+  required:
+    - provider_id
+    - name
+    - runtime_class
+    - credential
+  properties:
+    provider_id:
+      $ref: "common.yaml#/Id"
+    name:
+      type: string
+      minLength: 1
+    runtime_class:
+      $ref: "#/RuntimeClass"
+    upstream_client:
+      type: string
+      nullable: true
+    credential:
+      type: object
+      description: Write-only credential payload. It must be encrypted before persistence.
+      writeOnly: true
+      additionalProperties: true
+    proxy_id:
+      type: string
+      nullable: true
+      description: Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first.
+    status:
+      $ref: "#/ProviderAccountStatus"
+    priority:
+      type: integer
+      default: 0
+    weight:
+      type: number
+      minimum: 0
+      default: 1
+    risk_level:
+      type: string
+      enum:
+        - normal
+        - medium
+        - high
+      default: normal
+    metadata:
+      $ref: "common.yaml#/JsonObject"
+
+BatchCreateProviderAccountsRequest:
+  type: object
+  required:
+    - defaults
+    - items
+  properties:
+    defaults:
+      type: object
+      description: |
+        Applied to every item unless the item overrides it. Same shape as
+        CreateProviderAccountRequest minus name + credential, which must
+        be supplied per row.
+      required:
+        - provider_id
+        - runtime_class
+      properties:
+        provider_id:
+          $ref: "common.yaml#/Id"
+        runtime_class:
+          $ref: "#/RuntimeClass"
+        upstream_client:
+          type: string
+          nullable: true
+        group_id:
+          type: integer
+          nullable: true
+          description: When set, every successfully created account is added to this group.
+        proxy_id:
+          type: string
+          nullable: true
+          description: Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first.
+        priority:
+          type: integer
+          default: 0
+        weight:
+          type: number
+          minimum: 0
+          default: 1
+        risk_level:
+          type: string
+          enum:
+            - normal
+            - medium
+            - high
+          default: normal
+        metadata:
+          $ref: "common.yaml#/JsonObject"
+    items:
+      type: array
+      minItems: 1
+      maxItems: 1000
+      items:
+        type: object
+        required:
+          - name
+          - credential
+        properties:
+          name:
+            type: string
+            minLength: 1
+            maxLength: 255
+          credential:
+            type: object
+            additionalProperties: true
+            writeOnly: true
+            description: OAuth/api-key credential map; same shape as the single-create endpoint's credential field.
+          group_id:
+            type: integer
+            nullable: true
+            description: Per-row override of defaults.group_id.
+          priority:
+            type: integer
+            nullable: true
+          weight:
+            type: number
+            minimum: 0
+            nullable: true
+
+BatchCreateProviderAccountsResultRow:
+  type: object
+  required:
+    - index
+    - name
+  properties:
+    index:
+      type: integer
+      description: Zero-based index in the request `items` array.
+    name:
+      type: string
+    account_id:
+      type: string
+      allOf:
+        - $ref: "common.yaml#/Id"
+      nullable: true
+    error:
+      type: string
+      nullable: true
+      description: Empty when account_id is set; non-empty when account_id is null (validation, dedup, store failure).
+
+BatchCreateProviderAccountsResult:
+  type: object
+  required:
+    - results
+    - succeeded
+    - failed
+  properties:
+    results:
+      type: array
+      items:
+        $ref: "#/BatchCreateProviderAccountsResultRow"
+    succeeded:
+      type: integer
+    failed:
+      type: integer
+
+BatchCreateProviderAccountsResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/BatchCreateProviderAccountsResult"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+BatchDeleteProviderAccountsRequest:
+  type: object
+  required:
+    - account_ids
+  properties:
+    account_ids:
+      type: array
+      minItems: 1
+      maxItems: 1000
+      items:
+        $ref: "common.yaml#/Id"
+
+BatchDeleteProviderAccountsErrorRow:
+  type: object
+  required:
+    - id
+    - message
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    message:
+      type: string
+
+BatchDeleteProviderAccountsResult:
+  type: object
+  required:
+    - deleted_count
+    - deleted_ids
+    - errors
+  properties:
+    deleted_count:
+      type: integer
+    deleted_ids:
+      type: array
+      items:
+        $ref: "common.yaml#/Id"
+    errors:
+      type: array
+      description: Per-id failures (e.g. duplicate id within the batch, decryption error). NotFound is NOT a failure here — idempotent semantics.
+      items:
+        $ref: "#/BatchDeleteProviderAccountsErrorRow"
+
+BatchDeleteProviderAccountsResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/BatchDeleteProviderAccountsResult"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+BatchAccountGroupMembersRequest:
+  type: object
+  required:
+    - account_ids
+  properties:
+    account_ids:
+      type: array
+      minItems: 1
+      maxItems: 1000
+      items:
+        $ref: "common.yaml#/Id"
+
+BatchAccountGroupMembersErrorRow:
+  type: object
+  required:
+    - id
+    - message
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    message:
+      type: string
+
+BatchAccountGroupMembersResult:
+  type: object
+  required:
+    - applied_count
+    - applied_ids
+    - errors
+  properties:
+    applied_count:
+      type: integer
+    applied_ids:
+      type: array
+      items:
+        $ref: "common.yaml#/Id"
+    errors:
+      type: array
+      description: Per-id failures (account not found, duplicate within batch, store conflict). Idempotent successes (already-member on add, not-member on remove) appear in applied_ids, NOT errors.
+      items:
+        $ref: "#/BatchAccountGroupMembersErrorRow"
+
+BatchAccountGroupMembersResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/BatchAccountGroupMembersResult"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+BatchUpdateAccountConcurrencyItem:
+  type: object
+  required:
+    - account_id
+    - max_concurrency
+  properties:
+    account_id:
+      $ref: "common.yaml#/Id"
+    max_concurrency:
+      type: integer
+      minimum: 0
+      description: New per-account ceiling on concurrent in-flight requests. 0 clears the cap (the scheduler treats absent + zero identically).
+
+BatchUpdateAccountConcurrencyRequest:
+  type: object
+  required:
+    - items
+  properties:
+    items:
+      type: array
+      minItems: 1
+      maxItems: 1000
+      items:
+        $ref: "#/BatchUpdateAccountConcurrencyItem"
+
+BatchUpdateAccountConcurrencyErrorRow:
+  type: object
+  required:
+    - id
+    - message
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    message:
+      type: string
+
+BatchUpdateAccountConcurrencyResult:
+  type: object
+  required:
+    - updated_count
+    - errors
+  properties:
+    updated_count:
+      type: integer
+    errors:
+      type: array
+      description: Per-id failures (invalid id, duplicate in batch, store error). NotFound is NOT a failure — idempotent semantics.
+      items:
+        $ref: "#/BatchUpdateAccountConcurrencyErrorRow"
+
+BatchUpdateAccountConcurrencyResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/BatchUpdateAccountConcurrencyResult"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+BatchRefreshAdminAccountsRequest:
+  type: object
+  required:
+    - account_ids
+  properties:
+    account_ids:
+      type: array
+      minItems: 1
+      maxItems: 1000
+      items:
+        $ref: "common.yaml#/Id"
+
+BatchRefreshAdminAccountsErrorRow:
+  type: object
+  required:
+    - id
+    - message
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    message:
+      type: string
+
+BatchRefreshAdminAccountsRow:
+  type: object
+  required:
+    - account_id
+    - outcome_class
+  properties:
+    account_id:
+      $ref: "common.yaml#/Id"
+    outcome_class:
+      type: string
+      description: Categorical refresh outcome (success / permanent_error / transient_error / threshold_exceeded). Empty string when NotFound was idempotently skipped.
+    attempts:
+      type: integer
+      description: Post-call refresh_attempts (the cumulative consecutive-failure count; 0 on success).
+    needs_reauth_flipped:
+      type: boolean
+      description: True when this call moved needs_reauth_at from nil to non-nil.
+
+BatchRefreshAdminAccountsResult:
+  type: object
+  required:
+    - refreshed_count
+    - rows
+    - errors
+  properties:
+    refreshed_count:
+      type: integer
+      description: Number of rows that completed successfully (outcome_class=success or NotFound idempotent skip).
+    rows:
+      type: array
+      description: Per-id refresh outcome — preserves request order; carries the structured class + attempts even for failure rows.
+      items:
+        $ref: "#/BatchRefreshAdminAccountsRow"
+    errors:
+      type: array
+      description: Per-id failures (invalid id, duplicate in batch, non-OAuth runtime class, refresher error). NotFound is NOT a failure — idempotent semantics.
+      items:
+        $ref: "#/BatchRefreshAdminAccountsErrorRow"
+
+BatchRefreshAdminAccountsResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/BatchRefreshAdminAccountsResult"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+BatchUpdateAdminAccountCredentialItem:
+  type: object
+  required:
+    - account_id
+    - credential
+  properties:
+    account_id:
+      $ref: "common.yaml#/Id"
+    credential:
+      allOf:
+        - $ref: "common.yaml#/JsonObject"
+      description: Partial credential patch. Only fields present here overwrite the stored credential; absent fields are preserved. An empty object is rejected per-row to keep operator typos visible.
+
+BatchUpdateAdminAccountCredentialsRequest:
+  type: object
+  required:
+    - items
+  properties:
+    items:
+      type: array
+      minItems: 1
+      maxItems: 1000
+      items:
+        $ref: "#/BatchUpdateAdminAccountCredentialItem"
+
+BatchUpdateAdminAccountCredentialErrorRow:
+  type: object
+  required:
+    - id
+    - message
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    message:
+      type: string
+
+BatchUpdateAdminAccountCredentialsResult:
+  type: object
+  required:
+    - updated_count
+    - errors
+  properties:
+    updated_count:
+      type: integer
+    errors:
+      type: array
+      description: Per-id failures (invalid id, empty patch, store/encryption error, duplicate in batch). NotFound is NOT a failure — idempotent semantics.
+      items:
+        $ref: "#/BatchUpdateAdminAccountCredentialErrorRow"
+
+BatchUpdateAdminAccountCredentialsResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/BatchUpdateAdminAccountCredentialsResult"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+BatchSetAdminAffiliateRebateRateItem:
+  type: object
+  required:
+    - user_id
+  properties:
+    user_id:
+      $ref: "common.yaml#/Id"
+    rate_percent:
+      type: number
+      format: double
+      minimum: 0
+      maximum: 1
+      nullable: true
+      description: Override rate as a 0..1 fraction (e.g. 0.15 = 15%). Required unless clear=true.
+    clear:
+      type: boolean
+      description: When true, removes the override and falls back to the rule-derived rate. rate_percent is ignored when clear=true.
+
+BatchSetAdminAffiliateRebateRateRequest:
+  type: object
+  required:
+    - items
+  properties:
+    items:
+      type: array
+      minItems: 1
+      maxItems: 1000
+      items:
+        $ref: "#/BatchSetAdminAffiliateRebateRateItem"
+
+BatchSetAdminAffiliateRebateRateErrorRow:
+  type: object
+  required:
+    - id
+    - message
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    message:
+      type: string
+
+BatchSetAdminAffiliateRebateRateResult:
+  type: object
+  required:
+    - updated_count
+    - errors
+  properties:
+    updated_count:
+      type: integer
+    errors:
+      type: array
+      description: Per-id failures (invalid id, rate out of range, duplicate in batch).
+      items:
+        $ref: "#/BatchSetAdminAffiliateRebateRateErrorRow"
+
+BatchSetAdminAffiliateRebateRateResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/BatchSetAdminAffiliateRebateRateResult"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+BatchAssignAdminUserSubscriptionItem:
+  type: object
+  required:
+    - user_id
+    - plan_id
+  properties:
+    user_id:
+      $ref: "common.yaml#/Id"
+    plan_id:
+      $ref: "common.yaml#/Id"
+    expires_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: Optional explicit expiry override. When absent the subscription expires at start + plan.validity_days.
+    source_type:
+      type: string
+      description: Optional idempotency source tag — when both source_type and source_id are set, a matching existing subscription is returned idempotently (mirrors sub2api reused).
+    source_id:
+      type: string
+
+BatchAssignAdminUserSubscriptionsRequest:
+  type: object
+  required:
+    - items
+  properties:
+    items:
+      type: array
+      minItems: 1
+      maxItems: 1000
+      items:
+        $ref: "#/BatchAssignAdminUserSubscriptionItem"
+
+BatchAssignAdminUserSubscriptionsErrorRow:
+  type: object
+  required:
+    - id
+    - message
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    message:
+      type: string
+
+BatchAssignAdminUserSubscriptionsRow:
+  type: object
+  required:
+    - user_id
+    - plan_id
+    - outcome
+  properties:
+    user_id:
+      $ref: "common.yaml#/Id"
+    plan_id:
+      $ref: "common.yaml#/Id"
+    outcome:
+      type: string
+      enum:
+        - created
+        - reused
+        - failed
+        - skipped
+    subscription_id:
+      $ref: "common.yaml#/Id"
+
+BatchAssignAdminUserSubscriptionsResult:
+  type: object
+  required:
+    - created_count
+    - reused_count
+    - rows
+    - errors
+  properties:
+    created_count:
+      type: integer
+    reused_count:
+      type: integer
+    rows:
+      type: array
+      description: Per-row outcome in request order — carries created/reused/failed plus the subscription id on success.
+      items:
+        $ref: "#/BatchAssignAdminUserSubscriptionsRow"
+    errors:
+      type: array
+      description: Per-id failures (invalid id, missing plan, store error, duplicate (user_id, plan_id) in batch).
+      items:
+        $ref: "#/BatchAssignAdminUserSubscriptionsErrorRow"
+
+BatchAssignAdminUserSubscriptionsResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/BatchAssignAdminUserSubscriptionsResult"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+BatchSetGroupRateMultiplierItem:
+  type: object
+  required:
+    - group_id
+    - multiplier
+  properties:
+    group_id:
+      $ref: "common.yaml#/Id"
+    multiplier:
+      type: string
+      description: Decimal string > 0 (e.g. "0.5" for 50% off, "1.5" for surcharge). Stored as 8-decimal-place fixed.
+
+BatchSetGroupRateMultipliersRequest:
+  type: object
+  required:
+    - items
+  properties:
+    items:
+      type: array
+      minItems: 1
+      maxItems: 1000
+      items:
+        $ref: "#/BatchSetGroupRateMultiplierItem"
+
+BatchSetGroupRateMultiplierErrorRow:
+  type: object
+  required:
+    - id
+    - message
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    message:
+      type: string
+
+BatchSetGroupRateMultipliersResult:
+  type: object
+  required:
+    - updated_count
+    - errors
+  properties:
+    updated_count:
+      type: integer
+    errors:
+      type: array
+      description: Per-id failures (invalid id, invalid multiplier, store error). NotFound is idempotent.
+      items:
+        $ref: "#/BatchSetGroupRateMultiplierErrorRow"
+
+BatchSetGroupRateMultipliersResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/BatchSetGroupRateMultipliersResult"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+BatchSetGroupRPMOverrideItem:
+  type: object
+  required:
+    - group_id
+  properties:
+    group_id:
+      $ref: "common.yaml#/Id"
+    rpm_override:
+      type: integer
+      nullable: true
+      minimum: 0
+      description: New per-group RPM ceiling. null clears the override (no rate limit).
+
+BatchSetGroupRPMOverridesRequest:
+  type: object
+  required:
+    - items
+  properties:
+    items:
+      type: array
+      minItems: 1
+      maxItems: 1000
+      items:
+        $ref: "#/BatchSetGroupRPMOverrideItem"
+
+BatchSetGroupRPMOverrideErrorRow:
+  type: object
+  required:
+    - id
+    - message
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    message:
+      type: string
+
+BatchSetGroupRPMOverridesResult:
+  type: object
+  required:
+    - updated_count
+    - errors
+  properties:
+    updated_count:
+      type: integer
+    errors:
+      type: array
+      description: Per-id failures (invalid id, negative value, store error). NotFound is idempotent.
+      items:
+        $ref: "#/BatchSetGroupRPMOverrideErrorRow"
+
+BatchSetGroupRPMOverridesResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/BatchSetGroupRPMOverridesResult"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+UpdateProviderAccountRequest:
+  type: object
+  minProperties: 1
+  properties:
+    name:
+      type: string
+      minLength: 1
+    runtime_class:
+      $ref: "#/RuntimeClass"
+    upstream_client:
+      type: string
+      nullable: true
+    credential:
+      type: object
+      description: Write-only replacement credential payload. It must be encrypted before persistence.
+      writeOnly: true
+      additionalProperties: true
+    proxy_id:
+      type: string
+      nullable: true
+      description: Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first. Set null or an empty string to clear proxy binding.
+    status:
+      $ref: "#/ProviderAccountStatus"
+    priority:
+      type: integer
+    weight:
+      type: number
+      minimum: 0
+    risk_level:
+      type: string
+      enum:
+        - normal
+        - medium
+        - high
+    metadata:
+      $ref: "common.yaml#/JsonObject"
+
+BindProviderAccountProxyRequest:
+  type: object
+  required:
+    - proxy_id
+  properties:
+    proxy_id:
+      type: string
+      nullable: true
+      description: Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first. Set null or an empty string to clear proxy binding.
+
+ProviderAccountExportItem:
+  type: object
+  required:
+    - provider_id
+    - name
+    - runtime_class
+    - status
+    - priority
+    - weight
+    - credential_exported
+  properties:
+    provider_id:
+      $ref: "common.yaml#/Id"
+    name:
+      type: string
+    runtime_class:
+      $ref: "#/RuntimeClass"
+    upstream_client:
+      type: string
+      nullable: true
+    proxy_id:
+      type: string
+      nullable: true
+      description: Registered proxy definition id, when the exported account is bound to one.
+    status:
+      $ref: "#/ProviderAccountStatus"
+    priority:
+      type: integer
+    weight:
+      type: number
+      minimum: 0
+    metadata:
+      $ref: "common.yaml#/JsonObject"
+    risk_level:
+      type: string
+      enum:
+        - normal
+        - medium
+        - high
+    group_ids:
+      type: array
+      items:
+        $ref: "common.yaml#/Id"
+      default: []
+    credential_exported:
+      type: boolean
+      description: Always false for this endpoint; credentials are never exported.
+
+ProviderAccountExportResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/ProviderAccountExportItem"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+ProviderAccountImportItem:
+  type: object
+  required:
+    - provider_id
+    - name
+    - runtime_class
+  properties:
+    provider_id:
+      $ref: "common.yaml#/Id"
+    name:
+      type: string
+      minLength: 1
+    runtime_class:
+      $ref: "#/RuntimeClass"
+    upstream_client:
+      type: string
+      nullable: true
+    credential:
+      type: object
+      description: Write-only credential payload. Exports intentionally omit this field.
+      writeOnly: true
+      additionalProperties: true
+    proxy_id:
+      type: string
+      nullable: true
+      description: Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first.
+    status:
+      $ref: "#/ProviderAccountStatus"
+    risk_level:
+      type: string
+      enum: [normal, medium, high]
+      default: normal
+    priority:
+      type: integer
+      default: 0
+    weight:
+      type: number
+      minimum: 0
+      default: 1
+    metadata:
+      $ref: "common.yaml#/JsonObject"
+    group_ids:
+      type: array
+      items:
+        $ref: "common.yaml#/Id"
+      default: []
+
+ProviderAccountImportRequest:
+  type: object
+  required:
+    - accounts
+  properties:
+    accounts:
+      type: array
+      minItems: 1
+      items:
+        $ref: "#/ProviderAccountImportItem"
+
+ProviderAccountImportResult:
+  type: object
+  required:
+    - created_count
+    - updated_count
+    - skipped_count
+    - failed_count
+    - total_count
+    - created_ids
+    - updated_ids
+    - items
+    - warnings
+    - errors
+  properties:
+    created_count:
+      type: integer
+      minimum: 0
+    updated_count:
+      type: integer
+      minimum: 0
+      default: 0
+    skipped_count:
+      type: integer
+      minimum: 0
+    failed_count:
+      type: integer
+      minimum: 0
+      default: 0
+    total_count:
+      type: integer
+      minimum: 0
+      default: 0
+    created_ids:
+      type: array
+      items:
+        $ref: "common.yaml#/Id"
+    updated_ids:
+      type: array
+      items:
+        $ref: "common.yaml#/Id"
+      default: []
+    items:
+      type: array
+      items:
+        $ref: "#/CodexSessionImportItem"
+      default: []
+    warnings:
+      type: array
+      items:
+        $ref: "#/CodexSessionImportMessage"
+      default: []
+    errors:
+      type: array
+      items:
+        type: string
+
+ProviderAccountImportResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/ProviderAccountImportResult"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+CodexSessionImportRequest:
+  type: object
+  required:
+    - provider_id
+    - content
+  properties:
+    provider_id:
+      $ref: "common.yaml#/Id"
+    content:
+      type: string
+      minLength: 1
+      description: >-
+        Raw session payload. Accepts a Codex/ChatGPT session JSON object, a
+        single raw access token, a JSON array of either, or newline-delimited
+        (NDJSON) entries mixing the above.
+    name:
+      type: string
+      nullable: true
+      description: >-
+        Optional base account name. When multiple sessions are imported a
+        "#N" suffix is appended; when omitted the email/account id from the
+        session is used.
+    update_existing:
+      type: boolean
+      default: true
+      description: >-
+        When an account with a matching identity already exists, update its
+        credential instead of skipping. Defaults to true.
+    group_ids:
+      type: array
+      items:
+        $ref: "common.yaml#/Id"
+      default: []
+    proxy_id:
+      type: string
+      nullable: true
+      description: Registered active proxy definition id to bind to imported accounts. Raw proxy URLs are rejected; create and enable a proxy definition first.
+    status:
+      $ref: "#/ProviderAccountStatus"
+
+CodexSessionImportItem:
+  type: object
+  required:
+    - index
+    - action
+  properties:
+    index:
+      type: integer
+      minimum: 1
+    name:
+      type: string
+    action:
+      type: string
+      enum:
+        - created
+        - updated
+        - skipped
+        - failed
+    account_id:
+      $ref: "common.yaml#/Id"
+    message:
+      type: string
+
+CodexSessionImportMessage:
+  type: object
+  required:
+    - index
+    - message
+  properties:
+    index:
+      type: integer
+      minimum: 1
+    name:
+      type: string
+    message:
+      type: string
+
+CodexSessionImportResult:
+  type: object
+  required:
+    - total
+    - created
+    - updated
+    - skipped
+    - failed
+    - items
+    - warnings
+    - errors
+  properties:
+    total:
+      type: integer
+      minimum: 0
+    created:
+      type: integer
+      minimum: 0
+    updated:
+      type: integer
+      minimum: 0
+    skipped:
+      type: integer
+      minimum: 0
+    failed:
+      type: integer
+      minimum: 0
+    items:
+      type: array
+      items:
+        $ref: "#/CodexSessionImportItem"
+    warnings:
+      type: array
+      items:
+        $ref: "#/CodexSessionImportMessage"
+    errors:
+      type: array
+      items:
+        $ref: "#/CodexSessionImportMessage"
+
+CodexSessionImportResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/CodexSessionImportResult"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+BatchUpdateAccountsRequest:
+  type: object
+  required:
+    - account_ids
+    - status
+  properties:
+    account_ids:
+      type: array
+      minItems: 1
+      items:
+        $ref: "common.yaml#/Id"
+    status:
+      $ref: "#/ProviderAccountStatus"
+    priority:
+      type: integer
+      minimum: 0
+      description: |
+        Optional — when present, the scheduler-tier priority is set across
+        every selected account. Higher = preferred. Omit to leave priority
+        unchanged. Useful for re-tiering an entire group of accounts at
+        once after a quality re-evaluation.
+    weight:
+      type: number
+      format: float
+      minimum: 0
+      description: |
+        Optional — when present, the load-balancer weight is set across
+        every selected account. Omit to leave weight unchanged. Useful
+        for re-balancing traffic across a tenant's accounts in one
+        operation.
+    risk_level:
+      type: string
+      description: |
+        Optional — when present, the risk-level label is set across every
+        selected account. Omit to leave risk_level unchanged. The label
+        feeds the content-safety gate; bulk-setting is dangerous on a
+        heterogeneous selection (e.g. mixing personal + pooled accounts)
+        — pair with an admin confirm step in the UI.
+
+BulkUpdateProviderAccountsRequest:
+  type: object
+  description: |
+    sub2api `BulkUpdateAccountsRequest` superset. Either `account_ids`
+    or `filters` is required (server-side filter resolution lets the
+    UI offer "Edit Filtered" without round-tripping IDs through the
+    client). Every editable field is optional — only fields present
+    in the payload are written, so a caller can change just
+    `priority` for the selection without touching `status`. Mirrors
+    Service.BulkUpdateAccounts; per-row failures collect in `errors`.
+  properties:
+    account_ids:
+      type: array
+      minItems: 1
+      items:
+        $ref: "common.yaml#/Id"
+      description: |
+        Explicit selection. Mutually exclusive with `filters` — supply
+        one or the other. When both are present, `account_ids` wins
+        (matches sub2api).
+    filters:
+      $ref: "#/BulkUpdateProviderAccountsFilters"
+    add_group_id:
+      $ref: "common.yaml#/Id"
+      description: |
+        Optional account group id to add every resolved account to.
+        This can be the only mutation in the request, so "bulk edit
+        filtered" can assign group membership without the client
+        round-tripping every matched account id. The operation is
+        idempotent for accounts that are already members.
+    name:
+      type: string
+      description: |
+        Optional — rename every selected account. Almost never useful
+        for >1 account; included for sub2api parity.
+    status:
+      $ref: "#/ProviderAccountStatus"
+    priority:
+      type: integer
+      minimum: 0
+      description: Optional scheduler-tier priority. Higher = preferred.
+    weight:
+      type: number
+      format: float
+      minimum: 0
+      description: Optional load-balancer weight.
+    risk_level:
+      type: string
+      description: Optional risk-level label for the content-safety gate.
+    max_concurrency:
+      type: integer
+      minimum: 0
+      description: |
+        Optional per-account concurrency cap (0 clears the cap).
+        Stored in account metadata under `max_concurrency` — same key
+        the scheduler reads at admission, identical to
+        `/admin/accounts/batch-concurrency`.
+    proxy_id:
+      type: string
+      nullable: true
+      description: |
+        Optional active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first.
+        Empty string clears the binding.
+        Encode `null` as JSON null to leave unchanged.
+    upstream_client:
+      type: string
+      nullable: true
+      description: |
+        Optional upstream-client override. Empty string clears.
+        Encode `null` (the default when omitted) to leave unchanged.
+    runtime_class:
+      type: string
+      description: |
+        Optional auth-mechanism override (api_key / oauth_refresh /
+        etc.). Caller must ensure the runtime class is allowed by
+        the provider — the handler does NOT re-validate here.
+
+BulkUpdateProviderAccountsFilters:
+  type: object
+  description: |
+    Server-side filter set for `BulkUpdateProviderAccountsRequest` —
+    mirrors the GET /accounts list-query knobs. The handler resolves
+    these to IDs using the same list path the admin table uses, so
+    what the caller sees IS what the bulk-edit hits. An empty filter
+    set deliberately matches nothing (refuses to operate on every
+    account by accident).
+  properties:
+    provider_id:
+      type: string
+      description: Restrict to a single provider.
+    status:
+      type: string
+      description: Restrict to a single status (active/disabled/...).
+    group_id:
+      type: string
+      description: Restrict to members of one account group.
+    runtime_class:
+      type: string
+      description: Restrict to one runtime class (api_key/oauth_refresh/...).
+    search:
+      type: string
+      description: |
+        Case-insensitive substring match against the account name.
+        Mirrors sub2api `filters.search`.
+
+BatchQuotaFetchRequest:
+  type: object
+  required:
+    - account_ids
+  properties:
+    account_ids:
+      type: array
+      minItems: 1
+      items:
+        $ref: "common.yaml#/Id"
+
+BatchQuotaFetchRow:
+  type: object
+  required:
+    - account_id
+    - success
+  properties:
+    account_id:
+      $ref: "common.yaml#/Id"
+    success:
+      type: boolean
+    error:
+      type: string
+      description: Error message when success=false (omitted on success).
+
+BatchQuotaFetchResult:
+  type: object
+  required:
+    - total
+    - success
+    - failed
+    - rows
+  properties:
+    total:
+      type: integer
+      minimum: 0
+    success:
+      type: integer
+      minimum: 0
+    failed:
+      type: integer
+      minimum: 0
+    rows:
+      type: array
+      items:
+        $ref: "#/BatchQuotaFetchRow"
+
+BatchQuotaFetchResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/BatchQuotaFetchResult"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+BatchAccountActionRequest:
+  type: object
+  required:
+    - account_ids
+    - action
+  properties:
+    account_ids:
+      type: array
+      minItems: 1
+      items:
+        $ref: "common.yaml#/Id"
+    action:
+      type: string
+      description: >-
+        Maintenance action to apply per account. `clear_error` clears
+        transient error/cooldown metadata and reactivates non-healthy
+        accounts; `recover` resets the account back to active.
+      enum:
+        - clear_error
+        - recover
+
+BatchUpdateAccountsResult:
+  type: object
+  required:
+    - updated_count
+    - updated_ids
+    - errors
+  properties:
+    updated_count:
+      type: integer
+      minimum: 0
+    updated_ids:
+      type: array
+      items:
+        $ref: "common.yaml#/Id"
+    errors:
+      type: array
+      items:
+        type: string
+
+BatchUpdateAccountsResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/BatchUpdateAccountsResult"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AccountRpmStatus:
+  type: object
+  required:
+    - account_id
+    - rpm_used
+    - rpm_limit
+    - window_seconds
+  properties:
+    account_id:
+      $ref: "common.yaml#/Id"
+    rpm_used:
+      type: integer
+      minimum: 0
+    rpm_limit:
+      type: integer
+      nullable: true
+      minimum: 0
+    window_seconds:
+      type: integer
+      minimum: 1
+    reset_at:
+      type: string
+      format: date-time
+      nullable: true
+
+AccountRpmStatusResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/AccountRpmStatus"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AccountProxyQuality:
+  type: object
+  required:
+    - account_id
+    - proxy_id
+    - success_rate
+    - error_rate
+    - latency_p95_ms
+    - sample_count
+  properties:
+    account_id:
+      $ref: "common.yaml#/Id"
+    proxy_id:
+      type: string
+      nullable: true
+      description: Registered proxy definition id currently bound to the account.
+    success_rate:
+      type: number
+      minimum: 0
+      maximum: 1
+    error_rate:
+      type: number
+      minimum: 0
+      maximum: 1
+    latency_p95_ms:
+      type: integer
+      minimum: 0
+    sample_count:
+      type: integer
+      minimum: 0
+    last_checked_at:
+      type: string
+      format: date-time
+      nullable: true
+    metadata:
+      $ref: "common.yaml#/JsonObject"
+
+AccountProxyQualityResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/AccountProxyQuality"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+ProviderAccountResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/ProviderAccount"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+ProviderAccountListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/ProviderAccount"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AccountOAuthProviderConfig:
+  type: object
+  description: >-
+    Config-driven description of an upstream provider's OAuth endpoints used
+    to provision an account credential interactively. Secrets are write-only.
+  required:
+    - client_id
+  properties:
+    client_id:
+      type: string
+      minLength: 1
+    client_secret:
+      type: string
+      nullable: true
+      description: Confidential-client secret. Omit for public/PKCE clients.
+    authorize_url:
+      type: string
+      description: Authorization endpoint (https). Required for the authorization-code flow.
+    token_url:
+      type: string
+      description: Token endpoint used to exchange the code or device_code for tokens.
+    device_authorize_url:
+      type: string
+      description: RFC 8628 device-authorization endpoint. Required for the device-code flow.
+    redirect_uri:
+      type: string
+      description: Redirect URI registered with the provider (authorization-code flow).
+    scopes:
+      type: array
+      items:
+        type: string
+    use_pkce:
+      type: boolean
+      default: true
+      description: Whether to attach a PKCE S256 challenge to the authorization request.
+
+AccountOAuthAuthorizeUrlRequest:
+  type: object
+  required:
+    - config
+  properties:
+    config:
+      $ref: "#/AccountOAuthProviderConfig"
+
+AccountOAuthAuthorizeUrl:
+  type: object
+  required:
+    - session_id
+    - authorization_url
+    - state
+    - expires_at
+  properties:
+    session_id:
+      type: string
+    authorization_url:
+      type: string
+    state:
+      type: string
+    expires_at:
+      type: string
+      format: date-time
+
+AccountOAuthAuthorizeUrlResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/AccountOAuthAuthorizeUrl"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AccountOAuthExchangeRequest:
+  type: object
+  required:
+    - session_id
+    - state
+  properties:
+    session_id:
+      type: string
+    code:
+      type: string
+      description: Raw authorization/setup code, or a full callback URL for backwards-compatible clients.
+      minLength: 1
+    callback_url:
+      type: string
+      description: Full redirect/callback URL containing code and state query parameters.
+      minLength: 1
+    state:
+      type: string
+      minLength: 1
+
+AccountOAuthCredential:
+  type: object
+  description: >-
+    Provisioned upstream credential. Returned write-only so the client can
+    immediately submit it to POST /admin/accounts; never persisted by this
+    endpoint.
+  required:
+    - session_id
+    - credential
+  properties:
+    session_id:
+      type: string
+    credential:
+      type: object
+      description: >-
+        The minted upstream credential map (access_token/refresh_token/...)
+        to submit to POST /admin/accounts. Returned only here; never persisted.
+      additionalProperties: true
+    has_refresh_token:
+      type: boolean
+    has_access_token:
+      type: boolean
+    token_type:
+      type: string
+    scope:
+      type: string
+    expires_in:
+      type: integer
+
+AccountOAuthCredentialResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/AccountOAuthCredential"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AccountOAuthPendingStatus:
+  type: string
+  enum:
+    - pending
+    - completed
+    - failed
+    - expired
+
+AccountOAuthPending:
+  type: object
+  required:
+    - session_id
+    - mode
+    - status
+    - expires_at
+  properties:
+    session_id:
+      type: string
+    mode:
+      type: string
+      enum:
+        - authorization_code
+        - device_code
+    status:
+      $ref: "#/AccountOAuthPendingStatus"
+    failure_reason:
+      type: string
+    expires_at:
+      type: string
+      format: date-time
+
+AccountOAuthPendingResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/AccountOAuthPending"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AccountOAuthDeviceCodeRequest:
+  type: object
+  required:
+    - config
+  properties:
+    config:
+      $ref: "#/AccountOAuthProviderConfig"
+
+AccountOAuthDeviceCode:
+  type: object
+  required:
+    - session_id
+    - user_code
+    - verification_uri
+    - interval
+    - expires_at
+  properties:
+    session_id:
+      type: string
+    user_code:
+      type: string
+    verification_uri:
+      type: string
+    verification_uri_complete:
+      type: string
+    interval:
+      type: integer
+    expires_at:
+      type: string
+      format: date-time
+
+AccountOAuthDeviceCodeResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/AccountOAuthDeviceCode"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AccountOAuthDevicePollRequest:
+  type: object
+  required:
+    - session_id
+  properties:
+    session_id:
+      type: string
+
+DiscoverAccountModelsRequest:
+  type: object
+  properties:
+    persist:
+      type: boolean
+      default: false
+      description: Persist discovered model IDs to account metadata.
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 1000
+      default: 200
+      description: Maximum number of discovered model IDs to return.
+
+AccountModelDiscovery:
+  type: object
+  required:
+    - provider_id
+    - account_id
+    - source
+    - endpoint
+    - model_ids
+    - persisted
+    - checked_at
+  properties:
+    provider_id:
+      $ref: "common.yaml#/Id"
+    account_id:
+      $ref: "common.yaml#/Id"
+    source:
+      type: string
+      enum:
+        - openai-compatible
+        - anthropic-compatible
+        - gemini-compatible
+        - reverse-proxy-antigravity
+    endpoint:
+      type: string
+      format: uri
+    model_ids:
+      type: array
+      items:
+        type: string
+      default: []
+    persisted:
+      type: boolean
+    checked_at:
+      $ref: "common.yaml#/Timestamp"
+
+AccountModelDiscoveryResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/AccountModelDiscovery"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AccountGroupRateLimit:
+  type: object
+  required:
+    - account_group_id
+    - rpm_limit
+    - tpm_limit
+    - max_concurrency
+    - enabled
+    - created_at
+    - updated_at
+  properties:
+    account_group_id:
+      type: integer
+      format: int64
+    rpm_limit:
+      type: integer
+      format: int64
+      minimum: 0
+    tpm_limit:
+      type: integer
+      format: int64
+      minimum: 0
+    max_concurrency:
+      type: integer
+      format: int64
+      minimum: 0
+    enabled:
+      type: boolean
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+AccountAvailabilityRollup:
+  type: object
+  required:
+    - date
+    - provider_id
+    - total_samples
+    - healthy_samples
+    - availability_ratio
+    - avg_success_rate
+    - computed_at
+  properties:
+    date:
+      type: string
+    provider_id:
+      type: integer
+      format: int64
+    total_samples:
+      type: integer
+      format: int64
+    healthy_samples:
+      type: integer
+      format: int64
+    availability_ratio:
+      type: number
+      format: float
+    avg_success_rate:
+      type: number
+      format: float
+    computed_at:
+      type: string
+      format: date-time
+AccountAvailabilitySummary:
+  type: object
+  required:
+    - account_id
+    - account_name
+    - provider_id
+    - status
+    - overall_uptime
+    - window_days
+  properties:
+    account_id:
+      type: integer
+      format: int64
+    account_name:
+      type: string
+    provider_id:
+      type: integer
+      format: int64
+    status:
+      type: string
+    overall_uptime:
+      type: number
+      format: float
+    window_days:
+      type: integer
+      format: int64
+    last_checked_at:
+      type: string
+      format: date-time
+      nullable: true
+AccountsAvailabilitySummaryResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/AccountAvailabilitySummary"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+AccountAvailabilityResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      type: object
+      required:
+        - account_id
+        - window_days
+        - overall_uptime
+        - daily_availability
+      properties:
+        account_id:
+          type: integer
+          format: int64
+        window_days:
+          type: integer
+          format: int64
+        overall_uptime:
+          type: number
+          format: float
+        daily_availability:
+          type: array
+          items:
+            $ref: "#/AccountAvailabilityRollup"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+AccountQuotaSignal:
+  type: object
+  required:
+    - quota_type
+    - remaining
+    - used
+    - quota_limit
+    - remaining_ratio
+  properties:
+    quota_type:
+      type: string
+    remaining:
+      type: string
+    used:
+      type: string
+    quota_limit:
+      type: string
+    remaining_ratio:
+      type: number
+      format: float
+    reset_at:
+      type: string
+      format: date-time
+AccountQuotaReport:
+  type: object
+  required:
+    - provider
+    - supported
+    - source
+    - plan
+    - credits_remaining
+    - credits_used
+    - credits_limit
+    - currency
+    - status_code
+    - fetched_at
+    - quota_signals
+  properties:
+    provider:
+      type: string
+    supported:
+      type: boolean
+    source:
+      type: string
+    plan:
+      type: string
+    credits_remaining:
+      type: string
+    credits_used:
+      type: string
+    credits_limit:
+      type: string
+    currency:
+      type: string
+    status_code:
+      type: integer
+      format: int64
+    fetched_at:
+      type: string
+      format: date-time
+    quota_signals:
+      type: array
+      items:
+        $ref: "#/AccountQuotaSignal"
+AccountQuotaReportResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/AccountQuotaReport"
+    request_id:
+      $ref: "common.yaml#/RequestId"

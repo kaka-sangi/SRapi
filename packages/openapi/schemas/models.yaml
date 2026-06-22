@@ -1,0 +1,632 @@
+# Providers, models, model aliases, mappings, and capabilities
+ProviderProtocol:
+  type: string
+  enum:
+    - openai-compatible
+    - anthropic-compatible
+    - gemini-compatible
+    - rerank-compatible
+
+ProviderAdapterType:
+  type: string
+  enum:
+    - openai-compatible
+    - generic-reverse-proxy
+    - anthropic-compatible
+    - gemini-compatible
+    - rerank-compatible
+    - native-openai
+    - native-anthropic
+    - native-gemini
+    - native-grok
+    - openrouter
+    - reverse-proxy-chatgpt-web
+    - reverse-proxy-codex-cli
+    - reverse-proxy-claude-web
+    - reverse-proxy-claude-code-cli
+    - reverse-proxy-gemini-cli
+    - reverse-proxy-antigravity
+    - custom
+
+Provider:
+  type: object
+  required:
+    - id
+    - name
+    - display_name
+    - adapter_type
+    - protocol
+    - status
+    - created_at
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    name:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9_\\-]{1,62}$"
+    display_name:
+      type: string
+    adapter_type:
+      $ref: "#/ProviderAdapterType"
+    protocol:
+      $ref: "#/ProviderProtocol"
+    status:
+      $ref: "common.yaml#/ResourceStatus"
+    capabilities:
+      $ref: "common.yaml#/JsonObject"
+    config_schema:
+      $ref: "common.yaml#/JsonObject"
+    platform_family:
+      $ref: "accounts.yaml#/PlatformFamily"
+    auth_methods:
+      type: array
+      description: >-
+        Runtime classes (authentication methods) this provider accepts.
+        Empty or absent means no restriction (all methods allowed).
+      items:
+        $ref: "accounts.yaml#/RuntimeClass"
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+
+CreateProviderRequest:
+  type: object
+  required:
+    - name
+    - display_name
+    - adapter_type
+    - protocol
+  properties:
+    name:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9_\\-]{1,62}$"
+    display_name:
+      type: string
+      minLength: 1
+    adapter_type:
+      $ref: "#/ProviderAdapterType"
+    protocol:
+      $ref: "#/ProviderProtocol"
+    status:
+      $ref: "common.yaml#/ResourceStatus"
+    capabilities:
+      $ref: "common.yaml#/JsonObject"
+    config_schema:
+      $ref: "common.yaml#/JsonObject"
+
+UpdateProviderRequest:
+  type: object
+  minProperties: 1
+  properties:
+    display_name:
+      type: string
+      minLength: 1
+    adapter_type:
+      $ref: "#/ProviderAdapterType"
+    protocol:
+      $ref: "#/ProviderProtocol"
+    status:
+      $ref: "common.yaml#/ResourceStatus"
+    capabilities:
+      $ref: "common.yaml#/JsonObject"
+    config_schema:
+      $ref: "common.yaml#/JsonObject"
+
+ProviderResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/Provider"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+ProviderListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/Provider"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AdminQuickSetupRequest:
+  type: object
+  required:
+    - platform
+    - credential
+  properties:
+    platform:
+      type: string
+      minLength: 1
+      description: Built-in provider preset key, such as openai, anthropic, or codex-cli.
+    credential:
+      type: object
+      description: Write-only credential payload accepted by the selected platform/runtime class.
+      writeOnly: true
+      minProperties: 1
+      additionalProperties: true
+    name:
+      type: string
+      minLength: 1
+      description: Optional provider account name. Defaults to the preset display name.
+    runtime_class:
+      $ref: "accounts.yaml#/RuntimeClass"
+    model_catalog:
+      type: array
+      description: Optional model names to create and map to the selected provider.
+      items:
+        type: string
+        minLength: 1
+      default: []
+    discover_models:
+      type: boolean
+      default: false
+      description: Accepted for forward compatibility; current quick setup uses model_catalog or the preset catalog.
+    proxy_id:
+      type: string
+      nullable: true
+      description: Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first.
+    priority:
+      type: integer
+      default: 0
+    weight:
+      type: number
+      minimum: 0
+      default: 1
+
+AdminQuickSetupResult:
+  type: object
+  required:
+    - provider
+    - account
+    - models_created
+    - mappings_created
+  properties:
+    provider:
+      $ref: "#/Provider"
+    account:
+      $ref: "accounts.yaml#/ProviderAccount"
+    models_created:
+      type: integer
+      minimum: 0
+    mappings_created:
+      type: integer
+      minimum: 0
+    model_names:
+      type: array
+      items:
+        type: string
+      default: []
+    warnings:
+      type: array
+      items:
+        type: string
+      default: []
+
+AdminQuickSetupResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/AdminQuickSetupResult"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+CapabilityDescriptor:
+  type: object
+  required:
+    - key
+    - version
+    - status
+    - level
+  properties:
+    key:
+      type: string
+      example: input.text
+    version:
+      type: string
+      example: v1
+    status:
+      type: string
+      enum:
+        - stable
+        - experimental
+        - deprecated
+    level:
+      type: string
+      enum:
+        - required
+        - optional
+        - unsupported
+    metadata:
+      $ref: "common.yaml#/JsonObject"
+
+Model:
+  type: object
+  required:
+    - id
+    - canonical_name
+    - display_name
+    - status
+    - capabilities
+    - created_at
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    canonical_name:
+      type: string
+      example: gpt-4o-mini
+    display_name:
+      type: string
+    family:
+      type: string
+      example: gpt-4o
+    context_window:
+      type: integer
+      nullable: true
+      minimum: 1
+    max_output_tokens:
+      type: integer
+      nullable: true
+      minimum: 1
+    quality_tier:
+      type: string
+      nullable: true
+    status:
+      $ref: "common.yaml#/ResourceStatus"
+    capabilities:
+      type: array
+      items:
+        $ref: "#/CapabilityDescriptor"
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+
+CreateModelRequest:
+  type: object
+  required:
+    - canonical_name
+    - display_name
+  properties:
+    canonical_name:
+      type: string
+    display_name:
+      type: string
+    family:
+      type: string
+    context_window:
+      type: integer
+      nullable: true
+      minimum: 1
+    max_output_tokens:
+      type: integer
+      nullable: true
+      minimum: 1
+    quality_tier:
+      type: string
+      nullable: true
+    status:
+      $ref: "common.yaml#/ResourceStatus"
+    capabilities:
+      type: array
+      items:
+        $ref: "#/CapabilityDescriptor"
+      default: []
+
+UpdateModelRequest:
+  type: object
+  minProperties: 1
+  properties:
+    display_name:
+      type: string
+      minLength: 1
+    family:
+      type: string
+      nullable: true
+    context_window:
+      type: integer
+      nullable: true
+      minimum: 1
+    max_output_tokens:
+      type: integer
+      nullable: true
+      minimum: 1
+    quality_tier:
+      type: string
+      nullable: true
+    status:
+      $ref: "common.yaml#/ResourceStatus"
+    capabilities:
+      type: array
+      items:
+        $ref: "#/CapabilityDescriptor"
+      default: []
+
+ModelResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/Model"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+ModelListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/Model"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+ModelAlias:
+  type: object
+  required:
+    - id
+    - alias
+    - model_id
+    - fallback_models
+    - status
+    - created_at
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    alias:
+      type: string
+      minLength: 1
+      example: claude-sonnet
+    model_id:
+      $ref: "common.yaml#/Id"
+    strategy_hint:
+      type: string
+      nullable: true
+      example: balanced
+    fallback_models:
+      type: array
+      items:
+        type: string
+      default: []
+    status:
+      $ref: "common.yaml#/ResourceStatus"
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+
+CreateModelAliasRequest:
+  type: object
+  required:
+    - alias
+  properties:
+    alias:
+      type: string
+      minLength: 1
+      example: claude-sonnet
+    strategy_hint:
+      type: string
+      nullable: true
+      example: balanced
+    fallback_models:
+      type: array
+      items:
+        type: string
+      default: []
+    status:
+      $ref: "common.yaml#/ResourceStatus"
+
+UpdateModelAliasRequest:
+  type: object
+  minProperties: 1
+  properties:
+    alias:
+      type: string
+      minLength: 1
+      example: claude-sonnet
+    strategy_hint:
+      type: string
+      nullable: true
+      example: balanced
+    fallback_models:
+      type: array
+      items:
+        type: string
+      default: []
+    status:
+      $ref: "common.yaml#/ResourceStatus"
+
+ModelAliasResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/ModelAlias"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+ModelAliasListResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/ModelAlias"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+ModelProviderMapping:
+  type: object
+  required:
+    - id
+    - model_id
+    - provider_id
+    - upstream_model_name
+    - status
+    - created_at
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    model_id:
+      $ref: "common.yaml#/Id"
+    provider_id:
+      $ref: "common.yaml#/Id"
+    upstream_model_name:
+      type: string
+      minLength: 1
+      example: claude-3-7-sonnet
+    status:
+      $ref: "common.yaml#/ResourceStatus"
+    capability_override:
+      type: array
+      items:
+        $ref: "#/CapabilityDescriptor"
+      default: []
+    pricing_override:
+      $ref: "common.yaml#/JsonObject"
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+
+CreateModelProviderMappingRequest:
+  type: object
+  required:
+    - provider_id
+    - upstream_model_name
+  properties:
+    provider_id:
+      $ref: "common.yaml#/Id"
+    upstream_model_name:
+      type: string
+      minLength: 1
+    status:
+      $ref: "common.yaml#/ResourceStatus"
+    capability_override:
+      type: array
+      items:
+        $ref: "#/CapabilityDescriptor"
+      default: []
+    pricing_override:
+      $ref: "common.yaml#/JsonObject"
+
+UpdateModelProviderMappingRequest:
+  type: object
+  minProperties: 1
+  properties:
+    upstream_model_name:
+      type: string
+      minLength: 1
+    status:
+      $ref: "common.yaml#/ResourceStatus"
+    capability_override:
+      type: array
+      items:
+        $ref: "#/CapabilityDescriptor"
+      default: []
+    pricing_override:
+      $ref: "common.yaml#/JsonObject"
+
+ModelProviderMappingResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/ModelProviderMapping"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+ModelProviderMappingListResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/ModelProviderMapping"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+ModelProviderMappingPagedListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/ModelProviderMapping"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+CapabilityDefinition:
+  type: object
+  required:
+    - key
+    - version
+    - category
+    - status
+    - description
+  properties:
+    key:
+      type: string
+    version:
+      type: string
+    category:
+      type: string
+    status:
+      type: string
+      enum:
+        - stable
+        - experimental
+        - deprecated
+    description:
+      type: string
+    schema:
+      $ref: "common.yaml#/JsonObject"
+    replacement_key:
+      type: string
+      nullable: true
+
+CapabilityListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/CapabilityDefinition"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"

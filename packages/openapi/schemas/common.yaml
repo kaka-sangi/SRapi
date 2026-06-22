@@ -1,0 +1,322 @@
+# Common types, pagination, health, and error responses
+Id:
+  type: string
+  minLength: 1
+  maxLength: 64
+  example: "10001"
+
+RequestId:
+  type: string
+  minLength: 8
+  maxLength: 128
+  pattern: "^req_[A-Za-z0-9_\\-]+$"
+  example: req_01HY0000000000000000000000
+
+TraceId:
+  type: string
+  minLength: 8
+  maxLength: 128
+  example: trace_01HY0000000000000000000000
+
+Timestamp:
+  type: string
+  format: date-time
+  example: "2026-05-21T00:00:00Z"
+
+JsonObject:
+  type: object
+  additionalProperties: true
+
+CustomMenuItem:
+  type: object
+  required:
+    - id
+    - label
+    - url
+    - visibility
+    - sort_order
+  properties:
+    id:
+      type: string
+      maxLength: 80
+      description: Stable operator-defined identifier for the menu entry.
+    label:
+      type: string
+      minLength: 1
+      maxLength: 80
+    url:
+      type: string
+      minLength: 1
+      maxLength: 2048
+      description: Internal absolute path or external http(s) URL.
+    visibility:
+      type: string
+      enum: [user, admin]
+      description: Which sidebar role should render this custom menu.
+    sort_order:
+      type: integer
+      minimum: 0
+
+Pagination:
+  type: object
+  required:
+    - page
+    - page_size
+    - total
+    - has_next
+  properties:
+    page:
+      type: integer
+      minimum: 1
+    page_size:
+      type: integer
+      minimum: 1
+      maximum: 100
+    total:
+      type: integer
+      minimum: 0
+    has_next:
+      type: boolean
+
+ErrorCode:
+  type: string
+  enum:
+    - INVALID_REQUEST
+    - UNAUTHORIZED
+    - FORBIDDEN
+    - RESOURCE_NOT_FOUND
+    - RESOURCE_CONFLICT
+    - VALIDATION_FAILED
+    - RATE_LIMIT_EXCEEDED
+    - USER_BALANCE_INSUFFICIENT
+    - SUBSCRIPTION_EXPIRED
+    - API_KEY_DISABLED
+    - MODEL_NOT_ALLOWED
+    - MODEL_NOT_FOUND
+    - NO_AVAILABLE_ACCOUNT
+    - SCHEDULER_REJECTED
+    - PROVIDER_RATE_LIMITED
+    - PROVIDER_AUTH_FAILED
+    - PROVIDER_QUOTA_EXCEEDED
+    - INTERNAL_ERROR
+
+ErrorObject:
+  type: object
+  required:
+    - code
+    - message
+    - trace_id
+  properties:
+    code:
+      $ref: "#/ErrorCode"
+    message:
+      type: string
+    details:
+      $ref: "#/JsonObject"
+    trace_id:
+      $ref: "#/TraceId"
+
+ErrorResponse:
+  type: object
+  required:
+    - error
+    - request_id
+  properties:
+    error:
+      $ref: "#/ErrorObject"
+    request_id:
+      $ref: "#/RequestId"
+
+GatewayErrorObject:
+  type: object
+  required:
+    - message
+    - type
+  properties:
+    message:
+      type: string
+    type:
+      type: string
+      enum:
+        - invalid_request_error
+        - authentication_error
+        - permission_error
+        - rate_limit_error
+        - upstream_error
+        - service_unavailable_error
+        - internal_error
+    param:
+      type: string
+      nullable: true
+    code:
+      type: string
+      nullable: true
+      example: invalid_request
+
+GatewayErrorResponse:
+  type: object
+  required:
+    - error
+  properties:
+    error:
+      $ref: "#/GatewayErrorObject"
+
+GeminiErrorObject:
+  type: object
+  required:
+    - code
+    - message
+    - status
+  properties:
+    code:
+      type: integer
+      minimum: 100
+      maximum: 599
+    message:
+      type: string
+    status:
+      type: string
+      example: UNAVAILABLE
+    details:
+      type: array
+      items:
+        $ref: "#/JsonObject"
+
+GeminiErrorResponse:
+  type: object
+  required:
+    - error
+  properties:
+    error:
+      $ref: "#/GeminiErrorObject"
+
+HealthDependencyStatus:
+  type: string
+  enum:
+    - ok
+    - degraded
+    - unavailable
+    - not_configured
+
+HealthData:
+  type: object
+  required:
+    - status
+    - version
+    - dependencies
+  properties:
+    status:
+      type: string
+      enum:
+        - ok
+        - degraded
+    version:
+      type: string
+    dependencies:
+      type: object
+      required:
+        - database
+        - redis
+      properties:
+        database:
+          $ref: "#/HealthDependencyStatus"
+        redis:
+          $ref: "#/HealthDependencyStatus"
+
+HealthResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/HealthData"
+    request_id:
+      $ref: "#/RequestId"
+
+ResourceStatus:
+  type: string
+  enum:
+    - active
+    - disabled
+    - pending
+    - archived
+
+DeleteResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      type: object
+      required:
+        - deleted
+      properties:
+        deleted:
+          type: boolean
+    request_id:
+      $ref: "#/RequestId"
+
+BatchOperationResult:
+  type: object
+  required:
+    - requested
+    - succeeded
+    - failed
+  properties:
+    requested:
+      type: integer
+      minimum: 0
+    succeeded:
+      type: integer
+      minimum: 0
+    failed:
+      type: integer
+      minimum: 0
+    failed_ids:
+      type: array
+      items:
+        $ref: "#/Id"
+      default: []
+    per_item_reasons:
+      type: object
+      additionalProperties:
+        type: string
+      description: "Per-id reason for each code processed. Keys are the redeem-code id (stringified). Values: admin_action, already_disabled, expired, not_found."
+    disabled_reason_breakdown:
+      type: object
+      additionalProperties:
+        type: integer
+        minimum: 0
+      description: "Aggregate counts grouped by reason. Same value vocabulary as per_item_reasons."
+
+BatchOperationResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/BatchOperationResult"
+    request_id:
+      $ref: "#/RequestId"
+
+TimeWindow:
+  type: object
+  required:
+    - start
+    - end
+  properties:
+    start:
+      $ref: "#/Timestamp"
+    end:
+      $ref: "#/Timestamp"
+
+SecretConfigured:
+  type: object
+  required:
+    - configured
+  properties:
+    configured:
+      type: boolean

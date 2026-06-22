@@ -1,0 +1,1191 @@
+# Admin dashboard, settings, backup snapshots, and copilot configuration
+AdminTestResult:
+  type: object
+  required:
+    - ok
+    - status
+    - checked_at
+  properties:
+    ok:
+      type: boolean
+    status:
+      type: string
+      enum:
+        - ok
+        - failed
+    provider_id:
+      $ref: "common.yaml#/Id"
+    account_id:
+      $ref: "common.yaml#/Id"
+    latency_ms:
+      type: integer
+      minimum: 0
+    message:
+      type: string
+    checks:
+      $ref: "common.yaml#/JsonObject"
+    checked_at:
+      $ref: "common.yaml#/Timestamp"
+
+AdminTestResultResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/AdminTestResult"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AdminSendTestEmailRequest:
+  type: object
+  properties:
+    recipient:
+      type: string
+      format: email
+      description: >-
+        Mailbox to deliver the probe to. Defaults to the requesting admin's
+        own account email when omitted.
+
+BackupSnapshotKind:
+  type: string
+  enum:
+    - scheduled
+    - manual
+  description: scheduled = worker-driven daily run; manual = operator-triggered.
+
+BackupSnapshotStatus:
+  type: string
+  enum:
+    - running
+    - success
+    - failed
+    - superseded
+  description: |
+    running = pg_dump in flight; success = file written and checksummed;
+    failed = pg_dump/IO error; superseded = retention deleted the file.
+
+BackupSnapshot:
+  type: object
+  required:
+    - id
+    - kind
+    - status
+    - started_at
+    - size_bytes
+    - sha256
+    - file_path
+    - error_message
+    - triggered_by_user_id
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    kind:
+      $ref: "#/BackupSnapshotKind"
+    status:
+      $ref: "#/BackupSnapshotStatus"
+    started_at:
+      $ref: "common.yaml#/Timestamp"
+    completed_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: Set when the run finished (success or failed); null while running.
+    size_bytes:
+      type: integer
+      format: int64
+      minimum: 0
+      description: On-disk size of the dump file. 0 for failed/running rows.
+    sha256:
+      type: string
+      maxLength: 64
+      description: Hex-encoded SHA-256 of the dump file. Empty for failed/superseded rows.
+    file_path:
+      type: string
+      description: Path of the dump on the API host's disk. Empty when retention has wiped it.
+    error_message:
+      type: string
+      description: Stderr / system error captured on failed runs. Empty otherwise.
+    triggered_by_user_id:
+      type: integer
+      description: Admin user id that pressed "Snapshot now". 0 for scheduled runs.
+
+BackupSnapshotResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/BackupSnapshot"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+BackupSnapshotPagination:
+  type: object
+  required:
+    - total
+    - offset
+    - limit
+  properties:
+    total:
+      type: integer
+      minimum: 0
+    offset:
+      type: integer
+      minimum: 0
+    limit:
+      type: integer
+      minimum: 0
+
+BackupSnapshotListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/BackupSnapshot"
+    pagination:
+      $ref: "#/BackupSnapshotPagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+DeleteAdminBackupSnapshotResult:
+  type: object
+  required:
+    - id
+    - deleted
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    deleted:
+      type: boolean
+
+DeleteAdminBackupSnapshotResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/DeleteAdminBackupSnapshotResult"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AdminOverview:
+  type: object
+  required:
+    - provider_count
+    - model_count
+    - account_count
+    - active_account_count
+    - usage_log_count
+    - scheduler_decision_count
+    - request_success_rate
+    - user_count
+    - total_request_count
+    - total_token_count
+    - total_cost
+    - currency
+  properties:
+    provider_count:
+      type: integer
+      minimum: 0
+    model_count:
+      type: integer
+      minimum: 0
+    account_count:
+      type: integer
+      minimum: 0
+    active_account_count:
+      type: integer
+      minimum: 0
+    usage_log_count:
+      type: integer
+      minimum: 0
+    scheduler_decision_count:
+      type: integer
+      minimum: 0
+    request_success_rate:
+      type: number
+      minimum: 0
+      maximum: 1
+    user_count:
+      type: integer
+      minimum: 0
+    total_request_count:
+      type: integer
+      minimum: 0
+    total_token_count:
+      type: integer
+      minimum: 0
+    total_cost:
+      type: string
+    input_cost:
+      type: string
+    output_cost:
+      type: string
+    cache_read_cost:
+      type: string
+    cache_write_cost:
+      type: string
+    currency:
+      type: string
+
+AdminOverviewResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/AdminOverview"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AdminDashboard:
+  allOf:
+    - $ref: "#/AdminOverview"
+
+AdminDashboardResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/AdminDashboard"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AdminDashboardInventory:
+  type: object
+  required:
+    - total_api_keys
+    - active_api_keys
+    - total_accounts
+    - healthy_accounts
+    - abnormal_accounts
+  properties:
+    total_api_keys:
+      type: integer
+      minimum: 0
+    active_api_keys:
+      type: integer
+      minimum: 0
+    total_accounts:
+      type: integer
+      minimum: 0
+    healthy_accounts:
+      type: integer
+      minimum: 0
+    abnormal_accounts:
+      type: integer
+      minimum: 0
+
+AdminDashboardTraffic:
+  type: object
+  required:
+    - today_requests
+    - total_requests
+    - success_requests
+    - error_requests
+  properties:
+    today_requests:
+      type: integer
+      minimum: 0
+    total_requests:
+      type: integer
+      minimum: 0
+    success_requests:
+      type: integer
+      minimum: 0
+    error_requests:
+      type: integer
+      minimum: 0
+
+AdminDashboardUsers:
+  type: object
+  required:
+    - today_new_users
+    - total_users
+    - active_users
+  properties:
+    today_new_users:
+      type: integer
+      minimum: 0
+    total_users:
+      type: integer
+      minimum: 0
+    active_users:
+      type: integer
+      minimum: 0
+
+AdminDashboardCosts:
+  type: object
+  required:
+    - actual_cost
+    - account_cost
+    - standard_cost
+    - currency
+  properties:
+    actual_cost:
+      type: string
+      pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+    account_cost:
+      type: string
+      pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+    standard_cost:
+      type: string
+      pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+    currency:
+      type: string
+      minLength: 3
+      maxLength: 8
+
+AdminDashboardTokens:
+  type: object
+  required:
+    - today_tokens
+    - total_tokens
+    - input_tokens
+    - output_tokens
+    - cached_tokens
+    - costs
+  properties:
+    today_tokens:
+      type: integer
+      minimum: 0
+    total_tokens:
+      type: integer
+      minimum: 0
+    input_tokens:
+      type: integer
+      minimum: 0
+    output_tokens:
+      type: integer
+      minimum: 0
+    cached_tokens:
+      type: integer
+      minimum: 0
+    costs:
+      $ref: "#/AdminDashboardCosts"
+
+AdminDashboardPerformance:
+  type: object
+  required:
+    - current_rpm
+    - current_tpm
+    - peak_rpm
+    - peak_tpm
+    - average_latency_ms
+    - p95_latency_ms
+  properties:
+    current_rpm:
+      type: integer
+      minimum: 0
+    current_tpm:
+      type: integer
+      minimum: 0
+    peak_rpm:
+      type: integer
+      minimum: 0
+    peak_tpm:
+      type: integer
+      minimum: 0
+    average_latency_ms:
+      type: integer
+      minimum: 0
+    p95_latency_ms:
+      type: integer
+      minimum: 0
+
+AdminDashboardSnapshot:
+  type: object
+  required:
+    - window
+    - inventory
+    - traffic
+    - users
+    - tokens
+    - performance
+    - model_distribution
+    - token_trend
+    - user_usage_trend
+    - generated_at
+  properties:
+    window:
+      $ref: "common.yaml#/TimeWindow"
+    inventory:
+      $ref: "#/AdminDashboardInventory"
+    traffic:
+      $ref: "#/AdminDashboardTraffic"
+    users:
+      $ref: "#/AdminDashboardUsers"
+    tokens:
+      $ref: "#/AdminDashboardTokens"
+    performance:
+      $ref: "#/AdminDashboardPerformance"
+    model_distribution:
+      type: array
+      items:
+        $ref: "usage.yaml#/DashboardModelDistribution"
+    token_trend:
+      type: array
+      items:
+        $ref: "usage.yaml#/DashboardTrendPoint"
+    user_usage_trend:
+      type: array
+      items:
+        $ref: "usage.yaml#/DashboardUserUsageTrend"
+    generated_at:
+      $ref: "common.yaml#/Timestamp"
+
+AdminDashboardSnapshotResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/AdminDashboardSnapshot"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AdminSettingsGeneral:
+  type: object
+  required:
+    - site_name
+    - site_subtitle
+    - logo_url
+    - version_label
+    - contact_info
+    - doc_url
+    - custom_menus
+  properties:
+    site_name:
+      type: string
+      minLength: 1
+      maxLength: 80
+    site_subtitle:
+      type: string
+      maxLength: 160
+    logo_url:
+      type: string
+      maxLength: 2048
+    version_label:
+      type: string
+      maxLength: 80
+    contact_info:
+      type: string
+      maxLength: 240
+    doc_url:
+      type: string
+      maxLength: 2048
+    custom_menus:
+      type: array
+      items:
+        $ref: "common.yaml#/CustomMenuItem"
+
+AdminSettingsAgreement:
+  type: object
+  required:
+    - user_agreement
+    - privacy_policy
+  properties:
+    user_agreement:
+      type: string
+    privacy_policy:
+      type: string
+
+AdminSettingsFeatures:
+  type: object
+  required:
+    - enabled_channels
+    - channel_monitoring_enabled
+    - invitation_rebate_enabled
+    - payments_enabled
+  properties:
+    enabled_channels:
+      type: array
+      items:
+        type: string
+    channel_monitoring_enabled:
+      type: boolean
+    invitation_rebate_enabled:
+      type: boolean
+    payments_enabled:
+      type: boolean
+
+AdminSettingsSecurity:
+  type: object
+  required:
+    - admin_api_key
+    - registration_enabled
+    - registration_email_suffix_allowlist
+    - oauth_enabled
+    - oauth_providers
+    - oauth_provider_configs
+  properties:
+    admin_api_key:
+      $ref: "common.yaml#/SecretConfigured"
+    registration_enabled:
+      type: boolean
+    registration_email_suffix_allowlist:
+      type: array
+      description: Normalized allowed email suffixes for public registration. Empty means all valid email domains are allowed.
+      items:
+        type: string
+        pattern: "^@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$"
+    oauth_enabled:
+      type: boolean
+    oauth_providers:
+      type: array
+      items:
+        type: string
+    oauth_provider_configs:
+      type: array
+      description: Non-secret OAuth/OIDC provider authorization settings. Secrets for token exchange are configured outside this response.
+      items:
+        $ref: "auth.yaml#/OAuthProviderConfig"
+
+AdminSettingsUsers:
+  type: object
+  required:
+    - default_balance
+    - default_group
+    - user_self_delete_enabled
+    - rpm_limit_default
+  properties:
+    default_balance:
+      type: string
+      pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+    default_group:
+      type: string
+    user_self_delete_enabled:
+      type: boolean
+    rpm_limit_default:
+      type: integer
+      minimum: 0
+
+AdminSettingsGateway:
+  type: object
+  required:
+    - overload_cooldown_seconds
+    - rate_limit_cooldown_seconds
+    - stream_timeout_seconds
+    - request_shaper_enabled
+  properties:
+    overload_cooldown_seconds:
+      type: integer
+      minimum: 0
+    rate_limit_cooldown_seconds:
+      type: integer
+      minimum: 0
+    stream_timeout_seconds:
+      type: integer
+      minimum: 1
+    request_shaper_enabled:
+      type: boolean
+    protocol_conversion_routes:
+      type: array
+      items:
+        type: string
+        enum:
+          - chat_completions_to_responses
+          - chat_completions_to_messages
+          - responses_to_chat_completions
+          - responses_to_messages
+          - messages_to_chat_completions
+          - messages_to_responses
+      default:
+        - chat_completions_to_responses
+        - chat_completions_to_messages
+        - responses_to_chat_completions
+        - responses_to_messages
+        - messages_to_chat_completions
+        - messages_to_responses
+      description: >-
+        Enabled text endpoint conversion routes between Chat Completions,
+        Responses, and Anthropic Messages. Missing/null preserves the
+        default full compatibility set; an empty list disables all
+        cross-endpoint text conversions and keeps only provider-native
+        endpoints schedulable.
+    scheduler_strategy_rollout_enabled:
+      type: boolean
+      default: false
+      description: Enables deterministic real-traffic Scheduler shadow strategy rollout.
+    scheduler_strategy_shadow_strategy:
+      $ref: "scheduler.yaml#/SchedulerStrategyName"
+    scheduler_strategy_rollout_percent:
+      type: number
+      format: float
+      minimum: 0
+      maximum: 100
+      default: 0
+    scheduler_strategy_rollout_models:
+      type: array
+      items:
+        type: string
+      default: []
+      description: Optional canonical model or alias scope. Empty means all models.
+    scheduler_strategy_rollout_api_key_hashes:
+      type: array
+      items:
+        type: string
+      default: []
+      description: Optional SHA-256 API key prefix hash scope. Empty means all API keys.
+    retry_count:
+      type: integer
+      minimum: 1
+      maximum: 20
+      default: 20
+      description: Maximum cross-candidate gateway attempts before failing a request. Bounds how many distinct credentials the failover loop may try.
+    max_retry_credentials:
+      type: integer
+      minimum: 0
+      default: 0
+      description: Maximum distinct credentials the failover loop may exclude and retry across. 0 means unlimited (bounded only by retry_count and available candidates).
+    max_retry_interval_ms:
+      type: integer
+      minimum: 0
+      default: 2000
+      description: Default ceiling for same-candidate retry backoff delay in milliseconds. Per-account metadata overrides still apply.
+    passthrough_upstream_headers:
+      type: boolean
+      default: false
+      description: >-
+        When enabled, allowlisted upstream response headers are forwarded to
+        the client on both the streaming and buffered gateway response paths.
+        Hop-by-hop headers and headers SRapi already sets are never forwarded.
+        Default off so behavior is unchanged unless explicitly enabled.
+    passthrough_header_allowlist:
+      type: array
+      items:
+        type: string
+      default: []
+      description: >-
+        Case-insensitive allowlist of upstream response header names to
+        forward when passthrough_upstream_headers is enabled (e.g.
+        retry-after, x-request-id, x-ratelimit-remaining). A trailing "*"
+        wildcard matches by prefix (e.g. x-ratelimit-*).
+
+AdminSettingsPayment:
+  type: object
+  required:
+    - enabled
+    - providers
+    - subscription_plans_enabled
+  properties:
+    enabled:
+      type: boolean
+    providers:
+      type: array
+      items:
+        type: string
+    subscription_plans_enabled:
+      type: boolean
+
+AdminSettingsEmail:
+  type: object
+  required:
+    - smtp_configured
+    - templates
+  properties:
+    smtp_configured:
+      type: boolean
+      description: True when host and sender are configured. Password state is exposed separately.
+    smtp_host:
+      type: string
+      default: ""
+    smtp_port:
+      type: integer
+      minimum: 1
+      maximum: 65535
+      default: 587
+    smtp_username:
+      type: string
+      default: ""
+    smtp_password_configured:
+      type: boolean
+      default: false
+      description: True when an SMTP password is configured by deployment environment.
+    smtp_from:
+      type: string
+      format: email
+      default: ""
+    smtp_from_name:
+      type: string
+      default: ""
+    smtp_use_tls:
+      type: boolean
+      default: false
+    public_base_url:
+      type: string
+      default: ""
+      description: Absolute public console base URL used to build auth email links.
+    templates:
+      type: object
+      additionalProperties:
+        type: string
+    balance_low_notify_enabled:
+      type: boolean
+      default: true
+      description: Enables optional low-balance notification trigger after usage charges cross the threshold.
+    balance_low_notify_threshold:
+      type: string
+      default: "5.00000000"
+      pattern: '^[0-9]+(\.[0-9]+)?$'
+      description: Default wallet balance threshold used for low-balance notifications.
+    balance_low_notify_recharge_url:
+      type: string
+      default: ""
+      description: Optional absolute recharge URL used by low-balance notification templates.
+    subscription_expiry_notify_enabled:
+      type: boolean
+      default: true
+      description: Enables optional subscription expiry reminder trigger for active subscriptions before they expire.
+    account_quota_notify_enabled:
+      type: boolean
+      default: true
+      description: Enables optional provider-account quota alert trigger when quota snapshots cross the remaining-ratio threshold.
+    account_quota_notify_remaining_ratio:
+      type: string
+      default: "0.20000000"
+      pattern: '^(0(\.[0-9]+)?|1(\.0+)?)$'
+      description: Remaining quota ratio threshold for account quota alerts. For example, 0.20 alerts when remaining quota crosses 20%.
+
+AdminSettingsBackup:
+  type: object
+  required:
+    - enabled
+    - retention_days
+  properties:
+    enabled:
+      type: boolean
+    last_backup_at:
+      $ref: "common.yaml#/Timestamp"
+      nullable: true
+    retention_days:
+      type: integer
+      minimum: 1
+
+AdminSettings:
+  type: object
+  required:
+    - general
+    - agreement
+    - features
+    - security
+    - users
+    - gateway
+    - payment
+    - email
+    - backup
+    - copilot
+    - maintenance
+  properties:
+    general:
+      $ref: "#/AdminSettingsGeneral"
+    agreement:
+      $ref: "#/AdminSettingsAgreement"
+    features:
+      $ref: "#/AdminSettingsFeatures"
+    security:
+      $ref: "#/AdminSettingsSecurity"
+    users:
+      $ref: "#/AdminSettingsUsers"
+    gateway:
+      $ref: "#/AdminSettingsGateway"
+    payment:
+      $ref: "#/AdminSettingsPayment"
+    email:
+      $ref: "#/AdminSettingsEmail"
+    backup:
+      $ref: "#/AdminSettingsBackup"
+    copilot:
+      $ref: "#/AdminSettingsCopilot"
+    maintenance:
+      $ref: "#/AdminSettingsMaintenance"
+
+AdminSettingsMaintenance:
+  type: object
+  description: >-
+    Maintenance gate for the public gateway. When enabled, /v1/* and
+    /v1beta/* respond 503 with a structured payload while the admin
+    console and authentication surfaces remain reachable so operators
+    can disable the gate.
+  required:
+    - enabled
+    - message
+  properties:
+    enabled:
+      type: boolean
+      description: Master switch for the maintenance gate.
+    message:
+      type: string
+      maxLength: 1024
+      description: Operator-supplied message surfaced in 503 responses and the public banner.
+    expected_recovery_at:
+      $ref: "common.yaml#/Timestamp"
+      nullable: true
+      description: Optional ETA; rendered as Retry-After and as a banner hint until elapsed.
+
+AdminSettingsCopilot:
+  type: object
+  description: >-
+    Admin AI Copilot configuration. The copilot drives an agentic
+    tool-calling loop over the admin API; configure which LLM powers it and
+    how autonomously it may act.
+  required:
+    - enabled
+    - source
+    - provider_account_id
+    - model
+    - dedicated_protocol
+    - dedicated_base_url
+    - dedicated_api_key_configured
+    - owner_only
+    - auto_run_reads
+    - web_search_enabled
+    - web_search_provider
+    - web_search_base_url
+    - web_search_api_key_configured
+  properties:
+    enabled:
+      type: boolean
+      description: Master switch for the copilot chat endpoint.
+    source:
+      type: string
+      enum:
+        - account
+        - dedicated
+      description: >-
+        Where the copilot's LLM credentials come from. "account" reuses an
+        existing provider account; "dedicated" uses a standalone key.
+    provider_account_id:
+      type: integer
+      description: Provider account id used when source is "account" (0 = unset).
+    model:
+      type: string
+      description: Default upstream model the copilot calls (e.g. claude-3-5-sonnet, gpt-4o).
+    models:
+      type: array
+      items:
+        type: string
+      default: []
+      description: >-
+        Selectable models offered in the chat composer's picker. Optional;
+        when empty the picker is auto-derived from the account's discovered
+        models plus the default.
+    dedicated_protocol:
+      type: string
+      description: >-
+        Wire protocol for dedicated mode (openai-compatible,
+        anthropic-compatible, gemini-compatible).
+    dedicated_base_url:
+      type: string
+      description: Upstream base URL for dedicated mode.
+    dedicated_api_key:
+      type: string
+      writeOnly: true
+      description: >-
+        API key for dedicated mode. Write-only; supplied to set or rotate
+        the key and never returned. Omit to keep the stored key.
+    dedicated_api_key_configured:
+      type: boolean
+      description: True when a dedicated API key is stored.
+    owner_only:
+      type: boolean
+      description: Restrict the copilot to owner-role admins.
+    auto_run_reads:
+      type: boolean
+      description: Auto-execute read-only (GET) tool calls without confirmation.
+    web_search_enabled:
+      type: boolean
+      description: Enable the copilot's public-web search tool (works with any model).
+    web_search_provider:
+      type: string
+      description: Search backend for the web_search tool (tavily or brave).
+    web_search_base_url:
+      type: string
+      description: Optional override base URL for the search provider.
+    web_search_api_key:
+      type: string
+      writeOnly: true
+      description: >-
+        API key for the search provider. Write-only; supplied to set or
+        rotate the key and never returned. Omit to keep the stored key.
+    web_search_api_key_configured:
+      type: boolean
+      description: True when a search-provider API key is stored.
+
+AdminSettingsResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/AdminSettings"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AdminCopilotConfig:
+  type: object
+  required:
+    - enabled
+    - source
+    - model
+    - models
+    - protocol
+    - owner_only
+    - configured
+    - web_search_configured
+    - web_search_provider
+  properties:
+    enabled:
+      type: boolean
+    source:
+      type: string
+      enum:
+        - account
+        - dedicated
+    model:
+      type: string
+      description: Default model the composer selects.
+    models:
+      type: array
+      items:
+        type: string
+      default: []
+      description: Models offered in the composer picker (custom entries also allowed).
+    protocol:
+      type: string
+      description: Wire protocol of the configured source (hints model capabilities).
+    owner_only:
+      type: boolean
+    configured:
+      type: boolean
+      description: True when the selected source has usable credentials.
+    web_search_configured:
+      type: boolean
+      description: True when the copilot's web search tool is enabled and has a usable key.
+    web_search_provider:
+      type: string
+      description: Configured web search backend (empty when disabled).
+
+AdminCopilotConfigResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/AdminCopilotConfig"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+CopilotConversationSummary:
+  type: object
+  description: A saved copilot conversation as shown in the sidebar list.
+  required:
+    - id
+    - title
+    - updated_at
+  properties:
+    id:
+      type: integer
+    title:
+      type: string
+    updated_at:
+      type: string
+      format: date-time
+
+CopilotConversation:
+  type: object
+  description: A saved copilot conversation with its full transcript.
+  required:
+    - id
+    - title
+    - messages
+    - created_at
+    - updated_at
+  properties:
+    id:
+      type: integer
+    title:
+      type: string
+    messages:
+      type: array
+      items:
+        $ref: "#/AdminCopilotMessage"
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+
+CopilotConversationCreateRequest:
+  type: object
+  required:
+    - messages
+  properties:
+    title:
+      type: string
+      description: Optional; auto-derived from the first user message when blank.
+    messages:
+      type: array
+      items:
+        $ref: "#/AdminCopilotMessage"
+
+CopilotConversationRenameRequest:
+  type: object
+  required:
+    - title
+  properties:
+    title:
+      type: string
+
+CopilotConversationListResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/CopilotConversationSummary"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+CopilotConversationResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/CopilotConversation"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+AdminCopilotToolCall:
+  type: object
+  required:
+    - id
+    - name
+    - arguments
+  properties:
+    id:
+      type: string
+    name:
+      type: string
+    arguments:
+      type: string
+      description: Raw JSON arguments emitted by the model.
+
+AdminCopilotToolResult:
+  type: object
+  required:
+    - tool_call_id
+    - content
+  properties:
+    tool_call_id:
+      type: string
+    content:
+      type: string
+    is_error:
+      type: boolean
+      default: false
+
+AdminCopilotImage:
+  type: object
+  required:
+    - mime_type
+    - data
+  properties:
+    mime_type:
+      type: string
+      description: Image MIME type, e.g. image/png.
+    data:
+      type: string
+      description: "Base64-encoded image bytes (no data URL prefix)."
+
+AdminCopilotMessage:
+  type: object
+  required:
+    - role
+  properties:
+    role:
+      type: string
+      enum:
+        - user
+        - assistant
+        - tool
+    content:
+      type: string
+      default: ""
+    reasoning:
+      type: string
+      default: ""
+      description: >-
+        Model chain-of-thought for an assistant message (display only;
+        never sent back upstream).
+    images:
+      type: array
+      items:
+        $ref: "#/AdminCopilotImage"
+      default: []
+      description: Image attachments on a user message (multimodal input).
+    tool_calls:
+      type: array
+      items:
+        $ref: "#/AdminCopilotToolCall"
+      default: []
+    tool_results:
+      type: array
+      items:
+        $ref: "#/AdminCopilotToolResult"
+      default: []
+
+AdminCopilotApproval:
+  type: object
+  required:
+    - tool_call_id
+    - approved
+  properties:
+    tool_call_id:
+      type: string
+    approved:
+      type: boolean
+
+AdminCopilotChatRequest:
+  type: object
+  required:
+    - messages
+  properties:
+    messages:
+      type: array
+      items:
+        $ref: "#/AdminCopilotMessage"
+    approval:
+      $ref: "#/AdminCopilotApproval"
+    model:
+      type: string
+      description: Per-turn model override; falls back to the configured default.
+    reasoning_effort:
+      type: string
+      enum:
+        - "off"
+        - low
+        - medium
+        - high
+      description: Thinking effort for reasoning-capable models.

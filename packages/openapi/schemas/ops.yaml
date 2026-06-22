@@ -1,0 +1,2564 @@
+# Operational observability: SLOs, alert rules, silences, notification channels, scheduled tests, channel monitors, domain events, and realtime slots
+OpsOverview:
+  type: object
+  required:
+    - window
+    - request_count
+    - success_count
+    - error_count
+    - error_rate
+    - latency_p50_ms
+    - latency_p95_ms
+    - latency_p99_ms
+    - average_latency_ms
+    - rpm
+    - tpm
+    - active_users
+    - generated_at
+  properties:
+    window:
+      $ref: "common.yaml#/TimeWindow"
+    request_count:
+      type: integer
+      minimum: 0
+    success_count:
+      type: integer
+      minimum: 0
+    error_count:
+      type: integer
+      minimum: 0
+    error_rate:
+      type: number
+      minimum: 0
+      maximum: 1
+    latency_p50_ms:
+      type: integer
+      minimum: 0
+    latency_p95_ms:
+      type: integer
+      minimum: 0
+    latency_p99_ms:
+      type: integer
+      minimum: 0
+    average_latency_ms:
+      type: integer
+      minimum: 0
+    rpm:
+      type: integer
+      minimum: 0
+    tpm:
+      type: integer
+      minimum: 0
+    active_users:
+      type: integer
+      minimum: 0
+    generated_at:
+      $ref: "common.yaml#/Timestamp"
+
+OpsOverviewResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/OpsOverview"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+OpsRealtimeRateSummary:
+  type: object
+  required:
+    - current
+    - peak
+    - average
+  properties:
+    current:
+      type: integer
+      minimum: 0
+      description: Rate observed in the final minute of the window.
+    peak:
+      type: integer
+      minimum: 0
+      description: Highest one-minute bucket observed in the window.
+    average:
+      type: integer
+      minimum: 0
+      description: Full-window average rate per minute.
+
+OpsRealtimeTraffic:
+  type: object
+  required:
+    - window
+    - requests_per_min
+    - tokens_per_min
+    - total_requests
+    - error_count
+    - error_rate
+    - usage_log_count
+    - ops_error_log_count
+    - generated_at
+  properties:
+    window:
+      $ref: "common.yaml#/TimeWindow"
+    requests_per_min:
+      $ref: "#/OpsRealtimeRateSummary"
+    tokens_per_min:
+      $ref: "#/OpsRealtimeRateSummary"
+    total_requests:
+      type: integer
+      minimum: 0
+      description: Deduplicated request attempts in the selected window.
+    error_count:
+      type: integer
+      minimum: 0
+      description: Failed request attempts, including error-only ops logs.
+    error_rate:
+      type: number
+      minimum: 0
+      maximum: 1
+    usage_log_count:
+      type: integer
+      minimum: 0
+      description: Usage rows scanned for the selected window.
+    ops_error_log_count:
+      type: integer
+      minimum: 0
+      description: Ops error rows scanned for the selected window.
+    generated_at:
+      $ref: "common.yaml#/Timestamp"
+
+OpsRealtimeTrafficResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/OpsRealtimeTraffic"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+OpsThroughputTrendPoint:
+  type: object
+  required:
+    - bucket_start
+    - request_count
+    - token_count
+    - rpm
+    - tpm
+    - cost
+  properties:
+    bucket_start:
+      $ref: "common.yaml#/Timestamp"
+    request_count:
+      type: integer
+      minimum: 0
+    token_count:
+      type: integer
+      minimum: 0
+    rpm:
+      type: integer
+      minimum: 0
+    tpm:
+      type: integer
+      minimum: 0
+    cost:
+      type: string
+      pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+
+OpsThroughputTrend:
+  type: object
+  required:
+    - window
+    - bucket
+    - points
+  properties:
+    window:
+      $ref: "common.yaml#/TimeWindow"
+    bucket:
+      type: string
+      enum:
+        - hour
+        - day
+    points:
+      type: array
+      items:
+        $ref: "#/OpsThroughputTrendPoint"
+
+OpsThroughputTrendResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/OpsThroughputTrend"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+OpsErrorTrendPoint:
+  type: object
+  required:
+    - bucket_start
+    - request_count
+    - error_count
+    - error_rate
+  properties:
+    bucket_start:
+      $ref: "common.yaml#/Timestamp"
+    request_count:
+      type: integer
+      minimum: 0
+    error_count:
+      type: integer
+      minimum: 0
+    error_rate:
+      type: number
+      minimum: 0
+      maximum: 1
+
+OpsErrorTrend:
+  type: object
+  required:
+    - window
+    - bucket
+    - points
+  properties:
+    window:
+      $ref: "common.yaml#/TimeWindow"
+    bucket:
+      type: string
+      enum:
+        - hour
+        - day
+    points:
+      type: array
+      items:
+        $ref: "#/OpsErrorTrendPoint"
+
+OpsErrorTrendResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/OpsErrorTrend"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+OpsErrorDistributionItem:
+  type: object
+  required:
+    - error_class
+    - owner
+    - count
+    - share
+  properties:
+    error_class:
+      type: string
+    owner:
+      type: string
+    count:
+      type: integer
+      minimum: 0
+    share:
+      type: number
+      minimum: 0
+      maximum: 1
+
+OpsErrorDistribution:
+  type: object
+  required:
+    - window
+    - items
+  properties:
+    window:
+      $ref: "common.yaml#/TimeWindow"
+    items:
+      type: array
+      items:
+        $ref: "#/OpsErrorDistributionItem"
+
+OpsErrorDistributionResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/OpsErrorDistribution"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+OpsLatencyBucket:
+  type: object
+  required:
+    - label
+    - lower_ms
+    - count
+    - share
+  properties:
+    label:
+      type: string
+    lower_ms:
+      type: integer
+      minimum: 0
+    upper_ms:
+      type: integer
+      minimum: 0
+      nullable: true
+    count:
+      type: integer
+      minimum: 0
+    share:
+      type: number
+      minimum: 0
+      maximum: 1
+
+OpsLatencyHistogram:
+  type: object
+  required:
+    - window
+    - buckets
+  properties:
+    window:
+      $ref: "common.yaml#/TimeWindow"
+    buckets:
+      type: array
+      items:
+        $ref: "#/OpsLatencyBucket"
+
+OpsLatencyHistogramResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/OpsLatencyHistogram"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+OpsErrorLog:
+  type: object
+  description: |
+    Operator-facing record of a single upstream failure observed by the
+    gateway hot path. Body excerpts are sanitised and credential-like
+    keys are redacted to "[REDACTED]" before persistence.
+  additionalProperties: true
+  properties:
+    id:
+      type: string
+    occurred_at:
+      type: string
+      format: date-time
+    request_id:
+      type: string
+    trace_id:
+      type: string
+    user_id:
+      $ref: "common.yaml#/Id"
+    api_key_id:
+      $ref: "common.yaml#/Id"
+    api_key_prefix:
+      type: string
+    account_id:
+      $ref: "common.yaml#/Id"
+    provider_id:
+      $ref: "common.yaml#/Id"
+    platform:
+      type: string
+    source_endpoint:
+      type: string
+    source_protocol:
+      type: string
+      description: Alias for platform, kept for error-log UI parity.
+    target_protocol:
+      type: string
+    model:
+      type: string
+    status_code:
+      type: integer
+    upstream_request_id:
+      type: string
+    stream_completion_state:
+      type: string
+      enum: [completed, interrupted, idle_timeout, failed, unknown]
+      description: |
+        Low-cardinality terminal state for gateway streaming requests.
+        Empty when the request was not streamed or the state was not
+        observed; never contains provider-native frames or response bodies.
+    attempt_no:
+      type: integer
+      minimum: 1
+    latency_ms:
+      type: integer
+      minimum: 0
+    input_tokens:
+      type: integer
+      minimum: 0
+    output_tokens:
+      type: integer
+      minimum: 0
+    usage_estimated:
+      type: boolean
+    error_class:
+      type: string
+    error_phase:
+      type: string
+    error_owner:
+      type: string
+    error_source:
+      type: string
+    error_message:
+      type: string
+    error_body_excerpt:
+      type: string
+    upstream_errors:
+      type: array
+      items:
+        $ref: "audit.yaml#/UpstreamErrorEvent"
+    resolution:
+      type: string
+      enum: [open, investigating, resolved, muted]
+    resolution_note:
+      type: string
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+    resolved_at:
+      type: string
+      format: date-time
+    resolved_by_user_id:
+      $ref: "common.yaml#/Id"
+
+OpsErrorLogListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/OpsErrorLog"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+OpsErrorLogResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/OpsErrorLog"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+OpsErrorFingerprint:
+  type: object
+  description: |
+    Real-time grouping of ops_error_logs rows by stable, low-sensitivity
+    failure dimensions. It is intended for operator triage and is not a
+    durable long-term rollup.
+  required:
+    - fingerprint
+    - count
+    - open_count
+    - investigating_count
+    - resolved_count
+    - muted_count
+    - first_occurred_at
+    - last_occurred_at
+    - source_endpoint
+    - target_protocol
+    - model
+    - status_class
+    - error_class
+    - error_phase
+    - error_owner
+    - error_source
+    - message_pattern
+  properties:
+    fingerprint:
+      type: string
+      description: Stable hash over low-sensitivity grouping dimensions.
+    count:
+      type: integer
+      minimum: 0
+    open_count:
+      type: integer
+      minimum: 0
+    investigating_count:
+      type: integer
+      minimum: 0
+    resolved_count:
+      type: integer
+      minimum: 0
+    muted_count:
+      type: integer
+      minimum: 0
+    first_occurred_at:
+      type: string
+      format: date-time
+    last_occurred_at:
+      type: string
+      format: date-time
+    example_error_log_id:
+      $ref: "common.yaml#/Id"
+    example_request_id:
+      type: string
+    example_error_message:
+      type: string
+    source_endpoint:
+      type: string
+    target_protocol:
+      type: string
+    model:
+      type: string
+    status_code:
+      type: integer
+      minimum: 100
+      maximum: 599
+    status_class:
+      type: string
+      enum: [1xx, 2xx, 3xx, 4xx, 5xx, unknown]
+    error_class:
+      type: string
+    error_phase:
+      type: string
+    error_owner:
+      type: string
+    error_source:
+      type: string
+    message_pattern:
+      type: string
+      description: Normalized error message with request ids, URLs, hashes, and numbers replaced.
+
+OpsErrorFingerprintListMeta:
+  type: object
+  required:
+    - total
+    - scanned
+    - truncated
+  properties:
+    total:
+      type: integer
+      minimum: 0
+      description: Number of discovered fingerprint groups before the response limit is applied. When truncated is true, this only covers scanned rows.
+    scanned:
+      type: integer
+      minimum: 0
+      description: Number of ops_error_logs rows scanned for this real-time summary.
+    truncated:
+      type: boolean
+      description: True when matching rows exceeded the bounded live scan cap.
+    window_start:
+      type: string
+      format: date-time
+    window_end:
+      type: string
+      format: date-time
+
+OpsErrorFingerprintListResponse:
+  type: object
+  required:
+    - data
+    - meta
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/OpsErrorFingerprint"
+    meta:
+      $ref: "#/OpsErrorFingerprintListMeta"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+OpsErrorLogResolutionUpdate:
+  type: object
+  required:
+    - resolution
+  properties:
+    resolution:
+      type: string
+      enum: [open, investigating, resolved, muted]
+    note:
+      type: string
+      maxLength: 2048
+
+OpsConcurrency:
+  type: object
+  required:
+    - active_gateway_requests
+    - active_realtime_slots
+    - active_by_api_key
+  properties:
+    active_gateway_requests:
+      type: integer
+      minimum: 0
+    active_realtime_slots:
+      type: integer
+      minimum: 0
+    active_by_api_key:
+      type: object
+      additionalProperties:
+        type: integer
+        minimum: 0
+
+OpsConcurrencyResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/OpsConcurrency"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+OpsSystemLogLevel:
+  type: string
+  enum:
+    - debug
+    - info
+    - warn
+    - error
+
+OpsSystemLog:
+  type: object
+  required:
+    - id
+    - level
+    - message
+    - source
+    - created_at
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    level:
+      $ref: "#/OpsSystemLogLevel"
+    message:
+      type: string
+    source:
+      type: string
+    request_id:
+      type: string
+    trace_id:
+      type: string
+    metadata:
+      $ref: "common.yaml#/JsonObject"
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+
+OpsSystemLogListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/OpsSystemLog"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+OpsSystemLogHealth:
+  type: object
+  required:
+    - storage_mode
+    - writable
+    - degraded
+    - stale
+    - total_count
+    - level_counts
+    - error_evidence_recorder
+    - checked_at
+  properties:
+    storage_mode:
+      type: string
+      enum:
+        - durable
+        - unavailable
+    writable:
+      type: boolean
+    degraded:
+      type: boolean
+    stale:
+      type: boolean
+    total_count:
+      type: integer
+      minimum: 0
+    level_counts:
+      type: object
+      additionalProperties:
+        type: integer
+        minimum: 0
+    last_log_at:
+      $ref: "common.yaml#/Timestamp"
+    last_error_at:
+      $ref: "common.yaml#/Timestamp"
+    last_error_source:
+      type: string
+    last_error_message:
+      type: string
+    error_evidence_recorder:
+      $ref: "#/OpsErrorEvidenceRecorderHealth"
+    checked_at:
+      $ref: "common.yaml#/Timestamp"
+
+OpsErrorEvidenceRecorderHealth:
+  type: object
+  required:
+    - enabled
+    - started
+    - draining
+    - degraded
+    - queue_depth
+    - queue_capacity
+    - enqueued_count
+    - processed_count
+    - recorded_count
+    - dropped_count
+    - write_failed_count
+  properties:
+    enabled:
+      type: boolean
+    started:
+      type: boolean
+    draining:
+      type: boolean
+    degraded:
+      type: boolean
+    queue_depth:
+      type: integer
+      minimum: 0
+    queue_capacity:
+      type: integer
+      minimum: 0
+    enqueued_count:
+      type: integer
+      format: int64
+      minimum: 0
+    processed_count:
+      type: integer
+      format: int64
+      minimum: 0
+    recorded_count:
+      type: integer
+      format: int64
+      minimum: 0
+    dropped_count:
+      type: integer
+      format: int64
+      minimum: 0
+    write_failed_count:
+      type: integer
+      format: int64
+      minimum: 0
+
+OpsSystemLogHealthResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/OpsSystemLogHealth"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+OpsSystemLogCleanupRequest:
+  type: object
+  properties:
+    level:
+      $ref: "#/OpsSystemLogLevel"
+    source:
+      type: string
+    q:
+      type: string
+    request_id:
+      type: string
+    trace_id:
+      type: string
+    start:
+      $ref: "common.yaml#/Timestamp"
+    end:
+      $ref: "common.yaml#/Timestamp"
+    dry_run:
+      type: boolean
+      default: false
+    max_delete:
+      type: integer
+      minimum: 1
+      maximum: 10000
+      default: 1000
+
+OpsSystemLogCleanupResult:
+  type: object
+  required:
+    - matched
+    - deleted
+    - dry_run
+    - max_delete
+    - limited
+  properties:
+    matched:
+      type: integer
+      minimum: 0
+    deleted:
+      type: integer
+      minimum: 0
+    dry_run:
+      type: boolean
+    max_delete:
+      type: integer
+      minimum: 1
+      maximum: 10000
+    limited:
+      type: boolean
+
+OpsSystemLogCleanupResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/OpsSystemLogCleanupResult"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+OpsSettings:
+  type: object
+  required:
+    - auto_refresh_enabled
+    - refresh_interval_seconds
+  properties:
+    auto_refresh_enabled:
+      type: boolean
+    refresh_interval_seconds:
+      type: integer
+      minimum: 5
+      maximum: 3600
+
+OpsSettingsResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/OpsSettings"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+DomainEventOutbox:
+  type: object
+  required:
+    - id
+    - event_id
+    - event_type
+    - event_version
+    - producer_module
+    - aggregate_type
+    - aggregate_id
+    - correlation_id
+    - causation_id
+    - idempotency_key
+    - payload
+    - metadata
+    - status
+    - attempt_count
+    - created_at
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    event_id:
+      type: string
+    event_type:
+      type: string
+    event_version:
+      type: string
+    producer_module:
+      type: string
+    aggregate_type:
+      type: string
+    aggregate_id:
+      type: string
+    correlation_id:
+      type: string
+    causation_id:
+      type: string
+    idempotency_key:
+      type: string
+    payload:
+      $ref: "common.yaml#/JsonObject"
+    metadata:
+      $ref: "common.yaml#/JsonObject"
+    status:
+      type: string
+      enum:
+        - pending
+        - published
+        - failed
+    attempt_count:
+      type: integer
+      minimum: 0
+    next_retry_at:
+      type: string
+      format: date-time
+      nullable: true
+    last_error:
+      type: string
+      nullable: true
+    published_at:
+      type: string
+      format: date-time
+      nullable: true
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+
+DomainEventOutboxListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/DomainEventOutbox"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+RealtimeSlotKind:
+  type: string
+  enum:
+    - responses_websocket
+    - realtime_websocket
+
+RealtimeActiveSlot:
+  type: object
+  required:
+    - id
+    - kind
+    - request_id
+    - user_id
+    - api_key_id
+    - source_endpoint
+    - session_affinity_source
+    - session_affinity_key_hash
+    - sticky_strength
+    - acquired_at
+  properties:
+    id:
+      type: string
+      description: Ephemeral in-process slot id.
+    kind:
+      $ref: "#/RealtimeSlotKind"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+    user_id:
+      $ref: "common.yaml#/Id"
+    api_key_id:
+      $ref: "common.yaml#/Id"
+    source_endpoint:
+      type: string
+      enum:
+        - /v1/responses/ws
+        - /v1/realtime
+    session_affinity_source:
+      type: string
+      description: Sanitized source label for sticky routing hints.
+    session_affinity_key_hash:
+      type: string
+      description: SHA-256 hash of the affinity key, or empty when no key was supplied.
+      pattern: "^(|sha256:[a-f0-9]{64})$"
+    sticky_account_id:
+      $ref: "common.yaml#/Id"
+    sticky_strength:
+      type: string
+    acquired_at:
+      $ref: "common.yaml#/Timestamp"
+
+RealtimeActiveSlotCounters:
+  type: object
+  required:
+    - active_slots
+    - acquired_total
+    - released_total
+    - rejected_total
+    - active_by_endpoint
+    - active_by_kind
+    - active_by_api_key_id
+  properties:
+    active_slots:
+      type: integer
+      minimum: 0
+    acquired_total:
+      type: integer
+      minimum: 0
+    released_total:
+      type: integer
+      minimum: 0
+    rejected_total:
+      type: integer
+      minimum: 0
+    active_by_endpoint:
+      type: object
+      additionalProperties:
+        type: integer
+        minimum: 0
+    active_by_kind:
+      type: object
+      additionalProperties:
+        type: integer
+        minimum: 0
+    active_by_api_key_id:
+      type: object
+      additionalProperties:
+        type: integer
+        minimum: 0
+
+RealtimeActiveSlotListResponse:
+  type: object
+  required:
+    - data
+    - counters
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/RealtimeActiveSlot"
+    counters:
+      $ref: "#/RealtimeActiveSlotCounters"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+OpsSLOStatus:
+  type: string
+  enum:
+    - active
+    - disabled
+
+OpsSLIType:
+  type: string
+  enum:
+    - availability
+    - latency
+    - freshness
+    - quality
+
+OpsAlertSeverity:
+  type: string
+  enum:
+    - critical
+    - warning
+    - ticket
+
+OpsAlertStatus:
+  type: string
+  enum:
+    - firing
+    - acknowledged
+    - resolved
+    - suppressed
+
+OpsNotificationChannelType:
+  type: string
+  enum:
+    - email
+
+OpsNotificationChannelStatus:
+  type: string
+  enum:
+    - active
+    - disabled
+
+OpsNotificationDeliveryStatus:
+  type: string
+  enum:
+    - pending
+    - delivered
+    - failed
+
+OpsSLOFilter:
+  type: object
+  required:
+    - source_endpoint
+    - model
+    - error_owner_exclude
+  properties:
+    source_endpoint:
+      type: string
+    model:
+      type: string
+    provider_id:
+      $ref: "common.yaml#/Id"
+      nullable: true
+    error_owner_exclude:
+      type: array
+      items:
+        type: string
+        enum:
+          - client
+          - business
+          - scheduler
+          - reverse_proxy
+          - provider
+          - internal
+      default: []
+
+OpsBurnRateThreshold:
+  type: object
+  required:
+    - severity
+    - short_window_seconds
+    - long_window_seconds
+    - burn_rate
+    - min_request_count
+  properties:
+    severity:
+      $ref: "#/OpsAlertSeverity"
+    short_window_seconds:
+      type: integer
+      minimum: 1
+    long_window_seconds:
+      type: integer
+      minimum: 1
+    burn_rate:
+      type: number
+      minimum: 0
+      exclusiveMinimum: true
+    min_request_count:
+      type: integer
+      minimum: 0
+
+OpsAlertPolicy:
+  type: object
+  required:
+    - name
+    - thresholds
+  properties:
+    name:
+      type: string
+      example: multi_window_burn_rate
+    thresholds:
+      type: array
+      items:
+        $ref: "#/OpsBurnRateThreshold"
+      default: []
+
+OpsSLODefinition:
+  type: object
+  required:
+    - id
+    - name
+    - sli_type
+    - objective
+    - window_days
+    - status
+    - filter
+    - alert_policy
+    - created_at
+    - updated_at
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    name:
+      type: string
+    sli_type:
+      $ref: "#/OpsSLIType"
+    objective:
+      type: number
+      minimum: 0
+      maximum: 1
+      description: Objective stored as a ratio, for example 0.995 for 99.5%.
+    window_days:
+      type: integer
+      minimum: 1
+      maximum: 365
+    status:
+      $ref: "#/OpsSLOStatus"
+    filter:
+      $ref: "#/OpsSLOFilter"
+    alert_policy:
+      $ref: "#/OpsAlertPolicy"
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+    updated_at:
+      $ref: "common.yaml#/Timestamp"
+
+OpsSLOEvaluation:
+  type: object
+  required:
+    - window_start
+    - window_end
+    - total_requests
+    - good_requests
+    - bad_requests
+    - error_rate
+    - burn_rate
+    - objective
+    - error_budget_consumed
+  properties:
+    window_start:
+      $ref: "common.yaml#/Timestamp"
+    window_end:
+      $ref: "common.yaml#/Timestamp"
+    total_requests:
+      type: integer
+      minimum: 0
+    good_requests:
+      type: integer
+      minimum: 0
+    bad_requests:
+      type: integer
+      minimum: 0
+    error_rate:
+      type: number
+      minimum: 0
+      maximum: 1
+    burn_rate:
+      type: number
+      minimum: 0
+    objective:
+      type: number
+      minimum: 0
+      maximum: 1
+    error_budget_consumed:
+      type: number
+      minimum: 0
+      maximum: 1
+
+OpsSLO:
+  type: object
+  required:
+    - definition
+    - evaluation
+  properties:
+    definition:
+      $ref: "#/OpsSLODefinition"
+    evaluation:
+      $ref: "#/OpsSLOEvaluation"
+
+CreateOpsSLORequest:
+  type: object
+  required:
+    - name
+    - objective
+  properties:
+    name:
+      type: string
+      minLength: 1
+    sli_type:
+      $ref: "#/OpsSLIType"
+    objective:
+      type: number
+      minimum: 0
+      maximum: 100
+      description: Accepts ratio values like 0.995 or percent values like 99.5; responses store the ratio.
+    window_days:
+      type: integer
+      minimum: 1
+      maximum: 365
+    status:
+      $ref: "#/OpsSLOStatus"
+    filter:
+      $ref: "#/OpsSLOFilter"
+    alert_policy:
+      $ref: "#/OpsAlertPolicy"
+
+UpdateOpsSLORequest:
+  type: object
+  properties:
+    name:
+      type: string
+      minLength: 1
+    objective:
+      type: number
+      minimum: 0
+      maximum: 100
+      description: Accepts ratio values like 0.995 or percent values like 99.5; responses store the ratio.
+    window_days:
+      type: integer
+      minimum: 1
+      maximum: 365
+    status:
+      $ref: "#/OpsSLOStatus"
+    filter:
+      $ref: "#/OpsSLOFilter"
+    alert_policy:
+      $ref: "#/OpsAlertPolicy"
+
+OpsSLODefinitionResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/OpsSLODefinition"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+OpsSLOListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/OpsSLO"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+OpsAlertEvent:
+  type: object
+  required:
+    - id
+    - rule_id
+    - severity
+    - status
+    - fingerprint
+    - summary
+    - details
+    - started_at
+    - created_at
+    - updated_at
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    slo_id:
+      $ref: "common.yaml#/Id"
+      nullable: true
+    rule_id:
+      type: string
+    severity:
+      $ref: "#/OpsAlertSeverity"
+    status:
+      $ref: "#/OpsAlertStatus"
+    fingerprint:
+      type: string
+    summary:
+      type: string
+    details:
+      $ref: "common.yaml#/JsonObject"
+    started_at:
+      $ref: "common.yaml#/Timestamp"
+    resolved_at:
+      type: string
+      format: date-time
+      nullable: true
+    acknowledged_at:
+      type: string
+      format: date-time
+      nullable: true
+    acknowledged_by:
+      $ref: "common.yaml#/Id"
+      nullable: true
+    suppressed_by:
+      type: string
+      nullable: true
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+    updated_at:
+      $ref: "common.yaml#/Timestamp"
+
+OpsAlertResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/OpsAlertEvent"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+OpsAlertListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/OpsAlertEvent"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+OpsAlertMetricType:
+  type: string
+  enum:
+    - error_rate
+    - success_rate
+    - latency_p95
+    - request_count
+
+OpsAlertOperator:
+  type: string
+  enum:
+    - gt
+    - gte
+    - lt
+    - lte
+
+OpsAlertRuleScope:
+  type: object
+  required:
+    - source_endpoint
+    - model
+    - error_class
+  properties:
+    source_endpoint:
+      type: string
+    model:
+      type: string
+    error_class:
+      type: string
+      description: Low-cardinality gateway or provider error class used to narrow rule evaluation.
+    provider_id:
+      $ref: "common.yaml#/Id"
+      nullable: true
+
+OpsAlertRule:
+  type: object
+  required:
+    - id
+    - name
+    - metric_type
+    - operator
+    - threshold
+    - severity
+    - enabled
+    - window_seconds
+    - cooldown_seconds
+    - min_request_count
+    - scope
+    - builtin_baseline
+    - baseline_key
+    - created_at
+    - updated_at
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    name:
+      type: string
+    metric_type:
+      $ref: "#/OpsAlertMetricType"
+    operator:
+      $ref: "#/OpsAlertOperator"
+    threshold:
+      type: number
+      description: Threshold compared against the observed metric value (ratio for rates, milliseconds for latency).
+    severity:
+      $ref: "#/OpsAlertSeverity"
+    enabled:
+      type: boolean
+    window_seconds:
+      type: integer
+      minimum: 1
+    cooldown_seconds:
+      type: integer
+      minimum: 0
+    min_request_count:
+      type: integer
+      minimum: 0
+    scope:
+      $ref: "#/OpsAlertRuleScope"
+    builtin_baseline:
+      type: boolean
+      description: True when this rule occupies one of SRapi's built-in baseline slots. Operators may still have edited its threshold, severity, or enabled state.
+    baseline_key:
+      type: string
+      description: Stable SRapi baseline identifier when builtin_baseline is true; empty for operator-defined rules.
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+    updated_at:
+      $ref: "common.yaml#/Timestamp"
+
+OpsAlertRuleBaselineStatus:
+  type: string
+  enum:
+    - covered
+    - disabled
+    - modified
+    - missing
+
+OpsAlertRuleBaselinePostureItem:
+  type: object
+  required:
+    - baseline_key
+    - name
+    - status
+    - enabled
+    - modified
+    - differences
+  properties:
+    baseline_key:
+      type: string
+      description: Stable SRapi baseline identifier.
+    name:
+      type: string
+      description: Built-in alert rule display name.
+    status:
+      $ref: "#/OpsAlertRuleBaselineStatus"
+    rule_id:
+      $ref: "common.yaml#/Id"
+      description: Configured alert rule id when this baseline exists.
+    enabled:
+      type: boolean
+      description: True when the configured baseline rule is enabled.
+    modified:
+      type: boolean
+      description: True when the configured baseline differs from SRapi's current default rule body.
+    differences:
+      type: array
+      description: Rule fields that differ from SRapi's current default baseline definition.
+      items:
+        type: string
+
+OpsAlertRuleBaselinePosture:
+  type: object
+  required:
+    - total_count
+    - configured_count
+    - enabled_count
+    - disabled_count
+    - modified_count
+    - missing_count
+    - items
+  properties:
+    total_count:
+      type: integer
+      minimum: 0
+    configured_count:
+      type: integer
+      minimum: 0
+    enabled_count:
+      type: integer
+      minimum: 0
+    disabled_count:
+      type: integer
+      minimum: 0
+    modified_count:
+      type: integer
+      minimum: 0
+    missing_count:
+      type: integer
+      minimum: 0
+    items:
+      type: array
+      items:
+        $ref: "#/OpsAlertRuleBaselinePostureItem"
+
+CreateOpsAlertRuleRequest:
+  type: object
+  required:
+    - name
+    - metric_type
+    - operator
+    - threshold
+  properties:
+    name:
+      type: string
+      minLength: 1
+    metric_type:
+      $ref: "#/OpsAlertMetricType"
+    operator:
+      $ref: "#/OpsAlertOperator"
+    threshold:
+      type: number
+    severity:
+      $ref: "#/OpsAlertSeverity"
+    enabled:
+      type: boolean
+    window_seconds:
+      type: integer
+      minimum: 1
+    cooldown_seconds:
+      type: integer
+      minimum: 0
+    min_request_count:
+      type: integer
+      minimum: 0
+    scope:
+      $ref: "#/OpsAlertRuleScope"
+
+UpdateOpsAlertRuleRequest:
+  type: object
+  properties:
+    name:
+      type: string
+      minLength: 1
+    metric_type:
+      $ref: "#/OpsAlertMetricType"
+    operator:
+      $ref: "#/OpsAlertOperator"
+    threshold:
+      type: number
+    severity:
+      $ref: "#/OpsAlertSeverity"
+    enabled:
+      type: boolean
+    window_seconds:
+      type: integer
+      minimum: 1
+    cooldown_seconds:
+      type: integer
+      minimum: 0
+    min_request_count:
+      type: integer
+      minimum: 0
+    scope:
+      $ref: "#/OpsAlertRuleScope"
+
+OpsAlertRuleResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/OpsAlertRule"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+OpsAlertRuleListResponse:
+  type: object
+  required:
+    - data
+    - baseline_posture
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/OpsAlertRule"
+    baseline_posture:
+      $ref: "#/OpsAlertRuleBaselinePosture"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+OpsAlertSilenceMatcher:
+  type: object
+  properties:
+    rule_id:
+      type: string
+    severity:
+      $ref: "#/OpsAlertSeverity"
+      nullable: true
+    source_endpoint:
+      type: string
+    model:
+      type: string
+    error_class:
+      type: string
+      description: Low-cardinality gateway or provider error class used to match scoped alert rules.
+    provider_id:
+      $ref: "common.yaml#/Id"
+      nullable: true
+
+OpsAlertSilence:
+  type: object
+  required:
+    - id
+    - matcher
+    - starts_at
+    - ends_at
+    - created_at
+    - updated_at
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    comment:
+      type: string
+    matcher:
+      $ref: "#/OpsAlertSilenceMatcher"
+    starts_at:
+      $ref: "common.yaml#/Timestamp"
+    ends_at:
+      $ref: "common.yaml#/Timestamp"
+    created_by:
+      $ref: "common.yaml#/Id"
+      nullable: true
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+    updated_at:
+      $ref: "common.yaml#/Timestamp"
+
+CreateOpsAlertSilenceRequest:
+  type: object
+  required:
+    - ends_at
+  properties:
+    comment:
+      type: string
+    matcher:
+      $ref: "#/OpsAlertSilenceMatcher"
+    starts_at:
+      $ref: "common.yaml#/Timestamp"
+    ends_at:
+      $ref: "common.yaml#/Timestamp"
+
+OpsAlertSilenceResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/OpsAlertSilence"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+OpsAlertSilenceListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/OpsAlertSilence"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+OpsNotificationChannel:
+  type: object
+  required:
+    - id
+    - name
+    - type
+    - status
+    - min_severity
+    - email_recipients
+    - send_resolved
+    - created_at
+    - updated_at
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    name:
+      type: string
+    type:
+      $ref: "#/OpsNotificationChannelType"
+    status:
+      $ref: "#/OpsNotificationChannelStatus"
+    min_severity:
+      $ref: "#/OpsAlertSeverity"
+    email_recipients:
+      type: array
+      items:
+        type: string
+        format: email
+      default: []
+    send_resolved:
+      type: boolean
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+    updated_at:
+      $ref: "common.yaml#/Timestamp"
+
+CreateOpsNotificationChannelRequest:
+  type: object
+  required:
+    - name
+    - type
+    - email_recipients
+  properties:
+    name:
+      type: string
+      minLength: 1
+    type:
+      $ref: "#/OpsNotificationChannelType"
+    status:
+      $ref: "#/OpsNotificationChannelStatus"
+    min_severity:
+      $ref: "#/OpsAlertSeverity"
+    email_recipients:
+      type: array
+      minItems: 1
+      items:
+        type: string
+        format: email
+    send_resolved:
+      type: boolean
+
+UpdateOpsNotificationChannelRequest:
+  type: object
+  properties:
+    name:
+      type: string
+      minLength: 1
+    status:
+      $ref: "#/OpsNotificationChannelStatus"
+    min_severity:
+      $ref: "#/OpsAlertSeverity"
+    email_recipients:
+      type: array
+      minItems: 1
+      items:
+        type: string
+        format: email
+    send_resolved:
+      type: boolean
+
+OpsNotificationChannelResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/OpsNotificationChannel"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+OpsNotificationChannelListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/OpsNotificationChannel"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+OpsNotificationDelivery:
+  type: object
+  required:
+    - id
+    - channel_id
+    - alert_event_id
+    - alert_status
+    - severity
+    - status
+    - target
+    - attempt_count
+    - next_attempt_at
+    - created_at
+    - updated_at
+  properties:
+    id:
+      $ref: "common.yaml#/Id"
+    channel_id:
+      $ref: "common.yaml#/Id"
+    channel_name:
+      type: string
+    channel_type:
+      $ref: "#/OpsNotificationChannelType"
+      nullable: true
+    alert_event_id:
+      $ref: "common.yaml#/Id"
+    alert_summary:
+      type: string
+    alert_status:
+      $ref: "#/OpsAlertStatus"
+    alert_started_at:
+      type: string
+      format: date-time
+      nullable: true
+    alert_updated_at:
+      type: string
+      format: date-time
+      nullable: true
+    severity:
+      $ref: "#/OpsAlertSeverity"
+    status:
+      $ref: "#/OpsNotificationDeliveryStatus"
+    target:
+      type: string
+    attempt_count:
+      type: integer
+      minimum: 0
+    last_error:
+      type: string
+    next_attempt_at:
+      $ref: "common.yaml#/Timestamp"
+    delivered_at:
+      type: string
+      format: date-time
+      nullable: true
+    last_attempt_at:
+      type: string
+      format: date-time
+      nullable: true
+    created_at:
+      $ref: "common.yaml#/Timestamp"
+    updated_at:
+      $ref: "common.yaml#/Timestamp"
+
+OpsNotificationDeliveryListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/OpsNotificationDelivery"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+
+ScheduledTestPlan:
+  type: object
+  required:
+    - id
+    - name
+    - enabled
+    - scope_type
+    - interval_seconds
+    - cron_expression
+    - probe_model
+    - max_results
+    - auto_recover
+    - last_status
+    - last_summary
+    - created_at
+    - updated_at
+  properties:
+    id:
+      type: integer
+      format: int64
+    name:
+      type: string
+    enabled:
+      type: boolean
+    scope_type:
+      type: string
+      enum:
+        - all
+        - account
+        - group
+    scope_id:
+      type: integer
+      format: int64
+      nullable: true
+    interval_seconds:
+      type: integer
+      format: int64
+    cron_expression:
+      type: string
+    probe_model:
+      type: string
+    max_results:
+      type: integer
+      format: int64
+    auto_recover:
+      type: boolean
+    last_run_at:
+      type: string
+      format: date-time
+      nullable: true
+    last_status:
+      type: string
+    last_summary:
+      type: string
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+CreateScheduledTestPlanRequest:
+  type: object
+  required:
+    - name
+    - scope_type
+  properties:
+    name:
+      type: string
+    enabled:
+      type: boolean
+    scope_type:
+      type: string
+      enum:
+        - all
+        - account
+        - group
+    scope_id:
+      type: integer
+      format: int64
+      nullable: true
+    interval_seconds:
+      type: integer
+      format: int64
+    cron_expression:
+      type: string
+    probe_model:
+      type: string
+    max_results:
+      type: integer
+      format: int64
+    auto_recover:
+      type: boolean
+UpdateScheduledTestPlanRequest:
+  type: object
+  properties:
+    name:
+      type: string
+    enabled:
+      type: boolean
+    scope_type:
+      type: string
+      enum:
+        - all
+        - account
+        - group
+    scope_id:
+      type: integer
+      format: int64
+      nullable: true
+    interval_seconds:
+      type: integer
+      format: int64
+    cron_expression:
+      type: string
+    probe_model:
+      type: string
+    max_results:
+      type: integer
+      format: int64
+    auto_recover:
+      type: boolean
+ScheduledTestPlanRun:
+  type: object
+  required:
+    - id
+    - plan_id
+    - trigger
+    - status
+    - selected
+    - probed
+    - skipped
+    - failed
+    - unhealthy
+    - recovered
+    - summary
+    - started_at
+    - finished_at
+  properties:
+    id:
+      type: integer
+      format: int64
+    plan_id:
+      type: integer
+      format: int64
+    trigger:
+      type: string
+      enum:
+        - schedule
+        - manual
+    status:
+      type: string
+      enum:
+        - ok
+        - warning
+        - partial
+        - failed
+    selected:
+      type: integer
+      format: int64
+    probed:
+      type: integer
+      format: int64
+    skipped:
+      type: integer
+      format: int64
+    failed:
+      type: integer
+      format: int64
+    unhealthy:
+      type: integer
+      format: int64
+    recovered:
+      type: integer
+      format: int64
+    summary:
+      type: string
+    started_at:
+      type: string
+      format: date-time
+    finished_at:
+      type: string
+      format: date-time
+ScheduledTestPlanResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/ScheduledTestPlan"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+ScheduledTestPlanListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/ScheduledTestPlan"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+ScheduledTestPlanRunResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/ScheduledTestPlanRun"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+ScheduledTestPlanRunListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/ScheduledTestPlanRun"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+ImportScheduledTestPlan:
+  type: object
+  required:
+    - name
+    - scope_type
+  description: >
+    Importable scheduled-test-plan shape. Account/group scopes are remapped
+    by natural key; snapshots do not export source-environment integer
+    scope IDs.
+  properties:
+    name:
+      type: string
+    enabled:
+      type: boolean
+    scope_type:
+      type: string
+      enum:
+        - all
+        - account
+        - group
+    scope_account_provider_name:
+      type: string
+      description: Provider name used with scope_account_name for account-scoped plans.
+    scope_account_name:
+      type: string
+      description: Provider account name used for account-scoped plans.
+    scope_group_name:
+      type: string
+      description: Account group name used for group-scoped plans.
+    interval_seconds:
+      type: integer
+      format: int64
+    cron_expression:
+      type: string
+    probe_model:
+      type: string
+    max_results:
+      type: integer
+      format: int64
+    auto_recover:
+      type: boolean
+
+ChannelMonitorScope:
+  type: string
+  enum:
+    - account
+    - group
+    - provider
+    - model
+  description: What the monitor probes — a single account, an account group, all of a provider's accounts, or accounts serving a model.
+
+ChannelMonitorRequest:
+  type: object
+  description: Custom synthetic-probe request override; empty fields inherit the config-map probe defaults.
+  properties:
+    method:
+      type: string
+    url:
+      type: string
+    headers:
+      type: object
+      additionalProperties:
+        type: string
+    body:
+      type: string
+    expected_status_codes:
+      type: array
+      items:
+        type: integer
+        format: int64
+    response_json_path:
+      type: string
+    response_contains:
+      type: string
+ChannelMonitor:
+  type: object
+  required:
+    - id
+    - name
+    - enabled
+    - scope
+    - scope_ref
+    - interval_seconds
+    - model
+    - request
+    - created_at
+    - updated_at
+  properties:
+    id:
+      type: integer
+      format: int64
+    name:
+      type: string
+    enabled:
+      type: boolean
+    scope:
+      $ref: "#/ChannelMonitorScope"
+    scope_ref:
+      type: string
+    interval_seconds:
+      type: integer
+      format: int64
+    model:
+      type: string
+    request:
+      $ref: "#/ChannelMonitorRequest"
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+    last_run_at:
+      type: string
+      format: date-time
+      description: Timestamp of the most recent recorded run for this monitor (absent when no runs exist yet).
+    last_run_ok:
+      type: boolean
+      description: Whether the most recent run was a fully-OK result. Absent when no runs exist.
+    last_run_latency_ms:
+      type: integer
+      minimum: 0
+      description: Latency in ms of the most recent run. Absent when no runs exist.
+    recent_uptime_window_days:
+      type: integer
+      minimum: 1
+      description: Window in days over which recent_uptime_success_rate is computed (absent when no recent runs).
+    recent_uptime_sample_count:
+      type: integer
+      minimum: 0
+      description: How many runs in the window contributed to recent_uptime_success_rate (capped per server policy).
+    recent_uptime_success_rate:
+      type: number
+      minimum: 0
+      maximum: 1
+      description: Ratio of OK runs over recent_uptime_sample_count (absent when no recent runs).
+CreateChannelMonitorRequest:
+  type: object
+  required:
+    - name
+    - scope
+  properties:
+    name:
+      type: string
+    enabled:
+      type: boolean
+    scope:
+      $ref: "#/ChannelMonitorScope"
+    scope_ref:
+      type: string
+    interval_seconds:
+      type: integer
+      format: int64
+    model:
+      type: string
+    request:
+      $ref: "#/ChannelMonitorRequest"
+UpdateChannelMonitorRequest:
+  type: object
+  properties:
+    name:
+      type: string
+    enabled:
+      type: boolean
+    scope:
+      $ref: "#/ChannelMonitorScope"
+    scope_ref:
+      type: string
+    interval_seconds:
+      type: integer
+      format: int64
+    model:
+      type: string
+    request:
+      $ref: "#/ChannelMonitorRequest"
+ChannelMonitorResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/ChannelMonitor"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+ChannelMonitorListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/ChannelMonitor"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+ChannelMonitorCheckResult:
+  type: object
+  required:
+    - account_id
+    - account_name
+    - provider_id
+    - model
+    - ok
+    - status_code
+    - latency_ms
+  properties:
+    account_id:
+      type: integer
+      format: int64
+    account_name:
+      type: string
+    provider_id:
+      type: integer
+      format: int64
+    model:
+      type: string
+    ok:
+      type: boolean
+    status_code:
+      type: integer
+      format: int64
+    latency_ms:
+      type: integer
+      format: int64
+    error_class:
+      type: string
+    metadata:
+      $ref: "common.yaml#/JsonObject"
+ChannelMonitorRun:
+  type: object
+  required:
+    - id
+    - monitor_id
+    - run_id
+    - ok
+    - checked_count
+    - ok_count
+    - latency_ms
+    - trigger
+    - results
+    - created_at
+  properties:
+    id:
+      type: integer
+      format: int64
+    monitor_id:
+      type: integer
+      format: int64
+    run_id:
+      type: string
+    ok:
+      type: boolean
+    checked_count:
+      type: integer
+      format: int64
+    ok_count:
+      type: integer
+      format: int64
+    latency_ms:
+      type: integer
+      format: int64
+    trigger:
+      type: string
+    results:
+      type: array
+      items:
+        $ref: "#/ChannelMonitorCheckResult"
+    created_at:
+      type: string
+      format: date-time
+ChannelMonitorRunResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/ChannelMonitorRun"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+ChannelMonitorRunListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/ChannelMonitorRun"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+ChannelMonitorTemplate:
+  type: object
+  required:
+    - id
+    - name
+    - description
+    - request
+    - created_at
+    - updated_at
+  properties:
+    id:
+      type: integer
+      format: int64
+    name:
+      type: string
+    description:
+      type: string
+    request:
+      $ref: "#/ChannelMonitorRequest"
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+CreateChannelMonitorTemplateRequest:
+  type: object
+  required:
+    - name
+  properties:
+    name:
+      type: string
+    description:
+      type: string
+    request:
+      $ref: "#/ChannelMonitorRequest"
+UpdateChannelMonitorTemplateRequest:
+  type: object
+  properties:
+    name:
+      type: string
+    description:
+      type: string
+    request:
+      $ref: "#/ChannelMonitorRequest"
+ApplyChannelMonitorTemplateRequest:
+  type: object
+  required:
+    - monitor_ids
+  properties:
+    monitor_ids:
+      type: array
+      items:
+        type: integer
+        format: int64
+ChannelMonitorTemplateResponse:
+  type: object
+  required:
+    - data
+    - request_id
+  properties:
+    data:
+      $ref: "#/ChannelMonitorTemplate"
+    request_id:
+      $ref: "common.yaml#/RequestId"
+ChannelMonitorTemplateListResponse:
+  type: object
+  required:
+    - data
+    - pagination
+    - request_id
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/ChannelMonitorTemplate"
+    pagination:
+      $ref: "common.yaml#/Pagination"
+    request_id:
+      $ref: "common.yaml#/RequestId"

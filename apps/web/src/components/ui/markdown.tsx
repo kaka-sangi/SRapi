@@ -58,11 +58,20 @@ export function Markdown({ children, className }: { children: string; className?
         remarkPlugins={[remarkGfm]}
         components={{
           p: ({ children }) => <p className="whitespace-pre-wrap">{children}</p>,
-          a: ({ children, href }) => (
-            <a href={href} target="_blank" rel="noreferrer" className="text-srapi-primary underline underline-offset-2">
-              {children}
-            </a>
-          ),
+          a: ({ children, href }) => {
+            const safe = href && /^https?:\/\/|^mailto:/i.test(href) ? href : undefined;
+            return (
+              <a href={safe} target="_blank" rel="noopener noreferrer" className="text-srapi-primary underline underline-offset-2">
+                {children}
+              </a>
+            );
+          },
+          img: ({ src, alt }) => {
+            const srcStr = typeof src === "string" ? src : undefined;
+            const safe = srcStr && /^https?:\/\//i.test(srcStr) ? srcStr : undefined;
+            if (!safe) return null;
+            return <img src={safe} alt={alt ?? ""} className="max-w-full rounded-xl" />;
+          },
           strong: ({ children }) => <strong className="font-semibold text-srapi-text-primary">{children}</strong>,
           ul: ({ children }) => (
             <ul className="list-disc space-y-1 pl-5 marker:text-srapi-text-tertiary">{children}</ul>

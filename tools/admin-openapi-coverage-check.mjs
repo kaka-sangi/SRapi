@@ -5,6 +5,7 @@ import { join, relative } from "node:path";
 const repoRoot = process.cwd();
 const httpserverDir = join(repoRoot, "apps", "api", "internal", "httpserver");
 const openapiPath = join(repoRoot, "packages", "openapi", "openapi.yaml");
+const openapiBundlePath = join(repoRoot, "build", "openapi", "openapi.bundle.yaml");
 const copilotSpecPath = join(repoRoot, "apps", "api", "internal", "modules", "copilot", "openapi.spec.yaml");
 
 const methods = new Set(["GET", "POST", "PUT", "PATCH", "DELETE"]);
@@ -18,7 +19,13 @@ function main() {
   const missing = [...registeredKeys].filter((key) => !documentedKeys.has(key)).sort();
   const extra = [...documentedKeys].filter((key) => !registeredKeys.has(key)).sort();
   const metadataFindings = checkAdminOperationMetadata(documented);
-  const copilotSynced = readFileSync(openapiPath, "utf8") === readFileSync(copilotSpecPath, "utf8");
+  let copilotSynced = false;
+  try {
+    copilotSynced = readFileSync(openapiBundlePath, "utf8") === readFileSync(copilotSpecPath, "utf8");
+  } catch {
+    // Bundle file may not exist yet if openapi-bundle hasn't run.
+    copilotSynced = false;
+  }
 
   const findings = [];
   if (missing.length > 0) {
