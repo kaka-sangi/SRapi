@@ -76,11 +76,12 @@ export function SidebarNav({
   }
 
   return (
-    <nav className="space-y-0.5 text-sm">
-      {sections.map((section) => (
-        <div key={section.titleKey}>
-          <div className="px-2 pb-1 pt-4 font-mono text-2xs uppercase tracking-widest text-srapi-text-secondary">
-            {t(section.titleKey)}
+    <nav className="space-y-1 text-sm">
+      {sections.map((section, idx) => (
+        <div key={section.titleKey} className={idx > 0 ? "pt-2" : undefined}>
+          <div className="flex items-center gap-2 px-2 pb-1.5 pt-4 font-mono text-2xs uppercase tracking-[0.22em] text-srapi-text-tertiary">
+            <span>{t(section.titleKey)}</span>
+            <span className="h-px flex-1 bg-srapi-border" aria-hidden />
           </div>
           {section.items.map((item) => {
             const active = isActive(item.href);
@@ -94,13 +95,22 @@ export function SidebarNav({
                 aria-current={active ? "page" : undefined}
                 data-tour={tourTag}
                 className={cn(
-                  "flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors",
+                  // The leading 2px terracotta indicator only appears when active
+                  // (replaces the box-on-active treatment with a quieter, more
+                  // editorial cue). Hover gets a subtle wash without a border.
+                  "group relative flex items-center gap-2.5 rounded-lg pl-3.5 pr-3 py-2 transition-[background-color,color,padding] duration-150 ease-[var(--ease-out-quint)]",
                   active
-                    ? "tactile-card border border-srapi-border bg-srapi-card text-srapi-text-primary"
-                    : "text-srapi-text-secondary hover:bg-srapi-card/60 hover:text-srapi-text-primary",
+                    ? "bg-srapi-card text-srapi-text-primary shadow-[inset_2px_0_0_var(--color-srapi-primary)]"
+                    : "text-srapi-text-secondary hover:bg-srapi-card/60 hover:pl-4 hover:text-srapi-text-primary",
                 )}
               >
-                <Icon className="size-4 shrink-0" aria-hidden />
+                <Icon
+                  className={cn(
+                    "size-4 shrink-0 transition-colors",
+                    active ? "text-srapi-primary" : "text-srapi-text-tertiary group-hover:text-srapi-text-secondary",
+                  )}
+                  aria-hidden
+                />
                 <span className="truncate">{t(item.labelKey)}</span>
               </Link>
             );
@@ -146,16 +156,26 @@ export function SidebarNav({
 export function SidebarBrand() {
   const { t } = useLanguage();
   return (
-    <div className="flex items-center gap-2.5 px-2 py-3">
-      <div className="grid size-8 place-items-center rounded-lg bg-srapi-invert font-serif text-lg text-srapi-invert-fg">
-        S
+    <div className="flex items-center gap-3 border-b border-srapi-border/70 px-2 pb-4 pt-1">
+      <div className="relative grid size-9 place-items-center overflow-hidden rounded-lg bg-srapi-invert font-serif text-lg text-srapi-invert-fg shadow-[inset_0_-6px_12px_-6px_rgba(255,255,255,0.18)]">
+        <span className="relative z-[1]">S</span>
+        <span
+          className="pointer-events-none absolute inset-0 opacity-50 mix-blend-overlay"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 30% 25%, rgba(255,255,255,0.45), transparent 55%)",
+          }}
+          aria-hidden
+        />
       </div>
-      <div className="font-serif text-xl tracking-tight text-srapi-text-primary">
-        {t("common.appName")}
+      <div className="min-w-0 leading-tight">
+        <div className="font-serif text-xl tracking-tight text-srapi-text-primary">
+          {t("common.appName")}
+        </div>
+        <div className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.22em] text-srapi-text-tertiary">
+          {t("common.version")}
+        </div>
       </div>
-      <span className="ml-auto font-mono text-2xs text-srapi-text-secondary">
-        {t("common.version")}
-      </span>
     </div>
   );
 }

@@ -40,7 +40,7 @@ export function TopNav({
   }
 
   return (
-    <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-srapi-border bg-srapi-bg/85 px-4 py-3 backdrop-blur sm:px-5">
+    <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-srapi-border bg-srapi-bg/80 px-4 py-3 backdrop-blur-md sm:px-6">
       <Button
         variant="outline"
         size="icon"
@@ -55,21 +55,37 @@ export function TopNav({
         type="button"
         onClick={openCommand}
         data-tour="search-bar"
-        className="flex w-full max-w-xs items-center gap-2 rounded-full border border-srapi-border bg-srapi-card-muted px-3 py-1.5 text-sm text-srapi-text-secondary transition-colors hover:border-srapi-text-tertiary hover:text-srapi-text-primary"
+        className="group flex h-9 w-full max-w-sm items-center gap-2.5 rounded-full border border-srapi-border bg-srapi-card/80 px-3.5 text-sm text-srapi-text-secondary shadow-[inset_0_1px_0_0_rgba(255,255,255,0.55)] transition-[border-color,color,background-color,box-shadow] duration-150 ease-[var(--ease-out-quint)] hover:border-srapi-border-strong hover:bg-srapi-card hover:text-srapi-text-primary focus-visible:border-srapi-border-strong"
       >
-        <Search className="size-4" />
+        <Search className="size-4 text-srapi-text-tertiary transition-colors group-hover:text-srapi-text-secondary" />
         <span className="hidden truncate sm:inline">{t("common.search")}</span>
-        <span className="ml-auto hidden font-mono text-2xs sm:inline">⌘K</span>
+        <span className="ml-auto hidden rounded border border-srapi-border bg-srapi-card-muted px-1.5 py-0.5 font-mono text-[10px] tracking-wider text-srapi-text-tertiary sm:inline">
+          ⌘K
+        </span>
       </button>
 
       <div className="ml-auto flex items-center gap-2">
-        <span className="hidden items-center gap-1.5 font-mono text-2xs text-srapi-text-secondary sm:flex">
+        <span
+          className={cn(
+            "hidden items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.18em] sm:inline-flex",
+            live
+              ? "border-srapi-success/30 bg-srapi-success/10 text-srapi-success"
+              : "border-srapi-border bg-srapi-card-muted text-srapi-text-tertiary",
+          )}
+        >
           <span
             className={cn(
-              "size-1.5 rounded-full",
-              live ? "bg-srapi-success" : "bg-srapi-text-secondary",
+              "relative inline-block size-1.5 rounded-full",
+              live ? "bg-srapi-success" : "bg-srapi-text-tertiary",
             )}
-          />
+          >
+            {live ? (
+              <span
+                className="absolute inset-0 -m-1 animate-ping rounded-full bg-srapi-success/40"
+                aria-hidden
+              />
+            ) : null}
+          </span>
           {live ? t("common.live") : t("common.apiOffline")}
         </span>
         <AnnouncementBell />

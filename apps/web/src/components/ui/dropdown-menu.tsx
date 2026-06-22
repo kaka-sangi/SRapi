@@ -34,9 +34,13 @@ export const DropdownMenuItem = React.forwardRef<
   <DropdownMenuPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-sm outline-none transition-colors",
-      "data-[highlighted]:bg-srapi-card-muted",
-      destructive ? "text-srapi-error" : "text-srapi-text-primary",
+      "group relative flex cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-sm outline-none transition-[background-color,color,padding-left] duration-150",
+      // Highlight reveals a left terracotta indicator instead of a generic
+      // colored background — same vocabulary as the sidebar active state.
+      "data-[highlighted]:bg-srapi-card-muted data-[highlighted]:pl-3 data-[highlighted]:shadow-[inset_2px_0_0_var(--color-srapi-primary)]",
+      destructive
+        ? "text-srapi-error data-[highlighted]:shadow-[inset_2px_0_0_var(--color-srapi-error)]"
+        : "text-srapi-text-primary",
       className,
     )}
     {...props}

@@ -16,8 +16,10 @@ export const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex h-10 w-full items-center justify-between gap-2 rounded-xl border border-srapi-border bg-srapi-card-muted px-3.5 text-sm text-srapi-text-primary transition-colors",
-      "hover:border-srapi-text-tertiary focus-visible:border-srapi-text-secondary data-[placeholder]:text-srapi-text-secondary/60",
+      // Trigger mirrors the Input letterpress treatment: 1px inner highlight,
+      // hairline border, calm transition. No bright focus ring.
+      "flex h-10 w-full items-center justify-between gap-2 rounded-xl border border-srapi-border bg-srapi-card px-3.5 text-sm text-srapi-text-primary shadow-[inset_0_1px_0_0_rgba(255,255,255,0.5)] transition-[border-color,background-color] duration-150",
+      "hover:border-srapi-border-strong hover:bg-srapi-card focus-visible:border-srapi-text-secondary data-[placeholder]:text-srapi-text-secondary/60",
       "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-srapi-border",
       className,
     )}

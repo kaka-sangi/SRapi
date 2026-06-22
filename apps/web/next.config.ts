@@ -19,6 +19,7 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   output: "standalone",
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
   // Pin Turbopack's workspace root explicitly to silence the multi-lockfile
   // inference warning (lockfiles at repo root + apps/web). It must be the repo
   // root, NOT apps/web: this app imports the generated SDK from

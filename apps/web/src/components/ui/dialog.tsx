@@ -34,13 +34,16 @@ export const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "srapi-anim-dialog tactile-card fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-w-lg max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-2xl border border-srapi-border bg-srapi-card p-6",
+        "srapi-anim-dialog tactile-card fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-w-lg max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-2xl border border-srapi-border bg-srapi-card p-7",
+        // Hairline terracotta seam along the top — a small editorial
+        // accent that anchors the modal without looking like a header bar.
+        "before:pointer-events-none before:absolute before:inset-x-7 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-srapi-primary/30 before:to-transparent",
         className,
       )}
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-lg p-1 text-srapi-text-secondary transition-colors hover:bg-srapi-card-muted hover:text-srapi-text-primary">
+      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-lg p-1.5 text-srapi-text-tertiary transition-[background-color,color,transform] duration-150 hover:scale-105 hover:bg-srapi-card-muted hover:text-srapi-text-primary">
         <X className="size-4" />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>

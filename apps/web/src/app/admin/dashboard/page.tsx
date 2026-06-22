@@ -289,10 +289,11 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
       {/* Token trend over the window */}
       <Card className="anim-rise-sm" style={rise(9)}>
         <CardContent>
-          <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+          <div className="flex items-center gap-2 font-mono text-2xs uppercase tracking-[0.18em] text-srapi-text-tertiary">
+            <span className="block h-px w-5 bg-srapi-border-strong" aria-hidden />
             {t("dashboard.tokenTrend")}
-          </span>
-          <div className="mt-3">
+          </div>
+          <div className="mt-4">
             {tokenTrend.length > 0 ? (
               <TrendChart
                 series={[
@@ -366,9 +367,15 @@ function SnapshotSummary({
   const windowText = `${formatDateTime(window.start)} - ${formatDateTime(window.end)}`;
 
   return (
-    <Card className="anim-rise-sm" style={rise(0)}>
-      <CardContent className="py-4">
-        <div className="grid gap-4 md:grid-cols-5">
+    <Card className="anim-rise-sm relative overflow-hidden" style={rise(0)}>
+      {/* A whisper-thin terracotta seam runs along the top to anchor the
+          snapshot band visually without adding chrome. */}
+      <div
+        className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-srapi-primary/35 to-transparent"
+        aria-hidden
+      />
+      <CardContent className="py-5">
+        <div className="grid gap-x-6 gap-y-4 md:grid-cols-5">
           <SummaryMetric
             label={t("dashboard.window")}
             value={windowText}
@@ -396,8 +403,8 @@ function SnapshotSummary({
             tone={traffic.error_requests > 0 ? "danger" : "success"}
           />
         </div>
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-srapi-border pt-3">
-          <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-srapi-border pt-3">
+          <span className="font-mono text-2xs uppercase tracking-[0.18em] text-srapi-text-tertiary">
             {t("dashboard.generatedAt")}
           </span>
           <span className="font-mono text-2xs text-srapi-text-secondary">
@@ -426,11 +433,13 @@ function SummaryMetric({
 }) {
   return (
     <div className={cn("min-w-0", className)}>
-      <div className="font-mono text-2xs uppercase text-srapi-text-tertiary">{label}</div>
+      <div className="font-mono text-2xs uppercase tracking-[0.16em] text-srapi-text-tertiary">
+        {label}
+      </div>
       <div
         className={cn(
-          "mt-1 truncate text-sm font-medium text-srapi-text-primary",
-          mono && "font-mono text-xs",
+          "mt-1.5 truncate font-serif text-lg leading-tight tracking-tight text-srapi-text-primary",
+          mono && "font-mono text-xs font-normal",
         )}
         title={value}
       >

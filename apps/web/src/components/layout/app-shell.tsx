@@ -53,19 +53,21 @@ function ShellInner({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-dvh w-full">
-      {/* Desktop sidebar — pinned flush to the left edge */}
-      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-srapi-border bg-srapi-card-muted p-4 lg:flex">
+      {/* Desktop sidebar — pinned flush to the left edge.
+          A 1px hard rule + soft inner-glow on the right edge mimics a folded
+          paper crease against the page surface. */}
+      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-srapi-border bg-srapi-card-muted/85 p-4 lg:flex shadow-[inset_-1px_0_0_var(--color-srapi-border),inset_-9px_0_18px_-12px_rgba(28,26,23,0.06)]">
         <SidebarBrand />
-        <div className="mt-2 flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="mt-3 flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <SidebarNav role={user.role} />
         </div>
-        <div className="mt-auto flex items-center gap-2.5 border-t border-srapi-border px-2 pt-4">
-          <div className="grid size-8 place-items-center rounded-full bg-srapi-primary/15 font-serif text-srapi-primary">
+        <div className="mt-auto flex items-center gap-3 border-t border-srapi-border pt-4">
+          <div className="grid size-9 place-items-center rounded-full bg-srapi-primary/12 font-serif text-base text-srapi-primary ring-1 ring-inset ring-srapi-primary/15">
             {(user.name?.[0] ?? "U").toUpperCase()}
           </div>
           <div className="min-w-0 text-xs leading-tight">
-            <div className="truncate text-srapi-text-primary">{user.name}</div>
-            <div className="truncate font-mono text-2xs text-srapi-text-secondary">{user.email}</div>
+            <div className="truncate font-medium text-srapi-text-primary">{user.name}</div>
+            <div className="truncate font-mono text-2xs text-srapi-text-tertiary">{user.email}</div>
           </div>
         </div>
       </aside>
@@ -86,7 +88,12 @@ function ShellInner({ children }: { children: React.ReactNode }) {
           <div className="flex min-w-0 flex-1 flex-col">
             <TopNav user={user} onOpenNav={() => setNavOpen(true)} live={live} />
             <main className="flex-1">
-              <div ref={pageRef} className="anim-page mx-auto w-full max-w-[1280px] space-y-6 p-5 sm:p-7">{children}</div>
+              <div
+                ref={pageRef}
+                className="anim-page mx-auto w-full max-w-[1320px] space-y-7 px-5 py-6 sm:px-8 sm:py-8 lg:px-10"
+              >
+                {children}
+              </div>
             </main>
           </div>
         </TourProvider>

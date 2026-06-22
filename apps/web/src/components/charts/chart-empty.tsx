@@ -20,12 +20,14 @@ export function ChartEmpty({
   return (
     <div
       className={cn(
-        "flex h-28 flex-col items-center justify-center gap-2 text-srapi-text-tertiary",
+        "relative flex h-32 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-srapi-border bg-srapi-card-muted/30 text-srapi-text-tertiary",
         className,
       )}
     >
-      <Icon className="size-5 opacity-50" strokeWidth={1.5} aria-hidden />
-      <span className="font-mono text-2xs">{label}</span>
+      <div className="grid size-9 place-items-center rounded-lg border border-srapi-border bg-srapi-card/80 text-srapi-text-tertiary">
+        <Icon className="size-4" strokeWidth={1.5} aria-hidden />
+      </div>
+      <span className="font-mono text-2xs uppercase tracking-[0.18em]">{label}</span>
     </div>
   );
 }

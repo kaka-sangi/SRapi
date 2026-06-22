@@ -36,7 +36,9 @@ export const TableHeader = React.forwardRef<
   <thead
     ref={ref}
     className={cn(
-      "border-b border-srapi-border text-left font-mono text-2xs uppercase text-srapi-text-tertiary [&_th]:font-medium",
+      // Header row sits on a sandy wash so it visually anchors the table to the
+      // page even when the parent card has no header chrome.
+      "border-b border-srapi-border-strong bg-srapi-card-muted/40 text-left font-mono text-2xs uppercase tracking-[0.12em] text-srapi-text-tertiary [&_th]:font-medium",
       className,
     )}
     {...props}
@@ -74,7 +76,7 @@ export const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      "h-10 px-3 align-middle first:pl-5 last:pr-5",
+      "h-11 px-3 align-middle first:pl-5 last:pr-5",
       numeric && "text-right font-mono tabular",
       className,
     )}

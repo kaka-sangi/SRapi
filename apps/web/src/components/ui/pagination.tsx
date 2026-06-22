@@ -29,8 +29,10 @@ export function Pagination({
   const label = labelFor ? labelFor(from, to, total) : `${from}–${to} / ${total}`;
 
   return (
-    <div className="flex items-center justify-between gap-3 px-5 py-3">
-      <span className="font-mono text-2xs text-srapi-text-secondary">{label}</span>
+    <div className="flex items-center justify-between gap-3 border-t border-srapi-border bg-srapi-card-muted/40 px-5 py-3">
+      <span className="font-mono text-2xs uppercase tracking-wider text-srapi-text-tertiary">
+        {label}
+      </span>
       <div className="flex items-center gap-1.5">
         <Button
           variant="outline"

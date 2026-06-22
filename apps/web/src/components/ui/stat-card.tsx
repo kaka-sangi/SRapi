@@ -91,26 +91,37 @@ export function StatCard({
   const display = isNum ? (format ? format(counted) : String(Math.round(counted))) : value;
 
   return (
-    <Card className={cn("flex flex-col p-5", className)} style={style}>
+    <Card
+      className={cn(
+        "group relative flex flex-col overflow-hidden p-5",
+        // A 1px ember accent runs along the top edge — quiet by default,
+        // saturates on hover. Replaces the generic "colored card" trope.
+        "before:pointer-events-none before:absolute before:inset-x-5 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-srapi-border-strong before:to-transparent before:opacity-70 before:transition-opacity before:duration-200 hover:before:via-srapi-primary/45 hover:before:opacity-100",
+        className,
+      )}
+      style={style}
+    >
       <div className="flex items-center justify-between">
-        <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">{label}</span>
+        <span className="font-mono text-2xs uppercase tracking-[0.18em] text-srapi-text-tertiary">
+          {label}
+        </span>
         {trend && (
           <span
             className={cn(
-              "font-mono text-2xs tabular",
-              trend.dir === "up" ? "text-srapi-success" : "text-srapi-error",
+              "inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 font-mono text-[10px] tabular",
+              trend.dir === "up"
+                ? "border-srapi-success/25 bg-srapi-success/10 text-srapi-success"
+                : "border-srapi-error/25 bg-srapi-error/10 text-srapi-error",
             )}
           >
             {trend.dir === "up" ? "↑" : "↓"} {trend.text}
           </span>
         )}
       </div>
-      <div className="mt-3 font-serif text-3xl leading-none text-srapi-text-primary tabular">
-        {display}
+      <div className="mt-3 flex items-baseline gap-1.5 font-serif text-[2.5rem] leading-none tracking-tight text-srapi-text-primary tabular">
+        <span>{display}</span>
         {unit && (
-          <span className="ml-1.5 text-sm font-sans font-normal text-srapi-text-tertiary">
-            {unit}
-          </span>
+          <span className="font-sans text-sm font-normal text-srapi-text-tertiary">{unit}</span>
         )}
       </div>
       {spark && spark.length >= 2 && (
@@ -118,7 +129,9 @@ export function StatCard({
           <Sparkline values={spark} ariaLabel={label} className="h-8" />
         </div>
       )}
-      {hint && <div className="mt-2.5 font-mono text-2xs text-srapi-text-tertiary">{hint}</div>}
+      {hint && (
+        <div className="mt-2.5 font-mono text-2xs text-srapi-text-tertiary">{hint}</div>
+      )}
     </Card>
   );
 }
