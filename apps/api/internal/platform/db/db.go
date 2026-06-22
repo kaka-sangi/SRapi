@@ -38,6 +38,9 @@ func Open(cfg config.DependencyConfig) (*Client, error) {
 	if cfg.ConnMaxLifetimeSeconds > 0 {
 		db.SetConnMaxLifetime(time.Duration(cfg.ConnMaxLifetimeSeconds) * time.Second)
 	}
+	if cfg.ConnMaxIdleTimeSeconds > 0 {
+		db.SetConnMaxIdleTime(time.Duration(cfg.ConnMaxIdleTimeSeconds) * time.Second)
+	}
 	return &Client{
 		db:  db,
 		ent: ent.NewClient(ent.Driver(entsql.OpenDB(dialect.Postgres, db))),

@@ -18,6 +18,12 @@
 # DATABASE_USER: srapi
 # DATABASE_PASSWORD: ""
 # DATABASE_SSLMODE: disable
+# Connection-pool tuning. Size MAX_OPEN_CONNS so (replicas * MAX_OPEN_CONNS)
+# stays under Postgres max_connections. 0 = driver default (unbounded open).
+# DATABASE_MAX_OPEN_CONNS: "25"
+# DATABASE_MAX_IDLE_CONNS: "10"
+# DATABASE_CONN_MAX_LIFETIME_SECONDS: "1800"
+# DATABASE_CONN_MAX_IDLE_TIME_SECONDS: "300"
 
 # --- Redis ---
 # REDIS_HOST: localhost

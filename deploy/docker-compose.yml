@@ -64,6 +64,10 @@ services:
       DATABASE_PASSWORD: ${DATABASE_PASSWORD:-srapi_dev_password_change_me}
       DATABASE_DBNAME: ${DATABASE_DBNAME:-srapi}
       DATABASE_SSLMODE: ${DATABASE_SSLMODE:-disable}
+      DATABASE_MAX_OPEN_CONNS: ${DATABASE_MAX_OPEN_CONNS:-25}
+      DATABASE_MAX_IDLE_CONNS: ${DATABASE_MAX_IDLE_CONNS:-10}
+      DATABASE_CONN_MAX_LIFETIME_SECONDS: ${DATABASE_CONN_MAX_LIFETIME_SECONDS:-1800}
+      DATABASE_CONN_MAX_IDLE_TIME_SECONDS: ${DATABASE_CONN_MAX_IDLE_TIME_SECONDS:-300}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
@@ -117,6 +121,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     deploy:
       resources:
         limits:

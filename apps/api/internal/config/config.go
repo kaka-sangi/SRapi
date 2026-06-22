@@ -164,9 +164,10 @@ type DependencyConfig struct {
 	Database string
 	SSLMode  string
 	// Connection-pool tuning (database only; zero = driver default).
-	MaxOpenConns           int
-	MaxIdleConns           int
-	ConnMaxLifetimeSeconds int
+	MaxOpenConns            int
+	MaxIdleConns            int
+	ConnMaxLifetimeSeconds  int
+	ConnMaxIdleTimeSeconds  int
 	// Redis connection-pool and timeout tuning (zero = go-redis default).
 	PoolSize            int
 	MinIdleConns        int
@@ -372,9 +373,10 @@ func Load() Config {
 			Password:               getEnv("DATABASE_PASSWORD", ""),
 			Database:               getEnv("DATABASE_DBNAME", "srapi"),
 			SSLMode:                getEnv("DATABASE_SSLMODE", "disable"),
-			MaxOpenConns:           getIntEnv("DATABASE_MAX_OPEN_CONNS", 50),
-			MaxIdleConns:           getIntEnv("DATABASE_MAX_IDLE_CONNS", 20),
+			MaxOpenConns:           getIntEnv("DATABASE_MAX_OPEN_CONNS", 25),
+			MaxIdleConns:           getIntEnv("DATABASE_MAX_IDLE_CONNS", 10),
 			ConnMaxLifetimeSeconds: getIntEnv("DATABASE_CONN_MAX_LIFETIME_SECONDS", 1800),
+			ConnMaxIdleTimeSeconds: getIntEnv("DATABASE_CONN_MAX_IDLE_TIME_SECONDS", 300),
 		},
 		Redis: DependencyConfig{
 			Host:                getEnv("REDIS_HOST", "localhost"),
