@@ -320,6 +320,13 @@ type runtimeState struct {
 	// admin SSE subscribers receive them live with a 256-entry per-subscriber
 	// buffer (drop-on-overflow). Always non-nil after newRuntimeState.
 	errorEventStream *erroreventstreamservice.MemoryPublisher
+
+	// copilotSummary* caches the system-state snapshot used in the copilot's
+	// system prompt so we don't re-query accounts/providers/models on every
+	// chat message (TTL: 60 s).
+	copilotSummaryCache    string
+	copilotSummaryCachedAt time.Time
+	copilotSummaryMu       sync.Mutex
 }
 
 type dependencyHealth struct {

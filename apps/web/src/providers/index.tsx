@@ -7,6 +7,7 @@ import { ToastUIProvider } from "@/context/ToastContext";
 import { CopilotSessionProvider } from "@/context/CopilotSessionContext";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { MaintenanceBanner } from "@/components/layout/maintenance-banner";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 
 export function Providers({
   children,
@@ -26,8 +27,10 @@ export function Providers({
               {/* Holds the copilot chat session + in-flight stream above the
                   router so generation survives client-side navigation. */}
               <CopilotSessionProvider>
-                <MaintenanceBanner />
-                {children}
+                <ErrorBoundary>
+                  <MaintenanceBanner />
+                  {children}
+                </ErrorBoundary>
               </CopilotSessionProvider>
             </ToastUIProvider>
           </TooltipProvider>

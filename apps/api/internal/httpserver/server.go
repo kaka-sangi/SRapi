@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -678,7 +679,7 @@ func newWithServer(cfg config.Config, logger *slog.Logger, options ...Option) (h
 	// require operator-only routes to be re-resolved; it only intercepts the
 	// public gateway namespaces, leaving the admin console reachable.
 	gated := server.maintenanceGateMiddleware(handler)
-	return securityHeadersMiddleware(requestIDMiddleware(server.tracingMiddleware(server.gatewayConcurrencyMiddleware(gated)))), server
+	return recoverMiddleware(logger, corsMiddleware(securityHeadersMiddleware(requestIDMiddleware(server.tracingMiddleware(server.gatewayConcurrencyMiddleware(gated)))))), server
 }
 
 func (s *Server) registerAdminBillingRoutes(mux *http.ServeMux) {
@@ -1038,6 +1039,54 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 		h.Set("X-Frame-Options", "DENY")
 		h.Set("Referrer-Policy", "no-referrer")
 		h.Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+		next.ServeHTTP(w, r)
+	})
+}
+
+func recoverMiddleware(logger *slog.Logger, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if rec := recover(); rec != nil {
+				if logger != nil {
+					logger.Error("handler panic recovered",
+						"panic", rec,
+						"method", r.Method,
+						"path", r.URL.Path,
+						"stack", string(debug.Stack()),
+					)
+				}
+				if !headersSent(w) {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusInternalServerError)
+					_, _ = w.Write([]byte(`{"error":{"code":"INTERNAL_ERROR","message":"internal server error"}}`))
+				}
+			}
+		}()
+		next.ServeHTTP(w, r)
+	})
+}
+
+func headersSent(w http.ResponseWriter) bool {
+	if rw, ok := w.(*traceResponseWriter); ok {
+		return rw.wroteHeader
+	}
+	return false
+}
+
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+		if origin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token, X-Request-ID")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Max-Age", "86400")
+		}
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		next.ServeHTTP(w, r)
 	})
 }

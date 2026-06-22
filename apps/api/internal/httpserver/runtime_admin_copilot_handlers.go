@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"time"
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/copilot"
@@ -569,11 +570,23 @@ func (s *Server) copilotModelList(ctx context.Context, settings copilot.Settings
 	return models, protocol
 }
 
+const copilotSummaryCacheTTL = 60 * time.Second
+
 // buildCopilotSummary produces a compact text snapshot of the system state for
 // the copilot's system prompt — counts, health, etc. so the model starts with
 // situational awareness and can give more relevant first responses. Best-effort:
-// any error silently yields an empty string.
+// any error silently yields an empty string. Results are cached for 60 seconds
+// to avoid re-querying accounts/providers/models on every chat message.
 func (s *Server) buildCopilotSummary(ctx context.Context) string {
+	s.runtime.copilotSummaryMu.Lock()
+	if time.Since(s.runtime.copilotSummaryCachedAt) < copilotSummaryCacheTTL {
+		cached := s.runtime.copilotSummaryCache
+		s.runtime.copilotSummaryMu.Unlock()
+		return cached
+	}
+	s.runtime.copilotSummaryMu.Unlock()
+
+	// Build fresh summary.
 	var parts []string
 
 	// Accounts summary
@@ -603,10 +616,17 @@ func (s *Server) buildCopilotSummary(ctx context.Context) string {
 		parts = append(parts, fmt.Sprintf("Models: %d defined", len(models)))
 	}
 
-	if len(parts) == 0 {
-		return ""
+	var result string
+	if len(parts) > 0 {
+		result = "Current system state:\n" + strings.Join(parts, "\n")
 	}
-	return "Current system state:\n" + strings.Join(parts, "\n")
+
+	// Cache the result.
+	s.runtime.copilotSummaryMu.Lock()
+	s.runtime.copilotSummaryCache = result
+	s.runtime.copilotSummaryCachedAt = time.Now()
+	s.runtime.copilotSummaryMu.Unlock()
+	return result
 }
 
 // accountSupportedModels reads the model ids discovered for an account.

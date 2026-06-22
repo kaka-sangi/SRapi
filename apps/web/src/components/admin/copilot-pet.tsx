@@ -6,6 +6,7 @@ import Link from "next/link";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X, ExternalLink, Keyboard } from "lucide-react";
 import { CopilotChat } from "@/components/admin/copilot-chat";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { useAdminCopilotConfig } from "@/hooks/admin-queries";
 import { useCopilotSession } from "@/context/CopilotSessionContext";
 import { useLanguage } from "@/context/LanguageContext";
@@ -125,7 +126,9 @@ export function CopilotPet() {
           </header>
           {showShortcuts ? <ShortcutsList /> : null}
           <div className="min-h-0 flex-1 px-4 pb-3">
-            <CopilotChat models={cfg.models ?? []} defaultModel={cfg.model ?? ""} />
+            <ErrorBoundary>
+              <CopilotChat models={cfg.models ?? []} defaultModel={cfg.model ?? ""} />
+            </ErrorBoundary>
           </div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

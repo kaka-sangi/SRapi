@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"reflect"
+	"sync"
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/config"
@@ -123,6 +125,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		Addr:              cfg.Address(),
 		Handler:           handler,
 		ReadHeaderTimeout: defaultReadHeaderTimeout,
+		IdleTimeout:       120 * time.Second,
 	}
 	return &App{
 		cfg:        cfg,
@@ -1058,77 +1061,38 @@ func (w appWorkers) start(ctx context.Context) {
 }
 
 func (w appWorkers) shutdown(ctx context.Context) error {
-	var errs []error
-	if w.outbox != nil {
-		errs = append(errs, w.outbox.Shutdown(ctx))
+	type shutdowner interface {
+		Shutdown(context.Context) error
 	}
-	if w.retention != nil {
-		errs = append(errs, w.retention.Shutdown(ctx))
+	all := []shutdowner{
+		w.outbox, w.retention, w.availability, w.backup,
+		w.authClean, w.idemClean, w.quotaRefresh, w.tokenRefresh,
+		w.liteLLMPricing, w.connectivityTest, w.scheduledTest,
+		w.channelMonitor, w.proxyProbe, w.expirer, w.reconcile,
+		w.subExpiry, w.quota, w.balance, w.health, w.quality,
+		w.sloEval, w.alertNotifications, w.usageReconciler,
 	}
-	if w.availability != nil {
-		errs = append(errs, w.availability.Shutdown(ctx))
+	var wg sync.WaitGroup
+	errs := make(chan error, len(all))
+	for _, s := range all {
+		if s == nil || reflect.ValueOf(s).IsNil() {
+			continue
+		}
+		wg.Add(1)
+		go func(s shutdowner) {
+			defer wg.Done()
+			if err := s.Shutdown(ctx); err != nil {
+				errs <- err
+			}
+		}(s)
 	}
-	if w.backup != nil {
-		errs = append(errs, w.backup.Shutdown(ctx))
+	wg.Wait()
+	close(errs)
+	var collected []error
+	for err := range errs {
+		collected = append(collected, err)
 	}
-	if w.authClean != nil {
-		errs = append(errs, w.authClean.Shutdown(ctx))
-	}
-	if w.idemClean != nil {
-		errs = append(errs, w.idemClean.Shutdown(ctx))
-	}
-	if w.expirer != nil {
-		errs = append(errs, w.expirer.Shutdown(ctx))
-	}
-	if w.reconcile != nil {
-		errs = append(errs, w.reconcile.Shutdown(ctx))
-	}
-	if w.subExpiry != nil {
-		errs = append(errs, w.subExpiry.Shutdown(ctx))
-	}
-	if w.quota != nil {
-		errs = append(errs, w.quota.Shutdown(ctx))
-	}
-	if w.balance != nil {
-		errs = append(errs, w.balance.Shutdown(ctx))
-	}
-	if w.usageReconciler != nil {
-		errs = append(errs, w.usageReconciler.Shutdown(ctx))
-	}
-	if w.health != nil {
-		errs = append(errs, w.health.Shutdown(ctx))
-	}
-	if w.quality != nil {
-		errs = append(errs, w.quality.Shutdown(ctx))
-	}
-	if w.sloEval != nil {
-		errs = append(errs, w.sloEval.Shutdown(ctx))
-	}
-	if w.alertNotifications != nil {
-		errs = append(errs, w.alertNotifications.Shutdown(ctx))
-	}
-	if w.quotaRefresh != nil {
-		errs = append(errs, w.quotaRefresh.Shutdown(ctx))
-	}
-	if w.liteLLMPricing != nil {
-		errs = append(errs, w.liteLLMPricing.Shutdown(ctx))
-	}
-	if w.connectivityTest != nil {
-		errs = append(errs, w.connectivityTest.Shutdown(ctx))
-	}
-	if w.scheduledTest != nil {
-		errs = append(errs, w.scheduledTest.Shutdown(ctx))
-	}
-	if w.channelMonitor != nil {
-		errs = append(errs, w.channelMonitor.Shutdown(ctx))
-	}
-	if w.proxyProbe != nil {
-		errs = append(errs, w.proxyProbe.Shutdown(ctx))
-	}
-	if w.tokenRefresh != nil {
-		errs = append(errs, w.tokenRefresh.Shutdown(ctx))
-	}
-	return errors.Join(errs...)
+	return errors.Join(collected...)
 }
 
 type dependencyPinger interface {
