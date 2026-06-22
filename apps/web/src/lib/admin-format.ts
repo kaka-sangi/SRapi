@@ -1,6 +1,6 @@
 "use client";
 
-import type { BadgeProps } from "@/components/ui";
+import type { BadgeProps } from "@/components/ui/badge";
 
 export function formatInteger(value: number | null | undefined): string {
   if (typeof value !== "number" || !Number.isFinite(value)) {

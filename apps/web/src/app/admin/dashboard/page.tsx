@@ -181,11 +181,8 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
     <div className="space-y-5">
       <SnapshotSummary snapshot={snapshot} errorRate={errorRate} />
 
-      {/* KPI grid — surfaces traffic, tokens, cost tiers, throughput, latency, users.
-          Six tiles fit a single row on xl+ displays so the operator can read the whole
-          KPI band without scrolling. Stays 2-up on mobile and 3-up on lg for
-          comfortable card sizing. */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-8">
+      {/* KPI grid — 2 rows × 4 columns on lg+, 2-up on mobile. */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div className="anim-rise-sm" style={rise(0)}>
           <StatCard
             className="h-full"
