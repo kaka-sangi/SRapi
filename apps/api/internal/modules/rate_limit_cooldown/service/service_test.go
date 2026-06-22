@@ -134,6 +134,72 @@ func TestConsecutiveDisable_EscalatesToTempDisable_PerModel(t *testing.T) {
 	}
 }
 
+func TestConsecutiveDisable_ExponentialBackoff(t *testing.T) {
+	svc, clock := newTestService(t)
+	t0 := time.Unix(30_000, 0)
+
+	// Record exactly consecutiveDisableThreshold hits (5) → base cooldown (10 min).
+	for i := 0; i < consecutiveDisableThreshold; i++ {
+		setClock(clock, t0.Add(time.Duration(i)*time.Second))
+		svc.RecordRateLimitHit(50, "model-exp", 1*time.Second)
+	}
+	active, unblock := svc.IsAccountInCooldown(50, "model-exp")
+	if !active {
+		t.Fatal("expected temp-disable at threshold")
+	}
+	dur5 := unblock.Sub(t0.Add(time.Duration(consecutiveDisableThreshold-1) * time.Second))
+	if dur5 != baseCooldown {
+		t.Fatalf("5 hits: want %v, got %v", baseCooldown, dur5)
+	}
+
+	// 6th hit → 20 min.
+	setClock(clock, t0.Add(time.Duration(consecutiveDisableThreshold)*time.Second))
+	svc.RecordRateLimitHit(50, "model-exp", 1*time.Second)
+	_, unblock = svc.IsAccountInCooldown(50, "model-exp")
+	dur6 := unblock.Sub(t0.Add(time.Duration(consecutiveDisableThreshold) * time.Second))
+	if dur6 != 2*baseCooldown {
+		t.Fatalf("6 hits: want %v, got %v", 2*baseCooldown, dur6)
+	}
+
+	// 7th hit → 30 min (cap).
+	setClock(clock, t0.Add(time.Duration(consecutiveDisableThreshold+1)*time.Second))
+	svc.RecordRateLimitHit(50, "model-exp", 1*time.Second)
+	_, unblock = svc.IsAccountInCooldown(50, "model-exp")
+	dur7 := unblock.Sub(t0.Add(time.Duration(consecutiveDisableThreshold+1) * time.Second))
+	if dur7 != maxDisableCooldown {
+		t.Fatalf("7 hits: want %v, got %v", maxDisableCooldown, dur7)
+	}
+
+	// 8th hit → still 30 min (cap).
+	setClock(clock, t0.Add(time.Duration(consecutiveDisableThreshold+2)*time.Second))
+	svc.RecordRateLimitHit(50, "model-exp", 1*time.Second)
+	_, unblock = svc.IsAccountInCooldown(50, "model-exp")
+	dur8 := unblock.Sub(t0.Add(time.Duration(consecutiveDisableThreshold+2) * time.Second))
+	if dur8 != maxDisableCooldown {
+		t.Fatalf("8 hits: want %v (cap), got %v", maxDisableCooldown, dur8)
+	}
+}
+
+func TestEscalatedCooldown_Values(t *testing.T) {
+	tests := []struct {
+		hits int
+		want time.Duration
+	}{
+		{4, baseCooldown},           // below threshold, exponent clamped to 0
+		{5, baseCooldown},           // 2^0 = 1x
+		{6, 2 * baseCooldown},      // 2^1 = 2x
+		{7, maxDisableCooldown},     // 2^2 = 4x but capped at 30 min
+		{8, maxDisableCooldown},     // still capped
+		{20, maxDisableCooldown},    // large value, still capped
+	}
+	for _, tt := range tests {
+		got := escalatedCooldown(tt.hits)
+		if got != tt.want {
+			t.Errorf("escalatedCooldown(%d) = %v, want %v", tt.hits, got, tt.want)
+		}
+	}
+}
+
 func TestConsecutiveDisable_WindowSlidesOff(t *testing.T) {
 	svc, clock := newTestService(t)
 	t0 := time.Unix(20_000, 0)

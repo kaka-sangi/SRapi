@@ -38,7 +38,12 @@ const (
 	// temp-disable.
 	consecutiveDisableThreshold = 5
 	consecutiveWindow           = 10 * time.Minute
-	disableCooldown             = 10 * time.Minute
+	// baseCooldown is the temp-disable duration when hits first reach
+	// consecutiveDisableThreshold.  Each additional hit doubles it up to
+	// maxDisableCooldown:
+	//   5 hits → 10 min, 6 → 20 min, 7+ → 30 min (cap).
+	baseCooldown       = 10 * time.Minute
+	maxDisableCooldown = 30 * time.Minute
 
 	// minCooldown clamps a zero/negative retryAfter to a deterministic
 	// minimum so any record always carries a real cooldown window.
@@ -129,7 +134,7 @@ func (s *Service) RecordRateLimitHit(accountID int64, model string, retryAfter t
 	entry.hits = filtered
 
 	if len(entry.hits) >= consecutiveDisableThreshold {
-		disableUntil := now.Add(disableCooldown)
+		disableUntil := now.Add(escalatedCooldown(len(entry.hits)))
 		if disableUntil.After(entry.tempDisabledUntil) {
 			entry.tempDisabledUntil = disableUntil
 		}
@@ -294,6 +299,24 @@ func (s *Service) checkLocked(key Key, now time.Time) (bool, time.Time) {
 	delete(s.entries, key)
 	s.order.Remove(elem)
 	return false, time.Time{}
+}
+
+// escalatedCooldown computes the temp-disable duration using exponential
+// backoff: baseCooldown * 2^(hits - threshold), capped at maxDisableCooldown.
+//
+//	5 hits → 10 min (base)
+//	6 hits → 20 min
+//	7+ hits → 30 min (cap)
+func escalatedCooldown(hits int) time.Duration {
+	exponent := hits - consecutiveDisableThreshold
+	if exponent < 0 {
+		exponent = 0
+	}
+	d := baseCooldown << exponent // baseCooldown * 2^exponent
+	if d > maxDisableCooldown {
+		return maxDisableCooldown
+	}
+	return d
 }
 
 func normalizeKey(accountID int64, model string) Key {
