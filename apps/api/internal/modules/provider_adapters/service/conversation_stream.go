@@ -450,10 +450,11 @@ func (s *Service) streamReverseProxyCodexResponses(ctx context.Context, streamer
 }
 
 type codexExposeStreamBodyReader struct {
-	upstream io.ReadCloser
-	scanner  *bufio.Scanner
-	state    CodexIdentityConfuseState
-	release  func()
+	upstream       io.ReadCloser
+	scanner        *bufio.Scanner
+	releaseScanner func() // returns the pooled scan buffer
+	state          CodexIdentityConfuseState
+	release        func()
 
 	frame  bytes.Buffer
 	out    bytes.Buffer
@@ -474,13 +475,13 @@ func codexExposeStreamBody(upstream io.ReadCloser, state CodexIdentityConfuseSta
 	if !state.Enabled {
 		return &codexReleaseStreamBody{upstream: upstream, release: release}
 	}
-	scanner := bufio.NewScanner(upstream)
-	scanner.Buffer(make([]byte, 0, 64*1024), 52_428_800)
+	scanner, releaseBuf := acquireSSEScanner(upstream, 52_428_800)
 	return &codexExposeStreamBodyReader{
-		upstream: upstream,
-		scanner:  scanner,
-		state:    state,
-		release:  release,
+		upstream:       upstream,
+		scanner:        scanner,
+		releaseScanner: releaseBuf,
+		state:          state,
+		release:        release,
 	}
 }
 
@@ -529,6 +530,10 @@ func (r *codexExposeStreamBodyReader) Close() error {
 		return nil
 	}
 	r.closed = true
+	if r.releaseScanner != nil {
+		r.releaseScanner()
+		r.releaseScanner = nil
+	}
 	var err error
 	if r.upstream != nil {
 		err = r.upstream.Close()

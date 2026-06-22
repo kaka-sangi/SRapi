@@ -1,7 +1,6 @@
 package service
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -315,8 +314,8 @@ func newOpenAICompatibleImageStreamBody(upstream io.ReadCloser, req contract.Ima
 }
 
 func transformOpenAICompatibleImageStream(upstream io.Reader, downstream io.Writer, req contract.ImageGenerationRequest) error {
-	scanner := bufio.NewScanner(upstream)
-	scanner.Buffer(make([]byte, 0, 64*1024), 52_428_800)
+	scanner, releaseScanner := acquireSSEScanner(upstream, 52_428_800)
+	defer releaseScanner()
 	acc := newSSEFrameAccumulator()
 	state := newOpenAICompatibleImageStreamState(req)
 	for scanner.Scan() {

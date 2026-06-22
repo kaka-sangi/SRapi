@@ -33,8 +33,9 @@ const codexChatStreamRawCap = 16 << 20
 // parseCodexResponsesBody — keeping billing accurate without re-deriving token
 // accounting here.
 type codexChatStreamReader struct {
-	upstream io.ReadCloser
-	scanner  *bufio.Scanner
+	upstream       io.ReadCloser
+	scanner        *bufio.Scanner
+	releaseScanner func() // returns the pooled scan buffer
 
 	out bytes.Buffer // pending transformed chat SSE bytes awaiting Read
 	raw bytes.Buffer // accumulated raw upstream SSE (capped) for final usage parse
@@ -56,18 +57,18 @@ type codexChatStreamReader struct {
 }
 
 func newCodexChatStreamReader(upstream io.ReadCloser, req contract.ConversationRequest) *codexChatStreamReader {
-	scanner := bufio.NewScanner(upstream)
-	scanner.Buffer(make([]byte, 0, 64*1024), 4<<20)
+	scanner, release := acquireSSEScanner(upstream, 4<<20)
 	id := strings.TrimSpace(req.RequestID)
 	if id == "" {
 		id = "codex_stream"
 	}
 	return &codexChatStreamReader{
-		upstream: upstream,
-		scanner:  scanner,
-		id:       "chatcmpl_" + id,
-		model:    strings.TrimSpace(req.Model),
-		created:  time.Now().Unix(),
+		upstream:       upstream,
+		scanner:        scanner,
+		releaseScanner: release,
+		id:             "chatcmpl_" + id,
+		model:          strings.TrimSpace(req.Model),
+		created:        time.Now().Unix(),
 	}
 }
 
@@ -82,6 +83,10 @@ func (r *codexChatStreamReader) Read(p []byte) (int, error) {
 }
 
 func (r *codexChatStreamReader) Close() error {
+	if r.releaseScanner != nil {
+		r.releaseScanner()
+		r.releaseScanner = nil
+	}
 	if r.upstream != nil {
 		return r.upstream.Close()
 	}

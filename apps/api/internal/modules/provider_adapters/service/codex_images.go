@@ -1,7 +1,6 @@
 package service
 
 import (
-	"bufio"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -560,8 +559,8 @@ func newCodexImageGenerationStreamBody(upstream io.ReadCloser, req contract.Imag
 }
 
 func transformCodexImageGenerationStream(upstream io.Reader, downstream io.Writer, req contract.ImageGenerationRequest) error {
-	scanner := bufio.NewScanner(upstream)
-	scanner.Buffer(make([]byte, 0, 64*1024), 52_428_800)
+	scanner, releaseScanner := acquireSSEScanner(upstream, 52_428_800)
+	defer releaseScanner()
 	pending := make([]codexResponsesOutputItem, 0, 1)
 	streamMeta := codexImageGenerationStreamMetaFromRequest(req)
 	createdAt := time.Now().Unix()

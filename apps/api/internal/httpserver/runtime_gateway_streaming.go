@@ -489,6 +489,9 @@ readLoop:
 			if sc.err != nil {
 				if sc.err != io.EOF {
 					interrupted = true
+					// Inject an in-band error event so the client knows the
+					// stream was interrupted rather than seeing a silent close.
+					_ = writeSSEStreamError(w, flusher, "upstream image stream interrupted", "upstream_stream_error", http.StatusBadGateway)
 				}
 				break readLoop
 			}
