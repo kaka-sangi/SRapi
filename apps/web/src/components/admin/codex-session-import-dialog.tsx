@@ -228,7 +228,7 @@ export function CodexSessionImportDialog({
 export function CodexImportResultPanel({ result }: { result: CodexSessionImportResult }) {
   const { t } = useLanguage();
   return (
-    <div className="space-y-3 rounded-md border border-srapi-border bg-srapi-card-muted p-3">
+    <div className="space-y-3 rounded-2xl border border-srapi-border bg-srapi-card-muted p-3.5">
       <div className="grid grid-cols-4 gap-2 text-center">
         <CodexStat label={t("codexImport.created")} value={result.created} tone="success" />
         <CodexStat label={t("codexImport.updated")} value={result.updated} />
@@ -275,9 +275,11 @@ function CodexStat({
         ? "text-srapi-error"
         : "text-srapi-text-primary";
   return (
-    <div>
-      <div className={`text-lg font-semibold ${toneClass}`}>{value}</div>
-      <div className="text-xs text-srapi-text-tertiary">{label}</div>
+    <div className="rounded-xl bg-srapi-card px-2 py-2">
+      <div className={`text-2xl font-semibold tracking-tight tabular ${toneClass}`}>{value}</div>
+      <div className="mt-0.5 text-[11px] font-medium uppercase tracking-[0.08em] text-srapi-text-tertiary">
+        {label}
+      </div>
     </div>
   );
 }

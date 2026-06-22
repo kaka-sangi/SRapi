@@ -36,11 +36,11 @@ function CodeBlock({ children }: { children?: ReactNode }) {
         type="button"
         onClick={copy}
         aria-label={t("copilot.copyCode")}
-        className="absolute right-2 top-2 rounded-md border border-srapi-border bg-srapi-card/80 p-1 text-srapi-text-tertiary opacity-0 transition-opacity hover:text-srapi-text-primary group-hover:opacity-100"
+        className="absolute right-2 top-2 rounded-lg bg-srapi-card/90 p-1.5 text-srapi-text-tertiary opacity-0 shadow-sm transition-opacity hover:text-srapi-text-primary group-hover:opacity-100"
       >
         {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
       </button>
-      <pre className="overflow-x-auto rounded-lg border border-srapi-border bg-srapi-card-muted/60 p-3 text-xs">
+      <pre className="overflow-x-auto rounded-xl bg-srapi-card-muted p-4 text-xs leading-relaxed">
         {children}
       </pre>
     </div>
@@ -64,14 +64,26 @@ export function Markdown({ children, className }: { children: string; className?
             </a>
           ),
           strong: ({ children }) => <strong className="font-semibold text-srapi-text-primary">{children}</strong>,
-          ul: ({ children }) => <ul className="list-disc space-y-1 pl-5">{children}</ul>,
-          ol: ({ children }) => <ol className="list-decimal space-y-1 pl-5">{children}</ol>,
-          li: ({ children }) => <li className="marker:text-srapi-text-tertiary">{children}</li>,
-          h1: ({ children }) => <h1 className="font-serif text-lg text-srapi-text-primary">{children}</h1>,
-          h2: ({ children }) => <h2 className="font-serif text-base text-srapi-text-primary">{children}</h2>,
-          h3: ({ children }) => <h3 className="font-serif text-sm font-semibold text-srapi-text-primary">{children}</h3>,
+          ul: ({ children }) => (
+            <ul className="list-disc space-y-1 pl-5 marker:text-srapi-text-tertiary">{children}</ul>
+          ),
+          ol: ({ children }) => (
+            <ol className="list-decimal space-y-1 pl-5 marker:text-srapi-text-tertiary">{children}</ol>
+          ),
+          li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+          h1: ({ children }) => (
+            <h1 className="text-lg font-semibold tracking-tight text-srapi-text-primary">{children}</h1>
+          ),
+          h2: ({ children }) => (
+            <h2 className="text-base font-semibold tracking-tight text-srapi-text-primary">{children}</h2>
+          ),
+          h3: ({ children }) => (
+            <h3 className="text-sm font-semibold tracking-tight text-srapi-text-primary">{children}</h3>
+          ),
           blockquote: ({ children }) => (
-            <blockquote className="border-l-2 border-srapi-border pl-3 text-srapi-text-secondary">{children}</blockquote>
+            <blockquote className="rounded-r-xl border-l-2 border-srapi-primary bg-srapi-card-muted/60 px-3 py-2 text-srapi-text-secondary">
+              {children}
+            </blockquote>
           ),
           hr: () => <hr className="border-srapi-border" />,
           code: ({ className: cls, children }) => {
@@ -80,24 +92,28 @@ export function Markdown({ children, className }: { children: string; className?
               return <code className="font-mono text-xs">{children}</code>;
             }
             return (
-              <code className="rounded bg-srapi-card-muted px-1 py-0.5 font-mono text-[0.85em] text-srapi-text-primary">
+              <code className="rounded-md bg-srapi-card-muted px-1.5 py-0.5 font-mono text-[0.85em] text-srapi-text-primary">
                 {children}
               </code>
             );
           },
           pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,
           table: ({ children }) => (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto rounded-xl border border-srapi-border">
               <table className="w-full border-collapse text-xs">{children}</table>
             </div>
           ),
-          thead: ({ children }) => <thead className="bg-srapi-card-muted/50">{children}</thead>,
-          th: ({ children }) => (
-            <th className="border border-srapi-border px-2 py-1 text-left font-medium text-srapi-text-secondary">
+          thead: ({ children }) => (
+            <thead className="bg-srapi-card-muted text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
               {children}
-            </th>
+            </thead>
           ),
-          td: ({ children }) => <td className="border border-srapi-border px-2 py-1 align-top">{children}</td>,
+          th: ({ children }) => (
+            <th className="border-b border-srapi-border px-3 py-2 text-left font-semibold">{children}</th>
+          ),
+          td: ({ children }) => (
+            <td className="border-b border-srapi-border/60 px-3 py-2 align-top last:border-0">{children}</td>
+          ),
         }}
       >
         {children}

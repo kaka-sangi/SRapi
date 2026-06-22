@@ -48,15 +48,15 @@ function UsageBar({
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-2 text-2xs">
+      <div className="flex items-center justify-between gap-2 text-[11px]">
         <span className="text-srapi-text-secondary">{label}</span>
-        <span className="font-mono text-srapi-text-tertiary">
+        <span className="tabular text-srapi-text-tertiary">
           {formatMoney(value, "USD")}
           {secondary}
         </span>
       </div>
       <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-srapi-card-muted">
-        <div className="h-full rounded-full bg-srapi-accent" style={{ width: `${percent}%` }} />
+        <div className="h-full rounded-full bg-srapi-primary" style={{ width: `${percent}%` }} />
       </div>
     </div>
   );

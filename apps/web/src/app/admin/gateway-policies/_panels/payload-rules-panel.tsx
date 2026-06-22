@@ -142,7 +142,7 @@ export function PayloadRulesPanel() {
       header: t("adminPayloadRules.match"),
       hideOnMobile: true,
       render: (r) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary">
+        <span className="text-xs text-srapi-text-tertiary tabular">
           {r.match_model || "*"}
           {" · "}
           {r.match_protocol || t("adminPayloadRules.anyProtocol")}
@@ -160,7 +160,7 @@ export function PayloadRulesPanel() {
       header: t("adminPayloadRules.priority"),
       align: "right",
       render: (r) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">{r.priority}</span>
+        <span className="text-xs text-srapi-text-tertiary tabular">{r.priority}</span>
       ),
     },
     {
@@ -304,13 +304,13 @@ function PathChips({ params }: { params: PayloadRule["params"] }) {
       {shown.map((path) => (
         <code
           key={path}
-          className="rounded border border-srapi-border px-1.5 py-0.5 font-mono text-2xs text-srapi-text-secondary"
+          className="rounded-full bg-srapi-card-muted px-2.5 py-1 font-mono text-[11px] font-medium text-srapi-text-secondary"
         >
           {path}
         </code>
       ))}
       {extra > 0 ? (
-        <span className="px-1 py-0.5 font-mono text-2xs text-srapi-text-tertiary">+{extra}</span>
+        <span className="px-1 py-0.5 text-xs text-srapi-text-tertiary tabular">+{extra}</span>
       ) : null}
     </div>
   );

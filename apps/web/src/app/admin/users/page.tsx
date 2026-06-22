@@ -45,6 +45,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { adminErrorMessage } from "@/lib/admin-api";
 import { QuietBadge } from "@/components/ui/quiet-badge";
+import { DataPill } from "@/components/ui/data-pill";
 import { Button } from "@/components/ui/button";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import { formatMoney, formatInteger, formatPercent } from "@/lib/admin-format";
@@ -223,8 +224,8 @@ function UsersContent() {
       sortValue: (u) => u.email,
       render: (u) => (
         <div className="min-w-0">
-          <div className="truncate text-srapi-text-primary">{u.name}</div>
-          <div className="truncate font-mono text-2xs text-srapi-text-tertiary">{u.email}</div>
+          <div className="truncate font-medium text-srapi-text-primary">{u.name}</div>
+          <div className="truncate text-[12px] text-srapi-text-tertiary">{u.email}</div>
         </div>
       ),
     },
@@ -233,7 +234,13 @@ function UsersContent() {
       header: t("adminUsers.roles"),
       hideOnMobile: true,
       render: (u) => (
-        <span className="font-mono text-2xs text-srapi-text-secondary">{u.roles.join(" · ")}</span>
+        <div className="flex flex-wrap gap-1">
+          {u.roles.map((role) => (
+            <DataPill key={role} size="sm">
+              {role}
+            </DataPill>
+          ))}
+        </div>
       ),
     },
     {
@@ -242,7 +249,7 @@ function UsersContent() {
       align: "right",
       sortValue: (u) => Number(u.balance),
       render: (u) => (
-        <span className="font-mono text-srapi-text-secondary tabular">
+        <span className="text-sm font-medium text-srapi-text-secondary tabular">
           {formatMoney(u.balance, u.currency)}
         </span>
       ),
@@ -255,21 +262,21 @@ function UsersContent() {
       render: (u) => {
         const today = spendingByUserId.get(u.id);
         if (!today) {
-          return <span className="font-mono text-2xs text-srapi-text-tertiary">—</span>;
+          return <span className="text-[12px] text-srapi-text-tertiary">—</span>;
         }
         if (today.requests === 0) {
           return (
-            <span className="font-mono text-2xs text-srapi-text-tertiary">
+            <span className="text-[12px] text-srapi-text-tertiary">
               {t("adminUsers.todayIdle")}
             </span>
           );
         }
         return (
           <div className="flex flex-col gap-0.5">
-            <span className="font-mono text-2xs text-srapi-text-secondary tabular">
+            <span className="text-[12px] font-medium text-srapi-text-secondary tabular">
               {formatInteger(today.requests)} · {formatMoney(today.cost, today.currency)}
             </span>
-            <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+            <span className="text-[11px] text-srapi-text-tertiary tabular">
               {formatPercent(today.success_rate)}
             </span>
           </div>
@@ -287,23 +294,21 @@ function UsersContent() {
         // editor lives behind the row-actions "Custom attributes" entry.
         const set = rows.filter((r) => r.value !== "");
         if (set.length === 0) {
-          return <span className="text-2xs text-srapi-text-tertiary">—</span>;
+          return <span className="text-[12px] text-srapi-text-tertiary">—</span>;
         }
         const chips = set.slice(0, 3);
         const extra = set.length - chips.length;
         return (
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             {chips.map((row) => (
-              <span
-                key={row.definition_id}
-                className="inline-flex items-center rounded-md border border-srapi-border bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary"
-                title={`${row.name} (${row.key})`}
-              >
-                {row.key}: {row.value}
-              </span>
+              <DataPill key={row.definition_id} size="sm" className="max-w-[12rem] truncate" >
+                <span className="truncate" title={`${row.name} (${row.key})`}>
+                  {row.key}: {row.value}
+                </span>
+              </DataPill>
             ))}
             {extra > 0 ? (
-              <span className="font-mono text-2xs text-srapi-text-tertiary">+{extra}</span>
+              <span className="text-[11px] font-medium text-srapi-text-tertiary">+{extra}</span>
             ) : null}
           </div>
         );
@@ -665,7 +670,7 @@ function BulkEditUsersDialog({
               disabled={isPending}
             >
               <select
-                className="w-full rounded-md border border-srapi-border bg-srapi-card px-2 py-1.5 text-2xs"
+                className="h-9 w-full rounded-lg border border-srapi-border bg-srapi-card px-2.5 text-sm text-srapi-text-primary"
                 value={statusValue}
                 disabled={!statusEnabled || isPending}
                 onChange={(e) => setStatusValue(e.target.value as UserStatus)}
@@ -687,7 +692,7 @@ function BulkEditUsersDialog({
                 type="number"
                 inputMode="numeric"
                 min={0}
-                className="w-full rounded-md border border-srapi-border bg-srapi-card px-2 py-1.5 text-2xs"
+                className="h-9 w-full rounded-lg border border-srapi-border bg-srapi-card px-2.5 text-sm text-srapi-text-primary"
                 value={rpmValue}
                 disabled={!rpmEnabled || isPending}
                 onChange={(e) => setRpmValue(e.target.value)}
@@ -702,7 +707,7 @@ function BulkEditUsersDialog({
             >
               <input
                 type="text"
-                className="w-full rounded-md border border-srapi-border bg-srapi-card px-2 py-1.5 text-2xs"
+                className="h-9 w-full rounded-lg border border-srapi-border bg-srapi-card px-2.5 text-sm text-srapi-text-primary"
                 value={rolesValue}
                 disabled={!rolesEnabled || isPending}
                 onChange={(e) => setRolesValue(e.target.value)}
@@ -710,7 +715,7 @@ function BulkEditUsersDialog({
               />
             </BulkEditUserRow>
             {error ? (
-              <p role="alert" className="text-2xs text-srapi-error">
+              <p role="alert" className="text-xs text-srapi-error">
                 {error}
               </p>
             ) : null}
@@ -752,7 +757,7 @@ function BulkEditUserRow({
         className="size-4 rounded border-srapi-border"
         aria-label={label}
       />
-      <span className="text-2xs text-srapi-text-secondary">{label}</span>
+      <span className="text-sm text-srapi-text-secondary">{label}</span>
       <div>{children}</div>
     </div>
   );

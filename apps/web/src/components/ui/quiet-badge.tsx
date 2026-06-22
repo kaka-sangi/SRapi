@@ -17,8 +17,8 @@ const TONE: Record<QuietStatus, string> = {
 };
 
 /**
- * §4.4 静默状态标记：11px mono，无高对比大背景，依靠 1px 砂岩边框包裹；
- * 仅状态字形(glyph)着色，文字保持主色，克制不抢眼。
+ * Quiet status marker: soft tinted pill, no border. The colored glyph carries
+ * the semantic; the label stays in secondary text so it never screams.
  */
 export function QuietBadge({
   status,
@@ -32,7 +32,7 @@ export function QuietBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-md border border-srapi-border px-2 py-0.5 font-mono text-2xs text-srapi-text-secondary",
+        "inline-flex items-center gap-1.5 rounded-full bg-srapi-card-muted px-2.5 py-0.5 text-[11px] font-medium text-srapi-text-secondary",
         className,
       )}
     >

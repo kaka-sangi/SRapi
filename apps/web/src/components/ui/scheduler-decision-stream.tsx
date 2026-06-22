@@ -61,7 +61,10 @@ export function SchedulerDecisionStream({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, reduced, charDelayMs, lineDelayMs]);
 
-  const baseClass = cn("font-mono text-xs leading-relaxed text-srapi-text-secondary", className);
+  const baseClass = cn(
+    "rounded-xl bg-srapi-card-muted p-4 font-mono text-xs leading-relaxed text-srapi-text-secondary",
+    className,
+  );
 
   if (reduced) {
     return (

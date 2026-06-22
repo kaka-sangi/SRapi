@@ -59,7 +59,7 @@ function OutboxContent() {
       header: t("adminOutbox.time"),
       pinned: true,
       render: (e) => (
-        <span className="whitespace-nowrap font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="whitespace-nowrap text-[12px] tabular text-srapi-text-tertiary">
           {formatDateTime(e.created_at)}
         </span>
       ),
@@ -69,8 +69,8 @@ function OutboxContent() {
       header: t("adminOutbox.event"),
       render: (e) => (
         <div className="min-w-0">
-          <div className="truncate font-mono text-xs text-srapi-text-primary">{e.event_type}</div>
-          <div className="truncate font-mono text-2xs text-srapi-text-tertiary">
+          <div className="truncate text-xs text-srapi-text-primary">{e.event_type}</div>
+          <div className="truncate text-[11px] text-srapi-text-tertiary">
             {e.aggregate_type}
             {e.aggregate_id ? ` #${e.aggregate_id}` : ""}
           </div>
@@ -82,7 +82,7 @@ function OutboxContent() {
       header: t("adminOutbox.producer"),
       hideOnMobile: true,
       render: (e) => (
-        <span className="font-mono text-2xs text-srapi-text-secondary">{e.producer_module}</span>
+        <span className="text-[12px] text-srapi-text-secondary">{e.producer_module}</span>
       ),
     },
     {
@@ -91,7 +91,7 @@ function OutboxContent() {
       align: "right",
       hideOnMobile: true,
       render: (e) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">{e.attempt_count}</span>
+        <span className="text-[12px] tabular text-srapi-text-tertiary">{e.attempt_count}</span>
       ),
     },
     {
@@ -205,10 +205,10 @@ function OutboxContent() {
 function Meta({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline gap-3">
-      <span className="w-28 shrink-0 font-mono text-2xs uppercase text-srapi-text-tertiary">
+      <span className="w-28 shrink-0 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
         {label}
       </span>
-      <span className="break-all font-mono text-xs text-srapi-text-secondary">{value}</span>
+      <span className="break-all text-xs text-srapi-text-secondary">{value}</span>
     </div>
   );
 }
@@ -227,7 +227,7 @@ function OutboxDiagnosticSummary({ event }: { event: DomainEventOutbox }) {
           : "—";
 
   return (
-    <span className="block truncate font-mono text-2xs text-srapi-text-secondary" title={value}>
+    <span className="block truncate text-[12px] text-srapi-text-secondary" title={value}>
       {value}
     </span>
   );
@@ -236,8 +236,8 @@ function OutboxDiagnosticSummary({ event }: { event: DomainEventOutbox }) {
 function JsonBlock({ label, value }: { label: string; value: unknown }) {
   return (
     <div>
-      <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">{label}</span>
-      <pre className="mt-1.5 max-h-48 overflow-auto rounded-lg bg-srapi-card-muted p-3 font-mono text-2xs text-srapi-text-secondary">
+      <span className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{label}</span>
+      <pre className="mt-1.5 max-h-48 overflow-auto rounded-lg bg-srapi-card-muted p-3 font-mono text-[11px] text-srapi-text-secondary">
         {safeJson(value)}
       </pre>
     </div>

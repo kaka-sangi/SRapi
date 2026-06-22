@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { IconBubble } from "./icon-bubble";
 
 export function EmptyState({
   icon: Icon,
@@ -17,25 +18,22 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "relative mx-auto flex max-w-md flex-col items-center justify-center gap-4 px-6 py-20 text-center",
+        "mx-auto flex max-w-md flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-srapi-border/70 bg-srapi-card-muted/40 p-8 text-center",
         className,
       )}
     >
-      {/* Soft radial halo behind the icon — calm, paper-warm */}
-      <div
-        className="pointer-events-none absolute left-1/2 top-12 -translate-x-1/2 select-none"
-        aria-hidden
-      >
-        <div className="h-32 w-32 rounded-full bg-srapi-primary/5 blur-2xl" />
-      </div>
       {Icon && (
-        <div className="relative grid size-14 place-items-center rounded-2xl border border-srapi-border bg-srapi-card text-srapi-text-secondary tactile-card">
-          <Icon className="size-6" aria-hidden />
-        </div>
+        <IconBubble tone="accent" className="size-12 [&>svg]:size-5">
+          <Icon aria-hidden />
+        </IconBubble>
       )}
-      <div className="font-serif text-xl tracking-tight text-srapi-text-primary">{title}</div>
+      <div className="text-base font-semibold tracking-tight text-srapi-text-primary">
+        {title}
+      </div>
       {description && (
-        <p className="max-w-sm text-sm leading-relaxed text-srapi-text-secondary">{description}</p>
+        <p className="max-w-sm text-sm leading-relaxed text-srapi-text-secondary">
+          {description}
+        </p>
       )}
       {action && <div className="mt-1.5">{action}</div>}
     </div>

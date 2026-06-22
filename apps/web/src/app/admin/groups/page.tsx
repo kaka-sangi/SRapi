@@ -36,6 +36,7 @@ import {
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { QuietBadge } from "@/components/ui/quiet-badge";
+import { DataPill } from "@/components/ui/data-pill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -132,9 +133,7 @@ function GroupsContent() {
       header: t("adminGroups.strategy"),
       hideOnMobile: true,
       render: (g) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary">
-          {g.strategy_hint || "default"}
-        </span>
+        <DataPill tone="neutral" size="sm">{g.strategy_hint || "default"}</DataPill>
       ),
     },
     {
@@ -143,7 +142,7 @@ function GroupsContent() {
       hideOnMobile: true,
       align: "right",
       render: (g) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-xs text-srapi-text-tertiary tabular">
           {g.rate_multiplier || "1.00000000"}×
         </span>
       ),
@@ -155,10 +154,10 @@ function GroupsContent() {
       render: (g) => {
         const rl = rateLimitByGroup.get(Number(g.id));
         if (!rl) {
-          return <span className="text-2xs text-srapi-text-tertiary">{t("adminRateLimit.none")}</span>;
+          return <span className="text-xs text-srapi-text-tertiary">{t("adminRateLimit.none")}</span>;
         }
         return (
-          <span className="font-mono text-2xs text-srapi-text-secondary tabular">
+          <span className="text-xs text-srapi-text-secondary tabular">
             {rl.enabled ? rateLimitSummary(rl) : t("adminRateLimit.off")}
           </span>
         );
@@ -428,7 +427,7 @@ function BulkGroupMultiplierDialog({
           <div className="mt-4 space-y-3">
             <div>
               <Label htmlFor="bulk-multiplier">{t("adminGroups.bulkSetMultiplier")}</Label>
-              <p className="mb-1.5 text-2xs text-srapi-text-tertiary">
+              <p className="mb-1.5 text-xs text-srapi-text-tertiary">
                 {t("adminGroups.bulkSetMultiplierHint")}
               </p>
               <Input
@@ -442,7 +441,7 @@ function BulkGroupMultiplierDialog({
               />
             </div>
             {error ? (
-              <p role="alert" className="text-2xs text-srapi-error">
+              <p role="alert" className="text-xs text-srapi-error">
                 {error}
               </p>
             ) : null}
@@ -503,7 +502,7 @@ function BulkGroupRpmDialog({
           <div className="mt-4 space-y-3">
             <div>
               <Label htmlFor="bulk-rpm">{t("adminGroups.bulkSetRpmOverride")}</Label>
-              <p className="mb-1.5 text-2xs text-srapi-text-tertiary">
+              <p className="mb-1.5 text-xs text-srapi-text-tertiary">
                 {t("adminGroups.bulkSetRpmOverrideHint")}
               </p>
               <Input
@@ -526,7 +525,7 @@ function BulkGroupRpmDialog({
               </label>
             </div>
             {error ? (
-              <p role="alert" className="text-2xs text-srapi-error">
+              <p role="alert" className="text-xs text-srapi-error">
                 {error}
               </p>
             ) : null}
@@ -610,7 +609,7 @@ function GroupFormDialog({
             </div>
             <div>
               <Label htmlFor="g-provider">{t("adminGroups.providerScope")}</Label>
-              <p className="mb-1.5 text-2xs text-srapi-text-tertiary">{t("adminGroups.providerScopeHint")}</p>
+              <p className="mb-1.5 text-xs text-srapi-text-tertiary">{t("adminGroups.providerScopeHint")}</p>
               <Select
                 value={form.selectedProviderId || ALL}
                 onValueChange={(v) =>
@@ -632,7 +631,7 @@ function GroupFormDialog({
             </div>
             <div>
               <Label htmlFor="g-model">{t("adminGroups.modelScope")}</Label>
-              <p className="mb-1.5 text-2xs text-srapi-text-tertiary">{t("adminGroups.modelScopeHint")}</p>
+              <p className="mb-1.5 text-xs text-srapi-text-tertiary">{t("adminGroups.modelScopeHint")}</p>
               <Select
                 value={form.selectedModelName || ALL}
                 onValueChange={(v) =>
@@ -654,7 +653,7 @@ function GroupFormDialog({
             </div>
             <div>
               <Label htmlFor="g-strategy">{t("adminGroups.strategy")}</Label>
-              <p className="mb-1.5 text-2xs text-srapi-text-tertiary">{t("adminGroups.strategyHint")}</p>
+              <p className="mb-1.5 text-xs text-srapi-text-tertiary">{t("adminGroups.strategyHint")}</p>
               <Select value={form.strategyHint} onValueChange={(v) => set("strategyHint", v)}>
                 <SelectTrigger id="g-strategy">
                   <SelectValue />
@@ -688,7 +687,7 @@ function GroupFormDialog({
             </div>
             <div>
               <Label htmlFor="g-rate-multiplier">{t("adminGroups.rateMultiplier")}</Label>
-              <p className="mb-1.5 text-2xs text-srapi-text-tertiary">
+              <p className="mb-1.5 text-xs text-srapi-text-tertiary">
                 {t("adminGroups.rateMultiplierHint")}
               </p>
               <Input

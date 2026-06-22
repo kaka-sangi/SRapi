@@ -119,7 +119,7 @@ export function KeyValueEditor({
           setNextId((n) => n + 1);
         }}
         className={cn(
-          "inline-flex items-center gap-1 rounded-lg border border-dashed border-srapi-border px-2.5 py-1 text-2xs text-srapi-text-secondary transition-colors hover:border-srapi-text-tertiary hover:text-srapi-text-primary disabled:opacity-50",
+          "inline-flex items-center gap-1.5 rounded-xl border border-dashed border-srapi-border px-3 py-1.5 text-xs font-medium text-srapi-text-secondary transition-colors hover:border-srapi-primary hover:bg-srapi-accent-soft hover:text-srapi-primary disabled:opacity-50",
         )}
       >
         <Plus className="size-3.5" /> {addLabel}

@@ -193,7 +193,9 @@ export function ViewAsCodeDialog({
       </DialogTrigger>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{t("playground.viewAsCode")}</DialogTitle>
+          <DialogTitle className="font-sans text-lg font-semibold tracking-tight">
+            {t("playground.viewAsCode")}
+          </DialogTitle>
           <DialogDescription>{t("playground.viewAsCodeHint")}</DialogDescription>
         </DialogHeader>
 

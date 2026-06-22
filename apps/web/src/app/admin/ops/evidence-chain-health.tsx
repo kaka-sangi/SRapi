@@ -42,9 +42,7 @@ export function OpsEvidenceChainHealth({
     return (
       <Card>
         <CardHeader className="flex-row items-center justify-between gap-3">
-          <CardTitle className="not-italic font-sans text-base text-srapi-text-primary">
-            {t("adminOps.evidenceChain")}
-          </CardTitle>
+          <CardTitle>{t("adminOps.evidenceChain")}</CardTitle>
           <Skeleton className="h-6 w-24" />
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-4">
@@ -63,9 +61,7 @@ export function OpsEvidenceChainHealth({
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between gap-3">
-        <CardTitle className="not-italic font-sans text-base text-srapi-text-primary">
-          {t("adminOps.evidenceChain")}
-        </CardTitle>
+        <CardTitle>{t("adminOps.evidenceChain")}</CardTitle>
         {loading && !health ? (
           <Skeleton className="h-6 w-24" />
         ) : (
@@ -141,10 +137,10 @@ export function OpsEvidenceChainHealth({
           }
         />
         <div className="min-w-0 space-y-2 md:border-l md:border-srapi-border md:pl-4">
-          <div className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
             {t("adminOps.evidenceLinks")}
           </div>
-          <div className="flex flex-wrap gap-2 font-mono text-2xs">
+          <div className="flex flex-wrap gap-2 text-[12px]">
             <Link
               href={ADMIN_ROUTES.opsSystemLogs}
               className="text-srapi-text-secondary underline-offset-2 hover:text-srapi-text-primary hover:underline"
@@ -185,11 +181,11 @@ function EvidenceMetric({
 }) {
   return (
     <div className="min-w-0 space-y-2 md:border-l md:border-srapi-border md:pl-4 md:first:border-l-0 md:first:pl-0">
-      <div className="font-mono text-2xs uppercase text-srapi-text-tertiary">{label}</div>
-      <div className="truncate font-mono text-sm text-srapi-text-primary tabular" title={value}>
+      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{label}</div>
+      <div className="truncate text-sm font-medium tabular text-srapi-text-primary" title={value}>
         {value}
       </div>
-      <div className="font-mono text-2xs text-srapi-text-tertiary">{footer}</div>
+      <div className="text-[11px] text-srapi-text-tertiary">{footer}</div>
     </div>
   );
 }

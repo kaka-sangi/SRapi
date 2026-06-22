@@ -22,7 +22,8 @@ import {
 import { FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { writeClipboard } from "@/components/ui/copy-button";
-import { Badge } from "@/components/ui/badge";
+import { DataPill } from "@/components/ui/data-pill";
+import { IconBubble } from "@/components/ui/icon-bubble";
 import { Markdown } from "@/components/ui/markdown";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
@@ -165,7 +166,7 @@ export function CopilotChat({ models, defaultModel }: { models: string[]; defaul
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex-1 overflow-y-auto px-1 pb-4">
           {empty ? (
-            <EmptyState />
+            <EmptyState onPick={(text) => setInput(text)} />
           ) : (
             <div className="mx-auto max-w-3xl space-y-5 py-4">
               {messages.map((message, i) => (
@@ -179,14 +180,14 @@ export function CopilotChat({ models, defaultModel }: { models: string[]; defaul
                 />
               ))}
               {running && !pending ? (
-                <div className="flex items-center gap-2 pl-9 text-sm text-srapi-text-tertiary">
+                <div className="flex items-center gap-3 pl-12 text-sm text-srapi-text-tertiary">
                   <Loader2 className="size-4 animate-spin" />
                   {t("copilot.thinking")}
                 </div>
               ) : null}
               {pending ? <PendingActionBanner action={pending} onResolve={resolvePending} disabled={running} /> : null}
               {error ? (
-                <div className="ml-9 flex items-start gap-2 rounded-xl border border-srapi-error/30 bg-srapi-error/5 px-3 py-2 text-sm text-srapi-error">
+                <div className="ml-12 flex items-start gap-2 rounded-2xl border border-srapi-error/30 bg-srapi-error/5 px-4 py-3 text-sm text-srapi-error">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0" />
                   <span className="flex-1">{error}</span>
                   <button
@@ -201,8 +202,10 @@ export function CopilotChat({ models, defaultModel }: { models: string[]; defaul
                 </div>
               ) : null}
               {usage ? (
-                <div className="pl-9 text-2xs text-srapi-text-tertiary">
-                  {t("copilot.usageTokens", { input: usage.input, output: usage.output })}
+                <div className="pl-12">
+                  <DataPill tone="neutral" size="sm">
+                    {t("copilot.usageTokens", { input: usage.input, output: usage.output })}
+                  </DataPill>
                 </div>
               ) : null}
               <div ref={endRef} />
@@ -239,7 +242,7 @@ export function CopilotChat({ models, defaultModel }: { models: string[]; defaul
                 title={t("copilot.yoloHint")}
               >
                 <Zap className="size-3.5" />
-                <span className="hidden text-2xs sm:inline">{t("copilot.yolo")}</span>
+                <span className="hidden text-[11px] font-medium sm:inline">{t("copilot.yolo")}</span>
               </Button>
             }
           />
@@ -251,7 +254,7 @@ export function CopilotChat({ models, defaultModel }: { models: string[]; defaul
             hidden
             onChange={(e) => void onPickFiles(e.currentTarget.files)}
           />
-          <p className="mt-1.5 px-1 text-center text-2xs text-srapi-text-tertiary">{t("copilot.egressWarning")}</p>
+          <p className="mt-2 px-1 text-center text-[11px] text-srapi-text-tertiary">{t("copilot.egressWarning")}</p>
         </div>
       </div>
     </div>
@@ -302,22 +305,22 @@ function ConversationSidebar() {
   const items = list.data ?? [];
 
   return (
-    <div className="hidden w-60 shrink-0 flex-col rounded-2xl border border-srapi-border bg-srapi-card/40 md:flex">
-      <div className="p-2">
-        <Button variant="outline" size="sm" className="w-full justify-start" onClick={newConversation}>
+    <div className="hidden w-64 shrink-0 flex-col rounded-2xl border border-srapi-border bg-srapi-card-muted/40 md:flex">
+      <div className="p-3">
+        <Button variant="outline" size="sm" className="w-full justify-start gap-2" onClick={newConversation}>
           <Plus className="size-4" />
           {t("copilot.newChat")}
         </Button>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
         {list.isPending ? (
           <div className="flex items-center justify-center px-2 py-6">
             <Loader2 className="size-4 animate-spin text-srapi-text-tertiary" />
           </div>
         ) : items.length === 0 ? (
-          <p className="px-2 py-6 text-center text-2xs text-srapi-text-tertiary">{t("copilot.noConversations")}</p>
+          <p className="px-2 py-8 text-center text-[12px] text-srapi-text-tertiary">{t("copilot.noConversations")}</p>
         ) : (
-          <ul className="space-y-0.5">
+          <ul className="space-y-1">
             {items.map((item) => (
               <li key={item.id} className="group relative">
                 {editing?.id === item.id ? (
@@ -330,29 +333,33 @@ function ConversationSidebar() {
                       if (e.key === "Enter") void commitRename(item);
                       if (e.key === "Escape") setEditing(null);
                     }}
-                    className="w-full rounded-md border border-srapi-primary/40 bg-srapi-bg px-2 py-1.5 text-xs text-srapi-text-primary outline-none"
+                    className="w-full rounded-xl border border-srapi-primary/40 bg-srapi-card px-3 py-2 text-sm text-srapi-text-primary outline-none"
                   />
                 ) : (
                   <button
                     type="button"
                     onClick={() => void loadConversation(item.id)}
-                    className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors ${
+                    className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm transition-colors ${
                       activeId === item.id
-                        ? "bg-srapi-card-muted text-srapi-text-primary"
-                        : "text-srapi-text-secondary hover:bg-srapi-card-muted/60"
+                        ? "bg-srapi-accent-soft text-srapi-primary font-medium"
+                        : "text-srapi-text-secondary hover:bg-srapi-card-muted/70"
                     }`}
                   >
-                    <MessageSquare className="size-3.5 shrink-0 text-srapi-text-tertiary" />
+                    <MessageSquare
+                      className={`size-3.5 shrink-0 ${
+                        activeId === item.id ? "text-srapi-primary" : "text-srapi-text-tertiary"
+                      }`}
+                    />
                     <span className="min-w-0 flex-1 truncate">{item.title || t("copilot.untitled")}</span>
                   </button>
                 )}
                 {editing?.id !== item.id ? (
-                  <div className="absolute right-1 top-1/2 hidden -translate-y-1/2 items-center gap-0.5 group-hover:flex">
+                  <div className="absolute right-1.5 top-1/2 hidden -translate-y-1/2 items-center gap-0.5 group-hover:flex">
                     <button
                       type="button"
                       aria-label={t("copilot.rename")}
                       onClick={() => setEditing({ id: item.id, value: item.title })}
-                      className="rounded p-1 text-srapi-text-tertiary hover:bg-srapi-card hover:text-srapi-text-primary"
+                      className="rounded-lg p-1.5 text-srapi-text-tertiary hover:bg-srapi-card hover:text-srapi-text-primary"
                     >
                       <Pencil className="size-3" />
                     </button>
@@ -360,7 +367,7 @@ function ConversationSidebar() {
                       type="button"
                       aria-label={t("copilot.delete")}
                       onClick={() => void remove(item)}
-                      className="rounded p-1 text-srapi-text-tertiary hover:bg-srapi-card hover:text-srapi-error"
+                      className="rounded-lg p-1.5 text-srapi-text-tertiary hover:bg-srapi-card hover:text-srapi-error"
                     >
                       <Trash2 className="size-3" />
                     </button>
@@ -375,14 +382,34 @@ function ConversationSidebar() {
   );
 }
 
-function EmptyState() {
+function EmptyState({ onPick }: { onPick: (text: string) => void }) {
   const { t } = useLanguage();
+  const examples = [t("copilot.example1"), t("copilot.example2"), t("copilot.example3")];
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 px-4 text-center">
-      <div className="flex size-14 items-center justify-center rounded-2xl bg-srapi-primary/10">
-        <Bot className="size-7 text-srapi-primary" />
+    <div className="mx-auto flex h-full max-w-3xl flex-col items-center justify-center gap-5 px-4 text-center">
+      <IconBubble tone="accent" size="lg" className="size-14 [&>svg]:size-6">
+        <Bot aria-hidden />
+      </IconBubble>
+      <div className="space-y-2">
+        <h2 className="text-3xl font-semibold tracking-tight text-srapi-text-primary">
+          {t("copilot.greeting")}
+        </h2>
+        <p className="max-w-md text-sm leading-relaxed text-srapi-text-secondary">
+          {t("copilot.emptyHint")}
+        </p>
       </div>
-      <h2 className="font-serif text-2xl text-srapi-text-primary">{t("copilot.greeting")}</h2>
+      <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+        {examples.map((label) => (
+          <button
+            key={label}
+            type="button"
+            onClick={() => onPick(label)}
+            className="inline-flex items-center gap-1 rounded-full bg-srapi-card-muted px-3 py-1.5 text-[12px] font-medium text-srapi-text-secondary transition-colors hover:bg-srapi-accent-soft hover:text-srapi-primary"
+          >
+            {label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -409,8 +436,8 @@ function MessageRow({
 
   if (message.role === "user") {
     return (
-      <div className="flex justify-end gap-2">
-        <div className="max-w-[80%] space-y-2">
+      <div className="flex justify-end gap-3">
+        <div className="min-w-0 flex-1 space-y-2">
           {message.images?.length ? (
             <div className="flex flex-wrap justify-end gap-1.5">
               {imageUrls.map((src, i) => (
@@ -419,7 +446,7 @@ function MessageRow({
                   key={i}
                   src={src}
                   alt=""
-                  className="size-20 rounded-lg border border-srapi-border object-cover"
+                  className="size-20 rounded-xl border border-srapi-border object-cover"
                 />
               ))}
             </div>
@@ -430,7 +457,7 @@ function MessageRow({
                 <span
                   key={i}
                   title={file.name}
-                  className="flex max-w-52 items-center gap-1.5 rounded-lg border border-srapi-border bg-srapi-card-muted px-2 py-1 text-2xs text-srapi-text-secondary"
+                  className="flex max-w-52 items-center gap-1.5 rounded-full bg-srapi-card-muted px-2.5 py-1 text-[11px] font-medium text-srapi-text-secondary"
                 >
                   <FileText className="size-3.5 shrink-0 text-srapi-text-tertiary" />
                   <span className="min-w-0 truncate">{file.name}</span>
@@ -439,26 +466,30 @@ function MessageRow({
             </div>
           ) : null}
           {message.content ? (
-            <div className="rounded-2xl rounded-tr-sm bg-srapi-invert px-3.5 py-2 text-sm text-srapi-invert-fg">
+            <div className="rounded-2xl bg-srapi-accent-soft px-4 py-3 text-sm leading-relaxed text-srapi-text-primary">
               {message.content}
             </div>
           ) : null}
         </div>
-        <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-srapi-card-muted">
-          <UserIcon className="size-4 text-srapi-text-tertiary" />
-        </div>
+        <IconBubble tone="neutral" size="md" className="mt-0.5 shrink-0">
+          <UserIcon aria-hidden />
+        </IconBubble>
       </div>
     );
   }
 
   return (
-    <div className="flex gap-2">
-      <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-srapi-primary/10">
-        <Bot className="size-4 text-srapi-primary" />
-      </div>
+    <div className="flex gap-3">
+      <IconBubble tone="accent" size="md" className="mt-0.5 shrink-0">
+        <Bot aria-hidden />
+      </IconBubble>
       <div className="min-w-0 flex-1 space-y-2">
         {message.reasoning ? <ReasoningBlock text={message.reasoning} /> : null}
-        {message.content ? <Markdown>{message.content}</Markdown> : null}
+        {message.content ? (
+          <div className="rounded-2xl border border-srapi-border bg-srapi-card px-4 py-3 text-sm leading-relaxed text-srapi-text-primary">
+            <Markdown>{message.content}</Markdown>
+          </div>
+        ) : null}
         {(message.tool_calls ?? []).map((call) => (
           <ToolCallCard key={call.id} call={call} result={resultsById.get(call.id)} />
         ))}
@@ -496,22 +527,22 @@ function MessageActions({
     });
   };
   return (
-    <div className="flex items-center gap-3 pt-0.5 text-srapi-text-tertiary">
+    <div className="flex items-center gap-3 pt-1 text-srapi-text-tertiary">
       <button
         type="button"
         onClick={copy}
-        className="flex items-center gap-1 text-2xs transition-colors hover:text-srapi-text-secondary"
+        className="flex items-center gap-1 text-[11px] font-medium transition-colors hover:text-srapi-text-secondary"
       >
-        {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+        {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
         {t("copilot.copy")}
       </button>
       {canRegenerate && onRegenerate ? (
         <button
           type="button"
           onClick={onRegenerate}
-          className="flex items-center gap-1 text-2xs transition-colors hover:text-srapi-text-secondary"
+          className="flex items-center gap-1 text-[11px] font-medium transition-colors hover:text-srapi-text-secondary"
         >
-          <RefreshCw className="size-3" />
+          <RefreshCw className="size-3.5" />
           {t("copilot.regenerate")}
         </button>
       ) : null}
@@ -531,48 +562,56 @@ function ToolCallCard({
   const { method, path } = describeCall(call);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-srapi-border bg-srapi-card-muted/40 text-xs">
+    <div className="overflow-hidden rounded-2xl border border-srapi-border bg-srapi-card-muted/60 text-xs">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-srapi-card-muted"
+        className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-srapi-card-muted"
       >
-        <Wrench className="size-3.5 shrink-0 text-srapi-text-tertiary" />
+        <IconBubble tone="accent" size="sm" className="shrink-0">
+          <Wrench aria-hidden />
+        </IconBubble>
         {method ? (
-          <Badge variant="neutral" className="font-mono text-2xs">
+          <DataPill tone="accent" size="sm">
             {method}
-          </Badge>
+          </DataPill>
         ) : null}
-        <span className="min-w-0 flex-1 truncate font-mono text-srapi-text-secondary">{path || call.name}</span>
+        <span className="min-w-0 flex-1 truncate text-sm font-medium text-srapi-text-primary">
+          {path || call.name}
+        </span>
         {result ? (
           result.is_error ? (
-            <Badge variant="danger" className="text-2xs">
+            <DataPill tone="error" size="sm">
               {t("copilot.failed")}
-            </Badge>
+            </DataPill>
           ) : (
-            <Badge variant="success" className="text-2xs">
+            <DataPill tone="success" size="sm">
               {t("copilot.ok")}
-            </Badge>
+            </DataPill>
           )
         ) : (
-          <span className="flex shrink-0 items-center gap-1 text-2xs text-srapi-text-tertiary">
+          <span className="flex shrink-0 items-center gap-1 text-[11px] font-medium text-srapi-text-tertiary">
             <Loader2 className="size-3.5 animate-spin" />
             {t("copilot.toolRunning")}
           </span>
         )}
-        <ChevronDown className={`size-3.5 shrink-0 text-srapi-text-tertiary transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown
+          className={`size-4 shrink-0 text-srapi-text-tertiary transition-transform ${open ? "rotate-180" : ""}`}
+        />
       </button>
       {open ? (
-        <div className="space-y-2 border-t border-srapi-border px-3 py-2">
+        <div className="space-y-3 border-t border-srapi-border px-3 py-3">
           <div>
-            <div className="mb-1 text-2xs uppercase tracking-wide text-srapi-text-tertiary">{t("copilot.arguments")}</div>
-            <pre className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-2xs text-srapi-text-secondary">
+            <div className="mb-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
+              {t("copilot.arguments")}
+            </div>
+            <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-xl border border-srapi-border bg-srapi-card px-3 py-2 font-mono text-[11px] text-srapi-text-secondary">
               {prettyJSON(call.arguments)}
             </pre>
           </div>
           {result ? (
             <div>
-              <div className="mb-1 text-2xs uppercase tracking-wide text-srapi-text-tertiary">
+              <div className="mb-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                 {call.name === "web_search" ? t("copilot.sources") : t("copilot.result")}
               </div>
               {call.name === "web_search" ? (
@@ -605,28 +644,28 @@ function SearchResults({ content }: { content: string }) {
 
   if (items === null) {
     return (
-      <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-2xs text-srapi-text-secondary">
+      <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-srapi-border bg-srapi-card px-3 py-2 font-mono text-[11px] text-srapi-text-secondary">
         {content}
       </pre>
     );
   }
   if (items.length === 0) {
-    return <p className="text-2xs text-srapi-text-tertiary">{t("adminCommon.noResults")}</p>;
+    return <p className="text-[11px] text-srapi-text-tertiary">{t("adminCommon.noResults")}</p>;
   }
   return (
     <ul className="space-y-2">
       {items.map((it, i) => (
-        <li key={i} className="rounded-lg border border-srapi-border bg-srapi-card-muted/30 p-2">
+        <li key={i} className="rounded-xl border border-srapi-border bg-srapi-card p-2.5">
           <a
             href={it.url}
             target="_blank"
             rel="noreferrer"
-            className="text-xs font-medium text-srapi-primary underline underline-offset-2"
+            className="text-sm font-medium text-srapi-primary underline underline-offset-2"
           >
             {it.title || it.url}
           </a>
-          {it.url ? <div className="truncate text-2xs text-srapi-text-tertiary">{it.url}</div> : null}
-          {it.snippet ? <p className="mt-1 text-2xs text-srapi-text-secondary">{it.snippet}</p> : null}
+          {it.url ? <div className="truncate text-[11px] text-srapi-text-tertiary">{it.url}</div> : null}
+          {it.snippet ? <p className="mt-1 text-xs text-srapi-text-secondary">{it.snippet}</p> : null}
         </li>
       ))}
     </ul>
@@ -639,12 +678,15 @@ function ToolResultView({ content }: { content: string }) {
   const parsed = useMemo(() => parseResult(content), [content]);
   if (parsed.rows) {
     return (
-      <div className="overflow-x-auto rounded-lg border border-srapi-border">
-        <table className="w-full text-2xs">
+      <div className="overflow-x-auto rounded-xl border border-srapi-border bg-srapi-card">
+        <table className="w-full text-xs">
           <thead>
-            <tr className="border-b border-srapi-border bg-srapi-card-muted/50 text-left text-srapi-text-tertiary">
+            <tr className="border-b border-srapi-border bg-srapi-card-muted/50 text-left">
               {parsed.columns.map((c) => (
-                <th key={c} className="px-2 py-1 font-medium">
+                <th
+                  key={c}
+                  className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary"
+                >
                   {c}
                 </th>
               ))}
@@ -652,9 +694,9 @@ function ToolResultView({ content }: { content: string }) {
           </thead>
           <tbody>
             {parsed.rows.map((row, i) => (
-              <tr key={i} className="border-b border-srapi-border/60 last:border-0">
+              <tr key={i} className="border-b border-srapi-border/70 transition-colors last:border-0 hover:bg-srapi-card-muted/50">
                 {parsed.columns.map((c) => (
-                  <td key={c} className="max-w-[12rem] truncate px-2 py-1 font-mono text-srapi-text-secondary">
+                  <td key={c} className="max-w-[12rem] truncate px-3 py-2 font-mono text-[11px] text-srapi-text-secondary">
                     {row[c]}
                   </td>
                 ))}
@@ -662,12 +704,12 @@ function ToolResultView({ content }: { content: string }) {
             ))}
           </tbody>
         </table>
-        {parsed.more ? <div className="px-2 py-1 text-2xs text-srapi-text-tertiary">+{parsed.more}…</div> : null}
+        {parsed.more ? <div className="px-3 py-1.5 text-[11px] text-srapi-text-tertiary">+{parsed.more}…</div> : null}
       </div>
     );
   }
   return (
-    <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-2xs text-srapi-text-secondary">
+    <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-srapi-border bg-srapi-card px-3 py-2 font-mono text-[11px] text-srapi-text-secondary">
       {parsed.text}
     </pre>
   );
@@ -686,32 +728,38 @@ function PendingActionBanner({
   const danger = !!action.danger;
   return (
     <div
-      className={`ml-9 rounded-2xl border p-3 ${
-        danger ? "border-srapi-error/40 bg-srapi-error/5" : "border-srapi-primary/40 bg-srapi-primary/5"
+      className={`ml-12 rounded-2xl border p-4 ${
+        danger ? "border-srapi-error/40 bg-srapi-error/5" : "border-srapi-primary/40 bg-srapi-accent-soft/40"
       }`}
     >
-      <div className="flex items-start gap-2">
-        <AlertTriangle className={`mt-0.5 size-4 shrink-0 ${danger ? "text-srapi-error" : "text-srapi-primary"}`} />
+      <div className="flex items-start gap-3">
+        <IconBubble tone={danger ? "error" : "accent"} size="md" className="mt-0.5 shrink-0">
+          <AlertTriangle aria-hidden />
+        </IconBubble>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium text-srapi-text-primary">
+          <div className="text-sm font-semibold tracking-tight text-srapi-text-primary">
             {danger ? t("copilot.dangerTitle") : t("copilot.approvalTitle")}
           </div>
-          {action.summary ? <div className="mt-0.5 text-xs text-srapi-text-secondary">{action.summary}</div> : null}
-          <div className="mt-2 flex items-center gap-2 font-mono text-xs">
-            <Badge variant={danger ? "danger" : "neutral"}>{action.method}</Badge>
-            <span className="min-w-0 truncate text-srapi-text-secondary">{action.path}</span>
+          {action.summary ? (
+            <div className="mt-1 text-xs leading-relaxed text-srapi-text-secondary">{action.summary}</div>
+          ) : null}
+          <div className="mt-2.5 flex items-center gap-2">
+            <DataPill tone={danger ? "error" : "accent"} size="md">
+              {action.method}
+            </DataPill>
+            <span className="min-w-0 truncate font-mono text-xs text-srapi-text-secondary">{action.path}</span>
           </div>
           {action.body ? (
-            <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-md bg-srapi-bg/60 p-2 font-mono text-2xs text-srapi-text-secondary">
+            <pre className="mt-2.5 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-srapi-border bg-srapi-card px-3 py-2 font-mono text-[11px] text-srapi-text-secondary">
               {prettyJSON(action.body)}
             </pre>
           ) : null}
           {danger ? (
-            <p className="mt-2 text-2xs text-srapi-error">{t("copilot.dangerConfirmHint")}</p>
+            <p className="mt-2.5 text-[11px] font-medium text-srapi-error">{t("copilot.dangerConfirmHint")}</p>
           ) : null}
         </div>
       </div>
-      <div className="mt-3 flex justify-end gap-2">
+      <div className="mt-4 flex justify-end gap-2">
         <Button variant="outline" size="sm" onClick={() => onResolve(false)} disabled={disabled}>
           <X className="size-4" />
           {t("copilot.deny")}

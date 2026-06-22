@@ -3,7 +3,8 @@
 import { Timer } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { formatInteger } from "@/lib/admin-format";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { SectionTitle } from "@/components/ui/section-title";
 import { ChartEmpty } from "@/components/charts/chart-empty";
 import type { OpsLatencyBucket } from "@/hooks/admin-queries/ops-charts";
 
@@ -49,15 +50,16 @@ export function OpsLatencyHistogramChart({
 
   return (
     <Card>
-      <CardHeader className="flex-row items-center justify-between">
-        <CardTitle className="not-italic font-sans text-base text-srapi-text-primary">
-          {title}
-        </CardTitle>
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
-          {formatInteger(total)} {requestsLabel}
-        </span>
-      </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        <SectionTitle
+          icon={<Timer aria-hidden />}
+          label={title}
+          action={
+            <span className="text-[11px] tabular text-srapi-text-tertiary">
+              {formatInteger(total)} {requestsLabel}
+            </span>
+          }
+        />
         {loading && buckets.length === 0 ? (
           <div
             role="img"
@@ -111,7 +113,7 @@ export function OpsLatencyHistogramChart({
                     x={x + barW / 2}
                     y={H - 7}
                     textAnchor="middle"
-                    className="fill-srapi-text-tertiary font-mono"
+                    className="fill-srapi-text-tertiary"
                     style={{ fontSize: 8 }}
                   >
                     {b.label}

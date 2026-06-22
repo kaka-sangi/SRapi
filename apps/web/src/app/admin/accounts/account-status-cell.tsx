@@ -29,24 +29,22 @@ export function AccountStatusCell({
       title={actionLabel}
       onClick={onToggle}
       className={cn(
-        "inline-flex h-7 items-center gap-1.5 rounded-md border border-srapi-border px-2 font-mono text-2xs text-srapi-text-secondary transition-colors hover:border-srapi-text-tertiary hover:bg-srapi-card-muted hover:text-srapi-text-primary disabled:pointer-events-none disabled:opacity-50",
+        "inline-flex h-7 items-center gap-1.5 rounded-full border border-srapi-border bg-srapi-card px-2.5 text-[11px] font-medium text-srapi-text-secondary transition-colors hover:border-srapi-border-strong hover:bg-srapi-card-muted hover:text-srapi-text-primary disabled:pointer-events-none disabled:opacity-50",
       )}
     >
       <span
         aria-hidden
         className={cn(
-          "text-[0.7em] leading-none",
+          "inline-block size-1.5 rounded-full",
           tone === "active"
-            ? "text-srapi-success"
+            ? "bg-srapi-success"
             : tone === "limited"
-              ? "text-srapi-warning"
+              ? "bg-srapi-warning"
               : tone === "error"
-                ? "text-srapi-error"
-                : "text-srapi-text-tertiary",
+                ? "bg-srapi-error"
+                : "bg-srapi-text-tertiary/60",
         )}
-      >
-        {tone === "active" ? "●" : tone === "disabled" ? "○" : "■"}
-      </span>
+      />
       {label}
     </button>
   ) : (
@@ -67,7 +65,7 @@ export function AccountStatusCell({
           href={validationURL}
           target="_blank"
           rel="noreferrer"
-          className="text-2xs text-srapi-primary hover:underline"
+          className="text-[11px] font-medium text-srapi-primary hover:underline"
         >
           {t("adminAccounts.validationLink")}
         </a>

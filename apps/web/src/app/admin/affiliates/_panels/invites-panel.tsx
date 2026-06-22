@@ -80,7 +80,7 @@ export function InvitesPanel() {
       header: t("adminAffiliates.date"),
       align: "right",
       render: (r) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-[12px] tabular text-srapi-text-tertiary">
           {formatDateTime(r.created_at)}
         </span>
       ),
@@ -191,7 +191,9 @@ function BulkRebateRateDialog({
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t("adminAffiliates.bulkRebateTitle")}</DialogTitle>
+          <DialogTitle className="text-lg font-semibold tracking-tight">
+            {t("adminAffiliates.bulkRebateTitle")}
+          </DialogTitle>
           <DialogDescription>{t("adminAffiliates.bulkRebateBody")}</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-3">
@@ -203,7 +205,7 @@ function BulkRebateRateDialog({
             value={raw}
             onChange={(e) => setRaw(e.target.value)}
             rows={6}
-            className="w-full rounded border border-srapi-border bg-srapi-bg-secondary px-3 py-2 text-sm font-mono"
+            className="w-full rounded-xl border border-srapi-border bg-srapi-card-muted/60 px-3 py-2 text-sm tabular text-srapi-text-primary placeholder:text-srapi-text-tertiary focus:border-srapi-primary/40 focus:outline-none focus:ring-2 focus:ring-srapi-primary/20"
             placeholder="123,0.15&#10;456,clear"
           />
           {error ? (

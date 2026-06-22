@@ -79,14 +79,16 @@ export function FileDropZone({
         onDragLeave={onDragLeave}
         onDrop={onDrop}
         className={cn(
-          "flex cursor-pointer flex-col items-center gap-1.5 rounded-xl border-2 border-dashed px-4 py-5 text-center transition-colors",
+          "flex cursor-pointer flex-col items-center gap-2 rounded-2xl border-2 border-dashed p-8 text-center transition-colors",
           dragging
-            ? "border-srapi-text-tertiary bg-srapi-bg-sunken"
-            : "border-srapi-border bg-srapi-card-muted hover:border-srapi-text-tertiary",
+            ? "border-srapi-primary bg-srapi-accent-soft"
+            : "border-srapi-border bg-srapi-card-muted/30 hover:border-srapi-border-strong hover:bg-srapi-card-muted/50",
           disabled && "pointer-events-none opacity-50",
         )}
       >
-        <Upload className="size-5 text-srapi-text-tertiary" />
+        <span className="grid size-9 place-items-center rounded-xl bg-srapi-accent-soft text-srapi-primary [&>svg]:size-4">
+          <Upload />
+        </span>
         {hint ? (
           <p className="text-xs text-srapi-text-tertiary">{hint}</p>
         ) : null}
@@ -105,11 +107,11 @@ export function FileDropZone({
       </div>
 
       {hasFiles ? (
-        <div className="mt-2 flex flex-wrap gap-1.5">
+        <div className="mt-3 flex flex-wrap gap-1.5">
           {fileNames.map((name) => (
             <span
               key={name}
-              className="inline-flex items-center gap-1 rounded-md bg-srapi-card-muted px-2 py-0.5 text-2xs text-srapi-text-secondary"
+              className="inline-flex items-center gap-1 rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-secondary"
             >
               {name}
             </span>
@@ -119,7 +121,7 @@ export function FileDropZone({
               type="button"
               onClick={onClearFiles}
               aria-label={t("common.removeFile")}
-              className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-2xs text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
+              className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] text-srapi-text-tertiary transition-colors hover:bg-srapi-card-muted hover:text-srapi-text-secondary"
             >
               <X className="size-3" />
             </button>

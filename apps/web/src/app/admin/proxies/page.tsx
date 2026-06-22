@@ -28,6 +28,7 @@ import {
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { QuietBadge } from "@/components/ui/quiet-badge";
+import { DataPill } from "@/components/ui/data-pill";
 import { Button } from "@/components/ui/button";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import {
@@ -299,7 +300,7 @@ function ProxiesContent() {
       key: "protocol",
       header: t("adminProxies.protocol"),
       render: (p) => (
-        <span className="font-mono text-2xs uppercase text-srapi-text-secondary">{p.type}</span>
+        <DataPill tone="neutral" size="sm" className="uppercase">{p.type}</DataPill>
       ),
     },
     {
@@ -317,7 +318,7 @@ function ProxiesContent() {
           <div className="flex items-center gap-1.5">
             <span className="text-srapi-text-primary">{name || code}</span>
             {code && name ? (
-              <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">{code}</span>
+              <span className="text-xs uppercase tabular text-srapi-text-tertiary">{code}</span>
             ) : null}
           </div>
         );
@@ -335,7 +336,7 @@ function ProxiesContent() {
         const total = (p.probe_success_count ?? 0) + (p.probe_failure_count ?? 0);
         if (!p.last_probed_at || total <= 0 || typeof p.probe_success_pct_7d !== "number") {
           return (
-            <span className="text-2xs text-srapi-text-tertiary" title={t("adminProxies.availabilityNeverProbed")}>
+            <span className="text-xs text-srapi-text-tertiary" title={t("adminProxies.availabilityNeverProbed")}>
               —
             </span>
           );
@@ -362,7 +363,7 @@ function ProxiesContent() {
       header: t("adminProxies.url"),
       hideOnMobile: true,
       render: (p) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary">
+        <span className="text-xs text-srapi-text-tertiary">
           {p.url_configured ? "✓" : "—"}
         </span>
       ),
@@ -375,7 +376,7 @@ function ProxiesContent() {
       render: (p) => {
         const snap = readLastTest(p);
         if (!snap) {
-          return <span className="text-2xs text-srapi-text-tertiary">{t("adminProxies.neverTested")}</span>;
+          return <span className="text-xs text-srapi-text-tertiary">{t("adminProxies.neverTested")}</span>;
         }
         return (
           <div className="flex flex-col gap-0.5">
@@ -387,11 +388,11 @@ function ProxiesContent() {
                 }
                 aria-hidden
               />
-              <span className="font-mono text-2xs text-srapi-text-tertiary">
+              <span className="text-xs text-srapi-text-tertiary tabular">
                 {formatDateTime(snap.at)}
               </span>
             </div>
-            <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+            <span className="text-xs text-srapi-text-tertiary tabular">
               {snap.ok
                 ? formatLatency(snap.latency_ms)
                 : snap.error_class || t("adminProxies.testFailed", { reason: "" })}
@@ -594,10 +595,10 @@ function ProxyLifecycleCell({
   const fallbackLabel = fallbackModeLabel(t, fallbackMode);
   return (
     <div className="flex flex-col gap-0.5">
-      <span className={expired ? "text-2xs text-srapi-error" : "font-mono text-2xs text-srapi-text-tertiary"}>
+      <span className={expired ? "text-xs text-srapi-error" : "text-xs text-srapi-text-tertiary tabular"}>
         {expiresAt ? (expired ? t("adminProxies.expired") : formatDateTime(proxy.expires_at)) : t("adminProxies.noExpiry")}
       </span>
-      <span className="text-2xs text-srapi-text-tertiary">
+      <span className="text-xs text-srapi-text-tertiary">
         {fallbackMode === "proxy" && backupName ? `${fallbackLabel}: ${backupName}` : fallbackLabel}
       </span>
     </div>

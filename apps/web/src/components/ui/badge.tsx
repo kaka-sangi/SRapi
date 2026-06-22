@@ -3,20 +3,17 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/cn";
 
 const badgeVariants = cva(
-  // Editorial badge: hairline border, soft warm fill so semantics
-  // (success / warn / danger) read at a glance without screaming color.
-  "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 font-mono text-2xs tracking-wide",
+  // Modern pill badge: soft tinted bg, no border, rounded-full. Reads at a
+  // glance for semantic state without competing with primary content.
+  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium",
   {
     variants: {
       variant: {
-        neutral:
-          "border-srapi-border bg-srapi-card-muted/60 text-srapi-text-secondary",
-        success:
-          "border-srapi-success/25 bg-srapi-success/10 text-srapi-success",
-        warning:
-          "border-srapi-warning/25 bg-srapi-warning/10 text-srapi-warning",
-        danger: "border-srapi-error/25 bg-srapi-error/10 text-srapi-error",
-        info: "border-srapi-border bg-srapi-card text-srapi-text-primary",
+        neutral: "bg-srapi-card-muted text-srapi-text-secondary",
+        success: "bg-srapi-success/12 text-srapi-success",
+        warning: "bg-srapi-warning/12 text-srapi-warning",
+        danger: "bg-srapi-error/12 text-srapi-error",
+        info: "bg-srapi-accent-soft text-srapi-primary",
       },
     },
     defaultVariants: { variant: "neutral" },

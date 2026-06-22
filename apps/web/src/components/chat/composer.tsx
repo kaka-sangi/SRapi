@@ -76,7 +76,7 @@ export function Composer({
               title={file.name}
             >
               <FileText className="size-4 shrink-0 text-srapi-text-tertiary" />
-              <span className="min-w-0 truncate text-2xs text-srapi-text-secondary">{file.name}</span>
+              <span className="min-w-0 truncate text-[11px] font-medium text-srapi-text-secondary">{file.name}</span>
               {removeFile ? (
                 <button
                   type="button"

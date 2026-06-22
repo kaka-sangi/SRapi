@@ -161,7 +161,7 @@ function UsageBody({
               <SelectItem value="failed">{t("usage.failed")}</SelectItem>
             </SelectContent>
           </Select>
-          <span className="ml-auto font-mono text-2xs text-srapi-text-tertiary tabular">
+          <span className="ml-auto text-[12px] font-medium text-srapi-text-tertiary tabular">
             {t("usage.showing", { filtered: filtered.length, total: logs.length })}
           </span>
         </div>
@@ -204,11 +204,11 @@ function UsageBody({
               <TableBody>
                 {filtered.map((log) => (
                   <TableRow key={log.request_id}>
-                    <TableCell className="whitespace-nowrap font-mono text-2xs text-srapi-text-tertiary tabular">
+                    <TableCell className="whitespace-nowrap text-[12px] text-srapi-text-tertiary tabular">
                       {log.created_at.replace("T", " ").slice(0, 16)}
                     </TableCell>
                     <TableCell className="max-w-[180px] truncate text-srapi-text-primary" title={log.model}>{log.model}</TableCell>
-                    <TableCell className="max-w-[140px] truncate font-mono text-2xs text-srapi-text-tertiary" title={log.source_endpoint}>
+                    <TableCell className="max-w-[140px] truncate text-[12px] text-srapi-text-tertiary" title={log.source_endpoint}>
                       {log.source_endpoint}
                     </TableCell>
                     <TableCell>
@@ -217,12 +217,12 @@ function UsageBody({
                         label={log.success ? t("usage.successful") : t("usage.failed")}
                       />
                     </TableCell>
-                    <TableCell className="text-right font-mono text-srapi-text-secondary tabular">
+                    <TableCell className="text-right text-sm text-srapi-text-secondary tabular">
                       {log.total_tokens.toLocaleString()}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-srapi-text-secondary tabular">
-                      <div>{formatMoney(log.cost, log.currency)}</div>
-                      <div className="mt-1 max-w-[200px] truncate text-2xs text-srapi-text-tertiary" title={usageCostBreakdown(log, t)}>
+                    <TableCell className="text-right text-sm text-srapi-text-secondary tabular">
+                      <div className="font-medium">{formatMoney(log.cost, log.currency)}</div>
+                      <div className="mt-1 max-w-[200px] truncate text-[11px] text-srapi-text-tertiary" title={usageCostBreakdown(log, t)}>
                         {usageCostBreakdown(log, t)}
                       </div>
                     </TableCell>

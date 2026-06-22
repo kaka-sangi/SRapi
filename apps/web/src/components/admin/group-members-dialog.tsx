@@ -129,20 +129,23 @@ export function GroupMembersDialog({
             </Button>
           </div>
 
-          <div className="rounded-lg border border-srapi-border">
-            <div className="border-b border-srapi-border px-3 py-2 font-mono text-2xs uppercase tracking-widest text-srapi-text-secondary">
+          <div className="rounded-xl border border-srapi-border bg-srapi-card">
+            <div className="border-b border-srapi-border/70 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
               {t("adminGroups.members")}
             </div>
             {members.isLoading ? (
               <DialogListSkeleton rows={2} className="p-3" />
             ) : memberRows.length === 0 ? (
-              <p className="px-3 py-6 text-center text-2xs text-srapi-text-tertiary">
+              <p className="px-3 py-6 text-center text-xs text-srapi-text-tertiary">
                 {t("adminGroups.membersEmpty")}
               </p>
             ) : (
-              <ul className="divide-y divide-srapi-border">
+              <ul className="divide-y divide-srapi-border/70">
                 {memberRows.map((m) => (
-                  <li key={m.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                  <li
+                    key={m.id}
+                    className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-srapi-card-muted/60"
+                  >
                     <span className="truncate text-sm text-srapi-text-primary">
                       {accountName(m.account_id)}
                     </span>

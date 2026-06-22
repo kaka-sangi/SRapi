@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, ShieldCheck, Sparkles } from "lucide-react";
+import { CheckCircle2, ShieldCheck, Sparkles, Star } from "lucide-react";
 import { apiService } from "@/lib/api";
 import { CheckoutRedirect } from "@/components/features/checkout-redirect";
 import {
@@ -15,6 +15,8 @@ import { meErrorMessage } from "@/lib/me-api";
 import { useLanguage } from "@/context/LanguageContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { IconBubble } from "@/components/ui/icon-bubble";
+import { DataPill } from "@/components/ui/data-pill";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -49,10 +51,14 @@ export default function PricingPage() {
     return [...list].sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
   }, [plans.data]);
 
+  // Highlight the middle plan as the "popular" tier when 3+ are available;
+  // the visual treatment uses a soft accent border-l-4 instead of any badge.
+  const highlightIndex = sortedPlans.length >= 3 ? Math.floor(sortedPlans.length / 2) : -1;
+
   return (
     <div className="relative flex min-h-dvh flex-col">
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
-        <Link href="/" className="font-serif text-2xl leading-none text-srapi-text-primary">
+        <Link href="/" className="text-2xl font-semibold leading-none tracking-tight text-srapi-text-primary">
           SRapi
         </Link>
         <div className="flex items-center gap-2">
@@ -68,7 +74,7 @@ export default function PricingPage() {
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-6 pb-16">
         <div className="mx-auto max-w-2xl text-center">
-          <h1 className="font-serif text-4xl text-srapi-text-primary sm:text-5xl">
+          <h1 className="text-4xl font-semibold tracking-tight text-srapi-text-primary sm:text-5xl">
             {t("pricing.title")}
           </h1>
           <p className="mt-3 text-srapi-text-secondary">{t("pricing.subtitle")}</p>
@@ -87,8 +93,13 @@ export default function PricingPage() {
             <EmptyState />
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {sortedPlans.map((plan) => (
-                <PlanCard key={plan.id} plan={plan} onSubscribe={() => setSelected(plan)} />
+              {sortedPlans.map((plan, idx) => (
+                <PlanCard
+                  key={plan.id}
+                  plan={plan}
+                  highlight={idx === highlightIndex}
+                  onSubscribe={() => setSelected(plan)}
+                />
               ))}
             </div>
           )}
@@ -108,21 +119,47 @@ export default function PricingPage() {
   );
 }
 
-function PlanCard({ plan, onSubscribe }: { plan: SubscriptionPlan; onSubscribe: () => void }) {
+function PlanCard({
+  plan,
+  highlight = false,
+  onSubscribe,
+}: {
+  plan: SubscriptionPlan;
+  highlight?: boolean;
+  onSubscribe: () => void;
+}) {
   const { t } = useLanguage();
   const entitlements = entitlementLines(plan);
 
   return (
-    <Card className="card-raised flex h-full flex-col">
+    <Card
+      className={`flex h-full flex-col ${
+        highlight ? "card-raised border-l-4 border-l-srapi-primary" : ""
+      }`}
+    >
       <CardContent className="flex flex-1 flex-col">
-        <h3 className="font-serif text-2xl text-srapi-text-primary">{plan.name}</h3>
-        {plan.description ? (
-          <p className="mt-2 text-sm text-srapi-text-secondary">{plan.description}</p>
-        ) : null}
-        <div className="mt-6 font-serif text-4xl text-srapi-text-primary tabular">
-          {formatMoney(plan.price, plan.currency)}
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="text-xl font-semibold tracking-tight text-srapi-text-primary">
+            {plan.name}
+          </h3>
+          {highlight ? (
+            <DataPill tone="accent" size="sm">
+              <Star className="size-3" aria-hidden />
+              {t("pricing.popular") || "Popular"}
+            </DataPill>
+          ) : null}
         </div>
-        <p className="mt-1 text-2xs uppercase tracking-wide text-srapi-text-tertiary">
+        {plan.description ? (
+          <p className="mt-2 text-sm leading-relaxed text-srapi-text-secondary">
+            {plan.description}
+          </p>
+        ) : null}
+        <div className="mt-6 flex items-baseline gap-2">
+          <span className="text-3xl font-semibold tracking-tight tabular text-srapi-text-primary">
+            {formatMoney(plan.price, plan.currency)}
+          </span>
+        </div>
+        <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
           {t("pricing.perPeriod", { days: plan.validity_days })}
         </p>
 
@@ -157,12 +194,16 @@ function PlanCard({ plan, onSubscribe }: { plan: SubscriptionPlan; onSubscribe: 
 function EmptyState() {
   const { t } = useLanguage();
   return (
-    <div className="mx-auto flex max-w-md flex-col items-center rounded-xl border border-dashed border-srapi-border bg-srapi-card px-6 py-10 text-center">
-      <ShieldCheck className="size-8 text-srapi-text-tertiary" aria-hidden />
-      <h3 className="mt-3 font-serif text-lg text-srapi-text-primary">
+    <div className="mx-auto flex max-w-md flex-col items-center gap-3 rounded-2xl border border-dashed border-srapi-border/70 bg-srapi-card-muted/40 px-6 py-10 text-center">
+      <IconBubble tone="accent" className="size-12 [&>svg]:size-5">
+        <ShieldCheck aria-hidden />
+      </IconBubble>
+      <h3 className="text-base font-semibold tracking-tight text-srapi-text-primary">
         {t("pricing.emptyTitle")}
       </h3>
-      <p className="mt-1 text-sm text-srapi-text-secondary">{t("pricing.emptyBody")}</p>
+      <p className="max-w-sm text-sm leading-relaxed text-srapi-text-secondary">
+        {t("pricing.emptyBody")}
+      </p>
     </div>
   );
 }
@@ -257,7 +298,7 @@ function SubscribeDialog({
               {methods.isLoading ? (
                 <Skeleton className="mt-1 h-10 w-full" />
               ) : methodList.length === 0 ? (
-                <p className="mt-1 text-sm text-srapi-text-tertiary">{t("billing.noMethods")}</p>
+                <p className="mt-1 text-xs text-srapi-text-tertiary">{t("billing.noMethods")}</p>
               ) : (
                 <Select
                   value={effectiveInstanceId}

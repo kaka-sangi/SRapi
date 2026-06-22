@@ -102,7 +102,7 @@ export function RequestEvidencePanel() {
       header: t("adminRequestEvidence.time"),
       pinned: true,
       render: (row) => (
-        <span className="text-2xs text-srapi-text-tertiary tabular font-mono whitespace-nowrap">
+        <span className="whitespace-nowrap text-[12px] tabular text-srapi-text-tertiary">
           {formatDateTime(row.created_at)}
         </span>
       ),
@@ -131,7 +131,7 @@ export function RequestEvidencePanel() {
             </button>
           </div>
           <div
-            className="text-2xs text-srapi-text-tertiary truncate font-mono"
+            className="truncate text-[12px] text-srapi-text-tertiary"
             title={row.model ?? ""}
           >
             {row.model || "—"}
@@ -146,12 +146,12 @@ export function RequestEvidencePanel() {
       render: (row) => (
         <div className="min-w-0">
           <div
-            className="text-2xs text-srapi-text-secondary truncate font-mono"
+            className="truncate text-[12px] text-srapi-text-secondary"
             title={row.source_endpoint ?? ""}
           >
             {row.source_endpoint || "—"}
           </div>
-          <div className="text-2xs text-srapi-text-tertiary truncate font-mono">
+          <div className="truncate text-[12px] text-srapi-text-tertiary">
             {row.source_protocol || "—"}
             {row.target_protocol ? ` -> ${row.target_protocol}` : ""}
           </div>
@@ -163,7 +163,7 @@ export function RequestEvidencePanel() {
       header: t("adminRequestEvidence.actor"),
       hideOnMobile: true,
       render: (row) => (
-        <div className="text-2xs text-srapi-text-tertiary space-y-0.5 font-mono">
+        <div className="space-y-0.5 text-[12px] text-srapi-text-tertiary">
           <div>
             {t("adminRequestEvidence.userShort")}: {row.user_id ?? "—"}
           </div>
@@ -183,7 +183,7 @@ export function RequestEvidencePanel() {
       render: (row) => (
         <div className="space-y-0.5 text-right">
           <div className={statusClass(row.status_code)}>{row.status_code ?? "—"}</div>
-          <div className="text-2xs text-srapi-text-tertiary font-mono">
+          <div className="text-[12px] text-srapi-text-tertiary">
             {row.attempt_no ? `#${row.attempt_no}` : "—"}
           </div>
         </div>
@@ -201,7 +201,7 @@ export function RequestEvidencePanel() {
           >
             {row.error_class || "—"}
           </div>
-          <div className="text-2xs text-srapi-text-tertiary line-clamp-2 break-words">
+          <div className="line-clamp-2 break-words text-[12px] text-srapi-text-tertiary">
             {row.error_message || row.error_phase || "—"}
           </div>
         </div>
@@ -214,7 +214,7 @@ export function RequestEvidencePanel() {
       hideOnMobile: true,
       render: (row) => (
         <div className="space-y-0.5 text-right">
-          <div className="text-2xs text-srapi-text-tertiary tabular font-mono">
+          <div className="text-[12px] tabular text-srapi-text-tertiary">
             {typeof row.latency_ms === "number" ? formatLatency(row.latency_ms) : "—"}
           </div>
           <StreamCompletionBadge state={row.stream_completion_state} />
@@ -447,7 +447,7 @@ function RequestEvidenceScopeFilters({
 
   return (
     <div className="flex w-full flex-wrap items-center gap-1.5">
-      <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+      <span className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
         {t("adminRequestEvidence.scope")}
       </span>
       {chips.map((chip) => (
@@ -486,7 +486,7 @@ function ScopeChip({
 }) {
   return (
     <span
-      className="border-srapi-border bg-srapi-card-muted inline-flex max-w-full items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-2xs text-srapi-text-secondary sm:max-w-80"
+      className="inline-flex max-w-full items-center gap-1 rounded-full bg-srapi-card-muted px-2.5 py-0.5 text-[11px] font-medium text-srapi-text-secondary sm:max-w-80"
       title={`${label}:${value}`}
     >
       <span className="text-srapi-text-tertiary">{label}</span>
@@ -540,7 +540,7 @@ function RequestEvidenceDetailDialog({
     <Dialog open={Boolean(requestID)} onOpenChange={(open) => (!open ? onClose() : undefined)}>
       <DialogContent className="max-w-5xl gap-5">
         <DialogHeader>
-          <DialogTitle className="font-sans text-base">
+          <DialogTitle className="text-lg font-semibold tracking-tight">
             {t("adminRequestEvidence.detailTitle")}
           </DialogTitle>
           <DialogDescription className="font-mono text-xs">
@@ -744,13 +744,13 @@ function DetailMetric({
     tone === "error"
       ? "text-srapi-error"
       : tone === "success"
-        ? "text-emerald-400"
+        ? "text-srapi-success"
         : tone === "muted"
           ? "text-srapi-text-tertiary"
           : "text-srapi-text-primary";
   return (
-    <div className="border-srapi-border rounded border p-3">
-      <div className="text-srapi-text-tertiary text-2xs uppercase">{label}</div>
+    <div className="rounded-xl border border-srapi-border p-3">
+      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{label}</div>
       <div className={`mt-1 text-sm font-semibold ${valueClass}`}>{value}</div>
     </div>
   );
@@ -777,7 +777,7 @@ function TokenEvidenceValue({
   if (typeof total !== "number" || !Number.isFinite(total)) {
     return <span className="text-srapi-text-tertiary">—</span>;
   }
-  const tone = estimated === true ? "text-amber-400" : "text-emerald-400";
+  const tone = estimated === true ? "text-srapi-warning" : "text-srapi-success";
   const label =
     estimated === undefined
       ? null
@@ -788,7 +788,7 @@ function TokenEvidenceValue({
     <span className="inline-flex items-baseline justify-end gap-1 font-mono tabular">
       <span className="text-srapi-text-primary">{formatInteger(total)}</span>
       {label ? (
-        <span className={`${compact ? "text-2xs" : "text-2xs"} ${tone}`}>{label}</span>
+        <span className={`text-[11px] font-medium ${tone}`}>{label}</span>
       ) : null}
     </span>
   );
@@ -799,14 +799,14 @@ function StreamCompletionBadge({ state }: { state?: RequestEvidenceRow["stream_c
   if (!state) return <span className="text-srapi-text-tertiary">—</span>;
   const className =
     state === "completed"
-      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+      ? "border-srapi-success/30 bg-srapi-success/10 text-srapi-success"
       : state === "idle_timeout" || state === "failed"
-        ? "border-red-500/30 bg-red-500/10 text-red-300"
+        ? "border-srapi-error/30 bg-srapi-error/10 text-srapi-error"
         : state === "interrupted"
-          ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
+          ? "border-srapi-warning/30 bg-srapi-warning/12 text-srapi-warning"
           : "border-srapi-border bg-srapi-card-muted text-srapi-text-tertiary";
   return (
-    <span className={`inline-flex rounded border px-1.5 py-0.5 font-mono text-2xs ${className}`}>
+    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${className}`}>
       {t(`adminRequestEvidence.streamState.${state}`)}
     </span>
   );
@@ -865,7 +865,7 @@ function EvidenceLink({
   return (
     <Link
       href={href}
-      className="border-srapi-border text-2xs text-srapi-text-secondary hover:bg-srapi-card-muted hover:text-srapi-text-primary inline-flex items-center gap-1 rounded border px-1.5 py-0.5"
+      className="inline-flex items-center gap-1 rounded-full border border-srapi-border bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-secondary hover:text-srapi-text-primary"
     >
       {icon}
       {label}
@@ -882,11 +882,11 @@ function SourceChip({
 }) {
   const className =
     tone === "error"
-      ? "border-red-500/30 bg-red-500/10 text-red-300"
+      ? "bg-srapi-error/12 text-srapi-error"
       : tone === "info"
-        ? "border-sky-500/30 bg-sky-500/10 text-sky-300"
-        : "border-srapi-border bg-srapi-card-muted text-srapi-text-secondary";
-  return <span className={`text-2xs rounded border px-1.5 py-0.5 ${className}`}>{label}</span>;
+        ? "bg-srapi-accent-soft text-srapi-primary"
+        : "bg-srapi-card-muted text-srapi-text-secondary";
+  return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${className}`}>{label}</span>;
 }
 
 function kindTone(kind: RequestEvidenceRow["kind"]): QuietStatus {
@@ -905,11 +905,11 @@ function kindLabel(
 }
 
 function statusClass(status: number | undefined): string {
-  const base = "font-mono text-2xs tabular";
+  const base = "text-[12px] font-medium tabular";
   if (status == null) return `${base} text-srapi-text-tertiary`;
   if (status >= 500) return `${base} text-srapi-error`;
-  if (status >= 400) return `${base} text-amber-500`;
-  return `${base} text-emerald-400`;
+  if (status >= 400) return `${base} text-srapi-warning`;
+  return `${base} text-srapi-success`;
 }
 
 function requestEvidenceSortValue(raw?: string): "created_at_desc" | "latency_desc" {
@@ -932,9 +932,9 @@ function normalizeLatencyFilterInput(raw: string): string | undefined {
 }
 
 function systemLogLevelClass(level: string): string {
-  const base = "font-mono text-2xs uppercase";
+  const base = "text-[11px] font-semibold uppercase tracking-[0.12em]";
   if (level === "error") return `${base} text-srapi-error`;
-  if (level === "warn") return `${base} text-amber-500`;
-  if (level === "info") return `${base} text-sky-400`;
+  if (level === "warn") return `${base} text-srapi-warning`;
+  if (level === "info") return `${base} text-srapi-success`;
   return `${base} text-srapi-text-tertiary`;
 }

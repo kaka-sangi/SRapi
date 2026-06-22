@@ -68,7 +68,7 @@ function Content() {
       key: "time",
       header: t("adminOpsSystemLogs.time"),
       render: (row) => (
-        <span className="whitespace-nowrap font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="whitespace-nowrap text-[12px] tabular text-srapi-text-tertiary">
           {formatDateTime(row.created_at)}
         </span>
       ),
@@ -83,7 +83,7 @@ function Content() {
       header: t("adminOpsSystemLogs.source"),
       hideOnMobile: true,
       render: (row) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary">{row.source || "—"}</span>
+        <span className="text-[12px] text-srapi-text-tertiary">{row.source || "—"}</span>
       ),
     },
     {
@@ -198,10 +198,10 @@ function Content() {
               ) : null}
               {detail.metadata && Object.keys(detail.metadata).length > 0 ? (
                 <div>
-                  <div className="text-2xs uppercase text-srapi-text-tertiary">
+                  <div className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                     {t("adminOpsSystemLogs.metadata")}
                   </div>
-                  <pre className="mt-1 max-h-96 overflow-auto rounded-lg border border-srapi-border bg-srapi-card-muted px-3 py-2 text-2xs text-srapi-text-secondary">
+                  <pre className="mt-1 max-h-96 overflow-auto rounded-lg border border-srapi-border bg-srapi-card-muted px-3 py-2 font-mono text-[11px] text-srapi-text-secondary">
                     {safeJson(detail.metadata)}
                   </pre>
                 </div>
@@ -234,7 +234,7 @@ function ExactFilterInput({
       onChange={(event) => onChange(event.target.value.trim())}
       placeholder={placeholder}
       aria-label={ariaLabel}
-      className="h-9 font-mono text-2xs sm:w-48"
+      className="h-9 text-xs sm:w-48"
     />
   );
 }
@@ -369,12 +369,12 @@ function EvidenceTile({
   return (
     <Card className="flex min-h-28 flex-col justify-between p-4">
       <div>
-        <div className="font-mono text-2xs uppercase text-srapi-text-tertiary">{label}</div>
+        <div className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{label}</div>
         <div className="mt-2 line-clamp-2 break-words text-sm font-medium text-srapi-text-primary">
           {value}
         </div>
       </div>
-      <div className="mt-3 font-mono text-2xs text-srapi-text-tertiary">{footer}</div>
+      <div className="mt-3 text-[11px] text-srapi-text-tertiary">{footer}</div>
     </Card>
   );
 }
@@ -408,8 +408,8 @@ function LevelCounts({ counts }: { counts: OpsSystemLogHealth["level_counts"] | 
 function KV({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline gap-3">
-      <dt className="w-24 shrink-0 text-2xs uppercase text-srapi-text-tertiary">{label}</dt>
-      <dd className="flex min-w-0 items-center gap-1.5 font-mono text-2xs text-srapi-text-secondary">
+      <dt className="w-24 shrink-0 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{label}</dt>
+      <dd className="flex min-w-0 items-center gap-1.5 text-[12px] text-srapi-text-secondary">
         <span className="break-all">{value}</span>
         <CopyButton value={value} size="inline" />
       </dd>
@@ -424,14 +424,14 @@ function EvidenceSummary({ log }: { log: OpsSystemLog }) {
   const requestDumpHref = adminRequestDumpsHref(log);
   const requestEvidenceHref = adminRequestEvidenceHref(log);
   if (items.length === 0 && !errorHref && !requestDumpHref && !requestEvidenceHref) {
-    return <span className="text-2xs text-srapi-text-tertiary font-mono">—</span>;
+    return <span className="text-[11px] text-srapi-text-tertiary">—</span>;
   }
   return (
     <div className="flex max-w-md flex-wrap gap-1.5">
       {errorHref ? (
         <Link
           href={errorHref}
-          className="max-w-full truncate rounded bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-secondary underline-offset-2 hover:text-srapi-text-primary hover:underline"
+          className="max-w-full truncate rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-secondary underline-offset-2 hover:text-srapi-text-primary hover:underline"
         >
           {t("adminOpsSystemLogs.openErrorLogs")}
         </Link>
@@ -439,7 +439,7 @@ function EvidenceSummary({ log }: { log: OpsSystemLog }) {
       {requestDumpHref ? (
         <Link
           href={requestDumpHref}
-          className="max-w-full truncate rounded bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-secondary underline-offset-2 hover:text-srapi-text-primary hover:underline"
+          className="max-w-full truncate rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-secondary underline-offset-2 hover:text-srapi-text-primary hover:underline"
         >
           {t("adminOpsSystemLogs.openRequestDumps")}
         </Link>
@@ -447,7 +447,7 @@ function EvidenceSummary({ log }: { log: OpsSystemLog }) {
       {requestEvidenceHref ? (
         <Link
           href={requestEvidenceHref}
-          className="max-w-full truncate rounded bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-secondary underline-offset-2 hover:text-srapi-text-primary hover:underline"
+          className="max-w-full truncate rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-secondary underline-offset-2 hover:text-srapi-text-primary hover:underline"
         >
           {t("adminOpsSystemLogs.openRequestEvidence")}
         </Link>
@@ -455,7 +455,7 @@ function EvidenceSummary({ log }: { log: OpsSystemLog }) {
       {items.map((item) => (
         <span
           key={`${item.key}:${item.value}`}
-          className="bg-srapi-card-muted text-2xs text-srapi-text-secondary max-w-full truncate rounded px-1.5 py-0.5 font-mono"
+          className="max-w-full truncate rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-secondary"
           title={`${item.key}: ${item.value}`}
         >
           {item.key}:{item.value}
@@ -474,7 +474,7 @@ function RelatedEvidenceLinks({ log }: { log: OpsSystemLog }) {
 
   return (
     <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-3">
-      <div className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
         {t("adminOpsSystemLogs.relatedEvidence")}
       </div>
       <div className="mt-2 flex flex-wrap gap-2">

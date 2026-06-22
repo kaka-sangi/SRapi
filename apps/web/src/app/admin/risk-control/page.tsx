@@ -100,7 +100,7 @@ function RiskContent() {
       header: t("adminRisk.time"),
       pinned: true,
       render: (r) => (
-        <span className="whitespace-nowrap font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="whitespace-nowrap text-[12px] tabular text-srapi-text-tertiary">
           {formatDateTime(r.created_at)}
         </span>
       ),
@@ -238,7 +238,7 @@ function RiskContent() {
         <Card>
           <CardContent className="flex flex-wrap items-center gap-x-12 gap-y-4">
             <div>
-              <div className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                 {t("adminRisk.mode")}
               </div>
               <div className="mt-2">
@@ -246,26 +246,26 @@ function RiskContent() {
               </div>
             </div>
             <div>
-              <div className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                 {t("adminRisk.activeBlocks")}
               </div>
-              <div className="mt-1 font-serif text-3xl text-srapi-text-primary tabular">
+              <div className="mt-1 text-3xl font-semibold tracking-tight tabular text-srapi-text-primary">
                 {formatInteger(status.data.active_blocks)}
               </div>
             </div>
             <div>
-              <div className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                 {t("adminRisk.recentEvents")}
               </div>
-              <div className="mt-1 font-serif text-3xl text-srapi-text-primary tabular">
+              <div className="mt-1 text-3xl font-semibold tracking-tight tabular text-srapi-text-primary">
                 {formatInteger(status.data.recent_events)}
               </div>
             </div>
             <div className="ml-auto text-right">
-              <div className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                 {t("adminCommon.updated")}
               </div>
-              <div className="mt-2 font-mono text-2xs text-srapi-text-secondary tabular">
+              <div className="mt-2 text-[12px] tabular text-srapi-text-secondary">
                 {formatDateTime(status.data.evaluated_at)}
               </div>
             </div>
@@ -298,7 +298,7 @@ function RiskContent() {
         <Card>
           <CardContent className="flex flex-wrap items-center gap-x-12 gap-y-4">
             <div>
-              <div className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                 {t("adminRisk.contentSafetyTitle")}
               </div>
               <div className="mt-2">
@@ -309,7 +309,7 @@ function RiskContent() {
               </div>
             </div>
             <div>
-              <div className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                 {t("adminRisk.contentSafetyMode")}
               </div>
               <div className="mt-2">
@@ -320,18 +320,18 @@ function RiskContent() {
               </div>
             </div>
             <div>
-              <div className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                 {t("adminRisk.customKeywordCount")}
               </div>
-              <div className="mt-1 font-serif text-3xl text-srapi-text-primary tabular">
+              <div className="mt-1 text-3xl font-semibold tracking-tight tabular text-srapi-text-primary">
                 {formatInteger(contentSafety.data.custom_keywords.length)}
               </div>
             </div>
             <div>
-              <div className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                 {t("adminRisk.modelScopeCount")}
               </div>
-              <div className="mt-1 font-serif text-3xl text-srapi-text-primary tabular">
+              <div className="mt-1 text-3xl font-semibold tracking-tight tabular text-srapi-text-primary">
                 {formatInteger(contentSafety.data.model_scopes.length)}
               </div>
             </div>

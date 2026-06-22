@@ -39,9 +39,13 @@ export function PromoCodeUsagesDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-lg font-semibold tracking-tight">
             {t("adminPromos.usagesTitle")}
-            {code ? <span className="font-mono text-srapi-text-tertiary"> · {code}</span> : null}
+            {code ? (
+              <span className="ml-2 inline-flex items-center rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium tabular text-srapi-text-secondary">
+                {code}
+              </span>
+            ) : null}
           </DialogTitle>
         </DialogHeader>
         <div className="mt-3 max-h-[60vh] overflow-y-auto">
@@ -66,19 +70,19 @@ export function PromoCodeUsagesDialog({
                   <TableBody>
                     {result.data.map((usage) => (
                       <TableRow key={usage.id}>
-                        <TableCell className="font-mono text-2xs text-srapi-text-tertiary tabular">
+                        <TableCell className="text-[12px] tabular text-srapi-text-tertiary">
                           {formatDateTime(usage.applied_at)}
                         </TableCell>
-                        <TableCell className="font-mono text-2xs text-srapi-text-secondary">
+                        <TableCell className="text-xs tabular text-srapi-text-secondary">
                           #{usage.user_id}
                         </TableCell>
-                        <TableCell className="font-mono text-2xs text-srapi-text-tertiary">
+                        <TableCell className="text-xs tabular text-srapi-text-tertiary">
                           {usage.order_no}
                         </TableCell>
-                        <TableCell className="tabular">
+                        <TableCell className="text-sm font-medium tabular text-srapi-text-primary">
                           {formatMoney(usage.discount_amount, usage.currency)}
                         </TableCell>
-                        <TableCell className="tabular">
+                        <TableCell className="text-sm font-medium tabular text-srapi-text-primary">
                           {formatMoney(usage.final_amount, usage.currency)}
                         </TableCell>
                       </TableRow>

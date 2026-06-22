@@ -1,6 +1,8 @@
 "use client";
 
 import { useLanguage } from "@/context/LanguageContext";
+import { Card } from "@/components/ui/card";
+import { DataPill } from "@/components/ui/data-pill";
 import { cn } from "@/lib/cn";
 import {
   PLATFORM_ICON_COLORS,
@@ -9,7 +11,8 @@ import {
 } from "./presets";
 
 // ---------------------------------------------------------------------------
-// Step 1: Platform grid
+// Step 1: Platform grid — DiscoveryCard-style tiles with icon bubble, title,
+// description, and a footer row of auth-type/model-count pills.
 // ---------------------------------------------------------------------------
 
 export function PlatformGrid({
@@ -36,47 +39,49 @@ export function PlatformGrid({
           key={p.key}
           type="button"
           onClick={() => onSelect(p)}
-          className={cn(
-            "group relative flex items-start gap-4 rounded-xl border bg-srapi-card p-5 text-left transition-all",
-            p.custom
-              ? "border-dashed border-srapi-border hover:border-srapi-primary/50 hover:bg-srapi-primary/5"
-              : "border-srapi-border hover:border-srapi-text-tertiary hover:shadow-sm",
-            "active:scale-[0.985]",
-          )}
+          className="block h-full text-left focus:outline-none"
         >
-          <div
+          <Card
             className={cn(
-              "flex size-11 shrink-0 items-center justify-center rounded-lg font-mono text-xs font-bold tracking-tight transition-colors",
-              p.custom
-                ? "bg-srapi-primary/10 text-srapi-primary group-hover:bg-srapi-primary/20"
-                : PLATFORM_ICON_COLORS[p.key] ?? "bg-srapi-card-muted text-srapi-text-secondary",
+              "card-interactive group h-full",
+              p.custom && "border-dashed border-srapi-primary/30 bg-srapi-accent-soft/20",
             )}
           >
-            {PLATFORM_ICONS[p.key] ?? p.key.slice(0, 2).toUpperCase()}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium text-srapi-text-primary">
-              {p.name}
-            </div>
-            <div className="mt-0.5 text-xs leading-relaxed text-srapi-text-tertiary">
-              {p.description}
-            </div>
-            <div className="mt-2.5 flex flex-wrap gap-1.5">
-              {p.authTypes.map((a) => (
-                <span
-                  key={a}
-                  className="rounded-md bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary"
+            <div className="flex h-full flex-col gap-4 p-5">
+              <div className="flex items-start gap-3">
+                <div
+                  className={cn(
+                    "grid size-11 shrink-0 place-items-center rounded-xl font-mono text-xs font-bold tracking-tight transition-transform duration-200 group-hover:scale-105",
+                    p.custom
+                      ? "bg-srapi-accent-soft text-srapi-primary"
+                      : PLATFORM_ICON_COLORS[p.key] ?? "bg-srapi-card-muted text-srapi-text-secondary",
+                  )}
                 >
-                  {a}
-                </span>
-              ))}
-              {p.defaultModels.length > 0 && (
-                <span className="rounded-md bg-srapi-card-muted px-1.5 py-0.5 text-2xs text-srapi-text-tertiary">
-                  {p.defaultModels.length} {t("adminAccounts.models")}
-                </span>
-              )}
+                  {PLATFORM_ICONS[p.key] ?? p.key.slice(0, 2).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base font-semibold tracking-tight text-srapi-text-primary">
+                    {p.name}
+                  </h3>
+                  <p className="mt-1 text-sm leading-relaxed text-srapi-text-secondary line-clamp-2">
+                    {p.description}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-auto flex flex-wrap gap-1.5 border-t border-srapi-border/70 pt-3">
+                {p.authTypes.map((a) => (
+                  <DataPill key={a} tone="neutral" size="sm">
+                    {a}
+                  </DataPill>
+                ))}
+                {p.defaultModels.length > 0 && (
+                  <DataPill tone="neutral" size="sm">
+                    {p.defaultModels.length} {t("adminAccounts.models")}
+                  </DataPill>
+                )}
+              </div>
             </div>
-          </div>
+          </Card>
         </button>
       ))}
     </div>

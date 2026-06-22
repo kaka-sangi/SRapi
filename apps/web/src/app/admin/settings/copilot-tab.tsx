@@ -52,7 +52,7 @@ export function CopilotTab({
             <Label htmlFor="copilot-enabled" className="mb-0">
               {t("copilot.fieldEnabled")}
             </Label>
-            <p className="mt-0.5 text-2xs text-srapi-text-tertiary">{t("copilot.fieldEnabledHint")}</p>
+            <p className="mt-0.5 text-xs text-srapi-text-tertiary">{t("copilot.fieldEnabledHint")}</p>
           </div>
           <Switch
             id="copilot-enabled"
@@ -96,7 +96,7 @@ export function CopilotTab({
               placeholder="claude-3-5-sonnet / gpt-4o"
               onChange={(e) => onField("model", e.target.value)}
             />
-            <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("copilot.fieldModelHint")}</p>
+            <p className="mt-1 text-xs text-srapi-text-tertiary">{t("copilot.fieldModelHint")}</p>
           </div>
         </div>
 
@@ -114,7 +114,7 @@ export function CopilotTab({
               addCustomLabel={(q) => t("adminCommon.addValue", { value: q })}
             />
           </div>
-          <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("copilot.fieldModelsHint")}</p>
+          <p className="mt-1 text-xs text-srapi-text-tertiary">{t("copilot.fieldModelsHint")}</p>
         </div>
 
         {value.source === "account" ? (
@@ -135,7 +135,7 @@ export function CopilotTab({
                 ))}
               </SelectContent>
             </Select>
-            <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("copilot.fieldAccountHint")}</p>
+            <p className="mt-1 text-xs text-srapi-text-tertiary">{t("copilot.fieldAccountHint")}</p>
           </div>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2">
@@ -181,13 +181,13 @@ export function CopilotTab({
         )}
 
 
-        <div className="space-y-4 border-t border-srapi-border pt-4">
+        <div className="space-y-4 border-t border-srapi-border/70 pt-4">
           <div className="flex items-center justify-between gap-4">
             <div>
               <Label htmlFor="copilot-websearch" className="mb-0">
                 {t("copilot.fieldWebSearch")}
               </Label>
-              <p className="mt-0.5 text-2xs text-srapi-text-tertiary">{t("copilot.fieldWebSearchHint")}</p>
+              <p className="mt-0.5 text-xs text-srapi-text-tertiary">{t("copilot.fieldWebSearchHint")}</p>
             </div>
             <Switch
               id="copilot-websearch"
@@ -240,13 +240,13 @@ export function CopilotTab({
           ) : null}
         </div>
 
-        <div className="space-y-4 border-t border-srapi-border pt-4">
+        <div className="space-y-4 border-t border-srapi-border/70 pt-4">
           <div className="flex items-center justify-between gap-4">
             <div>
               <Label htmlFor="copilot-autorun" className="mb-0">
                 {t("copilot.fieldAutoRunReads")}
               </Label>
-              <p className="mt-0.5 text-2xs text-srapi-text-tertiary">{t("copilot.fieldAutoRunReadsHint")}</p>
+              <p className="mt-0.5 text-xs text-srapi-text-tertiary">{t("copilot.fieldAutoRunReadsHint")}</p>
             </div>
             <Switch
               id="copilot-autorun"
@@ -259,7 +259,7 @@ export function CopilotTab({
               <Label htmlFor="copilot-owner" className="mb-0">
                 {t("copilot.fieldOwnerOnly")}
               </Label>
-              <p className="mt-0.5 text-2xs text-srapi-text-tertiary">{t("copilot.fieldOwnerOnlyHint")}</p>
+              <p className="mt-0.5 text-xs text-srapi-text-tertiary">{t("copilot.fieldOwnerOnlyHint")}</p>
             </div>
             <Switch
               id="copilot-owner"
@@ -269,7 +269,7 @@ export function CopilotTab({
           </div>
         </div>
 
-        <div className="flex justify-end border-t border-srapi-border pt-4">
+        <div className="flex justify-end border-t border-srapi-border/70 pt-4">
           <Button variant="primary" loading={pending} onClick={onSave}>
             {t("adminSettings.saveSection")}
           </Button>

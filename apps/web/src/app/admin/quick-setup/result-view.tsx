@@ -126,7 +126,7 @@ export function ResultView({
               <dd className="text-right">
                 <div className="font-medium text-srapi-text-primary">{accountName}</div>
                 {accountId && (
-                  <div className="font-mono text-2xs text-srapi-text-tertiary">ID: {accountId}</div>
+                  <div className="text-xs text-srapi-text-tertiary tabular">ID: {accountId}</div>
                 )}
               </dd>
             </div>
@@ -143,13 +143,13 @@ export function ResultView({
 
         {/* Model names */}
         {result.model_names && result.model_names.length > 0 && (
-          <div className="rounded-xl border border-srapi-border bg-srapi-card p-5">
+          <div className="rounded-2xl border border-srapi-border bg-srapi-card p-5">
             <Label className="mb-3">{t("adminQuickSetup.resultModels")}</Label>
             <div className="flex flex-wrap gap-1.5">
               {result.model_names.map((m) => (
                 <span
                   key={m}
-                  className="rounded-md bg-srapi-card-muted px-2 py-0.5 font-mono text-2xs text-srapi-text-secondary"
+                  className="rounded-full bg-srapi-card-muted px-2.5 py-1 font-mono text-[11px] font-medium text-srapi-text-secondary"
                 >
                   {m}
                 </span>

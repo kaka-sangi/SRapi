@@ -70,7 +70,7 @@ export function SpecialFieldRow({
           <TagInput id={id} value={tags} onChange={(next) => onChange(field.key, next)} />
         </div>
         {hint !== hintId ? (
-          <p className="mt-1 text-2xs text-srapi-text-tertiary">{hint}</p>
+          <p className="mt-1 text-xs text-srapi-text-tertiary">{hint}</p>
         ) : null}
       </div>
     );
@@ -88,7 +88,7 @@ export function SpecialFieldRow({
             return (
               <label
                 key={route.value}
-                className="flex min-h-10 cursor-pointer items-center gap-3 rounded-md border border-srapi-border bg-srapi-card/40 px-3 py-2 text-sm"
+                className="flex min-h-10 cursor-pointer items-center gap-3 rounded-xl border border-srapi-border/70 bg-srapi-card-muted/40 px-3 py-2 text-sm transition-colors hover:bg-srapi-card-muted/60"
               >
                 <Checkbox
                   checked={checked}
@@ -104,7 +104,7 @@ export function SpecialFieldRow({
             );
           })}
         </div>
-        <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("adminSettings.fields.protocol_conversion_routes_hint")}</p>
+        <p className="mt-1 text-xs text-srapi-text-tertiary">{t("adminSettings.fields.protocol_conversion_routes_hint")}</p>
       </div>
     );
   }
@@ -127,7 +127,7 @@ export function SpecialFieldRow({
             addCustomLabel={(q) => t("adminCommon.addValue", { value: q })}
           />
         </div>
-        <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("adminSettings.rolloutModelsHint")}</p>
+        <p className="mt-1 text-xs text-srapi-text-tertiary">{t("adminSettings.rolloutModelsHint")}</p>
       </div>
     );
   }
@@ -187,7 +187,7 @@ export function SpecialFieldRow({
         value={String(value ?? "")}
         onChange={(e) => onChange(field.key, e.target.value)}
       />
-      <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("adminSettings.customMenusHint")}</p>
+      <p className="mt-1 text-xs text-srapi-text-tertiary">{t("adminSettings.customMenusHint")}</p>
     </div>
   );
 }
@@ -250,17 +250,17 @@ function CustomMenusEditor({
           {t("adminSettings.addCustomMenu")}
         </Button>
       </div>
-      <p className="text-2xs text-srapi-text-tertiary">{t("adminSettings.customMenusHint")}</p>
+      <p className="text-xs text-srapi-text-tertiary">{t("adminSettings.customMenusHint")}</p>
       {value.length === 0 ? (
-        <div className="rounded-md border border-dashed border-srapi-border px-3 py-4 text-sm text-srapi-text-tertiary">
+        <div className="rounded-2xl border border-dashed border-srapi-border/70 bg-srapi-card-muted/40 px-3 py-4 text-sm text-srapi-text-tertiary">
           {t("adminSettings.customMenusEmpty")}
         </div>
       ) : (
         <div className="space-y-3">
           {value.map((menu, index) => (
-            <div key={index} className="rounded-md border border-srapi-border p-3">
+            <div key={index} className="rounded-xl border border-srapi-border/70 bg-srapi-card-muted/30 p-3">
               <div className="mb-3 flex items-center justify-between gap-3">
-                <div className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+                <div className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                   {t("adminSettings.customMenuItem", { n: index + 1 })}
                 </div>
                 <div className="flex items-center gap-1">
@@ -411,17 +411,17 @@ function OAuthProviderConfigsEditor({
           {t("adminSettings.addOAuthProviderConfig")}
         </Button>
       </div>
-      <p className="text-2xs text-srapi-text-tertiary">
+      <p className="text-xs text-srapi-text-tertiary">
         {t("adminSettings.oauthProviderConfigsHint")}
       </p>
       {value.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-srapi-border px-3 py-4 text-sm text-srapi-text-tertiary">
+        <div className="rounded-2xl border border-dashed border-srapi-border/70 bg-srapi-card-muted/40 px-3 py-4 text-sm text-srapi-text-tertiary">
           {t("adminSettings.oauthProviderConfigsEmpty")}
         </div>
       ) : (
         <div className="space-y-3">
           {value.map((config, index) => (
-            <div key={index} className="rounded-lg border border-srapi-border p-3">
+            <div key={index} className="rounded-xl border border-srapi-border/70 bg-srapi-card-muted/30 p-3">
               <div className="grid gap-3 lg:grid-cols-12">
                 <Field className="lg:col-span-2" label={t("adminSettings.oauthFields.provider")}>
                   <Select
@@ -572,7 +572,7 @@ function Field({
     <div className={className}>
       <label
         htmlFor={htmlFor}
-        className="mb-1.5 block text-2xs font-medium uppercase tracking-wide text-srapi-text-tertiary"
+        className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary"
       >
         {label}
       </label>

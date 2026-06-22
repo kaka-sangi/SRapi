@@ -42,7 +42,7 @@ export function MaintenanceBanner() {
           <span className="font-semibold">{t("adminSettings.maintenance.bannerTitle")}</span>
           {message ? <span className="text-srapi-text-secondary">{message}</span> : null}
           {recoveryHint ? (
-            <span className="font-mono text-2xs text-srapi-text-tertiary">{recoveryHint}</span>
+            <span className="text-xs tabular text-srapi-text-tertiary">{recoveryHint}</span>
           ) : null}
         </div>
       </div>

@@ -100,7 +100,7 @@ export function BillingLedgerPanel() {
       header: t("adminBillingLedger.time"),
       pinned: true,
       render: (r) => (
-        <span className="whitespace-nowrap font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="whitespace-nowrap text-[12px] tabular text-srapi-text-tertiary">
           {formatDateTime(r.created_at)}
         </span>
       ),
@@ -125,7 +125,7 @@ export function BillingLedgerPanel() {
       header: t("adminBillingLedger.amount"),
       align: "right",
       render: (r) => (
-        <span className="font-mono text-srapi-text-primary tabular">
+        <span className="tabular text-srapi-text-primary">
           {formatMoney(r.amount, r.currency)}
         </span>
       ),
@@ -136,7 +136,7 @@ export function BillingLedgerPanel() {
       align: "right",
       hideOnMobile: true,
       render: (r) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-[12px] tabular text-srapi-text-tertiary">
           {formatMoney(r.balance_after, r.currency)}
         </span>
       ),
@@ -150,7 +150,7 @@ export function BillingLedgerPanel() {
           <span className="text-srapi-text-secondary">
             {r.reference_type}
             {r.reference_id ? (
-              <span className="ml-1 font-mono text-2xs text-srapi-text-tertiary">#{r.reference_id}</span>
+              <span className="ml-1 text-[11px] text-srapi-text-tertiary">#{r.reference_id}</span>
             ) : null}
           </span>
         ) : (

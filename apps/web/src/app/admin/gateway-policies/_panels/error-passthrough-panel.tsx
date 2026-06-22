@@ -9,6 +9,7 @@ import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-
 import { ResourceFormDialog, type FieldConfig } from "@/components/admin/resource-form-dialog";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { QuietBadge, type QuietStatus } from "@/components/ui/quiet-badge";
+import { DataPill } from "@/components/ui/data-pill";
 import { Button } from "@/components/ui/button";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
@@ -140,7 +141,7 @@ export function ErrorPassthroughPanel() {
       header: t("adminErrorPassthrough.priority"),
       align: "right",
       render: (r) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">{r.priority}</span>
+        <span className="text-xs text-srapi-text-tertiary tabular">{r.priority}</span>
       ),
     },
     {
@@ -292,15 +293,12 @@ function MatchChips({ rule }: { rule: ErrorPassthroughRule }) {
   return (
     <div className="flex flex-wrap gap-1">
       {shown.map((item, i) => (
-        <span
-          key={`${item}-${i}`}
-          className="rounded border border-srapi-border px-1.5 py-0.5 font-mono text-2xs text-srapi-text-secondary"
-        >
+        <DataPill key={`${item}-${i}`} tone="neutral" size="sm">
           {item}
-        </span>
+        </DataPill>
       ))}
       {extra > 0 ? (
-        <span className="px-1 py-0.5 font-mono text-2xs text-srapi-text-tertiary">+{extra}</span>
+        <span className="px-1 py-0.5 text-xs text-srapi-text-tertiary tabular">+{extra}</span>
       ) : null}
     </div>
   );

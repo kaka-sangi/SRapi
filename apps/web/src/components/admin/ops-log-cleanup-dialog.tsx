@@ -91,7 +91,7 @@ export function OpsLogCleanupDialog({
       <DialogContent>
         <form onSubmit={submit}>
           <DialogHeader>
-            <DialogTitle>{t("adminOpsCleanup.title")}</DialogTitle>
+            <DialogTitle className="text-lg font-semibold tracking-tight">{t("adminOpsCleanup.title")}</DialogTitle>
             <DialogDescription>{t("adminOpsCleanup.subtitle")}</DialogDescription>
           </DialogHeader>
           <div className="mt-4 space-y-4">
@@ -131,7 +131,7 @@ export function OpsLogCleanupDialog({
                   id="cl-request-id"
                   value={requestID}
                   onChange={(e) => setRequestID(e.target.value)}
-                  className="font-mono text-2xs"
+                  className="text-xs"
                 />
               </div>
               <div>
@@ -140,7 +140,7 @@ export function OpsLogCleanupDialog({
                   id="cl-trace-id"
                   value={traceID}
                   onChange={(e) => setTraceID(e.target.value)}
-                  className="font-mono text-2xs"
+                  className="text-xs"
                 />
               </div>
             </div>
@@ -177,7 +177,7 @@ export function OpsLogCleanupDialog({
                 }}
               />
             </div>
-            <p className="text-2xs text-srapi-text-tertiary">{t("adminOpsCleanup.hint")}</p>
+            <p className="text-[11px] text-srapi-text-tertiary">{t("adminOpsCleanup.hint")}</p>
             {result ? (
               <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-3 text-xs text-srapi-text-secondary">
                 {result.dry_run

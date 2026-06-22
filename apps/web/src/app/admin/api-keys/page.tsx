@@ -84,9 +84,9 @@ function ApiKeysContent() {
       pinned: true,
       render: (k) => (
         <div className="min-w-0">
-          <div className="truncate text-srapi-text-primary">{k.name}</div>
+          <div className="truncate text-srapi-text-primary font-medium">{k.name}</div>
           <div className="flex min-w-0 items-center gap-1">
-            <span className="truncate font-mono text-2xs text-srapi-text-tertiary">{k.prefix}</span>
+            <span className="truncate font-mono text-xs text-srapi-text-tertiary">{k.prefix}</span>
             {k.prefix ? <CopyButton value={k.prefix} size="inline" /> : null}
           </div>
         </div>
@@ -97,7 +97,7 @@ function ApiKeysContent() {
       key: "owner",
       header: t("adminApiKeys.owner"),
       render: (k) => (
-        <span className="font-mono text-2xs text-srapi-text-secondary">
+        <span className="text-xs text-srapi-text-secondary tabular">
           {k.user_email || (k.user_id != null ? `#${k.user_id}` : "—")}
         </span>
       ),
@@ -108,7 +108,7 @@ function ApiKeysContent() {
       align: "right",
       hideOnMobile: true,
       render: (k) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-xs text-srapi-text-tertiary tabular">
           {k.rpm_limit != null ? k.rpm_limit : "∞"}
         </span>
       ),
@@ -118,7 +118,7 @@ function ApiKeysContent() {
       header: t("adminApiKeys.lastUsed"),
       hideOnMobile: true,
       render: (k) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-xs text-srapi-text-tertiary tabular">
           {k.last_used_at ? formatDateTime(k.last_used_at) : "—"}
         </span>
       ),

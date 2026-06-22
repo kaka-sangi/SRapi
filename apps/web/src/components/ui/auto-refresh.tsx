@@ -93,7 +93,7 @@ export function AutoRefreshControl({
         type="button"
         onClick={fire}
         aria-label={t("common.refreshNow")}
-        className="flex size-8 items-center justify-center rounded-lg border border-srapi-border bg-srapi-card text-srapi-text-secondary transition-colors hover:border-srapi-text-tertiary hover:text-srapi-text-primary"
+        className="flex size-8 items-center justify-center rounded-xl border border-srapi-border bg-srapi-card text-srapi-text-secondary transition-colors hover:border-srapi-text-tertiary hover:text-srapi-text-primary"
       >
         <RefreshCw className={cn("size-3.5", isRefreshing && "animate-spin")} />
       </button>
@@ -103,15 +103,15 @@ export function AutoRefreshControl({
             type="button"
             aria-label={t("common.autoRefresh")}
             className={cn(
-              "relative flex h-8 items-center gap-1.5 overflow-hidden rounded-lg border px-2.5 font-mono text-2xs transition-colors",
+              "relative flex h-8 items-center gap-1.5 overflow-hidden rounded-xl border px-2.5 text-[11px] font-medium transition-colors",
               intervalSec
-                ? "border-srapi-primary/30 bg-srapi-primary/5 text-srapi-primary"
+                ? "border-transparent bg-srapi-accent-soft text-srapi-primary"
                 : "border-srapi-border bg-srapi-card text-srapi-text-tertiary hover:text-srapi-text-secondary",
             )}
           >
             {intervalSec ? (
               <span
-                className="absolute inset-y-0 left-0 bg-srapi-primary/10 transition-[width] duration-1000 ease-linear"
+                className="absolute inset-y-0 left-0 bg-srapi-primary/15 transition-[width] duration-1000 ease-linear"
                 style={{ width: `${progress * 100}%` }}
               />
             ) : null}
@@ -126,7 +126,7 @@ export function AutoRefreshControl({
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-[8rem]">
-          <div className="px-2 pb-1 pt-1 font-mono text-2xs uppercase tracking-wide text-srapi-text-tertiary">
+          <div className="px-2 pb-1 pt-1 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
             {t("common.autoRefresh")}
           </div>
           {OPTIONS.map((sec) => (

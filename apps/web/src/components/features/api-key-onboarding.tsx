@@ -133,7 +133,7 @@ export function ApiKeyOnboarding({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-2xs font-medium uppercase tracking-wide text-srapi-text-tertiary">
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
           {t("apiKeys.onboardingTitle")}
         </p>
         <CopyableValue
@@ -158,7 +158,7 @@ export function ApiKeyOnboarding({
             spellCheck={false}
             className="font-mono"
           />
-          <p className="mt-1 text-2xs text-srapi-text-tertiary">
+          <p className="mt-1 text-xs text-srapi-text-tertiary">
             {t("apiKeys.onboardingPasteHint")}
           </p>
         </div>
@@ -182,7 +182,7 @@ export function ApiKeyOnboarding({
         </TabsContent>
         <TabsContent value="claude-code" className="mt-2">
           <CodeBlock code={claudeCodeSnippet(base, key)} />
-          <p className="mt-1.5 text-2xs text-srapi-text-tertiary">
+          <p className="mt-1.5 text-xs text-srapi-text-tertiary">
             {t("apiKeys.onboardingClaudeCodeHint")}
           </p>
         </TabsContent>

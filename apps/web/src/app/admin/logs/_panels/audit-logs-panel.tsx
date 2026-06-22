@@ -97,7 +97,7 @@ export function AuditLogsPanel() {
       header: t("adminAudit.time"),
       pinned: true,
       render: (a) => (
-        <span className="whitespace-nowrap font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="whitespace-nowrap text-[12px] tabular text-srapi-text-tertiary">
           {formatDateTime(a.created_at)}
         </span>
       ),
@@ -113,7 +113,7 @@ export function AuditLogsPanel() {
     {
       key: "action",
       header: t("adminAudit.action"),
-      render: (a) => <span className="font-mono text-xs text-srapi-text-primary">{a.action}</span>,
+      render: (a) => <span className="text-xs text-srapi-text-primary">{a.action}</span>,
     },
     {
       key: "resource",
@@ -122,7 +122,7 @@ export function AuditLogsPanel() {
         <span className="text-srapi-text-secondary">
           {a.resource_type}
           {a.resource_id ? (
-            <span className="ml-1 font-mono text-2xs text-srapi-text-tertiary">#{a.resource_id}</span>
+            <span className="ml-1 text-[11px] text-srapi-text-tertiary">#{a.resource_id}</span>
           ) : null}
         </span>
       ),
@@ -131,7 +131,7 @@ export function AuditLogsPanel() {
       key: "ip",
       header: t("adminAudit.ip"),
       hideOnMobile: true,
-      render: (a) => <span className="font-mono text-2xs text-srapi-text-tertiary">{a.ip || "—"}</span>,
+      render: (a) => <span className="text-[12px] text-srapi-text-tertiary">{a.ip || "—"}</span>,
     },
   ];
 
@@ -212,7 +212,7 @@ export function AuditLogsPanel() {
         <Dialog open onOpenChange={(open) => !open && setDetail(null)}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{t("adminAudit.detailTitle")}</DialogTitle>
+              <DialogTitle className="text-lg font-semibold tracking-tight">{t("adminAudit.detailTitle")}</DialogTitle>
               <DialogDescription>
                 {detail.action} · {detail.resource_type}
                 {detail.resource_id ? ` #${detail.resource_id}` : ""}
@@ -244,11 +244,11 @@ function AuditMeta({
 }) {
   return (
     <div className="flex items-baseline gap-3">
-      <span className="w-24 shrink-0 font-mono text-2xs uppercase text-srapi-text-tertiary">
+      <span className="w-24 shrink-0 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
         {label}
       </span>
       <span className="flex min-w-0 items-center gap-1.5">
-        <span className="break-all font-mono text-xs text-srapi-text-secondary">{value}</span>
+        <span className="break-all text-xs text-srapi-text-secondary">{value}</span>
         {copyable && value && value !== "—" ? <CopyButton value={value} size="inline" /> : null}
       </span>
     </div>
@@ -263,10 +263,10 @@ function JsonBlock({ label, value }: { label: string; value: unknown }) {
   return (
     <div>
       <div className="flex items-center gap-2">
-        <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">{label}</span>
+        <span className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{label}</span>
         {hasContent ? <CopyButton value={json} size="inline" /> : null}
       </div>
-      <pre className="mt-1.5 max-h-48 overflow-auto rounded-lg bg-srapi-card-muted p-3 font-mono text-2xs text-srapi-text-secondary">
+      <pre className="mt-1.5 max-h-48 overflow-auto rounded-lg bg-srapi-card-muted p-3 font-mono text-[11px] text-srapi-text-secondary">
         {json}
       </pre>
     </div>

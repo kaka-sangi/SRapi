@@ -74,7 +74,7 @@ export function CheckoutRedirect({
 
   const containerClass =
     variant === "card"
-      ? "rounded-lg border border-srapi-border bg-srapi-card px-3.5 py-3 text-sm"
+      ? "rounded-xl border border-srapi-border bg-srapi-card px-4 py-3 text-sm"
       : "text-sm";
 
   return (
@@ -82,11 +82,11 @@ export function CheckoutRedirect({
       <dl>
         <div className="flex items-center justify-between">
           <dt className="text-srapi-text-tertiary">{t("billing.orderNo")}</dt>
-          <dd className="font-mono text-srapi-text-secondary">{live.order_no}</dd>
+          <dd className="font-mono text-xs text-srapi-text-secondary">{live.order_no}</dd>
         </div>
         <div className="mt-1.5 flex items-center justify-between">
           <dt className="text-srapi-text-tertiary">{t("billing.payable")}</dt>
-          <dd className="font-mono text-srapi-text-primary tabular">
+          <dd className="text-base font-semibold tracking-tight tabular text-srapi-text-primary">
             {formatMoney(live.payable_amount, live.currency)}
           </dd>
         </div>
@@ -127,7 +127,7 @@ function PendingCheckout({ order }: { order: PaymentOrder }) {
 
   if (shape.kind === "none") {
     return (
-      <div className="mt-3 inline-flex items-center gap-1.5 text-2xs text-srapi-text-tertiary">
+      <div className="mt-3 inline-flex items-center gap-1.5 text-xs text-srapi-text-tertiary">
         <Loader2 className="size-3.5 animate-spin" aria-hidden />
         {t("billing.waitingPayment")}
       </div>
@@ -143,7 +143,7 @@ function PendingCheckout({ order }: { order: PaymentOrder }) {
             {t("billing.goPay")}
           </a>
         </Button>
-        <span className="inline-flex items-center gap-1.5 text-2xs text-srapi-text-tertiary">
+        <span className="inline-flex items-center gap-1.5 text-xs text-srapi-text-tertiary">
           <Loader2 className="size-3.5 animate-spin" aria-hidden />
           {t("billing.waitingPayment")}
         </span>
@@ -153,14 +153,14 @@ function PendingCheckout({ order }: { order: PaymentOrder }) {
 
   if (shape.kind === "qr") {
     return (
-      <div className="mt-3 flex flex-col items-center gap-2 rounded-lg border border-srapi-border bg-srapi-card-muted px-4 py-4">
+      <div className="mt-3 flex flex-col items-center gap-2 rounded-xl border border-srapi-border bg-srapi-card-muted px-4 py-4">
         <QRCodeSVG value={shape.url} size={192} level="M" includeMargin />
-        <p className="mt-1 text-2xs text-srapi-text-secondary">
+        <p className="mt-1 text-xs text-srapi-text-secondary">
           {shape.providerLabel
             ? t("checkout.scanWith", { app: shape.providerLabel })
             : t("checkout.scanGeneric")}
         </p>
-        <span className="inline-flex items-center gap-1.5 text-2xs text-srapi-text-tertiary">
+        <span className="inline-flex items-center gap-1.5 text-xs text-srapi-text-tertiary">
           <Loader2 className="size-3.5 animate-spin" aria-hidden />
           {t("billing.waitingPayment")}
         </span>
@@ -179,13 +179,13 @@ function PendingCheckout({ order }: { order: PaymentOrder }) {
           {t("checkout.openInApp")}
         </a>
       </Button>
-      <div className="flex flex-col items-center gap-2 rounded-lg border border-srapi-border bg-srapi-card-muted px-4 py-4">
+      <div className="flex flex-col items-center gap-2 rounded-xl border border-srapi-border bg-srapi-card-muted px-4 py-4">
         <QRCodeSVG value={shape.url} size={160} level="M" includeMargin />
-        <p className="text-2xs text-srapi-text-secondary">
+        <p className="text-xs text-srapi-text-secondary">
           {t("checkout.scanGeneric")}
         </p>
       </div>
-      <span className="inline-flex items-center gap-1.5 text-2xs text-srapi-text-tertiary">
+      <span className="inline-flex items-center gap-1.5 text-xs text-srapi-text-tertiary">
         <Loader2 className="size-3.5 animate-spin" aria-hidden />
         {t("billing.waitingPayment")}
       </span>

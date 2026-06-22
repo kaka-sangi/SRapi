@@ -130,8 +130,8 @@ export function LoginForm() {
   // ---- Two-factor step ----
   if (challengeId) {
     return (
-      <Card className="card-raised p-7 sm:p-8">
-        <h2 className="font-serif text-2xl text-srapi-text-primary">{t("login.twoFactorTitle")}</h2>
+      <Card className="p-7 sm:p-8">
+        <h2 className="text-2xl font-semibold tracking-tight text-srapi-text-primary">{t("login.twoFactorTitle")}</h2>
         <p className="mt-1.5 text-sm text-srapi-text-secondary">{t("login.twoFactorHint")}</p>
         <form onSubmit={handleVerify} noValidate className="mt-7 space-y-5">
           <div>
@@ -149,7 +149,7 @@ export function LoginForm() {
             />
           </div>
           {error && (
-            <p role="alert" className="text-sm text-srapi-error">
+            <p role="alert" className="rounded-xl bg-srapi-error/10 px-3 py-2 text-sm text-srapi-error">
               {error}
             </p>
           )}
@@ -157,7 +157,7 @@ export function LoginForm() {
             type="submit"
             variant="primary"
             size="lg"
-            className="w-full"
+            className="h-11 w-full rounded-xl btn-raise"
             disabled={submitting || code.length < 6}
           >
             {submitting ? t("login.verifying") : t("login.verify")}
@@ -169,7 +169,7 @@ export function LoginForm() {
               setChallengeExpiresAt(null);
               setError(null);
             }}
-            className="w-full text-center font-mono text-2xs text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
+            className="w-full text-center text-xs text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
           >
             {t("login.back")}
           </button>
@@ -180,8 +180,8 @@ export function LoginForm() {
 
   // ---- Password + OAuth step ----
   return (
-    <Card className="card-raised p-7 sm:p-8">
-      <h2 className="font-serif text-2xl text-srapi-text-primary">{t("login.title")}</h2>
+    <Card className="p-7 sm:p-8">
+      <h2 className="text-2xl font-semibold tracking-tight text-srapi-text-primary">{t("login.title")}</h2>
       <p className="mt-1.5 text-sm text-srapi-text-secondary">{t("login.subtitle")}</p>
 
       <form onSubmit={handleSubmit} noValidate className="mt-7 space-y-5">
@@ -201,7 +201,7 @@ export function LoginForm() {
             <Label htmlFor="password">{t("login.password")}</Label>
             <a
               href="/auth/reset"
-              className="font-mono text-2xs text-srapi-text-tertiary underline-offset-2 transition-colors hover:text-srapi-text-secondary hover:underline"
+              className="text-xs text-srapi-text-tertiary underline-offset-2 transition-colors hover:text-srapi-text-secondary hover:underline"
             >
               {t("login.forgot")}
             </a>
@@ -219,14 +219,14 @@ export function LoginForm() {
               type="button"
               onClick={() => setShowPassword((v) => !v)}
               aria-label={t(showPassword ? "login.hidePassword" : "login.showPassword")}
-              className="absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-lg text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
+              className="absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-xl text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
             >
               {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
             </button>
           </div>
         </div>
         {error && (
-          <p role="alert" className="text-sm text-srapi-error">
+          <p role="alert" className="rounded-xl bg-srapi-error/10 px-3 py-2 text-sm text-srapi-error">
             {error}
           </p>
         )}
@@ -235,7 +235,7 @@ export function LoginForm() {
           type="submit"
           variant="primary"
           size="lg"
-          className="w-full"
+          className="h-11 w-full rounded-xl btn-raise"
           disabled={submitting || (captcha.required && !captcha.token)}
         >
           {submitting ? t("login.signingIn") : t("login.signIn")}
@@ -244,7 +244,7 @@ export function LoginForm() {
           type="button"
           variant="outline"
           size="lg"
-          className="w-full"
+          className="h-11 w-full rounded-xl"
           disabled={submitting || !email || (captcha.required && !captcha.token)}
           onClick={requestPasswordless}
         >
@@ -261,27 +261,27 @@ export function LoginForm() {
         <>
           <div className="my-6 flex items-center gap-3">
             <span className="h-px flex-1 bg-srapi-border" />
-            <span className="font-mono text-2xs uppercase tracking-wide text-srapi-text-tertiary">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
               {t("login.orContinueWith")}
             </span>
             <span className="h-px flex-1 bg-srapi-border" />
           </div>
-          <div className="space-y-2.5">
+          <div className="flex flex-wrap gap-2">
             {providers.map((p) => (
               <a
                 key={`${p.provider}:${p.provider_key}`}
                 href={startOAuthHref(p.provider, p.provider_key)}
                 className={cn(
-                  "flex h-11 w-full items-center justify-center gap-2 rounded-lg border text-sm font-medium transition-colors",
+                  "inline-flex h-10 flex-1 min-w-[8rem] items-center justify-center gap-2 rounded-full border px-4 text-[13px] font-medium transition-colors",
                   p.provider === "linuxdo"
-                    ? "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200 dark:hover:bg-amber-900/40"
+                    ? "border-amber-300/70 bg-amber-50 text-amber-900 hover:bg-amber-100 dark:border-amber-700/60 dark:bg-amber-950/30 dark:text-amber-200 dark:hover:bg-amber-900/40"
                     : p.provider === "github"
-                      ? "border-gray-300 bg-gray-50 text-gray-900 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800/50 dark:text-gray-200 dark:hover:bg-gray-700/50"
-                      : "border-srapi-border-strong bg-srapi-card text-srapi-text-primary hover:border-srapi-text-tertiary hover:bg-srapi-card-muted",
+                      ? "border-srapi-border bg-srapi-card-soft text-srapi-text-primary hover:bg-srapi-card-muted"
+                      : "border-srapi-border bg-srapi-card-soft text-srapi-text-primary hover:bg-srapi-card-muted",
                 )}
               >
                 {p.provider === "linuxdo" ? (
-                  <span className="font-mono text-xs font-bold">L</span>
+                  <span className="text-xs font-bold">L</span>
                 ) : null}
                 {t("login.continueWith", { name: p.display_name })}
               </a>
@@ -296,7 +296,7 @@ export function LoginForm() {
           {t("login.signUp")}
         </a>
       </p>
-      <p className="mt-2 text-center text-2xs text-srapi-text-tertiary">
+      <p className="mt-2 text-center text-xs text-srapi-text-tertiary">
         <a href="/key-usage" className="underline-offset-4 hover:text-srapi-text-secondary hover:underline">
           {t("login.keyUsageLink")}
         </a>

@@ -135,7 +135,7 @@ function AnnouncementsContent() {
       header: t("adminAnnouncements.published"),
       hideOnMobile: true,
       render: (a) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-[12px] tabular text-srapi-text-tertiary">
           {formatDateTime(a.starts_at ?? a.created_at)}
         </span>
       ),

@@ -504,7 +504,7 @@ export function AccountFormDialog({
                   </SelectContent>
                 </Select>
                 {template ? (
-                  <p className="mt-1.5 text-2xs text-srapi-text-tertiary">
+                  <p className="mt-1.5 text-[11px] text-srapi-text-tertiary">
                     {t("adminAccounts.templateApplied")}
                   </p>
                 ) : null}
@@ -563,7 +563,7 @@ export function AccountFormDialog({
                     ) : null}
                   </div>
                   {oauthFlowMode ? (
-                    <p className="mt-1 text-2xs text-srapi-text-tertiary">
+                    <p className="mt-1 text-[11px] text-srapi-text-tertiary">
                       {t("accountOAuth.authorizeAccountHint")}
                     </p>
                   ) : null}
@@ -602,7 +602,7 @@ export function AccountFormDialog({
                           {t("accountOAuth.quickPasteApply")}
                         </Button>
                       </div>
-                      <p className="mt-1.5 text-2xs text-srapi-text-tertiary">
+                      <p className="mt-1.5 text-[11px] text-srapi-text-tertiary">
                         {t("accountOAuth.quickPasteHint")}
                       </p>
                     </div>
@@ -612,7 +612,7 @@ export function AccountFormDialog({
                       <div key={f.key}>
                         <Label
                           htmlFor={`cred-${f.key}`}
-                          className="mb-1 text-2xs font-normal text-srapi-text-secondary"
+                          className="mb-1 text-[11px] font-normal text-srapi-text-secondary"
                         >
                           {t(`adminAccounts.cred.${f.cred}Label`)}
                         </Label>
@@ -702,7 +702,7 @@ export function AccountFormDialog({
                   )}
                 </>
               )}
-              <p className="mt-1 text-2xs text-srapi-text-tertiary">{credHint}</p>
+              <p className="mt-1 text-[11px] text-srapi-text-tertiary">{credHint}</p>
             </div>
             </div>
 
@@ -718,7 +718,7 @@ export function AccountFormDialog({
                 disabled={busy}
                 onChange={(e) => setBaseUrl(e.target.value)}
               />
-              <p className="mt-1 text-2xs text-srapi-text-tertiary">
+              <p className="mt-1 text-[11px] text-srapi-text-tertiary">
                 {t("adminAccounts.baseUrlHint")}
               </p>
             </div>
@@ -741,7 +741,7 @@ export function AccountFormDialog({
               </button>
               {advancedOpen ? (
                 <div className="space-y-4 border-t border-srapi-border px-3.5 py-4">
-                  <p className="text-2xs text-srapi-text-tertiary">{t("adminAccounts.advancedHint")}</p>
+                  <p className="text-[11px] text-srapi-text-tertiary">{t("adminAccounts.advancedHint")}</p>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label htmlFor="account-priority">{t("adminAccounts.priority")}</Label>
@@ -827,7 +827,7 @@ export function AccountFormDialog({
                         {t("adminAccounts.tlsProfile")}
                       </Label>
                     </div>
-                    <p className="mt-1 text-2xs text-srapi-text-tertiary">
+                    <p className="mt-1 text-[11px] text-srapi-text-tertiary">
                       {t("adminAccounts.tlsProfileHint")}
                     </p>
                     {tlsProfileEnabled ? (
@@ -852,7 +852,7 @@ export function AccountFormDialog({
                   {Object.keys(metadataHints).length > 0 ? (
                     <div>
                       <Label>{t("adminAccounts.metadataHints")}</Label>
-                      <div className="mt-1.5 space-y-1 text-2xs text-srapi-text-tertiary">
+                      <div className="mt-1.5 space-y-1 text-[11px] text-srapi-text-tertiary">
                         {Object.entries(metadataHints).map(([key, hint]) => (
                           <p key={key}>
                             <span className="font-mono text-srapi-text-secondary">{key}</span>: {hint}
@@ -874,7 +874,7 @@ export function AccountFormDialog({
                   </div>
                   <div>
                     <Label>{t("adminAccounts.modelMapping")}</Label>
-                    <p className="mt-1 text-2xs text-srapi-text-tertiary">
+                    <p className="mt-1 text-[11px] text-srapi-text-tertiary">
                       {t("adminAccounts.modelMappingHint")}
                     </p>
                     <div className="mt-1.5">
@@ -890,7 +890,7 @@ export function AccountFormDialog({
                   </div>
                   <div>
                     <Label>{t("adminAccounts.compactModelMapping")}</Label>
-                    <p className="mt-1 text-2xs text-srapi-text-tertiary">
+                    <p className="mt-1 text-[11px] text-srapi-text-tertiary">
                       {t("adminAccounts.compactModelMappingHint")}
                     </p>
                     <div className="mt-1.5">
@@ -906,7 +906,7 @@ export function AccountFormDialog({
                   </div>
                   <div>
                     <Label>{t("adminAccounts.supportedModels")}</Label>
-                    <p className="mt-1 text-2xs text-srapi-text-tertiary">
+                    <p className="mt-1 text-[11px] text-srapi-text-tertiary">
                       {t("adminAccounts.supportedModelsHint")}
                     </p>
                     <div className="mt-1.5">
@@ -925,7 +925,7 @@ export function AccountFormDialog({
                             <button
                               key={m}
                               type="button"
-                              className="rounded-md border border-srapi-border px-2 py-0.5 text-2xs text-srapi-text-secondary transition-colors hover:border-srapi-text-tertiary hover:text-srapi-text-primary"
+                              className="rounded-full border border-srapi-border px-2.5 py-0.5 text-[11px] font-medium text-srapi-text-secondary transition-colors hover:border-srapi-border-strong hover:bg-srapi-card-muted hover:text-srapi-text-primary"
                               disabled={busy}
                               onClick={() => updateStringListKey(supportedModelsKey, [...supportedModels, m])}
                             >
@@ -937,7 +937,7 @@ export function AccountFormDialog({
                   </div>
                   <div>
                     <Label>{t("adminAccounts.excludedModels")}</Label>
-                    <p className="mt-1 text-2xs text-srapi-text-tertiary">
+                    <p className="mt-1 text-[11px] text-srapi-text-tertiary">
                       {t("adminAccounts.excludedModelsHint")}
                     </p>
                     <div className="mt-1.5">

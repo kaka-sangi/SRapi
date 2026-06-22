@@ -41,7 +41,7 @@ function PasswordlessContent() {
       <Card className="w-full max-w-sm p-8 text-center">
         {visibleError ? (
           <>
-            <h1 className="font-serif text-2xl text-srapi-text-primary">{t("passwordless.failed")}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-srapi-text-primary">{t("passwordless.failed")}</h1>
             <p className="mt-2 text-sm text-srapi-text-secondary">{visibleError}</p>
             <a href={SIGN_IN_ROUTE} className="mt-6 inline-block text-sm text-srapi-primary underline-offset-4 hover:underline">
               {t("passwordless.backToSignIn")}

@@ -93,7 +93,7 @@ export function RulesPanel() {
       key: "rate",
       header: t("adminAffiliates.rate"),
       render: (rule) => (
-        <span className="font-mono text-srapi-text-secondary tabular">
+        <span className="text-sm font-medium tabular text-srapi-text-primary">
           {rule.rate}
           {rule.fixed_amount !== "0.00000000" ? ` + ${rule.fixed_amount}` : ""}
         </span>
@@ -104,7 +104,7 @@ export function RulesPanel() {
       header: t("adminCommon.currency"),
       hideOnMobile: true,
       render: (rule) => (
-        <span className="font-mono text-srapi-text-tertiary">
+        <span className="text-xs tabular text-srapi-text-tertiary">
           {rule.currency}
           {rule.max_rebate_amount !== "0.00000000" ? ` · ${rule.max_rebate_amount}` : ""}
         </span>
@@ -115,7 +115,7 @@ export function RulesPanel() {
       header: t("adminAffiliates.validity"),
       hideOnMobile: true,
       render: (rule) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-[12px] tabular text-srapi-text-tertiary">
           {rule.valid_from ? formatDateTime(rule.valid_from) : "—"}
           {" / "}
           {rule.valid_to ? formatDateTime(rule.valid_to) : "—"}

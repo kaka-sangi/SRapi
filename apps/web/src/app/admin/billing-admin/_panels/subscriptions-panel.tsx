@@ -147,14 +147,16 @@ export function SubscriptionsPanel() {
       key: "plan",
       header: t("adminSubscriptions.plan"),
       pinned: true,
-      render: (s) => <span className="font-mono text-2xs text-srapi-text-secondary">{s.plan_id}</span>,
+      render: (s) => (
+        <span className="text-sm font-medium tabular text-srapi-text-secondary">{s.plan_id}</span>
+      ),
     },
     {
       key: "period",
       header: t("adminSubscriptions.period"),
       hideOnMobile: true,
       render: (s) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-[12px] tabular text-srapi-text-tertiary">
           {formatDate(s.starts_at)} – {formatDate(s.expires_at)}
         </span>
       ),
@@ -328,7 +330,9 @@ function BulkAssignSubscriptionDialog({
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t("adminSubscriptions.bulkAssignTitle")}</DialogTitle>
+          <DialogTitle className="text-lg font-semibold tracking-tight">
+            {t("adminSubscriptions.bulkAssignTitle")}
+          </DialogTitle>
           <DialogDescription>{t("adminSubscriptions.bulkAssignBody")}</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-3">
@@ -340,7 +344,7 @@ function BulkAssignSubscriptionDialog({
             value={raw}
             onChange={(e) => setRaw(e.target.value)}
             rows={6}
-            className="w-full rounded border border-srapi-border bg-srapi-bg-secondary px-3 py-2 text-sm font-mono"
+            className="w-full rounded-xl border border-srapi-border bg-srapi-card-muted/60 px-3 py-2 text-sm tabular text-srapi-text-primary placeholder:text-srapi-text-tertiary focus:border-srapi-primary/40 focus:outline-none focus:ring-2 focus:ring-srapi-primary/20"
             placeholder="123,5&#10;124,5"
           />
           {error ? (

@@ -8,8 +8,9 @@ export const Textarea = React.forwardRef<
   <textarea
     ref={ref}
     className={cn(
-      "min-h-20 w-full rounded-xl border border-srapi-border bg-srapi-card-muted px-3.5 py-2.5 text-sm text-srapi-text-primary transition-colors",
-      "placeholder:text-srapi-text-tertiary outline-none hover:border-srapi-text-tertiary focus:border-srapi-text-secondary",
+      // Matches Input language: rounded-xl, hairline border, white card surface.
+      "min-h-20 w-full rounded-xl border border-srapi-border bg-srapi-card px-3.5 py-2.5 text-sm text-srapi-text-primary transition-[border-color,background-color] duration-150",
+      "placeholder:text-srapi-text-tertiary outline-none hover:border-srapi-border-strong focus:border-srapi-border-strong",
       "aria-[invalid=true]:border-srapi-error aria-[invalid=true]:hover:border-srapi-error aria-[invalid=true]:focus:border-srapi-error",
       "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-srapi-border",
       className,

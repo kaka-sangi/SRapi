@@ -21,6 +21,8 @@ import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { IconBubble } from "@/components/ui/icon-bubble";
+import { DataPill } from "@/components/ui/data-pill";
 import {
   Table,
   TableBody,
@@ -254,7 +256,7 @@ function GatewayResourcesContent() {
               <CardHeader>
                 <CardTitle>
                   {t("adminGatewayResources.providerMatrix")}{" "}
-                  <span className="text-2xs text-srapi-text-tertiary font-mono">
+                  <span className="text-xs text-srapi-text-tertiary tabular">
                     {filters.providerRows.length}/{summary?.rows.length ?? 0}
                   </span>
                 </CardTitle>
@@ -301,7 +303,7 @@ function GatewayResourcesContent() {
               <CardHeader>
                 <CardTitle>
                   {t("adminGatewayResources.modelMatrix")}{" "}
-                  <span className="text-2xs text-srapi-text-tertiary font-mono">
+                  <span className="text-xs text-srapi-text-tertiary tabular">
                     {filters.modelRows.length}/{summary?.model_rows.length ?? 0}
                   </span>
                 </CardTitle>
@@ -348,7 +350,7 @@ function GatewayResourcesContent() {
               <CardHeader>
                 <CardTitle>
                   {t("adminGatewayResources.routeMatrix")}{" "}
-                  <span className="text-2xs text-srapi-text-tertiary font-mono">
+                  <span className="text-xs text-srapi-text-tertiary tabular">
                     {filters.routeRows.length}/{summary?.route_rows.length ?? 0}
                   </span>
                 </CardTitle>
@@ -488,10 +490,12 @@ function ResourceKpi({
   return (
     <Card className="p-5">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-2xs text-srapi-text-tertiary font-mono uppercase">{label}</span>
-        <Icon className="text-srapi-text-tertiary size-4" />
+        <span className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{label}</span>
+        <IconBubble size="sm" tone="accent">
+          <Icon aria-hidden />
+        </IconBubble>
       </div>
-      <div className="text-srapi-text-primary tabular mt-3 font-serif text-3xl leading-none">
+      <div className="mt-3 text-3xl font-semibold tracking-tight tabular leading-none text-srapi-text-primary">
         {value}
       </div>
     </Card>
@@ -885,16 +889,16 @@ function GatewayFixQueue({
   }
   const visible = fixes.slice(0, 5);
   return (
-    <Card className="p-4">
+    <Card className="p-5">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-2xs text-srapi-text-tertiary font-mono uppercase">
+        <span className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
           {t("adminGatewayResources.fixQueue")}
         </span>
         {visible.map((fix) => (
           <Link
             key={`${fix.area}:${fix.reason}`}
             href={fix.href}
-            className="border-srapi-border bg-srapi-card-muted hover:border-srapi-border-strong text-2xs inline-flex min-w-0 items-center gap-1.5 rounded-md border px-2 py-1 font-mono transition-colors"
+            className="inline-flex min-w-0 items-center gap-1.5 rounded-full bg-srapi-card-muted px-3 py-1 text-xs transition-colors hover:bg-srapi-card-soft"
             title={t(`adminGatewayResources.fixReason.${fix.reason}`, { count: fix.count })}
           >
             <QuietBadge
@@ -907,17 +911,17 @@ function GatewayFixQueue({
               }
               label={t(`adminGatewayResources.fixSeverity.${fix.severity}`)}
             />
-            <span className="text-srapi-text-secondary truncate">
+            <span className="text-srapi-text-secondary truncate font-medium">
               {t(`adminGatewayResources.fixArea.${fix.area}`)}
             </span>
             <span className="text-srapi-text-tertiary truncate">
               {t(`adminGatewayResources.reason.${fix.reason}`)}
             </span>
-            <span className="text-srapi-text-primary tabular">{fix.count}</span>
+            <span className="text-srapi-text-primary tabular font-semibold">{fix.count}</span>
           </Link>
         ))}
         {fixes.length > visible.length ? (
-          <span className="text-2xs text-srapi-text-tertiary font-mono">
+          <span className="text-xs text-srapi-text-tertiary tabular">
             +{fixes.length - visible.length}
           </span>
         ) : null}
@@ -950,12 +954,14 @@ function ProtocolConversionRoutePanel({
   const enabledRoutes = cleanVisibleProtocolConversionRoutes(routes);
   const enabled = new Set(enabledRoutes);
   return (
-    <Card className="p-4">
+    <Card className="p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <Shuffle className="text-srapi-text-tertiary size-4" />
-            <h3 className="text-srapi-text-primary font-medium">
+          <div className="flex items-center gap-2.5">
+            <IconBubble size="sm" tone="accent">
+              <Shuffle aria-hidden />
+            </IconBubble>
+            <h3 className="text-base font-semibold tracking-tight text-srapi-text-primary">
               {t("adminGatewayResources.protocolConversions")}
             </h3>
             <QuietBadge
@@ -968,7 +974,7 @@ function ProtocolConversionRoutePanel({
               })}
             />
           </div>
-          <p className="text-2xs text-srapi-text-tertiary mt-1">
+          <p className="text-sm text-srapi-text-secondary mt-1.5 leading-relaxed">
             {t("adminGatewayResources.protocolConversionsHint")}
           </p>
         </div>
@@ -978,14 +984,14 @@ function ProtocolConversionRoutePanel({
           </Link>
         </Button>
       </div>
-      <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+      <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
         {PROTOCOL_CONVERSION_ROUTES.map((route) => {
           const on = enabled.has(route);
           return (
             <Link
               key={route}
               href={`${ADMIN_ROUTES.settings}?tab=gateway`}
-              className="border-srapi-border bg-srapi-card-muted hover:border-srapi-border-strong flex min-w-0 items-center justify-between gap-3 rounded-md border px-3 py-2 transition-colors"
+              className="flex min-w-0 items-center justify-between gap-3 rounded-xl bg-srapi-card-muted px-3.5 py-2.5 transition-colors hover:bg-srapi-card-soft"
               title={t("adminGatewayResources.protocolConversionRouteHint", {
                 route: t(`adminSettings.protocolConversionRoutes.${route}`),
                 mode: on
@@ -993,7 +999,7 @@ function ProtocolConversionRoutePanel({
                   : t("adminGatewayResources.protocolConversionDisabled"),
               })}
             >
-              <span className="text-2xs text-srapi-text-secondary truncate">
+              <span className="text-xs text-srapi-text-secondary truncate font-medium">
                 {t(`adminSettings.protocolConversionRoutes.${route}`)}
               </span>
               <QuietBadge
@@ -1025,7 +1031,7 @@ function GatewayEndpointSummary({
       <CardHeader>
         <CardTitle>
           {t("adminGatewayResources.endpointSummary")}{" "}
-          <span className="text-2xs text-srapi-text-tertiary font-mono">
+          <span className="text-xs text-srapi-text-tertiary tabular">
             {rows.length}/{total}
           </span>
         </CardTitle>
@@ -1052,81 +1058,83 @@ function GatewayEndpointSummaryItem({ row }: { row: GatewayEndpointResourceSumma
   const evidenceHref = adminRequestEvidenceHref({ source_endpoint: row.source_endpoint });
   const decisionsHref = adminSchedulerDecisionsHref({ source_endpoint: row.source_endpoint });
   return (
-    <div
-      className="border-srapi-border bg-srapi-card-muted grid gap-3 rounded-md border p-3"
+    <Card
+      className="card-interactive p-4"
       title={endpointSummaryTitle(row, t)}
     >
-      <div className="flex min-w-0 items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-srapi-text-primary truncate text-sm font-medium">
-            {t(`adminGatewayResources.endpoint.${row.key}`)}
+      <div className="grid gap-3">
+        <div className="flex min-w-0 items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-srapi-text-primary truncate text-sm font-semibold tracking-tight">
+              {t(`adminGatewayResources.endpoint.${row.key}`)}
+            </div>
+            <div className="text-xs text-srapi-text-tertiary truncate tabular">
+              {row.source_endpoint}
+            </div>
           </div>
-          <div className="text-2xs text-srapi-text-tertiary truncate font-mono">
-            {row.source_endpoint}
-          </div>
+          <span className="inline-flex shrink-0 items-center gap-1.5">
+            <StatusIcon className="text-srapi-text-tertiary size-3.5" />
+            <QuietBadge status={status.quiet} label={status.label} />
+          </span>
         </div>
-        <span className="inline-flex shrink-0 items-center gap-1.5">
-          <StatusIcon className="text-srapi-text-tertiary size-3.5" />
-          <QuietBadge status={status.quiet} label={status.label} />
-        </span>
-      </div>
-      <div className="grid grid-cols-3 gap-2">
-        <EndpointSummaryMetric
-          label={t("adminGatewayResources.endpointModels")}
-          value={modelCoverage}
-          ready={row.ready_models === row.models && row.models > 0}
-        />
-        <EndpointSummaryMetric
-          label={t("adminGatewayResources.endpointRoutes")}
-          value={routeCoverage}
-          ready={row.ready_routes === row.routes && row.routes > 0}
-        />
-        <EndpointSummaryMetric
-          label={t("adminGatewayResources.endpointAccounts")}
-          value={accountCoverage}
-          ready={row.routable_account_routes > 0}
-        />
-      </div>
-      <GatewayTrafficSummary traffic={row.traffic} compact />
-      {row.unsupported_account_routes > 0 || row.unavailable_model_account_routes > 0 ? (
+        <div className="grid grid-cols-3 gap-2">
+          <EndpointSummaryMetric
+            label={t("adminGatewayResources.endpointModels")}
+            value={modelCoverage}
+            ready={row.ready_models === row.models && row.models > 0}
+          />
+          <EndpointSummaryMetric
+            label={t("adminGatewayResources.endpointRoutes")}
+            value={routeCoverage}
+            ready={row.ready_routes === row.routes && row.routes > 0}
+          />
+          <EndpointSummaryMetric
+            label={t("adminGatewayResources.endpointAccounts")}
+            value={accountCoverage}
+            ready={row.routable_account_routes > 0}
+          />
+        </div>
+        <GatewayTrafficSummary traffic={row.traffic} compact />
+        {row.unsupported_account_routes > 0 || row.unavailable_model_account_routes > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {row.unsupported_account_routes > 0 ? (
+              <DataPill tone="neutral" size="sm">
+                {t("adminGatewayResources.endpointUnsupported")}:{" "}
+                <span className="text-srapi-text-primary tabular">
+                  {row.unsupported_account_routes}
+                </span>
+              </DataPill>
+            ) : null}
+            {row.unavailable_model_account_routes > 0 ? (
+              <DataPill tone="neutral" size="sm">
+                {t("adminGatewayResources.endpointModelBlocked")}:{" "}
+                <span className="text-srapi-text-primary tabular">
+                  {row.unavailable_model_account_routes}
+                </span>
+              </DataPill>
+            ) : null}
+          </div>
+        ) : null}
         <div className="flex flex-wrap gap-1">
-          {row.unsupported_account_routes > 0 ? (
-            <span className="border-srapi-border text-srapi-text-tertiary rounded-md border px-1.5 py-0.5 font-mono text-2xs">
-              {t("adminGatewayResources.endpointUnsupported")}:{" "}
-              <span className="text-srapi-text-primary tabular">
-                {row.unsupported_account_routes}
-              </span>
-            </span>
+          <GatewayEndpointActionLink
+            href={routeHref}
+            label={t("adminGatewayResources.fixAction.routes")}
+          />
+          {evidenceHref ? (
+            <GatewayEndpointActionLink
+              href={evidenceHref}
+              label={t("adminGatewayResources.fixAction.requestEvidence")}
+            />
           ) : null}
-          {row.unavailable_model_account_routes > 0 ? (
-            <span className="border-srapi-border text-srapi-text-tertiary rounded-md border px-1.5 py-0.5 font-mono text-2xs">
-              {t("adminGatewayResources.endpointModelBlocked")}:{" "}
-              <span className="text-srapi-text-primary tabular">
-                {row.unavailable_model_account_routes}
-              </span>
-            </span>
+          {decisionsHref ? (
+            <GatewayEndpointActionLink
+              href={decisionsHref}
+              label={t("adminGatewayResources.fixAction.schedulerDecisions")}
+            />
           ) : null}
         </div>
-      ) : null}
-      <div className="flex flex-wrap gap-1">
-        <GatewayEndpointActionLink
-          href={routeHref}
-          label={t("adminGatewayResources.fixAction.routes")}
-        />
-        {evidenceHref ? (
-          <GatewayEndpointActionLink
-            href={evidenceHref}
-            label={t("adminGatewayResources.fixAction.requestEvidence")}
-          />
-        ) : null}
-        {decisionsHref ? (
-          <GatewayEndpointActionLink
-            href={decisionsHref}
-            label={t("adminGatewayResources.fixAction.schedulerDecisions")}
-          />
-        ) : null}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -1134,7 +1142,7 @@ function GatewayEndpointActionLink({ href, label }: { href: string; label: strin
   return (
     <Link
       href={href}
-      className="border-srapi-border bg-srapi-card-muted hover:border-srapi-border-strong text-2xs text-srapi-text-secondary rounded-md border px-2 py-1 font-mono transition-colors"
+      className="rounded-full bg-srapi-card-muted px-2.5 py-1 text-xs text-srapi-text-secondary font-medium transition-colors hover:bg-srapi-card-soft"
     >
       {label}
     </Link>
@@ -1152,14 +1160,14 @@ function EndpointSummaryMetric({
 }) {
   return (
     <div className="min-w-0">
-      <div className="text-srapi-text-tertiary truncate font-mono text-2xs uppercase">
+      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary truncate">
         {label}
       </div>
       <div
         className={
           ready
-            ? "text-srapi-success tabular font-mono text-sm"
-            : "text-srapi-text-secondary tabular font-mono text-sm"
+            ? "text-srapi-success tabular text-sm font-semibold"
+            : "text-srapi-text-secondary tabular text-sm font-semibold"
         }
       >
         {value}
@@ -1193,28 +1201,28 @@ function ModelResourceRow({ row }: { row: GatewayModelResourceRow }) {
         <div className="min-w-0">
           <Link
             href={ADMIN_ROUTES.models}
-            className="text-srapi-text-primary hover:text-srapi-accent truncate transition-colors"
+            className="text-srapi-text-primary hover:text-srapi-primary truncate transition-colors font-medium"
           >
             {row.model.display_name || row.model.canonical_name}
           </Link>
-          <div className="text-2xs text-srapi-text-tertiary truncate font-mono">
+          <div className="text-xs text-srapi-text-tertiary truncate tabular">
             {row.model.canonical_name}
           </div>
         </div>
       </TableCell>
-      <TableCell className="text-2xs tabular text-right font-mono">
+      <TableCell className="text-xs tabular text-right">
         <span className={row.active_providers > 0 ? "text-srapi-text-primary" : "text-srapi-error"}>
           {row.active_providers}
         </span>
       </TableCell>
-      <TableCell className="text-2xs tabular text-right font-mono">
+      <TableCell className="text-xs tabular text-right">
         <span
           className={row.active_model_mappings > 0 ? "text-srapi-text-primary" : "text-srapi-error"}
         >
           {row.active_model_mappings}
         </span>
       </TableCell>
-      <TableCell className="text-2xs tabular text-right font-mono">
+      <TableCell className="text-xs tabular text-right">
         <span className={row.routable_accounts > 0 ? "text-srapi-success" : "text-srapi-error"}>
           {row.routable_accounts}
         </span>
@@ -1225,7 +1233,7 @@ function ModelResourceRow({ row }: { row: GatewayModelResourceRow }) {
       <TableCell>
         <PricingCoverageBadge pricing={row.pricing} />
       </TableCell>
-      <TableCell className="text-2xs tabular text-right font-mono">
+      <TableCell className="text-xs tabular text-right">
         <span className={row.api_key_count > 0 ? "text-srapi-text-primary" : "text-srapi-error"}>
           {row.api_key_count}
         </span>
@@ -1246,16 +1254,13 @@ function ModelResourceRow({ row }: { row: GatewayModelResourceRow }) {
         {row.reasons.length > 0 ? (
           <div className="flex max-w-md flex-wrap gap-1">
             {row.reasons.map((reason) => (
-              <span
-                key={reason}
-                className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded-md border px-1.5 py-0.5 font-mono"
-              >
+              <DataPill key={reason} tone="neutral" size="sm">
                 {t(`adminGatewayResources.reason.${reason}`)}
-              </span>
+              </DataPill>
             ))}
           </div>
         ) : (
-          <span className="text-2xs text-srapi-text-tertiary">-</span>
+          <span className="text-xs text-srapi-text-tertiary">-</span>
         )}
       </TableCell>
       <TableCell>
@@ -1275,11 +1280,11 @@ function RouteResourceRow({ row }: { row: GatewayRouteResourceRow }) {
         <div className="min-w-0">
           <Link
             href={ADMIN_ROUTES.models}
-            className="text-srapi-text-primary hover:text-srapi-accent truncate transition-colors"
+            className="text-srapi-text-primary hover:text-srapi-primary truncate transition-colors font-medium"
           >
             {row.model.display_name || row.model.canonical_name}
           </Link>
-          <div className="text-2xs text-srapi-text-tertiary truncate font-mono">
+          <div className="text-xs text-srapi-text-tertiary truncate tabular">
             {row.model.canonical_name}
           </div>
         </div>
@@ -1288,19 +1293,19 @@ function RouteResourceRow({ row }: { row: GatewayRouteResourceRow }) {
         <div className="min-w-0">
           <Link
             href={ADMIN_ROUTES.providers}
-            className="text-srapi-text-primary hover:text-srapi-accent truncate transition-colors"
+            className="text-srapi-text-primary hover:text-srapi-primary truncate transition-colors font-medium"
           >
             {row.provider.display_name || row.provider.name}
           </Link>
-          <div className="text-2xs text-srapi-text-tertiary truncate font-mono">
+          <div className="text-xs text-srapi-text-tertiary truncate tabular">
             {row.provider.adapter_type}
           </div>
         </div>
       </TableCell>
-      <TableCell className="text-2xs text-srapi-text-secondary max-w-[220px] truncate font-mono">
+      <TableCell className="text-xs text-srapi-text-secondary max-w-[220px] truncate tabular">
         {row.upstream_model}
       </TableCell>
-      <TableCell className="text-2xs tabular text-right font-mono">
+      <TableCell className="text-xs tabular text-right">
         <span className={row.routable_accounts > 0 ? "text-srapi-success" : "text-srapi-error"}>
           {row.routable_accounts}
         </span>
@@ -1311,7 +1316,7 @@ function RouteResourceRow({ row }: { row: GatewayRouteResourceRow }) {
       <TableCell>
         <PricingCoverageBadge pricing={row.pricing} />
       </TableCell>
-      <TableCell className="text-2xs tabular text-right font-mono">
+      <TableCell className="text-xs tabular text-right">
         <span className={row.api_key_count > 0 ? "text-srapi-text-primary" : "text-srapi-error"}>
           {row.api_key_count}
         </span>
@@ -1332,16 +1337,13 @@ function RouteResourceRow({ row }: { row: GatewayRouteResourceRow }) {
         {row.reasons.length > 0 ? (
           <div className="flex max-w-md flex-wrap gap-1">
             {row.reasons.map((reason) => (
-              <span
-                key={reason}
-                className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded-md border px-1.5 py-0.5 font-mono"
-              >
+              <DataPill key={reason} tone="neutral" size="sm">
                 {t(`adminGatewayResources.reason.${reason}`)}
-              </span>
+              </DataPill>
             ))}
           </div>
         ) : (
-          <span className="text-2xs text-srapi-text-tertiary">-</span>
+          <span className="text-xs text-srapi-text-tertiary">—</span>
         )}
       </TableCell>
       <TableCell>
@@ -1374,7 +1376,7 @@ function PricingCoverageBadge({ pricing }: { pricing: GatewayPricingCoverage }) 
         status={status}
         label={t(`adminGatewayResources.pricingSource.${pricing.source}`)}
       />
-      <span className="text-2xs text-srapi-text-tertiary tabular font-mono">
+      <span className="text-xs text-srapi-text-tertiary tabular">
         {routeCount}
         {pricing.currency ? <span> · {pricing.currency}</span> : null}
       </span>
@@ -1397,8 +1399,8 @@ function EndpointMatrix({
         const title = endpointTitle(endpoint, t);
         const href = endpointDiagnosticsHref(row, endpoint);
         const className = available
-          ? "border-srapi-success/30 bg-srapi-success/10 text-srapi-success inline-flex items-center justify-between gap-1 rounded-md border px-1.5 py-0.5 font-mono text-2xs"
-          : "border-srapi-border bg-srapi-card-muted text-srapi-text-tertiary hover:border-srapi-border-strong hover:text-srapi-text-primary inline-flex items-center justify-between gap-1 rounded-md border px-1.5 py-0.5 font-mono text-2xs transition-colors";
+          ? "inline-flex items-center justify-between gap-1 rounded-full bg-srapi-success/10 px-2 py-0.5 text-[11px] font-medium text-srapi-success tabular"
+          : "inline-flex items-center justify-between gap-1 rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-tertiary tabular transition-colors hover:bg-srapi-card-soft hover:text-srapi-text-secondary";
         const content = (
           <>
             <span>{t(`adminGatewayResources.endpointShort.${endpoint.key}`)}</span>
@@ -1458,7 +1460,7 @@ function GatewayRowActions({ row }: { row: GatewayFixActionRow }) {
   const { t } = useLanguage();
   const actions = gatewayRowActions(row);
   if (actions.length === 0) {
-    return <span className="text-2xs text-srapi-text-tertiary">-</span>;
+    return <span className="text-xs text-srapi-text-tertiary">—</span>;
   }
   return (
     <div className="flex min-w-[170px] flex-wrap gap-1">
@@ -1466,13 +1468,13 @@ function GatewayRowActions({ row }: { row: GatewayFixActionRow }) {
         <Link
           key={action.key}
           href={action.href}
-          className="border-srapi-border bg-srapi-card-muted hover:border-srapi-border-strong text-2xs text-srapi-text-secondary rounded-md border px-2 py-1 font-mono transition-colors"
+          className="rounded-full bg-srapi-card-muted px-2.5 py-1 text-xs text-srapi-text-secondary font-medium transition-colors hover:bg-srapi-card-soft"
         >
           {t(`adminGatewayResources.fixAction.${action.labelKey}`)}
         </Link>
       ))}
       {actions.length > 5 ? (
-        <span className="text-2xs text-srapi-text-tertiary font-mono">+{actions.length - 5}</span>
+        <span className="text-xs text-srapi-text-tertiary tabular">+{actions.length - 5}</span>
       ) : null}
     </div>
   );
@@ -1738,8 +1740,8 @@ function GatewayTrafficSummary({
       <span
         className={
           errorCount > 0
-            ? "border-srapi-error/20 bg-srapi-error/10 text-srapi-error inline-flex w-fit items-center rounded-md border px-1.5 py-0.5 font-mono text-2xs"
-            : "border-srapi-border bg-srapi-card-muted text-srapi-text-secondary inline-flex w-fit items-center rounded-md border px-1.5 py-0.5 font-mono text-2xs"
+            ? "inline-flex w-fit items-center rounded-full bg-srapi-error/10 px-2 py-0.5 text-[11px] font-medium text-srapi-error tabular"
+            : "inline-flex w-fit items-center rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-secondary tabular"
         }
       >
         {t("adminGatewayResources.trafficRequests", {
@@ -1754,7 +1756,7 @@ function GatewayTrafficSummary({
         ) : null}
       </span>
       {lastError ? <GatewayTrafficLastErrorBadge error={lastError} /> : null}
-      <span className="text-2xs text-srapi-text-tertiary truncate font-mono">
+      <span className="text-xs text-srapi-text-tertiary truncate tabular">
         {hasRequests ? lastRequest : t("adminGatewayResources.noRecentTraffic")}
       </span>
     </div>
@@ -1771,7 +1773,7 @@ function GatewayTrafficLastErrorBadge({
     error: gatewayTrafficLastErrorLabel(error),
   });
   const className =
-    "border-srapi-error/20 bg-srapi-error/10 text-srapi-error hover:border-srapi-error/40 inline-flex max-w-[180px] rounded-md border px-1.5 py-0.5 font-mono text-2xs transition-colors";
+    "inline-flex max-w-[180px] rounded-full bg-srapi-error/10 px-2 py-0.5 text-[11px] font-medium text-srapi-error tabular transition-colors hover:bg-srapi-error/15";
   const content = <span className="truncate">{label}</span>;
   const href = adminErrorLogsHref({ request_id: error.request_id });
   if (!href) {
@@ -1875,29 +1877,29 @@ function ProviderResourceRow({ row }: { row: GatewayProviderResourceRow }) {
         <div className="min-w-0">
           <Link
             href={ADMIN_ROUTES.providers}
-            className="text-srapi-text-primary hover:text-srapi-accent truncate transition-colors"
+            className="text-srapi-text-primary hover:text-srapi-primary truncate transition-colors font-medium"
           >
             {row.provider.display_name || row.provider.name}
           </Link>
-          <div className="text-2xs text-srapi-text-tertiary truncate font-mono">
+          <div className="text-xs text-srapi-text-tertiary truncate tabular">
             {row.provider.name}
           </div>
         </div>
       </TableCell>
-      <TableCell className="text-2xs text-srapi-text-secondary font-mono">
+      <TableCell className="text-xs text-srapi-text-secondary tabular">
         {row.provider.adapter_type}
       </TableCell>
       <TableCell>
         <EndpointCapabilitySwitchStrip provider={row.provider} />
       </TableCell>
-      <TableCell className="text-2xs tabular text-right font-mono">
+      <TableCell className="text-xs tabular text-right">
         <span
           className={row.active_model_mappings > 0 ? "text-srapi-text-primary" : "text-srapi-error"}
         >
           {row.active_model_mappings}
         </span>
       </TableCell>
-      <TableCell className="text-2xs tabular text-right font-mono">
+      <TableCell className="text-xs tabular text-right">
         <div className="flex min-w-[120px] flex-col items-end gap-1">
           <div>
             <span className="text-srapi-success">{row.routable_accounts}</span>
@@ -1906,7 +1908,7 @@ function ProviderResourceRow({ row }: { row: GatewayProviderResourceRow }) {
           <AccountBlockersStrip blockers={row.account_blockers} />
         </div>
       </TableCell>
-      <TableCell className="text-2xs tabular text-right font-mono">
+      <TableCell className="text-xs tabular text-right">
         <span
           className={
             row.proxy_attention_accounts > 0 ? "text-srapi-error" : "text-srapi-text-primary"
@@ -1918,7 +1920,7 @@ function ProviderResourceRow({ row }: { row: GatewayProviderResourceRow }) {
           <span className="text-srapi-text-tertiary"> · {row.proxy_attention_accounts}</span>
         ) : null}
       </TableCell>
-      <TableCell className="text-2xs tabular text-right font-mono">
+      <TableCell className="text-xs tabular text-right">
         <span className="text-srapi-text-primary">{row.api_key_count}</span>
         {row.scoped_key_count > 0 ? (
           <span className="text-srapi-text-tertiary"> · {row.scoped_key_count}</span>
@@ -1937,16 +1939,13 @@ function ProviderResourceRow({ row }: { row: GatewayProviderResourceRow }) {
         {row.reasons.length > 0 ? (
           <div className="flex max-w-md flex-wrap gap-1">
             {row.reasons.map((reason) => (
-              <span
-                key={reason}
-                className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded-md border px-1.5 py-0.5 font-mono"
-              >
+              <DataPill key={reason} tone="neutral" size="sm">
                 {t(`adminGatewayResources.reason.${reason}`)}
-              </span>
+              </DataPill>
             ))}
           </div>
         ) : (
-          <span className="text-2xs text-srapi-text-tertiary">—</span>
+          <span className="text-xs text-srapi-text-tertiary">—</span>
         )}
       </TableCell>
       <TableCell>
@@ -1973,7 +1972,7 @@ function EndpointCapabilitySwitchStrip({
           <Link
             key={key}
             href={`${ADMIN_ROUTES.providers}?q=${encodeURIComponent(provider.name)}`}
-            className="border-srapi-border bg-srapi-card-muted hover:border-srapi-border-strong inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono text-2xs transition-colors"
+            className="inline-flex items-center gap-1 rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium tabular transition-colors hover:bg-srapi-card-soft"
             title={t("adminGatewayResources.endpointSwitchHint", {
               endpoint: t(`adminGatewayResources.endpoint.${key}`),
               mode: t(`adminGatewayResources.capabilityMode.${mode}`),
@@ -2025,10 +2024,10 @@ function AccountBlockersStrip({ blockers }: { blockers: GatewayAccountBlockers }
       {items.map((item) => (
         <span
           key={item.key}
-          className="border-srapi-error/20 bg-srapi-error/10 text-srapi-error rounded px-1 py-0.5 text-2xs leading-none"
+          className="rounded-full bg-srapi-error/10 px-2 py-0.5 text-[11px] font-medium leading-none text-srapi-error tabular"
         >
           {t(`adminGatewayResources.accountBlockersShort.${item.key}`)}
-          <span className="tabular ml-0.5">{item.value}</span>
+          <span className="ml-0.5">{item.value}</span>
         </span>
       ))}
     </div>

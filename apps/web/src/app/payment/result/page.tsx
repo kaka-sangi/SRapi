@@ -22,7 +22,7 @@ export default function PaymentResultPage() {
   return (
     <div className="relative flex min-h-dvh flex-col">
       <header className="mx-auto flex w-full max-w-4xl items-center justify-between px-6 py-6">
-        <Link href="/" className="font-serif text-2xl leading-none text-srapi-text-primary">
+        <Link href="/" className="text-2xl font-semibold leading-none tracking-tight text-srapi-text-primary">
           SRapi
         </Link>
         <div className="flex items-center gap-2">
@@ -47,9 +47,9 @@ function ResultContent() {
 
   if (!orderId) {
     return (
-      <Card className="card-raised w-full">
+      <Card className="w-full">
         <CardContent className="text-center">
-          <h1 className="font-serif text-xl text-srapi-text-primary">
+          <h1 className="text-xl font-semibold tracking-tight text-srapi-text-primary">
             {t("paymentResult.title")}
           </h1>
           <p className="mt-2 text-sm text-srapi-error">{t("paymentResult.missingOrder")}</p>
@@ -64,9 +64,9 @@ function ResultContent() {
   }
 
   return (
-    <Card className="card-raised w-full">
+    <Card className="w-full">
       <CardContent>
-        <h1 className="font-serif text-xl text-srapi-text-primary">
+        <h1 className="text-xl font-semibold tracking-tight text-srapi-text-primary">
           {t("paymentResult.title")}
         </h1>
         {status.data ? (
@@ -94,7 +94,7 @@ function ResultContent() {
           <div className="mt-6 flex flex-col items-center gap-3 text-sm text-srapi-text-secondary">
             <Loader2 className="size-6 animate-spin text-srapi-text-tertiary" aria-hidden />
             <span>{t("paymentResult.pendingTitle")}</span>
-            <p className="text-2xs text-srapi-text-tertiary">{t("paymentResult.pendingBody")}</p>
+            <p className="text-xs text-srapi-text-tertiary">{t("paymentResult.pendingBody")}</p>
           </div>
         )}
       </CardContent>
@@ -104,7 +104,7 @@ function ResultContent() {
 
 function LoadingCard() {
   return (
-    <Card className="card-raised w-full">
+    <Card className="w-full">
       <CardContent>
         <Skeleton className="h-6 w-40" />
         <Skeleton className="mt-6 h-24 w-full" />

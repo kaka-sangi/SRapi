@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { BarChart3, Download, Trash2 } from "lucide-react";
+import { BarChart3, Download, Trash2, LineChart, Layers } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { Button } from "@/components/ui/button";
 import { UsageCleanupDialog } from "@/components/admin/usage-cleanup-dialog";
@@ -44,11 +44,13 @@ import { useAdminUsageExport } from "@/hooks/use-admin-usage-export";
 import { useAccountNameLookup } from "@/hooks/use-account-name-lookup";
 import { useApiKeyNameLookup } from "@/hooks/use-api-key-name-lookup";
 import { useProviderNameLookup } from "@/hooks/use-provider-name-lookup";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { TrendChart } from "@/components/charts/trend-chart";
 import { BarSeries, type BarDatum } from "@/components/charts/bar-series";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { SectionTitle } from "@/components/ui/section-title";
+import { DataPill } from "@/components/ui/data-pill";
 import { BarChartSkeleton } from "@/components/charts/chart-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatMoney, formatDateTime, formatInteger } from "@/lib/admin-format";
@@ -247,7 +249,7 @@ function UsageContent() {
       header: t("adminUsage.time"),
       pinned: true,
       render: (u) => (
-        <span className="whitespace-nowrap font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="whitespace-nowrap text-[12px] text-srapi-text-tertiary tabular">
           {formatDateTime(u.created_at)}
         </span>
       ),
@@ -262,7 +264,7 @@ function UsageContent() {
           <button
             type="button"
             onClick={() => setBalanceUser({ id: String(u.user_id), email })}
-            className="truncate text-left text-srapi-text-secondary underline-offset-2 transition-colors hover:text-srapi-text-primary hover:underline"
+            className="truncate text-left text-sm text-srapi-text-secondary underline-offset-2 transition-colors hover:text-srapi-text-primary hover:underline"
             title={t("adminUsers.balanceHistory")}
           >
             {email}
@@ -273,7 +275,7 @@ function UsageContent() {
     {
       key: "model",
       header: t("adminUsage.model"),
-      render: (u) => <span className="text-srapi-text-primary">{u.model}</span>,
+      render: (u) => <span className="text-sm font-medium text-srapi-text-primary">{u.model}</span>,
     },
     {
       key: "input",
@@ -281,7 +283,7 @@ function UsageContent() {
       align: "right",
       hideOnMobile: true,
       render: (u) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-[12px] text-srapi-text-tertiary tabular">
           {formatInteger(u.input_tokens)}
         </span>
       ),
@@ -291,10 +293,10 @@ function UsageContent() {
       header: t("dashboard.outputTokens"),
       align: "right",
       render: (u) => (
-        <span className="font-mono text-srapi-text-secondary tabular">
+        <span className="text-sm font-medium text-srapi-text-secondary tabular">
           {formatInteger(u.output_tokens)}
           {u.cached_tokens > 0 ? (
-            <span className="ml-1 text-2xs text-srapi-success">+{formatInteger(u.cached_tokens)}</span>
+            <span className="ml-1 text-[11px] font-medium text-srapi-success">+{formatInteger(u.cached_tokens)}</span>
           ) : null}
         </span>
       ),
@@ -305,7 +307,7 @@ function UsageContent() {
       align: "right",
       hideOnMobile: true,
       render: (u) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-[12px] text-srapi-text-tertiary tabular">
           {formatMoney(u.input_cost ?? "0", u.currency)}
         </span>
       ),
@@ -316,7 +318,7 @@ function UsageContent() {
       align: "right",
       hideOnMobile: true,
       render: (u) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-[12px] text-srapi-text-tertiary tabular">
           {formatMoney(u.output_cost ?? "0", u.currency)}
         </span>
       ),
@@ -327,7 +329,7 @@ function UsageContent() {
       align: "right",
       hideOnMobile: true,
       render: (u) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-[12px] text-srapi-text-tertiary tabular">
           {formatMoney(u.cache_read_cost ?? "0", u.currency)}
         </span>
       ),
@@ -338,7 +340,7 @@ function UsageContent() {
       align: "right",
       hideOnMobile: true,
       render: (u) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-[12px] text-srapi-text-tertiary tabular">
           {formatMoney(u.cache_write_cost ?? "0", u.currency)}
         </span>
       ),
@@ -349,7 +351,7 @@ function UsageContent() {
       align: "right",
       hideOnMobile: true,
       render: (u) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-[12px] text-srapi-text-tertiary tabular">
           {formatInteger(u.cached_tokens)}
         </span>
       ),
@@ -360,7 +362,7 @@ function UsageContent() {
       align: "right",
       hideOnMobile: true,
       render: (u) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-[12px] text-srapi-text-tertiary tabular">
           {formatInteger(u.cache_creation_tokens ?? 0)}
         </span>
       ),
@@ -371,7 +373,7 @@ function UsageContent() {
       align: "right",
       hideOnMobile: true,
       render: (u) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-[12px] text-srapi-text-tertiary tabular">
           {u.rate_multiplier ? `×${u.rate_multiplier}` : "—"}
         </span>
       ),
@@ -382,7 +384,7 @@ function UsageContent() {
       align: "right",
       hideOnMobile: true,
       render: (u) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-[12px] text-srapi-text-tertiary tabular">
           {formatLatency(u.latency_ms)}
         </span>
       ),
@@ -392,7 +394,7 @@ function UsageContent() {
       header: t("adminUsage.cost"),
       align: "right",
       render: (u) => (
-        <span className="font-mono text-srapi-text-secondary tabular">
+        <span className="text-sm font-medium text-srapi-text-secondary tabular">
           {formatMoney(u.cost, u.currency)}
         </span>
       ),
@@ -402,7 +404,7 @@ function UsageContent() {
       header: t("adminApiKeys.title"),
       hideOnMobile: true,
       render: (u) => (
-        <span className="text-srapi-text-secondary">{apiKeyLookup.get(u.api_key_id)}</span>
+        <span className="text-sm text-srapi-text-secondary">{apiKeyLookup.get(u.api_key_id)}</span>
       ),
     },
     {
@@ -410,7 +412,7 @@ function UsageContent() {
       header: t("adminUsage.byAccount"),
       hideOnMobile: true,
       render: (u) => (
-        <span className="text-srapi-text-secondary">{accountLookup.get(u.account_id)}</span>
+        <span className="text-sm text-srapi-text-secondary">{accountLookup.get(u.account_id)}</span>
       ),
     },
     {
@@ -418,7 +420,7 @@ function UsageContent() {
       header: t("adminAccounts.title"),
       hideOnMobile: true,
       render: (u) => (
-        <span className="text-srapi-text-secondary">{providerLookup.get(u.provider_id)}</span>
+        <span className="text-sm text-srapi-text-secondary">{providerLookup.get(u.provider_id)}</span>
       ),
     },
     {
@@ -426,10 +428,10 @@ function UsageContent() {
       header: t("usage.endpoint"),
       hideOnMobile: true,
       render: (u) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary">
+        <DataPill size="sm">
           {u.source_protocol}
           {u.target_protocol ? ` → ${u.target_protocol}` : ""}
-        </span>
+        </DataPill>
       ),
     },
     {
@@ -438,7 +440,7 @@ function UsageContent() {
       align: "right",
       hideOnMobile: true,
       render: (u) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-[12px] text-srapi-text-tertiary tabular">
           {formatInteger(u.attempt_no)}
         </span>
       ),
@@ -448,7 +450,7 @@ function UsageContent() {
       header: t("usage.status"),
       hideOnMobile: true,
       render: (u) => (
-        <span className="text-2xs text-srapi-text-tertiary">{u.error_class || "—"}</span>
+        <span className="text-[12px] text-srapi-text-tertiary">{u.error_class || "—"}</span>
       ),
     },
     {
@@ -526,12 +528,13 @@ function UsageContent() {
         />
       ) : null}
       {dailyData.length > 0 ? (
-        <Card>
+        <Card className="anim-rise-sm">
           <CardContent>
-            <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">
-              {t("dashboard.tokenTrend")}
-            </span>
-            <div className="mt-3">
+            <SectionTitle
+              icon={<LineChart />}
+              label={t("dashboard.tokenTrend")}
+            />
+            <div className="mt-4">
               <TrendChart
                 series={[
                   { key: "input", label: t("dashboard.inputTokens"), values: dailyData.map((d) => d.input_tokens), tone: "secondary" },
@@ -586,11 +589,15 @@ function UsageContent() {
               ]}
               allLabel={t("adminCommon.allStatuses")}
             />
-            <FilterSelect
-              value={list.filters.window}
-              onChange={(v) => list.setFilter("window", v)}
-              options={LOG_WINDOW_PRESETS.map((p) => ({ value: p.value, label: t(p.labelKey) }))}
-              allLabel={t(LOG_WINDOW_ALL_LABEL_KEY)}
+            <SegmentedControl
+              size="sm"
+              ariaLabel={t(LOG_WINDOW_ALL_LABEL_KEY)}
+              value={list.filters.window ?? "__all__"}
+              onChange={(v) => list.setFilter("window", v === "__all__" ? undefined : v)}
+              options={[
+                { value: "__all__", label: t(LOG_WINDOW_ALL_LABEL_KEY) },
+                ...LOG_WINDOW_PRESETS.map((p) => ({ value: p.value, label: t(p.labelKey) })),
+              ]}
             />
           </ListToolbar>
         }
@@ -642,24 +649,24 @@ function UsageCharts() {
         emptyLabel={tWithFallback("adminUsage.trendEmpty", "No usage in window")}
         controls={
           <>
-            <Tabs value={dimension} onValueChange={(v) => setDimension(v as TrendDimension)}>
-              <TabsList>
-                {TREND_DIMENSIONS.map((dim) => (
-                  <TabsTrigger key={dim} value={dim} className="text-xs">
-                    {t(TREND_DIMENSION_LABEL_KEY[dim])}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-            <Tabs value={bucket} onValueChange={(v) => setBucket(v as TrendBucket)}>
-              <TabsList>
-                {TREND_BUCKETS.map((b) => (
-                  <TabsTrigger key={b} value={b} className="text-xs">
-                    {tWithFallback(`adminUsage.bucket.${b}`, b === "day" ? "Day" : "Hour")}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
+            <SegmentedControl
+              size="sm"
+              value={dimension}
+              onChange={(v) => setDimension(v as TrendDimension)}
+              options={TREND_DIMENSIONS.map((dim) => ({
+                value: dim,
+                label: t(TREND_DIMENSION_LABEL_KEY[dim]),
+              }))}
+            />
+            <SegmentedControl
+              size="sm"
+              value={bucket}
+              onChange={(v) => setBucket(v as TrendBucket)}
+              options={TREND_BUCKETS.map((b) => ({
+                value: b,
+                label: tWithFallback(`adminUsage.bucket.${b}`, b === "day" ? "Day" : "Hour"),
+              }))}
+            />
           </>
         }
       />
@@ -694,19 +701,20 @@ function UsageCharts() {
                 ))}
               </SelectContent>
             </Select>
-            <Tabs value={distMetric} onValueChange={(v) => setDistMetric(v as UsageDistributionMetric)}>
-              <TabsList>
-                {DISTRIBUTION_METRICS.map((m) => (
-                  <TabsTrigger key={m} value={m} className="text-xs">
-                    {m === "requests"
-                      ? tWithFallback("adminUsage.metric.requests", "Requests")
-                      : m === "tokens"
-                        ? t("usage.tokens")
-                        : t("adminUsage.cost")}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
+            <SegmentedControl
+              size="sm"
+              value={distMetric}
+              onChange={(v) => setDistMetric(v as UsageDistributionMetric)}
+              options={DISTRIBUTION_METRICS.map((m) => ({
+                value: m,
+                label:
+                  m === "requests"
+                    ? tWithFallback("adminUsage.metric.requests", "Requests")
+                    : m === "tokens"
+                      ? t("usage.tokens")
+                      : t("adminUsage.cost"),
+              }))}
+            />
           </>
         }
       />
@@ -720,20 +728,21 @@ function UsageBreakdown() {
   const aggregates = useAdminUsageAggregates(dimension);
 
   return (
-    <Card>
+    <Card className="anim-rise-sm">
       <CardHeader className="flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <CardTitle className="not-italic font-sans text-base text-srapi-text-primary">
-          {t("adminUsage.aggregatesTitle")}
-        </CardTitle>
-        <Tabs value={dimension} onValueChange={(v) => setDimension(v as AggregateDimension)}>
-          <TabsList>
-            {AGGREGATE_DIMENSIONS.map((dim) => (
-              <TabsTrigger key={dim} value={dim} className="text-xs">
-                {t(DIMENSION_LABEL_KEY[dim])}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        <SectionTitle
+          icon={<Layers />}
+          label={t("adminUsage.aggregatesTitle")}
+        />
+        <SegmentedControl
+          size="sm"
+          value={dimension}
+          onChange={(v) => setDimension(v as AggregateDimension)}
+          options={AGGREGATE_DIMENSIONS.map((dim) => ({
+            value: dim,
+            label: t(DIMENSION_LABEL_KEY[dim]),
+          }))}
+        />
       </CardHeader>
       <CardContent>
         <PageQueryState
@@ -766,14 +775,17 @@ function UsageBreakdown() {
                   ariaLabel={t("adminUsage.requests")}
                   formatValue={(v) => formatInteger(v)}
                 />
-                <div className="grid gap-2 md:grid-cols-2">
+                <div className="grid gap-3 md:grid-cols-2">
                   {top.slice(0, 4).map((row) => (
-                    <div key={row.aggregate_id} className="rounded-md border border-srapi-border/70 p-3 text-2xs">
+                    <div
+                      key={row.aggregate_id}
+                      className="rounded-2xl border border-srapi-border/70 bg-srapi-card-muted/40 p-4"
+                    >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="truncate font-mono text-srapi-text-primary">{row.aggregate_id}</span>
-                        <span className="font-mono text-srapi-text-secondary">{formatMoney(row.total_cost, row.currency)}</span>
+                        <span className="truncate text-sm font-medium text-srapi-text-primary">{row.aggregate_id}</span>
+                        <span className="text-sm font-medium text-srapi-text-secondary tabular">{formatMoney(row.total_cost, row.currency)}</span>
                       </div>
-                      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-srapi-text-tertiary">
+                      <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-[12px] text-srapi-text-tertiary">
                         <span>{t("usage.costIn")} {formatMoney(row.input_cost ?? "0", row.currency)}</span>
                         <span>{t("usage.costOut")} {formatMoney(row.output_cost ?? "0", row.currency)}</span>
                         <span>{t("usage.costCacheRead")} {formatMoney(row.cache_read_cost ?? "0", row.currency)}</span>

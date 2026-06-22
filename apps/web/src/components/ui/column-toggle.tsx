@@ -42,7 +42,7 @@ export function ColumnToggle({
           <button
             type="button"
             onClick={visibility.reset}
-            className="text-2xs text-srapi-text-tertiary transition-colors hover:text-srapi-text-primary"
+            className="text-[11px] text-srapi-text-tertiary transition-colors hover:text-srapi-text-primary"
             title={t("common.reset")}
           >
             <RotateCcw className="size-3" />
@@ -53,7 +53,7 @@ export function ColumnToggle({
           {columns.map((col) => (
             <label
               key={col.key}
-              className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-srapi-card-muted"
+              className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-srapi-card-muted"
             >
               <Checkbox
                 checked={visibility.isVisible(col.key)}

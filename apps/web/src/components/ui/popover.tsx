@@ -18,7 +18,8 @@ export const PopoverContent = React.forwardRef<
       align={align}
       sideOffset={sideOffset}
       className={cn(
-        "srapi-anim-pop tactile-card z-50 max-h-[min(22rem,var(--radix-popover-content-available-height))] overflow-hidden rounded-xl border border-srapi-border bg-srapi-card p-1 text-srapi-text-primary",
+        // Modern soft popover: big radius, hairline border, layered drop shadow.
+        "srapi-anim-pop z-50 max-h-[min(22rem,var(--radix-popover-content-available-height))] overflow-hidden rounded-2xl border border-srapi-border bg-srapi-card p-1.5 text-srapi-text-primary shadow-[0_12px_32px_-12px_rgba(28,24,20,0.18),0_4px_12px_-4px_rgba(28,24,20,0.08)]",
         className,
       )}
       {...props}

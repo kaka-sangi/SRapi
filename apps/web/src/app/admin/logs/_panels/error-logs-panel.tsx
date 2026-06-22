@@ -193,7 +193,7 @@ export function ErrorLogsPanel() {
         <button
           type="button"
           onClick={() => openDetail(e)}
-          className="text-2xs text-srapi-text-tertiary tabular hover:text-srapi-text-primary font-mono whitespace-nowrap underline-offset-2 transition-colors hover:underline"
+          className="whitespace-nowrap text-[12px] tabular text-srapi-text-tertiary underline-offset-2 transition-colors hover:text-srapi-text-primary hover:underline"
         >
           {formatDateTime(e.occurred_at ?? e.created_at)}
         </button>
@@ -230,7 +230,7 @@ export function ErrorLogsPanel() {
             : code != null && code >= 400
               ? "text-amber-500"
               : "text-srapi-text-tertiary";
-        return <span className={`text-2xs tabular font-mono ${color}`}>{code ?? "—"}</span>;
+        return <span className={`text-[12px] font-medium tabular ${color}`}>{code ?? "—"}</span>;
       },
     },
     {
@@ -247,17 +247,17 @@ export function ErrorLogsPanel() {
       render: (e) => (
         <div className="flex flex-wrap gap-1">
           {e.error_phase ? (
-            <span className="bg-srapi-card-muted text-2xs text-srapi-text-secondary rounded px-1.5 py-0.5 font-mono">
+            <span className="rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-secondary">
               {e.error_phase}
             </span>
           ) : null}
           {e.error_owner ? (
-            <span className="bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded px-1.5 py-0.5 font-mono">
+            <span className="rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-tertiary">
               {e.error_owner}
             </span>
           ) : null}
           {e.stream_completion_state ? (
-            <span className="bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded px-1.5 py-0.5 font-mono">
+            <span className="rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-tertiary">
               {e.stream_completion_state}
             </span>
           ) : null}
@@ -296,7 +296,7 @@ export function ErrorLogsPanel() {
       align: "right",
       hideOnMobile: true,
       render: (e) => (
-        <span className="text-2xs text-srapi-text-tertiary tabular font-mono">
+        <span className="text-[12px] tabular text-srapi-text-tertiary">
           {formatLatency(e.latency_ms ?? 0)}
         </span>
       ),
@@ -306,7 +306,7 @@ export function ErrorLogsPanel() {
       header: t("adminErrorLogs.protocol"),
       hideOnMobile: true,
       render: (e) => (
-        <span className="text-2xs text-srapi-text-tertiary font-mono">
+        <span className="text-[12px] text-srapi-text-tertiary">
           {e.source_protocol ?? e.platform ?? "—"}
           {e.target_protocol ? ` → ${e.target_protocol}` : ""}
         </span>
@@ -318,7 +318,7 @@ export function ErrorLogsPanel() {
       align: "right",
       hideOnMobile: true,
       render: (e) => (
-        <span className="text-2xs text-srapi-text-tertiary tabular font-mono">
+        <span className="text-[12px] tabular text-srapi-text-tertiary">
           {e.attempt_no ?? 1}
         </span>
       ),
@@ -328,7 +328,7 @@ export function ErrorLogsPanel() {
       header: t("adminErrorLogs.sourceEndpoint"),
       hideOnMobile: true,
       render: (e) => (
-        <span className="text-2xs text-srapi-text-tertiary font-mono">
+        <span className="text-[12px] text-srapi-text-tertiary">
           {e.source_endpoint || "—"}
         </span>
       ),
@@ -338,7 +338,7 @@ export function ErrorLogsPanel() {
       header: t("adminErrorLogs.errorOwner"),
       hideOnMobile: true,
       render: (e) => (
-        <span className="text-2xs text-srapi-text-tertiary font-mono">{e.error_owner || "—"}</span>
+        <span className="text-[12px] text-srapi-text-tertiary">{e.error_owner || "—"}</span>
       ),
     },
     {
@@ -365,7 +365,7 @@ export function ErrorLogsPanel() {
         <button
           type="button"
           onClick={() => openDetail(e)}
-          className="text-2xs text-srapi-text-tertiary hover:text-srapi-text-primary font-mono underline-offset-2 transition-colors hover:underline"
+          className="text-[12px] text-srapi-text-tertiary underline-offset-2 transition-colors hover:text-srapi-text-primary hover:underline"
         >
           {e.request_id}
         </button>
@@ -541,16 +541,16 @@ function ErrorMessageCell({ log }: { log: OpsErrorLog }) {
     return (
       <div className="min-w-0 space-y-1">
         <div className="flex flex-wrap gap-1">
-          <span className="bg-srapi-card-muted text-2xs text-srapi-text-primary rounded px-1.5 py-0.5 font-mono">
+          <span className="rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-primary">
             {diagnostic.reason}
           </span>
           {diagnostic.count ? (
-            <span className="bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded px-1.5 py-0.5 font-mono">
+            <span className="rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-tertiary">
               ×{diagnostic.count}
             </span>
           ) : null}
           {diagnostic.action ? (
-            <span className="bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded px-1.5 py-0.5 font-mono">
+            <span className="rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-tertiary">
               {diagnostic.action}
             </span>
           ) : null}
@@ -569,7 +569,7 @@ function ErrorMessageCell({ log }: { log: OpsErrorLog }) {
           {upstreamDiagnostic.parts.slice(0, 4).map((part) => (
             <span
               key={part}
-              className="bg-srapi-card-muted text-2xs text-srapi-text-primary rounded px-1.5 py-0.5 font-mono"
+              className="rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-primary"
             >
               {part}
             </span>
@@ -625,7 +625,7 @@ function ErrorFingerprintStrip({
           <Fingerprint aria-hidden className="text-srapi-text-tertiary size-4" />
           <span>{t("adminErrorLogs.fingerprintsTitle")}</span>
           {meta ? (
-            <span className="text-2xs text-srapi-text-tertiary font-mono font-normal">
+            <span className="text-[12px] text-srapi-text-tertiary font-normal">
               {t("adminErrorLogs.fingerprintsMeta", {
                 total: meta.total,
                 scanned: meta.scanned,
@@ -634,7 +634,7 @@ function ErrorFingerprintStrip({
           ) : null}
         </div>
         {meta?.truncated ? (
-          <span className="border-srapi-border text-2xs text-srapi-warning rounded border px-2 py-0.5">
+          <span className="rounded-full bg-srapi-warning/12 px-2 py-0.5 text-[11px] font-medium text-srapi-warning">
             {t("adminErrorLogs.fingerprintsTruncated")}
           </span>
         ) : null}
@@ -651,14 +651,14 @@ function ErrorFingerprintStrip({
                   <span className="text-srapi-text-primary font-mono text-xs font-semibold">
                     {item.error_class || "unknown"}
                   </span>
-                  <span className="text-2xs text-srapi-text-tertiary font-mono">
+                  <span className="text-[12px] text-srapi-text-tertiary">
                     {item.status_code ?? item.status_class}
                   </span>
-                  <span className="text-2xs text-srapi-text-tertiary font-mono">
+                  <span className="text-[12px] text-srapi-text-tertiary">
                     {item.error_owner || "—"}
                   </span>
                 </div>
-                <p className="text-2xs text-srapi-text-secondary mt-1 line-clamp-2 font-mono break-words">
+                <p className="mt-1 line-clamp-2 break-words text-[11px] text-srapi-text-secondary">
                   {item.message_pattern || item.example_error_message || "—"}
                 </p>
               </div>
@@ -684,7 +684,7 @@ function ErrorFingerprintStrip({
               <button
                 type="button"
                 onClick={() => onSelect(item)}
-                className="border-srapi-border text-2xs text-srapi-text-secondary hover:text-srapi-text-primary rounded border px-1.5 py-0.5 transition-colors"
+                className="rounded-full border border-srapi-border bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-secondary transition-colors hover:text-srapi-text-primary"
               >
                 {t("adminErrorLogs.focusFingerprint")}
               </button>
@@ -692,7 +692,7 @@ function ErrorFingerprintStrip({
                 <button
                   type="button"
                   onClick={() => onOpenExample(item)}
-                  className="border-srapi-border text-2xs text-srapi-text-secondary hover:text-srapi-text-primary rounded border px-1.5 py-0.5 transition-colors"
+                  className="rounded-full border border-srapi-border bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-secondary transition-colors hover:text-srapi-text-primary"
                 >
                   {t("adminErrorLogs.openExample")}
                 </button>
@@ -734,7 +734,7 @@ function RelatedEvidencePills({ log }: { log: OpsErrorLog }) {
   const requestDumpHref = adminRequestDumpsHref(log);
   const requestEvidenceHref = triage.links.find((link) => link.kind === "requestEvidence")?.href;
   if (!systemHref && !requestDumpHref && !requestEvidenceHref) {
-    return <span className="text-2xs text-srapi-text-tertiary font-mono">—</span>;
+    return <span className="text-[12px] text-srapi-text-tertiary">—</span>;
   }
 
   return (
@@ -742,7 +742,7 @@ function RelatedEvidencePills({ log }: { log: OpsErrorLog }) {
       {systemHref ? (
         <Link
           href={systemHref}
-          className="bg-srapi-card-muted text-2xs text-srapi-text-secondary hover:text-srapi-text-primary inline-flex max-w-full items-center gap-1 rounded px-1.5 py-0.5 font-mono underline-offset-2 hover:underline"
+          className="inline-flex max-w-full items-center gap-1 rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-secondary underline-offset-2 hover:text-srapi-text-primary hover:underline"
         >
           <ScrollText aria-hidden className="size-3 shrink-0" />
           <span className="truncate">{t("adminErrorLogs.openSystemLogs")}</span>
@@ -751,7 +751,7 @@ function RelatedEvidencePills({ log }: { log: OpsErrorLog }) {
       {requestDumpHref ? (
         <Link
           href={requestDumpHref}
-          className="bg-srapi-card-muted text-2xs text-srapi-text-secondary hover:text-srapi-text-primary inline-flex max-w-full items-center gap-1 rounded px-1.5 py-0.5 font-mono underline-offset-2 hover:underline"
+          className="inline-flex max-w-full items-center gap-1 rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-secondary underline-offset-2 hover:text-srapi-text-primary hover:underline"
         >
           <FileText aria-hidden className="size-3 shrink-0" />
           <span className="truncate">{t("adminErrorLogs.openRequestDumps")}</span>
@@ -760,7 +760,7 @@ function RelatedEvidencePills({ log }: { log: OpsErrorLog }) {
       {requestEvidenceHref ? (
         <Link
           href={requestEvidenceHref}
-          className="bg-srapi-card-muted text-2xs text-srapi-text-secondary hover:text-srapi-text-primary inline-flex max-w-full items-center gap-1 rounded px-1.5 py-0.5 font-mono underline-offset-2 hover:underline"
+          className="inline-flex max-w-full items-center gap-1 rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-secondary underline-offset-2 hover:text-srapi-text-primary hover:underline"
         >
           <Link2 aria-hidden className="size-3 shrink-0" />
           <span className="truncate">{t("adminErrorLogs.openRequestEvidence")}</span>

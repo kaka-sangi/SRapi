@@ -31,6 +31,7 @@ import { useToast } from "@/context/ToastContext";
 import { adminErrorMessage } from "@/lib/admin-api";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
+import { DataPill } from "@/components/ui/data-pill";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import {
   PROVIDER_ADAPTER_TYPES,
@@ -243,8 +244,10 @@ function ProvidersContent() {
       sortValue: (p) => p.display_name || p.name,
       render: (p) => (
         <div className="min-w-0">
-          <div className="text-srapi-text-primary truncate">{p.display_name || p.name}</div>
-          <div className="text-2xs text-srapi-text-tertiary truncate font-mono">{p.name}</div>
+          <div className="truncate text-sm font-medium text-srapi-text-primary">
+            {p.display_name || p.name}
+          </div>
+          <div className="truncate text-[11px] text-srapi-text-tertiary">{p.name}</div>
         </div>
       ),
     },
@@ -252,17 +255,13 @@ function ProvidersContent() {
       key: "adapterType",
       header: t("adminProviders.adapterType"),
       hideOnMobile: true,
-      render: (p) => (
-        <span className="text-2xs text-srapi-text-secondary font-mono">{p.adapter_type}</span>
-      ),
+      render: (p) => <DataPill tone="neutral">{p.adapter_type}</DataPill>,
     },
     {
       key: "protocol",
       header: t("adminProviders.protocol"),
       hideOnMobile: true,
-      render: (p) => (
-        <span className="text-2xs text-srapi-text-tertiary font-mono">{p.protocol}</span>
-      ),
+      render: (p) => <DataPill tone="neutral">{p.protocol}</DataPill>,
     },
     {
       key: "accounts",
@@ -271,10 +270,11 @@ function ProvidersContent() {
       sortValue: (p) => accountCountByProvider.get(p.id)?.total ?? 0,
       render: (p) => {
         const counts = accountCountByProvider.get(p.id);
-        if (!counts) return <span className="text-2xs text-srapi-text-tertiary">0</span>;
+        if (!counts)
+          return <span className="text-xs tabular text-srapi-text-tertiary">0</span>;
         return (
-          <span className="text-2xs flex items-center gap-1.5 font-mono">
-            <span className="text-srapi-success">{counts.active}</span>
+          <span className="flex items-center gap-1.5 text-xs tabular">
+            <span className="font-medium text-srapi-success">{counts.active}</span>
             <span className="text-srapi-text-tertiary">/ {counts.total}</span>
           </span>
         );

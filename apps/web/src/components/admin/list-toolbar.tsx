@@ -30,7 +30,7 @@ export function SearchInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="h-9 pl-9"
+        className="h-10 rounded-xl pl-9"
         type="search"
       />
     </div>
@@ -68,7 +68,7 @@ export function FilterSelect({
       value={value ?? ALL}
       onValueChange={(next) => onChange(next === ALL ? undefined : next)}
     >
-      <SelectTrigger className={cn("h-9 w-auto min-w-[8.5rem] gap-2 rounded-lg", className)}>
+      <SelectTrigger className={cn("h-10 w-auto min-w-[8.5rem] gap-2 rounded-xl", className)}>
         <SelectValue placeholder={placeholder ?? allLabel} />
       </SelectTrigger>
       <SelectContent>
@@ -86,7 +86,7 @@ export function FilterSelect({
 /** Horizontal toolbar wrapper: search on the left, filters trailing. */
 export function ListToolbar({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-2 border-b border-srapi-border px-3 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
+    <div className="flex flex-col gap-2 border-b border-srapi-border/70 bg-srapi-card px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
       {children}
     </div>
   );

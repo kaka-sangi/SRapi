@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Coins, Link2, UserPlus, WalletCards } from "lucide-react";
+import { Coins, Link2, UserPlus, WalletCards, Wallet, TrendingUp } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, type Column } from "@/components/admin/admin-list-view";
@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QuietBadge } from "@/components/ui/quiet-badge";
+import { IconBubble } from "@/components/ui/icon-bubble";
 import { CopyButton, CopyableValue } from "@/components/ui/copy-button";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import { formatMoney, formatDateTime } from "@/lib/admin-format";
@@ -101,7 +102,7 @@ function AffiliateContent() {
       key: "date",
       header: t("affiliate.date"),
       render: (r) => (
-        <span className="whitespace-nowrap font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="whitespace-nowrap text-[12px] tabular text-srapi-text-tertiary">
           {formatDateTime(r.created_at)}
         </span>
       ),
@@ -109,14 +110,14 @@ function AffiliateContent() {
     {
       key: "type",
       header: t("affiliate.type"),
-      render: (r) => <span className="text-srapi-text-secondary">{r.type || "—"}</span>,
+      render: (r) => <span className="text-sm text-srapi-text-secondary">{r.type || "—"}</span>,
     },
     {
       key: "amount",
       header: t("affiliate.amount"),
       align: "right",
       render: (r) => (
-        <span className="font-mono text-srapi-text-secondary tabular">
+        <span className="text-[12px] font-medium tabular text-srapi-text-primary">
           {formatMoney(r.amount, r.currency)}
         </span>
       ),
@@ -137,27 +138,37 @@ function AffiliateContent() {
       />
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardContent className="flex flex-wrap items-baseline gap-x-8 gap-y-4">
-            <div>
-              <div className="font-mono text-2xs uppercase text-srapi-text-tertiary">
-                {t("affiliate.available")}
-              </div>
-              {affiliate.isLoading ? (
-                <Skeleton className="mt-2 h-9 w-28" />
-              ) : (
-                <div className="mt-1 font-serif text-3xl text-srapi-text-primary tabular">
-                  {primary ? formatMoney(primary.available_balance, primary.currency) : "—"}
+        <Card className="card-raised border-l-4 border-l-srapi-primary">
+          <CardContent className="flex flex-wrap items-start gap-x-8 gap-y-4">
+            <div className="flex items-start gap-3">
+              <IconBubble tone="accent" size="lg">
+                <Wallet aria-hidden />
+              </IconBubble>
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
+                  {t("affiliate.available")}
                 </div>
-              )}
-            </div>
-            <div className="hidden h-10 w-px self-center bg-srapi-border sm:block" />
-            <div>
-              <div className="font-mono text-2xs uppercase text-srapi-text-tertiary">
-                {t("affiliate.accrued")}
+                {affiliate.isLoading ? (
+                  <Skeleton className="mt-2 h-9 w-28" />
+                ) : (
+                  <div className="mt-1 text-3xl font-semibold tracking-tight tabular text-srapi-text-primary">
+                    {primary ? formatMoney(primary.available_balance, primary.currency) : "—"}
+                  </div>
+                )}
               </div>
-              <div className="mt-1 font-serif text-3xl text-srapi-text-tertiary tabular">
-                {primary ? formatMoney(primary.accrued_amount, primary.currency) : "—"}
+            </div>
+            <div className="hidden h-12 w-px self-center bg-srapi-border sm:block" />
+            <div className="flex items-start gap-3">
+              <IconBubble tone="neutral" size="lg">
+                <TrendingUp aria-hidden />
+              </IconBubble>
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
+                  {t("affiliate.accrued")}
+                </div>
+                <div className="mt-1 text-3xl font-semibold tracking-tight tabular text-srapi-text-tertiary">
+                  {primary ? formatMoney(primary.accrued_amount, primary.currency) : "—"}
+                </div>
               </div>
             </div>
           </CardContent>
@@ -166,7 +177,7 @@ function AffiliateContent() {
         <Card>
           <CardContent>
             <form onSubmit={transfer} className="space-y-4">
-              <h3 className="font-serif text-lg text-srapi-text-primary">{t("affiliate.transfer")}</h3>
+              <h3 className="text-lg font-semibold tracking-tight text-srapi-text-primary">{t("affiliate.transfer")}</h3>
               <div>
                 <Label htmlFor="amount">{t("affiliate.transferAmount")}</Label>
                 <Input
@@ -200,7 +211,7 @@ function AffiliateContent() {
           <CardContent className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 className="font-serif text-lg text-srapi-text-primary">
+                <h3 className="text-lg font-semibold tracking-tight text-srapi-text-primary">
                   {t("affiliate.inviteCodes")}
                 </h3>
                 <p className="mt-1 text-sm text-srapi-text-secondary">
@@ -227,9 +238,11 @@ function AffiliateContent() {
                 ))}
               </div>
             ) : (
-              <div className="flex min-h-24 flex-col items-center justify-center rounded-lg border border-dashed border-srapi-border px-4 py-6 text-center">
-                <UserPlus className="size-5 text-srapi-text-tertiary" aria-hidden />
-                <p className="mt-2 text-sm text-srapi-text-secondary">
+              <div className="flex min-h-28 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-srapi-border/70 bg-srapi-card-muted/40 px-4 py-6 text-center">
+                <IconBubble tone="accent">
+                  <UserPlus aria-hidden />
+                </IconBubble>
+                <p className="text-sm text-srapi-text-secondary">
                   {t("affiliate.emptyInviteCodes")}
                 </p>
               </div>
@@ -240,7 +253,7 @@ function AffiliateContent() {
         <Card>
           <CardContent>
             <form onSubmit={requestWithdrawal} className="space-y-4">
-              <h3 className="font-serif text-lg text-srapi-text-primary">
+              <h3 className="text-lg font-semibold tracking-tight text-srapi-text-primary">
                 {t("affiliate.withdraw")}
               </h3>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -303,10 +316,10 @@ function InviteCodeRow({ code }: { code: AffiliateInviteCode }) {
   const inviteLink = invitePathForCode(code.code);
 
   return (
-    <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-srapi-border bg-srapi-card-muted px-3 py-2">
+    <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-xl border border-srapi-border bg-srapi-card-muted px-3.5 py-2.5">
       <div className="min-w-0 flex-1">
         <CopyableValue value={code.code} label={t("affiliate.copyCode")} />
-        <div className="mt-1 flex min-w-0 items-center gap-1 text-2xs text-srapi-text-tertiary">
+        <div className="mt-1 flex min-w-0 items-center gap-1 text-xs text-srapi-text-tertiary">
           <Link2 className="size-3 shrink-0" aria-hidden />
           <span className="truncate" title={inviteLink}>{inviteLink}</span>
         </div>

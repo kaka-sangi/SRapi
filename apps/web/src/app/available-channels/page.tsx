@@ -102,7 +102,7 @@ function AvailableModelsTable({
               className="pl-8 text-xs"
             />
           </div>
-          <span className="ml-auto font-mono text-2xs text-srapi-text-tertiary tabular">
+          <span className="ml-auto text-[12px] font-medium text-srapi-text-tertiary tabular">
             {rows.length} / {models.flatMap((m) => m.channels).length}
           </span>
         </div>
@@ -136,11 +136,11 @@ function AvailableModelsTable({
                 <TableRow key={`${model.id}:${channel.provider_id}:${channel.upstream_model}`}>
                   <TableCell className="max-w-[180px]">
                     <div className="truncate font-medium text-srapi-text-primary" title={model.name}>{model.name}</div>
-                    <div className="mt-1 truncate font-mono text-2xs text-srapi-text-tertiary" title={model.id}>{model.id}</div>
+                    <div className="mt-1 truncate text-[12px] text-srapi-text-tertiary tabular" title={model.id}>{model.id}</div>
                   </TableCell>
                   <TableCell className="max-w-[200px]">
                     <div className="truncate text-srapi-text-primary" title={channel.provider_display_name}>{channel.provider_display_name}</div>
-                    <div className="mt-1 truncate font-mono text-2xs text-srapi-text-tertiary" title={`${channel.protocol} · ${channel.upstream_model}`}>
+                    <div className="mt-1 truncate text-[12px] text-srapi-text-tertiary tabular" title={`${channel.protocol} · ${channel.upstream_model}`}>
                       {channel.protocol} · {channel.upstream_model}
                     </div>
                   </TableCell>
@@ -150,7 +150,7 @@ function AvailableModelsTable({
                   <TableCell>
                     <PricingText channel={channel} />
                   </TableCell>
-                  <TableCell className="text-right font-mono text-sm tabular text-srapi-text-secondary">
+                  <TableCell className="text-right text-sm font-medium tabular text-srapi-text-secondary">
                     {channel.active_account_count}/{channel.total_account_count}
                   </TableCell>
                 </TableRow>
@@ -169,14 +169,14 @@ function PricingText({ channel }: { channel: AvailableModelChannelSummary }) {
   const pricing = channel.pricing;
   if (pricing.billing_mode === "per_request" || pricing.billing_mode === "image") {
     return (
-      <div className="font-mono text-xs text-srapi-text-secondary">
-        {formatMoney(pricing.per_request_price, pricing.currency)}
+      <div className="text-xs text-srapi-text-secondary tabular">
+        <span className="font-medium">{formatMoney(pricing.per_request_price, pricing.currency)}</span>
         <span className="ml-1 text-srapi-text-tertiary">{t(`availableChannels.${pricing.billing_mode}`)}</span>
       </div>
     );
   }
   return (
-    <div className="space-y-1 font-mono text-xs text-srapi-text-secondary">
+    <div className="space-y-1 text-xs text-srapi-text-secondary tabular">
       <div>{t("availableChannels.inputPrice", { price: formatMoney(pricing.input_price_per_million_tokens, pricing.currency) })}</div>
       <div>{t("availableChannels.outputPrice", { price: formatMoney(pricing.output_price_per_million_tokens, pricing.currency) })}</div>
     </div>

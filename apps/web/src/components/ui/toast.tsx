@@ -23,9 +23,9 @@ export const ToastViewport = React.forwardRef<
 ));
 ToastViewport.displayName = "ToastViewport";
 
-// Quiet, paper-toned card. Tone shows only as a 2px left rule — no fills, no glow.
+// Card-raised toast: warm surface, soft shadow, tone shows as a 2px left rule.
 const toastVariants = cva(
-  "srapi-anim-toast tactile-card pointer-events-auto relative flex w-full items-start gap-3 rounded-xl border border-l-2 border-srapi-border bg-srapi-card p-4 pr-9",
+  "srapi-anim-toast tactile-card pointer-events-auto relative flex w-full items-start gap-3 rounded-2xl border border-l-2 border-srapi-border bg-srapi-card p-4 pr-9 shadow-md",
   {
     variants: {
       tone: {
@@ -64,7 +64,7 @@ export const ToastDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <ToastPrimitive.Description
     ref={ref}
-    className={cn("mt-0.5 text-xs leading-relaxed text-srapi-text-secondary", className)}
+    className={cn("mt-0.5 text-sm leading-relaxed text-srapi-text-secondary", className)}
     {...props}
   />
 ));

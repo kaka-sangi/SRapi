@@ -120,12 +120,12 @@ function SchedulerBody({
             <CardTitle>{t("scheduler.title")}</CardTitle>
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <SchedulerFilterChips filters={filters} />
-              <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+              <span className="text-[11px] tabular text-srapi-text-tertiary">
                 {decisions.length}
               </span>
             </div>
           </CardHeader>
-          <div className="max-h-[640px] divide-y divide-srapi-border overflow-y-auto">
+          <div className="max-h-[640px] divide-y divide-srapi-border/70 overflow-y-auto">
             {decisions.map((d) => {
               const key = decisionKey(d);
               const active = key === decisionKey(selected);
@@ -137,35 +137,41 @@ function SchedulerBody({
                   key={key}
                   onClick={() => onSelect(key)}
                   className={`grid w-full gap-2 px-5 py-3 text-left transition-colors ${
-                    active ? "bg-srapi-card-muted" : "hover:bg-srapi-card-muted/50"
+                    active
+                      ? "bg-srapi-accent-soft"
+                      : "hover:bg-srapi-card-muted/60"
                   }`}
                 >
                   <div className="flex min-w-0 items-center gap-2">
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm text-srapi-text-primary">{d.model}</div>
-                      <div className="truncate font-mono text-2xs text-srapi-text-secondary">
+                      <div
+                        className={`truncate text-sm ${active ? "font-medium text-srapi-primary" : "text-srapi-text-primary"}`}
+                      >
+                        {d.model}
+                      </div>
+                      <div className="truncate font-mono text-[11px] text-srapi-text-secondary">
                         {d.request_id} · #{d.attempt_no} · {formatDateTime(d.created_at)}
                       </div>
                     </div>
                     <QuietBadge status={outcome.status} label={t(outcome.labelKey)} />
                   </div>
                   <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                    <span className="rounded bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary">
+                    <span className="rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-tertiary">
                       {d.strategy}
                     </span>
-                    <span className="rounded bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary">
+                    <span className="rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-tertiary">
                       {d.candidate_count}/{d.rejected_count}
                     </span>
                     {d.fallback_from_decision_id ? (
-                      <span className="rounded bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-warning">
+                      <span className="rounded-full bg-srapi-warning/12 px-2 py-0.5 text-[11px] font-medium text-srapi-warning">
                         {t("scheduler.fallback")}
                       </span>
                     ) : null}
-                    <span className="max-w-44 truncate font-mono text-2xs text-srapi-text-secondary">
+                    <span className="max-w-44 truncate font-mono text-[11px] text-srapi-text-secondary">
                       {selectedAccount}
                     </span>
                     {primaryReject ? (
-                      <span className="max-w-40 truncate font-mono text-2xs text-srapi-error">
+                      <span className="max-w-40 truncate text-[11px] text-srapi-error">
                         {primaryReject.reason} ×{primaryReject.count}
                       </span>
                     ) : null}
@@ -182,7 +188,7 @@ function SchedulerBody({
           <CardHeader>
             <div className="min-w-0">
               <CardTitle>{t("scheduler.traceLog")}</CardTitle>
-              <div className="mt-1 truncate font-mono text-2xs text-srapi-text-tertiary tabular">
+              <div className="mt-1 truncate font-mono text-[11px] tabular text-srapi-text-tertiary">
                 {selected.request_id} · #{selected.attempt_no}
               </div>
             </div>
@@ -205,9 +211,9 @@ function SchedulerBody({
             />
             <SchedulerDecisionStream key={decisionKey(selected)} lines={decisionToLines(selected)} />
             {selected.warnings.length > 0 && (
-              <div className="mt-4 space-y-1 border-t border-srapi-border pt-4">
+              <div className="mt-4 space-y-1 border-t border-srapi-border/70 pt-4">
                 {selected.warnings.map((w, i) => (
-                  <div key={i} className="font-mono text-2xs text-srapi-warning">
+                  <div key={i} className="text-xs text-srapi-warning">
                     ! {w}
                   </div>
                 ))}
@@ -243,7 +249,7 @@ function SchedulerFilterChips({ filters }: { filters: SchedulerDecisionPanelFilt
   return entries.map(([label, value]) => (
     <span
       key={`${label}:${value}`}
-      className="max-w-56 truncate rounded bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary"
+      className="max-w-56 truncate rounded-full bg-srapi-card-muted px-2 py-0.5 font-mono text-[11px] font-medium text-srapi-text-tertiary"
       title={`${label}:${value}`}
     >
       {label}:{value}
@@ -275,7 +281,7 @@ function DecisionInvestigationSummary({
   const providerHref = adminProvidersHref(decision.selected_provider_id);
 
   return (
-    <div className="mb-5 grid gap-4 border-b border-srapi-border pb-5">
+    <div className="mb-5 grid gap-4 border-b border-srapi-border/70 pb-5">
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         <DecisionStat label={t("scheduler.strategy")} value={strategyLabel(decision)} />
         <DecisionStat label={t("scheduler.selectedAccount")} value={accountName} tone={decision.selected_account_id ? "normal" : "error"} />
@@ -292,8 +298,8 @@ function DecisionInvestigationSummary({
         />
       </div>
       {decision.selection_rationale ? (
-        <div className="rounded-md border border-srapi-border bg-srapi-card-muted px-3 py-2 text-xs text-srapi-text-secondary">
-          <div className="mb-1 font-mono text-2xs uppercase text-srapi-text-tertiary">
+        <div className="rounded-xl border border-srapi-border bg-srapi-card-muted px-3.5 py-2.5 text-xs text-srapi-text-secondary">
+          <div className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
             {t("scheduler.rationale")}
           </div>
           {decision.selection_rationale}
@@ -353,9 +359,11 @@ function DecisionStat({
           ? "text-srapi-text-tertiary"
           : "text-srapi-text-primary";
   return (
-    <div className="min-w-0 rounded-md border border-srapi-border px-3 py-2">
-      <div className="mb-1 font-mono text-2xs uppercase text-srapi-text-tertiary">{label}</div>
-      <div className={`truncate text-sm ${toneClass}`} title={value}>
+    <div className="min-w-0 rounded-xl border border-srapi-border px-3 py-2">
+      <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
+        {label}
+      </div>
+      <div className={`truncate text-sm font-medium ${toneClass}`} title={value}>
         {value || "-"}
       </div>
     </div>
@@ -365,37 +373,37 @@ function DecisionStat({
 function ScoreBreakdown({ scores }: { scores: SchedulerDecisionSummary["scores"] }) {
   const { t } = useLanguage();
   return (
-    <div className="min-w-0 overflow-hidden rounded-md border border-srapi-border">
-      <div className="flex items-center justify-between border-b border-srapi-border px-3 py-2">
-        <div className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+    <div className="min-w-0 overflow-hidden rounded-xl border border-srapi-border">
+      <div className="flex items-center justify-between border-b border-srapi-border/70 px-3 py-2">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
           {t("scheduler.scoreBreakdown")}
         </div>
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">{scores.length}</span>
+        <span className="text-[11px] tabular text-srapi-text-tertiary">{scores.length}</span>
       </div>
       {scores.length === 0 ? (
         <div className="px-3 py-3 text-xs text-srapi-text-tertiary">{t("scheduler.noScores")}</div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[680px] text-left text-xs">
-            <thead className="bg-srapi-card-muted font-mono text-2xs uppercase text-srapi-text-tertiary">
+            <thead className="bg-srapi-card-muted text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
               <tr>
-                <th className="px-3 py-2 font-medium">{t("scheduler.account")}</th>
-                <th className="px-2 py-2 text-right font-medium">{t("scheduler.finalScore")}</th>
-                <th className="px-2 py-2 text-right font-medium">health</th>
-                <th className="px-2 py-2 text-right font-medium">quota</th>
-                <th className="px-2 py-2 text-right font-medium">latency</th>
-                <th className="px-2 py-2 text-right font-medium">cost</th>
-                <th className="px-2 py-2 text-right font-medium">quality</th>
-                <th className="px-2 py-2 text-right font-medium">risk</th>
+                <th className="px-3 py-2 font-semibold">{t("scheduler.account")}</th>
+                <th className="px-2 py-2 text-right font-semibold">{t("scheduler.finalScore")}</th>
+                <th className="px-2 py-2 text-right font-semibold">health</th>
+                <th className="px-2 py-2 text-right font-semibold">quota</th>
+                <th className="px-2 py-2 text-right font-semibold">latency</th>
+                <th className="px-2 py-2 text-right font-semibold">cost</th>
+                <th className="px-2 py-2 text-right font-semibold">quality</th>
+                <th className="px-2 py-2 text-right font-semibold">risk</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-srapi-border">
+            <tbody className="divide-y divide-srapi-border/70">
               {scores.slice(0, 8).map((score) => (
                 <tr key={`${score.account}-${score.score}`}>
-                  <td className="max-w-44 truncate px-3 py-2 font-mono text-2xs text-srapi-text-secondary">
+                  <td className="max-w-44 truncate px-3 py-2 font-mono text-[11px] text-srapi-text-secondary">
                     {score.account}
                     {score.pareto_frontier ? (
-                      <span className="ml-2 rounded bg-srapi-card-muted px-1.5 py-0.5 text-srapi-success">
+                      <span className="ml-2 rounded-full bg-srapi-success/12 px-2 py-0.5 text-[10px] font-medium text-srapi-success">
                         frontier
                       </span>
                     ) : null}
@@ -420,11 +428,11 @@ function ScoreBreakdown({ scores }: { scores: SchedulerDecisionSummary["scores"]
 function ScoreCell({ value, strong = false, danger = false }: { value: number; strong?: boolean; danger?: boolean }) {
   return (
     <td
-      className={`px-2 py-2 text-right font-mono text-2xs tabular ${
+      className={`px-2 py-2 text-right text-[11px] tabular ${
         danger && value > 0
           ? "text-srapi-error"
           : strong
-            ? "text-srapi-text-primary"
+            ? "font-medium text-srapi-text-primary"
             : "text-srapi-text-tertiary"
       }`}
     >
@@ -436,12 +444,12 @@ function ScoreCell({ value, strong = false, danger = false }: { value: number; s
 function RejectReasons({ reasons }: { reasons: SchedulerDecisionSummary["rejected_reasons"] }) {
   const { t } = useLanguage();
   return (
-    <div className="rounded-md border border-srapi-border px-3 py-2">
+    <div className="rounded-xl border border-srapi-border px-3 py-2">
       <div className="mb-2 flex items-center justify-between">
-        <div className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
           {t("scheduler.rejectReasons")}
         </div>
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">{reasons.length}</span>
+        <span className="text-[11px] tabular text-srapi-text-tertiary">{reasons.length}</span>
       </div>
       {reasons.length === 0 ? (
         <div className="text-xs text-srapi-text-tertiary">{t("scheduler.noRejects")}</div>
@@ -450,7 +458,7 @@ function RejectReasons({ reasons }: { reasons: SchedulerDecisionSummary["rejecte
           {reasons.slice(0, 12).map((reason, index) => (
             <span
               key={`${reason.account}-${reason.reason}-${index}`}
-              className="inline-flex min-w-0 items-center gap-1.5 rounded-md border border-srapi-border bg-srapi-card-muted px-2 py-1 font-mono text-2xs"
+              className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-srapi-border bg-srapi-card-muted px-2 py-1 font-mono text-[11px]"
             >
               <span className="max-w-28 truncate text-srapi-text-secondary">{reason.account}</span>
               <span className="max-w-44 truncate text-srapi-error">{reason.reason}</span>

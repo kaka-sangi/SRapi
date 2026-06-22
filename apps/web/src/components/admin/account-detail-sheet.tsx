@@ -1,9 +1,14 @@
 "use client";
 
 import type { UseQueryResult } from "@tanstack/react-query";
-import { RefreshCw } from "lucide-react";
+import { Activity, RefreshCw, Server } from "lucide-react";
 import Link from "next/link";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { DataPill } from "@/components/ui/data-pill";
+import { IconBubble } from "@/components/ui/icon-bubble";
+import { SectionTitle } from "@/components/ui/section-title";
+import { QuietBadge } from "@/components/ui/quiet-badge";
+import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import {
   useAccountHealth,
@@ -73,21 +78,23 @@ function pct(ratio: number): string {
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 py-1.5">
-      <span className="text-2xs text-srapi-text-tertiary tracking-wide uppercase">{label}</span>
-      <span className="text-srapi-text-primary tabular font-mono text-xs">{value}</span>
+    <div className="flex items-baseline justify-between gap-4 py-2">
+      <span className="text-xs font-medium uppercase tracking-[0.1em] text-srapi-text-tertiary">
+        {label}
+      </span>
+      <span className="text-sm tabular font-medium text-srapi-text-primary">{value}</span>
     </div>
   );
 }
 
 function DetailMetric({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="border-srapi-border bg-srapi-card-muted min-w-0 rounded-md border px-3 py-2">
-      <div className="text-srapi-text-tertiary font-mono text-2xs tracking-wide uppercase">
+    <div className="min-w-0 rounded-xl border border-srapi-border bg-srapi-card-muted px-3.5 py-2.5">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-srapi-text-tertiary">
         {label}
       </div>
       <div
-        className="text-2xs text-srapi-text-secondary mt-1 truncate font-mono"
+        className="mt-1 truncate text-sm font-medium text-srapi-text-secondary"
         title={typeof value === "string" ? value : undefined}
       >
         {value}
@@ -202,12 +209,12 @@ function QuotaWindowRow({ window }: { window: QuotaDisplayWindow }) {
   return (
     <div className="space-y-1.5 py-2">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-2xs text-srapi-text-secondary font-mono tracking-wide uppercase">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-srapi-text-secondary">
           {quotaWindowDisplayLabel(window, t)}
         </span>
         <span
           className={cn(
-            "tabular font-mono text-xs",
+            "text-2xl font-semibold tracking-tight tabular",
             level === "crit"
               ? "text-srapi-error"
               : level === "warn"
@@ -218,7 +225,7 @@ function QuotaWindowRow({ window }: { window: QuotaDisplayWindow }) {
           {Math.round(window.remainingPercent)}%
         </span>
       </div>
-      <div className="bg-srapi-border relative h-1.5 overflow-hidden rounded-full">
+      <div className="relative h-1.5 overflow-hidden rounded-full bg-srapi-border">
         <div
           className={cn(
             "h-full rounded-full transition-all",
@@ -231,7 +238,7 @@ function QuotaWindowRow({ window }: { window: QuotaDisplayWindow }) {
           style={{ width: `${Math.max(window.remainingPercent, 2)}%` }}
         />
       </div>
-      <div className="text-2xs text-srapi-text-tertiary flex items-center justify-between gap-3 font-mono">
+      <div className="flex items-center justify-between gap-3 text-[11px] tabular text-srapi-text-tertiary">
         <span>{quotaWindowValue(window)}</span>
         <span>{quotaWindowTiming(window, t)}</span>
       </div>
@@ -262,20 +269,23 @@ function UsageWindowCard({
   return (
     <div className="space-y-1.5 py-2">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-2xs text-srapi-text-secondary font-mono tracking-wide uppercase">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-srapi-text-secondary">
           {usageWindowLabel(window.window, t)}
         </span>
-        <span className="text-srapi-text-primary tabular font-mono text-xs">
-          {formatCompactNumber(window.requests)} {t("adminAccounts.usageRequests").toLowerCase()}
+        <span className="text-lg font-semibold tracking-tight tabular text-srapi-text-primary">
+          {formatCompactNumber(window.requests)}{" "}
+          <span className="text-[11px] font-normal text-srapi-text-tertiary">
+            {t("adminAccounts.usageRequests").toLowerCase()}
+          </span>
         </span>
       </div>
-      <div className="bg-srapi-border relative h-1.5 overflow-hidden rounded-full">
+      <div className="relative h-1.5 overflow-hidden rounded-full bg-srapi-border">
         <div
-          className="bg-srapi-success h-full rounded-full transition-all"
+          className="h-full rounded-full bg-srapi-success transition-all"
           style={{ width: `${Math.max(ratio * 100, window.requests > 0 ? 2 : 0)}%` }}
         />
       </div>
-      <div className="text-2xs text-srapi-text-tertiary flex items-center justify-between gap-3 font-mono">
+      <div className="flex items-center justify-between gap-3 text-[11px] tabular text-srapi-text-tertiary">
         <span>
           {t("adminAccounts.usageTokens")} {formatCompactNumber(window.total_tokens)}
         </span>
@@ -285,7 +295,7 @@ function UsageWindowCard({
         </span>
       </div>
       {window.last_request_at ? (
-        <div className="text-2xs text-srapi-text-tertiary truncate font-mono">
+        <div className="truncate text-[11px] text-srapi-text-tertiary">
           {t("adminAccounts.lastUsedAt")} {formatDateTime(window.last_request_at)}
         </div>
       ) : null}
@@ -296,7 +306,7 @@ function UsageWindowCard({
 function UsageWindowsBody({ result }: { result: AccountUsageWindowsResult }) {
   const { t } = useLanguage();
   if (result.windows.length === 0) {
-    return <p className="text-2xs text-srapi-text-tertiary">{t("adminAccounts.detailNoData")}</p>;
+    return <p className="text-xs text-srapi-text-tertiary">{t("adminAccounts.detailNoData")}</p>;
   }
   const maxRequests = Math.max(...result.windows.map((w) => w.requests), 0);
   return (
@@ -346,7 +356,7 @@ function UsageDailyBody({ points }: { points: AccountUsageDailyPoint[] }) {
   const { t } = useLanguage();
   const activePoints = activeDailyUsagePoints(points);
   if (activePoints.length === 0) {
-    return <p className="text-2xs text-srapi-text-tertiary">{t("adminAccounts.detailNoData")}</p>;
+    return <p className="text-xs text-srapi-text-tertiary">{t("adminAccounts.detailNoData")}</p>;
   }
   // The series arrives oldest→newest from the read model; render most-recent
   // first in the table but keep chronological order for the sparkline.
@@ -358,28 +368,28 @@ function UsageDailyBody({ points }: { points: AccountUsageDailyPoint[] }) {
         <Sparkline values={spark} ariaLabel={t("adminAccounts.usageDailyTitle")} className="h-10" />
       ) : null}
       <TableScroll minWidth={320}>
-        <Table className="text-2xs">
+        <Table className="text-xs">
           <TableHeader>
             <TableRow>
-              <TableHead className="h-7">{t("adminAccounts.usageDailyDate")}</TableHead>
-              <TableHead className="h-7 text-right">{t("adminAccounts.usageRequests")}</TableHead>
-              <TableHead className="h-7 text-right">{t("adminAccounts.usageTokens")}</TableHead>
-              <TableHead className="h-7 text-right">{t("adminAccounts.usageCost")}</TableHead>
+              <TableHead className="h-8">{t("adminAccounts.usageDailyDate")}</TableHead>
+              <TableHead className="h-8 text-right">{t("adminAccounts.usageRequests")}</TableHead>
+              <TableHead className="h-8 text-right">{t("adminAccounts.usageTokens")}</TableHead>
+              <TableHead className="h-8 text-right">{t("adminAccounts.usageCost")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.map((p) => (
               <TableRow key={p.date}>
-                <TableCell className="text-srapi-text-secondary py-1.5 font-mono">
+                <TableCell className="py-2 text-[12px] tabular text-srapi-text-tertiary">
                   {formatDate(p.date)}
                 </TableCell>
-                <TableCell className="tabular text-srapi-text-primary py-1.5 text-right font-mono">
+                <TableCell className="py-2 text-right text-[12px] font-medium tabular text-srapi-text-primary">
                   {formatCompactNumber(p.requests)}
                 </TableCell>
-                <TableCell className="tabular text-srapi-text-secondary py-1.5 text-right font-mono">
+                <TableCell className="py-2 text-right text-[12px] tabular text-srapi-text-secondary">
                   {formatCompactNumber(p.input_tokens + p.output_tokens)}
                 </TableCell>
-                <TableCell className="tabular text-srapi-text-secondary py-1.5 text-right font-mono">
+                <TableCell className="py-2 text-right text-[12px] font-medium tabular text-srapi-text-secondary">
                   {formatMoney(p.cost, p.currency)}
                 </TableCell>
               </TableRow>
@@ -388,7 +398,7 @@ function UsageDailyBody({ points }: { points: AccountUsageDailyPoint[] }) {
         </Table>
       </TableScroll>
       {activePoints.length > rows.length ? (
-        <p className="text-2xs text-srapi-text-tertiary font-mono">
+        <p className="text-xs tabular text-srapi-text-tertiary">
           {t("adminAccounts.usageDailyRowsShown", {
             shown: rows.length,
             total: activePoints.length,
@@ -405,26 +415,23 @@ function Section<T>({
   title,
   query,
   action,
+  icon,
   children,
 }: {
   title: string;
   query: UseQueryResult<T>;
   action?: React.ReactNode;
+  icon?: React.ReactNode;
   children: (data: T) => React.ReactNode;
 }) {
   const { t } = useLanguage();
   return (
-    <div className="border-srapi-border border-t pt-4 first:border-t-0 first:pt-0">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <h3 className="text-2xs text-srapi-text-secondary font-mono tracking-widest uppercase">
-          {title}
-        </h3>
-        {action}
-      </div>
+    <div className="border-t border-srapi-border pt-5 first:border-t-0 first:pt-0">
+      <SectionTitle icon={icon} label={title} action={action} className="mb-3" />
       {query.isLoading ? (
         <DialogListSkeleton rows={2} />
       ) : query.data === undefined ? (
-        <p className="text-2xs text-srapi-text-tertiary">{t("adminAccounts.detailNoData")}</p>
+        <p className="text-xs text-srapi-text-tertiary">{t("adminAccounts.detailNoData")}</p>
       ) : (
         children(query.data)
       )}
@@ -488,36 +495,44 @@ export function AccountDetailSheet({
   return (
     <Sheet open={account !== null} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-[28rem] gap-0 overflow-y-auto p-6">
-        <SheetTitle>{t("adminAccounts.detailTitle")}</SheetTitle>
-        {account ? (
-          <SheetDescription
-            className="text-srapi-text-secondary block max-w-full truncate text-sm"
-            title={account.name}
-          >
-            {account.name}
-          </SheetDescription>
-        ) : null}
-
-        {account ? (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            <span className="bg-srapi-card-muted text-2xs text-srapi-text-secondary rounded-md px-2 py-0.5 font-mono">
-              {account.status}
-            </span>
-            <span className="bg-srapi-card-muted text-2xs text-srapi-text-secondary rounded-md px-2 py-0.5">
-              {runtimeClassLabel(t, account.runtime_class)}
-            </span>
-            {account.priority != null && account.priority !== 0 ? (
-              <span className="bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded-md px-2 py-0.5 font-mono">
-                P{account.priority}
-              </span>
+        <div className="flex items-start gap-3">
+          <IconBubble size="lg" tone="accent">
+            <Server aria-hidden />
+          </IconBubble>
+          <div className="min-w-0 flex-1">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
+              {t("adminAccounts.detailTitle")}
+            </div>
+            <SheetTitle className="mt-0.5 text-lg font-semibold tracking-tight">
+              {providerName ?? account?.provider_id ?? ""}
+            </SheetTitle>
+            {account ? (
+              <SheetDescription
+                className="mt-1 block max-w-full truncate text-sm text-srapi-text-secondary"
+                title={account.name}
+              >
+                {account.name}
+              </SheetDescription>
             ) : null}
-            {account.weight != null && account.weight !== 1 ? (
-              <span className="bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded-md px-2 py-0.5 font-mono">
-                W{account.weight}
-              </span>
+            {account ? (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <QuietBadge
+                  status={quietStatusFor(account.status)}
+                  label={statusLabel(t, account.status)}
+                />
+                <DataPill tone="neutral">
+                  {runtimeClassLabel(t, account.runtime_class)}
+                </DataPill>
+                {account.priority != null && account.priority !== 0 ? (
+                  <DataPill tone="neutral">P{account.priority}</DataPill>
+                ) : null}
+                {account.weight != null && account.weight !== 1 ? (
+                  <DataPill tone="neutral">W{account.weight}</DataPill>
+                ) : null}
+              </div>
             ) : null}
           </div>
-        ) : null}
+        </div>
 
         {account ? (
           <div className="mt-3 grid grid-cols-2 gap-2">
@@ -619,8 +634,8 @@ export function AccountDetailSheet({
           </div>
         ) : null}
 
-        <div className="mt-5 space-y-4">
-          <Section title={t("adminAccounts.healthTitle")} query={health}>
+        <div className="mt-6 space-y-5">
+          <Section title={t("adminAccounts.healthTitle")} query={health} icon={<Activity />}>
             {(h) => {
               const investigationLinks = adminAccountHealthInvestigationLinks(h);
               return (
@@ -699,7 +714,7 @@ export function AccountDetailSheet({
                   type="button"
                   onClick={() => void refreshQuota()}
                   disabled={fetchQuota.isPending}
-                  className="text-2xs text-srapi-text-tertiary hover:text-srapi-text-secondary flex items-center gap-1 font-mono tracking-wide uppercase transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1.5 rounded-full border border-srapi-border px-2.5 py-1 text-[11px] font-medium text-srapi-text-secondary transition-colors hover:bg-srapi-card-muted hover:text-srapi-text-primary disabled:opacity-50"
                 >
                   <RefreshCw className={cn("size-3", fetchQuota.isPending && "animate-spin")} />
                   {t("adminAccounts.quotaRefresh")}
@@ -709,7 +724,7 @@ export function AccountDetailSheet({
           >
             {(q) =>
               q.data.length === 0 ? (
-                <p className="text-2xs text-srapi-text-tertiary">
+                <p className="text-xs text-srapi-text-tertiary">
                   {t("adminAccounts.detailNoData")}
                 </p>
               ) : (

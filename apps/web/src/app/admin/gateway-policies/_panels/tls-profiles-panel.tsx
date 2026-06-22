@@ -128,7 +128,7 @@ export function TlsProfilesPanel() {
       key: "template",
       header: t("adminTlsProfiles.template"),
       render: (p) => (
-        <span className="text-srapi-text-secondary font-mono text-xs">
+        <span className="text-srapi-text-secondary text-sm tabular">
           {p.tls_template || "default"}
         </span>
       ),
@@ -138,7 +138,7 @@ export function TlsProfilesPanel() {
       header: t("adminTlsProfiles.httpPolicy"),
       hideOnMobile: true,
       render: (p) => (
-        <span className="text-2xs text-srapi-text-tertiary font-mono">{p.http_version_policy}</span>
+        <span className="text-xs text-srapi-text-tertiary tabular">{p.http_version_policy}</span>
       ),
     },
     {
@@ -147,7 +147,7 @@ export function TlsProfilesPanel() {
       hideOnMobile: true,
       render: (p) =>
         p.user_agent ? (
-          <span className="text-2xs text-srapi-text-tertiary block max-w-[20rem] truncate font-mono">
+          <span className="text-xs text-srapi-text-tertiary block max-w-[20rem] truncate tabular">
             {p.user_agent}
           </span>
         ) : (

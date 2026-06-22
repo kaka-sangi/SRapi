@@ -9,6 +9,7 @@ import { ResourceFormDialog, type FieldConfig } from "@/components/admin/resourc
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { Button } from "@/components/ui/button";
+import { DataPill } from "@/components/ui/data-pill";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
@@ -97,9 +98,9 @@ export function RolesPanel() {
         <div className="flex items-center gap-2">
           <span className="font-mono text-xs text-srapi-text-primary">{r.name}</span>
           {isBuiltInRole(r.name) ? (
-            <span className="rounded border border-srapi-border px-1 py-px text-2xs uppercase tracking-wide text-srapi-text-tertiary">
+            <DataPill tone="neutral" size="sm">
               {t("adminRoles.builtIn")}
-            </span>
+            </DataPill>
           ) : null}
         </div>
       ),
@@ -129,13 +130,13 @@ export function RolesPanel() {
             {perms.slice(0, 3).map((p) => (
               <span
                 key={p}
-                className="rounded-md border border-srapi-border px-1.5 py-0.5 font-mono text-2xs text-srapi-text-secondary"
+                className="rounded-full bg-srapi-card-muted px-2 py-0.5 font-mono text-[11px] font-medium text-srapi-text-secondary"
               >
                 {p}
               </span>
             ))}
             {perms.length > 3 ? (
-              <span className="font-mono text-2xs text-srapi-text-tertiary">
+              <span className="text-[11px] font-medium text-srapi-text-tertiary tabular">
                 +{perms.length - 3}
               </span>
             ) : null}
@@ -149,7 +150,7 @@ export function RolesPanel() {
       hideOnMobile: true,
       align: "right",
       render: (r) => (
-        <span className="font-mono text-2xs tabular text-srapi-text-tertiary">
+        <span className="text-[12px] tabular text-srapi-text-tertiary">
           {new Date(r.created_at).toLocaleDateString()}
         </span>
       ),

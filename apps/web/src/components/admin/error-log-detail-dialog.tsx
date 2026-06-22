@@ -77,10 +77,10 @@ export function ErrorLogDetailDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-lg font-semibold tracking-tight">
             {t("adminErrorLogs.detailTitle")}
             {userEmail ? (
-              <span className="font-mono text-srapi-text-tertiary"> · {userEmail}</span>
+              <span className="text-srapi-text-tertiary"> · {userEmail}</span>
             ) : null}
           </DialogTitle>
           <DialogDescription className="sr-only">{t("adminErrorLogs.subtitle")}</DialogDescription>
@@ -128,7 +128,7 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
         <div className="min-w-0">
-          <p className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
             {t("adminErrorLogs.errorClass")}
           </p>
           <div className="mt-1 flex items-center gap-1.5">
@@ -243,7 +243,7 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
 
       {events.length > 0 ? (
         <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
-          <p className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
             {t("adminErrorLogs.attemptHistory")}
           </p>
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -283,21 +283,21 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
                   className="rounded-md border border-srapi-border bg-srapi-card p-3"
                 >
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-2xs font-semibold text-srapi-text-primary">
+                    <span className="text-[11px] font-semibold text-srapi-text-primary">
                       {t("adminErrorLogs.attemptN", { n: ev.attempt_no ?? idx + 1 })}
                     </span>
                     {ev.kind ? (
-                      <span className="rounded bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary">
+                      <span className="rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-tertiary">
                         {ev.kind}
                       </span>
                     ) : null}
                     {ev.upstream_status_code != null && ev.upstream_status_code > 0 ? (
-                      <span className="font-mono text-2xs text-srapi-error">
+                      <span className="text-[11px] font-medium text-srapi-error">
                         {ev.upstream_status_code}
                       </span>
                     ) : null}
                     {offsetMs > 0 ? (
-                      <span className="font-mono text-2xs text-srapi-text-tertiary">
+                      <span className="text-[11px] text-srapi-text-tertiary">
                         +{offsetMs}ms
                       </span>
                     ) : null}
@@ -305,7 +305,7 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
                   <div className="mt-1 text-xs text-srapi-text-secondary">
                     {ev.account_name || "—"}
                     {ev.upstream_request_id ? (
-                      <span className="ml-2 font-mono text-2xs text-srapi-text-tertiary">
+                      <span className="ml-2 text-[11px] text-srapi-text-tertiary">
                         · {ev.upstream_request_id}
                       </span>
                     ) : null}
@@ -315,7 +315,7 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
                       <span className="shrink-0 font-medium">
                         {t("adminErrorLogs.upstreamTarget")}:
                       </span>
-                      <span className="min-w-0 break-all font-mono text-2xs text-srapi-text-tertiary">
+                      <span className="min-w-0 break-all text-[11px] text-srapi-text-tertiary">
                         {upstreamTarget}
                       </span>
                       <CopyButton value={upstreamTarget} size="inline" />
@@ -328,7 +328,7 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
                   ) : null}
                   {eventDiagnostic ? <UpstreamDiagnosticPills diagnostic={eventDiagnostic} /> : null}
                   {ev.body_excerpt ? (
-                    <p className="mt-1 break-words font-mono text-2xs text-srapi-text-tertiary">
+                    <p className="mt-1 break-words text-[11px] text-srapi-text-tertiary">
                       {ev.body_excerpt}
                     </p>
                   ) : null}
@@ -356,7 +356,7 @@ function ErrorLogTriageSummary({
     <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
             {t("adminOps.runbook.title")}
           </p>
           <div className="mt-1 flex flex-wrap gap-1.5">
@@ -389,7 +389,7 @@ function ErrorLogTriageSummary({
         <ol className="mt-3 grid gap-1.5">
           {triage.steps.slice(0, 4).map((step, index) => (
             <li key={step} className="flex gap-2 text-xs text-srapi-text-secondary">
-              <span className="font-mono text-2xs text-srapi-text-tertiary">{index + 1}</span>
+              <span className="text-[11px] text-srapi-text-tertiary">{index + 1}</span>
               <span>{t(`adminOps.runbook.steps.${step}`)}</span>
             </li>
           ))}
@@ -427,7 +427,7 @@ function SystemLogEvidence({
     <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
             {t("adminErrorLogs.systemLogs")}
           </p>
           <p className="mt-1 text-xs text-srapi-text-tertiary">
@@ -467,10 +467,10 @@ function SystemLogEvidence({
             >
               <div className="flex flex-wrap items-center gap-2">
                 <QuietBadge status={systemLogTone(log.level)} label={log.level} />
-                <span className="font-mono text-2xs text-srapi-text-tertiary">
+                <span className="text-[11px] text-srapi-text-tertiary">
                   {formatDateTime(log.created_at)}
                 </span>
-                <span className="font-mono text-2xs text-srapi-text-tertiary">
+                <span className="text-[11px] text-srapi-text-tertiary">
                   {log.source || "—"}
                 </span>
               </div>
@@ -566,12 +566,12 @@ function RequestLogEvidence({
     <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
             {t("adminErrorLogs.requestDump")}
           </p>
           {first ? (
             <div className="mt-1 min-w-0">
-              <p className="break-all font-mono text-2xs text-srapi-text-primary">
+              <p className="break-all font-mono text-[11px] text-srapi-text-primary">
                 {first.name}
               </p>
               <p className="mt-1 text-xs text-srapi-text-tertiary">
@@ -613,7 +613,7 @@ function RequestLogEvidence({
       {selected ? (
         <div className="mt-3 rounded-md border border-srapi-border bg-srapi-card p-3">
           <div className="mb-2 flex items-center justify-between gap-3">
-            <p className="min-w-0 break-all font-mono text-2xs text-srapi-text-tertiary">
+            <p className="min-w-0 break-all text-[11px] text-srapi-text-tertiary">
               {selected.name}
             </p>
             <Button type="button" variant="ghost" size="sm" onClick={() => setSelected(null)}>
@@ -685,7 +685,7 @@ function ResolutionEditor({
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <div>
-          <p className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
             {t("adminErrorLogs.currentResolution")}
           </p>
           <div className="mt-1 flex flex-wrap gap-2">
@@ -707,7 +707,7 @@ function ResolutionEditor({
           </div>
         </div>
         <div>
-          <p className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
             {t("adminErrorLogs.previousResolution")}
           </p>
           <p className="mt-1 text-sm text-srapi-text-secondary">{resolutionLabel(t, current)}</p>
@@ -715,7 +715,7 @@ function ResolutionEditor({
       </div>
 
       <div className="mt-3">
-        <label className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+        <label className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
           {t("adminErrorLogs.resolutionNote")}
         </label>
         <Textarea
@@ -740,12 +740,12 @@ function EvidenceBlock({
 }) {
   return (
     <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
-      <p className="font-mono text-2xs uppercase text-srapi-text-tertiary">{label}</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{label}</p>
       <div className="mt-1 flex items-start gap-1.5">
         <p
           className={
             "min-w-0 whitespace-pre-wrap break-words text-srapi-text-primary" +
-            (mono ? " font-mono text-2xs" : " text-sm")
+            (mono ? " font-mono text-[11px]" : " text-sm")
           }
         >
           {value}
@@ -770,13 +770,13 @@ function SchedulerDiagnosticSummary({
     <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
             {t("adminErrorLogs.schedulerDiagnostic")}
           </p>
           <p className="mt-1 text-sm text-srapi-text-primary">
             {diagnostic.primaryReason || "—"}
             {diagnostic.primaryCount != null ? (
-              <span className="ml-2 font-mono text-2xs text-srapi-text-tertiary">
+              <span className="ml-2 text-[11px] text-srapi-text-tertiary">
                 ×{formatInteger(diagnostic.primaryCount)}
               </span>
             ) : null}
@@ -826,7 +826,7 @@ function SchedulerDiagnosticSummary({
           {topReasons.map((item) => (
             <span
               key={item.reason}
-              className="rounded bg-srapi-card px-2 py-1 font-mono text-2xs text-srapi-text-secondary"
+              className="rounded-full bg-srapi-card px-2 py-0.5 text-[11px] font-medium text-srapi-text-secondary"
             >
               {item.reason}({formatInteger(item.count)})
             </span>
@@ -849,7 +849,7 @@ function UpstreamErrorDiagnosticSummary({ diagnostic }: { diagnostic: UpstreamEr
     <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
             {t("adminErrorLogs.upstreamDiagnostic")}
           </p>
           {diagnostic.message ? (
@@ -875,7 +875,7 @@ function UpstreamDiagnosticPills({ diagnostic }: { diagnostic: UpstreamErrorDiag
       {parts.map((part) => (
         <span
           key={part}
-          className="rounded bg-srapi-card px-2 py-1 font-mono text-2xs text-srapi-text-secondary"
+          className="rounded-full bg-srapi-card px-2 py-0.5 text-[11px] font-medium text-srapi-text-secondary"
         >
           {part}
         </span>
@@ -902,7 +902,7 @@ function Field({
         <p
           className={
             "min-w-0 break-all text-srapi-text-primary" +
-            (mono ? " font-mono text-2xs tabular" : " text-sm")
+            (mono ? " font-mono text-[11px] tabular" : " text-sm")
           }
         >
           {value}

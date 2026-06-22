@@ -34,12 +34,12 @@ export function CopilotPet() {
       {!open ? (
         <DialogPrimitive.Trigger asChild>
           <button type="button" aria-label={t("copilot.petOpen")} className="group fixed bottom-6 right-6 z-[55] outline-none">
-            <span className="absolute right-full top-1/2 mr-2 -translate-y-1/2 whitespace-nowrap rounded-md bg-srapi-invert px-2 py-1 text-2xs text-srapi-invert-fg opacity-0 shadow-sm transition-opacity group-hover:opacity-100">
+            <span className="absolute right-full top-1/2 mr-2 -translate-y-1/2 whitespace-nowrap rounded-full bg-srapi-invert px-2.5 py-1 text-[11px] font-medium text-srapi-invert-fg opacity-0 shadow-sm transition-opacity group-hover:opacity-100">
               {t("copilot.petName")}
             </span>
-            <span className="block transition-transform duration-200 ease-[cubic-bezier(0.34,1.4,0.5,1)] group-hover:-translate-y-1 group-hover:scale-105 group-active:scale-95">
-              <span className="srapi-pet-breathe block drop-shadow-[0_6px_16px_rgba(28,26,23,0.20)]">
-                <PetFace running={running} size={58} />
+            <span className="grid size-16 place-items-center rounded-full border border-srapi-border bg-srapi-card shadow-[0_10px_30px_-12px_rgba(28,26,23,0.28)] transition-transform duration-200 ease-[cubic-bezier(0.34,1.4,0.5,1)] group-hover:-translate-y-1 group-hover:scale-105 group-active:scale-95">
+              <span className="srapi-pet-breathe block">
+                <PetFace running={running} size={48} />
               </span>
             </span>
           </button>
@@ -48,27 +48,31 @@ export function CopilotPet() {
 
       <DialogPrimitive.Portal>
         <DialogPrimitive.Content
-          className="srapi-anim-pet-panel tactile-card fixed bottom-6 right-6 z-50 flex h-[min(760px,84vh)] w-[min(920px,92vw)] flex-col overflow-hidden rounded-2xl border border-srapi-border bg-srapi-card outline-none"
+          className="srapi-anim-pet-panel card-raised fixed bottom-6 right-6 z-50 flex h-[min(760px,84vh)] w-[min(920px,92vw)] flex-col overflow-hidden rounded-2xl border border-srapi-border bg-srapi-card outline-none"
           onInteractOutside={(e) => e.preventDefault()}
         >
           <DialogPrimitive.Title className="sr-only">
             {t("copilot.petName")} · {t("copilot.title")}
           </DialogPrimitive.Title>
-          <header className="flex shrink-0 items-center justify-between border-b border-srapi-border px-3 py-2">
-            <div className="flex items-center gap-2">
-              <PetFace size={26} />
+          <header className="flex shrink-0 items-center justify-between border-b border-srapi-border px-4 py-3">
+            <div className="flex items-center gap-2.5">
+              <span className="grid size-9 place-items-center rounded-xl bg-srapi-accent-soft">
+                <PetFace size={24} />
+              </span>
               <div className="leading-tight">
-                <div className="text-sm font-medium text-srapi-text-primary">{t("copilot.petName")}</div>
-                <div className="text-2xs text-srapi-text-tertiary">{t("copilot.title")}</div>
+                <div className="text-sm font-semibold tracking-tight text-srapi-text-primary">
+                  {t("copilot.petName")}
+                </div>
+                <div className="text-[11px] text-srapi-text-tertiary">{t("copilot.title")}</div>
               </div>
             </div>
-            <div className="flex items-center gap-0.5">
+            <div className="flex items-center gap-1">
               <Link
                 href={ADMIN_ROUTES.copilot}
                 onClick={() => setOpen(false)}
                 aria-label={t("copilot.petOpenFull")}
                 title={t("copilot.petOpenFull")}
-                className="rounded-md p-1.5 text-srapi-text-tertiary transition-colors hover:bg-srapi-card-muted hover:text-srapi-text-primary"
+                className="rounded-lg p-2 text-srapi-text-tertiary transition-colors hover:bg-srapi-card-muted hover:text-srapi-text-primary"
               >
                 <ExternalLink className="size-4" />
               </Link>
@@ -76,13 +80,13 @@ export function CopilotPet() {
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label={t("copilot.petClose")}
-                className="rounded-md p-1.5 text-srapi-text-tertiary transition-colors hover:bg-srapi-card-muted hover:text-srapi-text-primary"
+                className="rounded-lg p-2 text-srapi-text-tertiary transition-colors hover:bg-srapi-card-muted hover:text-srapi-text-primary"
               >
                 <X className="size-4" />
               </button>
             </div>
           </header>
-          <div className="min-h-0 flex-1 px-3 pb-2">
+          <div className="min-h-0 flex-1 px-4 pb-3">
             <CopilotChat models={cfg.models ?? []} defaultModel={cfg.model ?? ""} />
           </div>
         </DialogPrimitive.Content>

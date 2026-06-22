@@ -86,7 +86,7 @@ function DiagnosticsContent() {
         title={t("diagnostics.title")}
         actions={
           <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1.5 font-mono text-2xs text-srapi-text-tertiary">
+            <span className="flex items-center gap-1.5 text-[11px] text-srapi-text-tertiary">
               {streamConnected ? (
                 <><Wifi className="size-3 text-srapi-success" /> {t("common.live")}</>
               ) : (
@@ -162,14 +162,14 @@ function DiagnosticsContent() {
                           />
                           <QuietBadge status={summary.tone} label={t(summary.labelKey)} />
                         </div>
-                        <div className="mt-1 font-mono text-2xs text-srapi-text-tertiary">
+                        <div className="mt-1 text-[11px] text-srapi-text-tertiary">
                           {summary.detail}
                         </div>
                       </div>
                       <div className="flex items-center gap-4">
                         <span
                           className={
-                            "font-mono text-2xs tabular " +
+                            "text-[12px] font-medium tabular " +
                             (entry.success_rate >= 0.95
                               ? "text-srapi-success"
                               : entry.success_rate >= 0.8
@@ -254,14 +254,14 @@ function DiagnosticsContent() {
                           <span className="font-mono text-sm text-srapi-text-primary">{cache.name}</span>
                           <QuietBadge status={summary.tone} label={t(summary.labelKey)} />
                         </div>
-                        <div className="flex gap-4 font-mono text-2xs text-srapi-text-tertiary">
+                        <div className="flex gap-4 text-[11px] text-srapi-text-tertiary">
                           <span>size: {cache.size}</span>
                           <span className="text-srapi-success">hits: {cache.hits}</span>
                           <span className="text-srapi-error">misses: {cache.misses}</span>
                           <span>evictions: {cache.evictions}</span>
                         </div>
                       </div>
-                      <div className="font-mono text-2xs text-srapi-text-tertiary">
+                      <div className="text-[11px] text-srapi-text-tertiary">
                         {summary.detail}
                       </div>
                       <div className="flex items-center gap-2">
@@ -271,7 +271,7 @@ function DiagnosticsContent() {
                             style={{ width: `${Math.max(rateNum, 1)}%` }}
                           />
                         </div>
-                        <span className="font-mono text-2xs text-srapi-text-secondary tabular">{cache.hit_rate}</span>
+                        <span className="text-[12px] tabular text-srapi-text-secondary">{cache.hit_rate}</span>
                       </div>
                     </div>
                   );

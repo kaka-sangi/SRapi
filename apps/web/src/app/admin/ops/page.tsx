@@ -70,6 +70,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { SloCardSkeleton } from "@/components/charts/chart-skeleton";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DataPill } from "@/components/ui/data-pill";
+import { IconBubble } from "@/components/ui/icon-bubble";
 import { quietStatusFor } from "@/lib/status-badge";
 import { formatDateTime, formatInteger, formatPercent } from "@/lib/admin-format";
 import { MonitorContent } from "@/components/admin/ops-channel-monitor";
@@ -266,23 +268,19 @@ function OpsOverviewContent() {
       {throughputValues.length > 0 || errorValues.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
-            <CardContent>
-              <span className="text-2xs text-srapi-text-tertiary font-mono uppercase">
+            <CardContent className="space-y-3">
+              <span className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                 {t("adminOps.throughput")}
               </span>
-              <div className="mt-3">
-                <Sparkline values={throughputValues} ariaLabel={t("adminOps.throughput")} />
-              </div>
+              <Sparkline values={throughputValues} ariaLabel={t("adminOps.throughput")} />
             </CardContent>
           </Card>
           <Card>
-            <CardContent>
-              <span className="text-2xs text-srapi-text-tertiary font-mono uppercase">
+            <CardContent className="space-y-3">
+              <span className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                 {t("adminOps.errorRate")}
               </span>
-              <div className="mt-3">
-                <Sparkline values={errorValues} ariaLabel={t("adminOps.errorRate")} />
-              </div>
+              <Sparkline values={errorValues} ariaLabel={t("adminOps.errorRate")} />
             </CardContent>
           </Card>
         </div>
@@ -354,7 +352,7 @@ function OpsOverviewContent() {
                 return (
                   <Card key={def?.id ?? i}>
                     <CardHeader>
-                      <CardTitle className="text-srapi-text-primary font-sans text-base not-italic">
+                      <CardTitle>
                         {def?.name ?? t("adminOps.slo")}
                       </CardTitle>
                       <div className="flex items-center gap-2">
@@ -386,15 +384,15 @@ function OpsOverviewContent() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="flex items-baseline justify-between">
-                        <span className="text-srapi-text-secondary text-xs">
+                        <span className="text-xs text-srapi-text-secondary">
                           {t("adminOps.availability")}
                         </span>
-                        <span className="text-srapi-text-primary tabular font-serif text-2xl">
+                        <span className="text-2xl font-semibold tracking-tight tabular text-srapi-text-primary">
                           {availability.toFixed(2)}%
                         </span>
                       </div>
                       <QuotaNotchRail value={availability} />
-                      <div className="text-2xs text-srapi-text-tertiary flex items-center justify-between font-mono">
+                      <div className="flex items-center justify-between text-[11px] text-srapi-text-tertiary">
                         <span>
                           {t("adminOps.objective")} {objectivePct.toFixed(1)}%
                         </span>
@@ -414,41 +412,52 @@ function OpsOverviewContent() {
       {activeAlerts.length > 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-srapi-text-primary font-sans text-base not-italic">
-              {t("adminOps.alerts")}
-            </CardTitle>
+            <CardTitle>{t("adminOps.alerts")}</CardTitle>
+            <DataPill tone="error">{activeAlerts.length}</DataPill>
           </CardHeader>
-          <CardContent className="space-y-2">
-            {activeAlerts.map((alert) => {
-              const evidenceLinks = buildOpsAlertEvidenceLinks(alert.details);
-              const runbookSteps = buildOpsAlertRunbookSteps(alert.details);
-              return (
-                <div
-                  key={alert.id}
-                  className="border-srapi-border grid gap-3 border-t py-3 first:border-t-0 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.75fr)_auto]"
-                >
-                  <div className="min-w-0">
-                    <div className="text-srapi-text-primary truncate text-sm">{alert.summary}</div>
-                    <div className="text-2xs text-srapi-text-tertiary tabular font-mono">
-                      {formatDateTime(alert.started_at ?? alert.created_at)}
+          <CardContent>
+            <div className="grid gap-3 md:grid-cols-2">
+              {activeAlerts.map((alert) => {
+                const evidenceLinks = buildOpsAlertEvidenceLinks(alert.details);
+                const runbookSteps = buildOpsAlertRunbookSteps(alert.details);
+                const sev = alert.severity;
+                const tone =
+                  sev === "critical" ? "error" : sev === "warning" ? "warning" : "neutral";
+                return (
+                  <div
+                    key={alert.id}
+                    className="flex flex-col gap-3 rounded-2xl border border-srapi-border bg-srapi-card-muted/40 p-4"
+                  >
+                    <div className="flex items-start gap-3">
+                      <IconBubble tone={tone} size="md">
+                        <BellRing aria-hidden />
+                      </IconBubble>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-semibold tracking-tight text-srapi-text-primary">
+                          {alert.summary}
+                        </div>
+                        <div className="text-[12px] tabular text-srapi-text-tertiary">
+                          {formatDateTime(alert.started_at ?? alert.created_at)}
+                        </div>
+                      </div>
+                      <QuietBadge status={quietStatusFor(alert.severity)} label={alert.severity} />
+                    </div>
+                    <OpsAlertRunbookSteps steps={runbookSteps} compact />
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <AlertEvidenceActions links={evidenceLinks} />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        loading={ackMut.isPending && ackMut.variables === alert.id}
+                        onClick={() => ackAlert(alert.id)}
+                      >
+                        {t("adminOps.acknowledge")}
+                      </Button>
                     </div>
                   </div>
-                  <OpsAlertRunbookSteps steps={runbookSteps} compact />
-                  <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                    <QuietBadge status={quietStatusFor(alert.severity)} label={alert.severity} />
-                    <AlertEvidenceActions links={evidenceLinks} />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      loading={ackMut.isPending && ackMut.variables === alert.id}
-                      onClick={() => ackAlert(alert.id)}
-                    >
-                      {t("adminOps.acknowledge")}
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </CardContent>
         </Card>
       ) : null}
@@ -456,10 +465,8 @@ function OpsOverviewContent() {
       <Card>
         <CardHeader className="flex-row items-center justify-between">
           <div>
-            <CardTitle className="text-srapi-text-primary font-sans text-base not-italic">
-              {t("adminOps.alertRules.title")}
-            </CardTitle>
-            <p className="text-2xs text-srapi-text-tertiary mt-1">
+            <CardTitle>{t("adminOps.alertRules.title")}</CardTitle>
+            <p className="mt-1 text-xs text-srapi-text-secondary">
               {t("adminOps.alertRules.subtitle")}
             </p>
           </div>
@@ -467,7 +474,7 @@ function OpsOverviewContent() {
             ＋ {t("adminOps.alertRules.create")}
           </Button>
         </CardHeader>
-        <CardContent className="space-y-2">
+        <CardContent className="space-y-3">
           <AlertRuleBaselinePostureSummary posture={alertRules.data?.baseline_posture} />
           {(alertRules.data?.data ?? []).length === 0 ? (
             <EmptyState
@@ -476,56 +483,58 @@ function OpsOverviewContent() {
               description={t("adminOps.alertRules.emptyBody")}
             />
           ) : (
-            (alertRules.data?.data ?? []).map((rule) => (
-              <div
-                key={rule.id}
-                className="border-srapi-border flex items-center justify-between gap-4 border-t py-2.5 first:border-t-0"
-              >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-srapi-text-primary truncate text-sm">{rule.name}</span>
-                    <QuietBadge status={quietStatusFor(rule.severity)} label={rule.severity} />
-                    {rule.builtin_baseline ? (
-                      <QuietBadge status="active" label={t("adminOps.alertRules.builtinBaseline")} />
-                    ) : null}
+            <div className="divide-y divide-srapi-border/70">
+              {(alertRules.data?.data ?? []).map((rule) => (
+                <div
+                  key={rule.id}
+                  className="flex items-center justify-between gap-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-sm font-medium text-srapi-text-primary">{rule.name}</span>
+                      <QuietBadge status={quietStatusFor(rule.severity)} label={rule.severity} />
+                      {rule.builtin_baseline ? (
+                        <QuietBadge status="active" label={t("adminOps.alertRules.builtinBaseline")} />
+                      ) : null}
+                    </div>
+                    <div className="mt-1 text-[12px] tabular text-srapi-text-tertiary">
+                      {t(`adminOps.alertRules.metricType.${rule.metric_type}`)}{" "}
+                      {t(`adminOps.alertRules.operators.${rule.operator}`)} {rule.threshold}
+                      {" · "}
+                      {alertRuleScopeLabel(rule, t("adminOps.alertRules.globalScope"))}
+                      {rule.builtin_baseline && rule.baseline_key ? (
+                        <>
+                          {" · "}
+                          {rule.baseline_key}
+                        </>
+                      ) : null}
+                    </div>
                   </div>
-                  <div className="text-2xs text-srapi-text-tertiary tabular font-mono">
-                    {t(`adminOps.alertRules.metricType.${rule.metric_type}`)}{" "}
-                    {t(`adminOps.alertRules.operators.${rule.operator}`)} {rule.threshold}
-                    {" · "}
-                    {alertRuleScopeLabel(rule, t("adminOps.alertRules.globalScope"))}
-                    {rule.builtin_baseline && rule.baseline_key ? (
-                      <>
-                        {" · "}
-                        {rule.baseline_key}
-                      </>
-                    ) : null}
+                  <div className="flex shrink-0 items-center gap-3">
+                    <QuietBadge
+                      status={rule.enabled ? "active" : "disabled"}
+                      label={rule.enabled ? t("adminOps.alertRules.enabled") : t("common.disabled")}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setRuleTarget(rule)}
+                      aria-label={t("adminOps.alertRules.edit")}
+                      className="text-srapi-text-tertiary hover:text-srapi-text-primary transition-colors"
+                    >
+                      <Pencil className="size-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRuleToDelete(rule)}
+                      aria-label={t("common.delete")}
+                      className="text-srapi-text-tertiary hover:text-srapi-error transition-colors"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
                   </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-3">
-                  <QuietBadge
-                    status={rule.enabled ? "active" : "disabled"}
-                    label={rule.enabled ? t("adminOps.alertRules.enabled") : t("common.disabled")}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setRuleTarget(rule)}
-                    aria-label={t("adminOps.alertRules.edit")}
-                    className="text-srapi-text-tertiary hover:text-srapi-text-primary transition-colors"
-                  >
-                    <Pencil className="size-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRuleToDelete(rule)}
-                    aria-label={t("common.delete")}
-                    className="text-srapi-text-tertiary hover:text-srapi-error transition-colors"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>
@@ -534,10 +543,8 @@ function OpsOverviewContent() {
         <Card>
           <CardHeader className="flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-srapi-text-primary font-sans text-base not-italic">
-                {t("adminOps.notificationChannels.title")}
-              </CardTitle>
-              <p className="text-2xs text-srapi-text-tertiary mt-1">
+              <CardTitle>{t("adminOps.notificationChannels.title")}</CardTitle>
+              <p className="mt-1 text-xs text-srapi-text-secondary">
                 {t("adminOps.notificationChannels.subtitle")}
               </p>
             </div>
@@ -545,7 +552,7 @@ function OpsOverviewContent() {
               ＋ {t("adminOps.notificationChannels.create")}
             </Button>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-3">
             {(notificationChannels.data?.data ?? []).length === 0 ? (
               <EmptyState
                 icon={Mail}
@@ -553,72 +560,72 @@ function OpsOverviewContent() {
                 description={t("adminOps.notificationChannels.emptyBody")}
               />
             ) : (
-              (notificationChannels.data?.data ?? []).map((channel) => (
-                <div
-                  key={channel.id}
-                  className="border-srapi-border flex items-center justify-between gap-4 border-t py-2.5 first:border-t-0"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-srapi-text-primary truncate text-sm">
-                        {channel.name}
+              <div className="divide-y divide-srapi-border/70">
+                {(notificationChannels.data?.data ?? []).map((channel) => (
+                  <div
+                    key={channel.id}
+                    className="flex items-center justify-between gap-4 py-3"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate text-sm font-medium text-srapi-text-primary">
+                          {channel.name}
+                        </span>
+                        <QuietBadge
+                          status={channel.status === "active" ? "active" : "disabled"}
+                          label={
+                            channel.status === "active"
+                              ? t("adminOps.notificationChannels.active")
+                              : t("common.disabled")
+                          }
+                        />
+                        <QuietBadge
+                          status={quietStatusFor(channel.min_severity)}
+                          label={channel.min_severity}
+                        />
+                      </div>
+                      <div className="mt-1 truncate text-[12px] text-srapi-text-tertiary">
+                        {channel.email_recipients.join(", ")}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <span className="text-[11px] text-srapi-text-tertiary">
+                        {channel.send_resolved
+                          ? t("adminOps.notificationChannels.sendsResolved")
+                          : t("adminOps.notificationChannels.firingOnly")}
                       </span>
-                      <QuietBadge
-                        status={channel.status === "active" ? "active" : "disabled"}
-                        label={
-                          channel.status === "active"
-                            ? t("adminOps.notificationChannels.active")
-                            : t("common.disabled")
-                        }
-                      />
-                      <QuietBadge
-                        status={quietStatusFor(channel.min_severity)}
-                        label={channel.min_severity}
-                      />
-                    </div>
-                    <div className="text-2xs text-srapi-text-tertiary truncate font-mono">
-                      {channel.email_recipients.join(", ")}
+                      <button
+                        type="button"
+                        onClick={() => setNotificationChannelTarget(channel)}
+                        aria-label={t("adminOps.notificationChannels.edit")}
+                        className="text-srapi-text-tertiary hover:text-srapi-text-primary transition-colors"
+                      >
+                        <Pencil className="size-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNotificationChannelToDelete(channel)}
+                        aria-label={t("common.delete")}
+                        className="text-srapi-text-tertiary hover:text-srapi-error transition-colors"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
                     </div>
                   </div>
-                  <div className="flex shrink-0 items-center gap-3">
-                    <span className="text-2xs text-srapi-text-tertiary font-mono">
-                      {channel.send_resolved
-                        ? t("adminOps.notificationChannels.sendsResolved")
-                        : t("adminOps.notificationChannels.firingOnly")}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setNotificationChannelTarget(channel)}
-                      aria-label={t("adminOps.notificationChannels.edit")}
-                      className="text-srapi-text-tertiary hover:text-srapi-text-primary transition-colors"
-                    >
-                      <Pencil className="size-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setNotificationChannelToDelete(channel)}
-                      aria-label={t("common.delete")}
-                      className="text-srapi-text-tertiary hover:text-srapi-error transition-colors"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-srapi-text-primary font-sans text-base not-italic">
-              {t("adminOps.notificationDeliveries.title")}
-            </CardTitle>
-            <p className="text-2xs text-srapi-text-tertiary mt-1">
+            <CardTitle>{t("adminOps.notificationDeliveries.title")}</CardTitle>
+            <p className="mt-1 text-xs text-srapi-text-secondary">
               {t("adminOps.notificationDeliveries.subtitle")}
             </p>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-3">
             {(notificationDeliveries.data?.data ?? []).length === 0 ? (
               <EmptyState
                 icon={BellRing}
@@ -626,41 +633,43 @@ function OpsOverviewContent() {
                 description={t("adminOps.notificationDeliveries.emptyBody")}
               />
             ) : (
-              (notificationDeliveries.data?.data ?? []).map((delivery) => (
-                <div
-                  key={delivery.id}
-                  className="border-srapi-border border-t py-2.5 first:border-t-0"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-srapi-text-primary min-w-0 truncate text-sm">
-                      {delivery.alert_summary ?? delivery.target}
-                    </span>
-                    <QuietBadge
-                      status={
-                        delivery.status === "delivered"
-                          ? "active"
-                          : delivery.status === "failed"
-                            ? "error"
-                            : "limited"
-                      }
-                      label={t(`adminOps.notificationDeliveries.status.${delivery.status}`)}
-                    />
-                  </div>
-                  <div className="text-2xs text-srapi-text-tertiary mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono">
-                    <span>{delivery.target}</span>
-                    <span>{delivery.channel_name ?? delivery.channel_id}</span>
-                    <span>
-                      {t("adminOps.notificationDeliveries.attempts")} {delivery.attempt_count}
-                    </span>
-                    <span>{formatDateTime(delivery.updated_at)}</span>
-                  </div>
-                  {delivery.last_error ? (
-                    <div className="text-2xs text-srapi-error mt-1 truncate">
-                      {delivery.last_error}
+              <div className="divide-y divide-srapi-border/70">
+                {(notificationDeliveries.data?.data ?? []).map((delivery) => (
+                  <div
+                    key={delivery.id}
+                    className="py-3"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="min-w-0 truncate text-sm text-srapi-text-primary">
+                        {delivery.alert_summary ?? delivery.target}
+                      </span>
+                      <QuietBadge
+                        status={
+                          delivery.status === "delivered"
+                            ? "active"
+                            : delivery.status === "failed"
+                              ? "error"
+                              : "limited"
+                        }
+                        label={t(`adminOps.notificationDeliveries.status.${delivery.status}`)}
+                      />
                     </div>
-                  ) : null}
-                </div>
-              ))
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-srapi-text-tertiary">
+                      <span>{delivery.target}</span>
+                      <span>{delivery.channel_name ?? delivery.channel_id}</span>
+                      <span>
+                        {t("adminOps.notificationDeliveries.attempts")} {delivery.attempt_count}
+                      </span>
+                      <span className="tabular">{formatDateTime(delivery.updated_at)}</span>
+                    </div>
+                    {delivery.last_error ? (
+                      <div className="mt-1 truncate text-[11px] text-srapi-error">
+                        {delivery.last_error}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>
@@ -669,10 +678,8 @@ function OpsOverviewContent() {
       <Card>
         <CardHeader className="flex-row items-center justify-between">
           <div>
-            <CardTitle className="text-srapi-text-primary font-sans text-base not-italic">
-              {t("adminOps.silences.title")}
-            </CardTitle>
-            <p className="text-2xs text-srapi-text-tertiary mt-1">
+            <CardTitle>{t("adminOps.silences.title")}</CardTitle>
+            <p className="mt-1 text-xs text-srapi-text-secondary">
               {t("adminOps.silences.subtitle")}
             </p>
           </div>
@@ -680,7 +687,7 @@ function OpsOverviewContent() {
             ＋ {t("adminOps.silences.create")}
           </Button>
         </CardHeader>
-        <CardContent className="space-y-2">
+        <CardContent className="space-y-3">
           {(alertSilences.data?.data ?? []).length === 0 ? (
             <EmptyState
               icon={BellOff}
@@ -688,36 +695,38 @@ function OpsOverviewContent() {
               description={t("adminOps.silences.emptyBody")}
             />
           ) : (
-            (alertSilences.data?.data ?? []).map((silence) => {
-              const matcherText = alertSilenceMatcherLabel(
-                silence,
-                t("adminOps.silences.anyMatcher"),
-              );
-              return (
-                <div
-                  key={silence.id}
-                  className="border-srapi-border flex items-center justify-between gap-4 border-t py-2.5 first:border-t-0"
-                >
-                  <div className="min-w-0">
-                    <div className="text-srapi-text-primary truncate text-sm">
-                      {silence.comment || matcherText}
-                    </div>
-                    <div className="text-2xs text-srapi-text-tertiary tabular font-mono">
-                      {silence.comment ? `${matcherText} · ` : ""}
-                      {formatDateTime(silence.starts_at)} → {formatDateTime(silence.ends_at)}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setSilenceToDelete(silence)}
-                    aria-label={t("common.delete")}
-                    className="text-srapi-text-tertiary hover:text-srapi-error shrink-0 transition-colors"
+            <div className="divide-y divide-srapi-border/70">
+              {(alertSilences.data?.data ?? []).map((silence) => {
+                const matcherText = alertSilenceMatcherLabel(
+                  silence,
+                  t("adminOps.silences.anyMatcher"),
+                );
+                return (
+                  <div
+                    key={silence.id}
+                    className="flex items-center justify-between gap-4 py-3"
                   >
-                    <Trash2 className="size-3.5" />
-                  </button>
-                </div>
-              );
-            })
+                    <div className="min-w-0">
+                      <div className="truncate text-sm text-srapi-text-primary">
+                        {silence.comment || matcherText}
+                      </div>
+                      <div className="mt-1 text-[12px] tabular text-srapi-text-tertiary">
+                        {silence.comment ? `${matcherText} · ` : ""}
+                        {formatDateTime(silence.starts_at)} → {formatDateTime(silence.ends_at)}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSilenceToDelete(silence)}
+                      aria-label={t("common.delete")}
+                      className="shrink-0 text-srapi-text-tertiary transition-colors hover:text-srapi-error"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </CardContent>
       </Card>
@@ -851,10 +860,10 @@ function RealtimeTrafficPanel({
       <CardContent>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <span className="text-2xs text-srapi-text-tertiary font-mono uppercase">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
               {t("adminOps.realtimeTraffic")}
             </span>
-            <div className="text-2xs text-srapi-text-tertiary mt-1">
+            <div className="mt-1 text-[12px] text-srapi-text-secondary">
               {traffic
                 ? t("adminOps.realtimeTrafficWindow", {
                     start: formatDateTime(traffic.window.start),
@@ -933,10 +942,10 @@ function RealtimeMetric({
 
 function CompactMetric({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
-    <div className="rounded border border-srapi-border/80 bg-srapi-card-muted/50 px-3 py-2">
-      <div className="text-2xs text-srapi-text-tertiary font-mono uppercase">{label}</div>
-      <div className="text-srapi-text-primary mt-1 font-mono text-lg tabular-nums">{value}</div>
-      <div className="text-2xs text-srapi-text-tertiary mt-1 truncate">{hint}</div>
+    <div className="rounded-xl border border-srapi-border/80 bg-srapi-card-muted/50 px-3 py-2.5">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{label}</div>
+      <div className="mt-1 text-lg font-semibold tracking-tight tabular text-srapi-text-primary">{value}</div>
+      <div className="mt-1 truncate text-[11px] text-srapi-text-tertiary">{hint}</div>
     </div>
   );
 }
@@ -957,13 +966,13 @@ function AlertRuleBaselinePostureSummary({
         : "active";
 
   return (
-    <div className="border-srapi-border bg-srapi-card-muted/50 space-y-2 rounded-md border p-3">
+    <div className="space-y-3 rounded-xl border border-srapi-border bg-srapi-card-muted/50 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-srapi-text-primary text-sm font-medium">
+          <div className="text-sm font-medium text-srapi-text-primary">
             {t("adminOps.alertRules.baselinePosture")}
           </div>
-          <div className="text-2xs text-srapi-text-tertiary">
+          <div className="text-[11px] text-srapi-text-tertiary">
             {t("adminOps.alertRules.baselinePostureSummary", {
               enabled: posture.enabled_count,
               total: posture.total_count,
@@ -983,17 +992,17 @@ function AlertRuleBaselinePostureSummary({
         />
       </div>
       {attention.length > 0 ? (
-        <div className="grid gap-1.5 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
           {attention.slice(0, 6).map((item) => (
-            <div key={item.baseline_key} className="min-w-0 rounded border border-srapi-border/80 px-2 py-1.5">
+            <div key={item.baseline_key} className="min-w-0 rounded-lg border border-srapi-border/80 px-2.5 py-2">
               <div className="flex items-center gap-2">
-                <span className="text-srapi-text-primary truncate text-2xs font-medium">
+                <span className="truncate text-[11px] font-medium text-srapi-text-primary">
                   {item.baseline_key}
                 </span>
                 <QuietBadge status={baselinePostureTone(item)} label={baselinePostureLabel(t, item)} />
               </div>
               {item.differences.length > 0 ? (
-                <div className="text-2xs text-srapi-text-tertiary mt-1 truncate font-mono">
+                <div className="mt-1 truncate text-[11px] text-srapi-text-tertiary">
                   {item.differences.join(", ")}
                 </div>
               ) : null}

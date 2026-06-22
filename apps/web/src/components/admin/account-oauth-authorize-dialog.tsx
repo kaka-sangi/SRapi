@@ -298,7 +298,7 @@ export function AccountOAuthAuthorizeDialog({
                 )}
               />
             </button>
-            <p className="mt-1 text-2xs text-srapi-text-tertiary">
+            <p className="mt-1 text-[11px] text-srapi-text-tertiary">
               {t("accountOAuth.advancedConfigHint")}
             </p>
             {advancedOpen ? (
@@ -325,7 +325,7 @@ export function AccountOAuthAuthorizeDialog({
                     disabled={busy || polling}
                     onChange={(e) => setClientSecret(e.target.value)}
                   />
-                  <p className="mt-1 text-2xs text-srapi-text-tertiary">
+                  <p className="mt-1 text-[11px] text-srapi-text-tertiary">
                     {t("accountOAuth.clientSecretHint")}
                   </p>
                 </div>
@@ -422,7 +422,7 @@ export function AccountOAuthAuthorizeDialog({
                     <div className="text-sm font-medium text-srapi-text-primary">
                       {t("accountOAuth.stepOpenTitle")}
                     </div>
-                    <p className="mt-1 text-2xs text-srapi-text-tertiary">
+                    <p className="mt-1 text-[11px] text-srapi-text-tertiary">
                       {t("accountOAuth.stepOpenHint")}
                     </p>
                     {authUrl ? (
@@ -446,11 +446,11 @@ export function AccountOAuthAuthorizeDialog({
                     <div className="text-sm font-medium text-srapi-text-primary">
                       {t("accountOAuth.stepCodeTitle")}
                     </div>
-                    <p className="mt-1 text-2xs text-srapi-text-tertiary">
+                    <p className="mt-1 text-[11px] text-srapi-text-tertiary">
                       {t("accountOAuth.pasteCodeHint")}
                     </p>
                     <div className="mt-2">
-                      <Label htmlFor="oauth-callback-code" className="text-2xs">
+                      <Label htmlFor="oauth-callback-code" className="text-[11px]">
                         {t("accountOAuth.callbackCode")}
                       </Label>
                       <Input
@@ -471,7 +471,7 @@ export function AccountOAuthAuthorizeDialog({
           {/* Device-code: show the user code + verification URI while polling. */}
           {!isAuthCode && device ? (
             <div className="space-y-2 rounded-lg border border-srapi-border bg-srapi-card-muted px-3.5 py-3">
-              <p className="text-2xs text-srapi-text-tertiary">{t("accountOAuth.deviceCodeHint")}</p>
+              <p className="text-[11px] text-srapi-text-tertiary">{t("accountOAuth.deviceCodeHint")}</p>
               <div className="flex items-center gap-2">
                 <span className="font-mono text-lg tracking-widest text-srapi-text-primary">
                   {device.user_code}
@@ -487,7 +487,7 @@ export function AccountOAuthAuthorizeDialog({
                 </a>
               </div>
               {polling ? (
-                <p className="inline-flex items-center gap-1.5 text-2xs text-srapi-text-secondary">
+                <p className="inline-flex items-center gap-1.5 text-[11px] text-srapi-text-secondary">
                   <Loader2 className="size-3.5 animate-spin" />
                   {t("accountOAuth.waitingForApproval")}
                 </p>

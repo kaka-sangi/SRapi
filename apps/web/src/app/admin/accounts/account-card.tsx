@@ -8,6 +8,7 @@ import { PageQueryState } from "@/components/layout/page-query-state";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DataPill } from "@/components/ui/data-pill";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Pagination } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -246,10 +247,10 @@ function AccountCard({
   return (
     <article
       className={cn(
-        "tactile-card border-srapi-border bg-srapi-card rounded-lg border transition-colors",
+        "rounded-2xl border border-srapi-border bg-srapi-card shadow-[0_1px_2px_rgba(26,24,20,0.04)] transition-colors",
         account.status === "disabled" && "opacity-55",
         selected && "border-srapi-primary/50 bg-srapi-card-muted",
-        onDetail && "hover:border-srapi-border-strong cursor-pointer",
+        onDetail && "cursor-pointer hover:border-srapi-border-strong",
       )}
       onClick={(e) => {
         if (!onDetail) return;
@@ -259,7 +260,7 @@ function AccountCard({
       }}
     >
       {/* Header */}
-      <div className="flex items-start gap-3 px-4 pt-4 pb-3">
+      <div className="flex items-start gap-3 px-5 pt-5 pb-3">
         {onSelect ? (
           <Checkbox
             aria-label="select row"
@@ -270,20 +271,22 @@ function AccountCard({
         ) : null}
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="text-srapi-text-primary truncate text-sm font-medium">{account.name}</h3>
+            <h3 className="truncate text-sm font-semibold tracking-tight text-srapi-text-primary">
+              {account.name}
+            </h3>
             <div className="shrink-0">{actions}</div>
           </div>
           <div className="mt-1.5 flex min-w-0 items-center gap-1.5">
-            <span className="text-srapi-text-secondary truncate text-xs">{providerName}</span>
-            <span className="text-srapi-border shrink-0">·</span>
-            <span className="text-2xs text-srapi-text-tertiary truncate">
+            <span className="truncate text-xs text-srapi-text-secondary">{providerName}</span>
+            <span className="shrink-0 text-srapi-border">·</span>
+            <span className="truncate text-[11px] text-srapi-text-tertiary">
               {runtimeClassLabel(t, account.runtime_class)}
             </span>
           </div>
           {hasIdentity ? (
-            <div className="text-2xs mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 font-mono">
+            <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]">
               <span
-                className="text-srapi-text-secondary max-w-[13rem] min-w-0 truncate"
+                className="min-w-0 max-w-[13rem] truncate text-srapi-text-secondary"
                 title={identity.primary}
               >
                 {identity.primary}
@@ -291,7 +294,7 @@ function AccountCard({
               {identity.secondary.slice(0, 2).map((item) => (
                 <span
                   key={item}
-                  className="text-srapi-text-tertiary max-w-[8rem] truncate"
+                  className="max-w-[8rem] truncate text-srapi-text-tertiary"
                   title={item}
                 >
                   {item}
@@ -299,110 +302,101 @@ function AccountCard({
               ))}
             </div>
           ) : null}
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            <span className="bg-srapi-card-muted text-srapi-text-tertiary rounded-md px-1.5 py-0.5 font-mono text-2xs">
-              {modelPolicy}
-            </span>
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            <DataPill tone="neutral">{modelPolicy}</DataPill>
             {endpointFacts.map((fact) => (
-              <span
+              <DataPill
                 key={fact.key}
-                className={cn(
-                  "rounded-md px-1.5 py-0.5 font-mono text-2xs",
-                  fact.tone === "enabled"
-                    ? "bg-srapi-success/10 text-srapi-success"
-                    : "bg-srapi-error/10 text-srapi-error",
-                )}
-                title={`${fact.label}: ${fact.value}`}
+                tone={fact.tone === "enabled" ? "success" : "error"}
+                className="whitespace-nowrap"
               >
-                {fact.label}: {fact.value}
-              </span>
+                <span title={`${fact.label}: ${fact.value}`}>
+                  {fact.label}: {fact.value}
+                </span>
+              </DataPill>
             ))}
-            <span className="bg-srapi-card-muted text-srapi-text-tertiary rounded-md px-1.5 py-0.5 font-mono text-2xs">
-              {proxyLabel}
-            </span>
-            <span className="bg-srapi-card-muted text-srapi-text-tertiary rounded-md px-1.5 py-0.5 font-mono text-2xs">
-              {routeLabel}
-            </span>
+            <DataPill tone="neutral">{proxyLabel}</DataPill>
+            <DataPill tone="neutral">{routeLabel}</DataPill>
             {visibleGroups.length > 0 ? (
               visibleGroups.map((name) => (
-                <span
+                <DataPill
                   key={name}
-                  className="bg-srapi-card-muted text-srapi-text-tertiary max-w-[7rem] truncate rounded-md px-1.5 py-0.5 font-mono text-2xs"
-                  title={name}
+                  tone="neutral"
+                  className="max-w-[7rem] truncate"
                 >
-                  {name}
-                </span>
+                  <span title={name}>{name}</span>
+                </DataPill>
               ))
             ) : (
-              <span className="bg-srapi-card-muted text-srapi-text-tertiary rounded-md px-1.5 py-0.5 font-mono text-2xs">
-                {t("adminAccounts.ungrouped")}
-              </span>
+              <DataPill tone="neutral">{t("adminAccounts.ungrouped")}</DataPill>
             )}
             {extraGroupCount > 0 ? (
-              <span className="bg-srapi-card-muted text-srapi-text-tertiary rounded-md px-1.5 py-0.5 font-mono text-2xs">
-                +{extraGroupCount}
-              </span>
+              <DataPill tone="neutral">+{extraGroupCount}</DataPill>
             ) : null}
             {[...capacityFacts, ...profileFacts].slice(0, 4).map((fact) => (
-              <span
+              <DataPill
                 key={fact.key}
-                className="bg-srapi-card-muted text-srapi-text-tertiary max-w-[10rem] truncate rounded-md px-1.5 py-0.5 font-mono text-2xs"
-                title={`${fact.label}: ${fact.value}`}
+                tone="neutral"
+                className="max-w-[10rem] truncate"
               >
-                {fact.label}: {fact.value}
-              </span>
+                <span title={`${fact.label}: ${fact.value}`}>
+                  {fact.label}: {fact.value}
+                </span>
+              </DataPill>
             ))}
           </div>
         </div>
       </div>
 
       {/* Status row */}
-      <div className="border-srapi-border/50 flex min-w-0 flex-wrap items-center gap-2 border-t px-4 py-2.5">
+      <div className="flex min-w-0 flex-wrap items-center gap-2 border-t border-srapi-border/60 px-5 py-3">
         {status}
         <AccountHealthCell health={health} investigationHref={investigationHref} />
         <AccountQuotaCell health={health} />
         {account.risk_level ? (
-          <span className="text-2xs text-srapi-text-tertiary font-mono">{account.risk_level}</span>
+          <DataPill tone="neutral" size="sm">{account.risk_level}</DataPill>
         ) : null}
         <TokenExpiryInline account={account} />
       </div>
 
       {/* Metrics */}
-      <div className="border-srapi-border/50 bg-srapi-border/30 grid gap-px border-t sm:grid-cols-3">
-        <div className="bg-srapi-card px-4 py-2.5">
-          <div className="text-srapi-text-tertiary mb-1 font-mono text-2xs tracking-wide uppercase">
+      <div className="grid gap-px border-t border-srapi-border/60 bg-srapi-border/30 sm:grid-cols-3">
+        <div className="bg-srapi-card px-5 py-3">
+          <div className="mb-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
             {t("adminAccounts.healthTitle")}
           </div>
           <AccountHealthCell health={health} investigationHref={investigationHref} />
         </div>
-        <div className="bg-srapi-card px-4 py-2.5">
-          <div className="text-srapi-text-tertiary mb-1 font-mono text-2xs tracking-wide uppercase">
+        <div className="bg-srapi-card px-5 py-3">
+          <div className="mb-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
             {t("adminAccounts.quotaTitle")}
           </div>
           <AccountQuotaCell health={health} />
         </div>
-        <div className="bg-srapi-card px-4 py-2.5">
-          <div className="text-srapi-text-tertiary mb-1 font-mono text-2xs tracking-wide uppercase">
+        <div className="bg-srapi-card px-5 py-3">
+          <div className="mb-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
             {t("adminAccounts.today")}
           </div>
           {hasTodayUsage && today ? (
-            <div className="text-2xs tabular flex min-w-0 flex-col gap-0.5 font-mono">
-              <span className="text-srapi-text-primary truncate">
+            <div className="flex min-w-0 flex-col gap-0.5 text-xs tabular">
+              <span className="truncate text-base font-semibold tracking-tight text-srapi-text-primary">
                 {formatCompactNumber(today.requests)}{" "}
-                {t("adminAccounts.usageRequests").toLowerCase()}
+                <span className="text-xs font-normal text-srapi-text-tertiary">
+                  {t("adminAccounts.usageRequests").toLowerCase()}
+                </span>
               </span>
-              <span className="text-srapi-text-secondary truncate">
+              <span className="truncate text-srapi-text-secondary">
                 {formatCompactNumber(
                   today.total_tokens || today.input_tokens + today.output_tokens,
                 )}{" "}
                 {t("adminAccounts.usageTokens").toLowerCase()}
               </span>
-              <span className="text-srapi-text-tertiary truncate">
+              <span className="truncate text-srapi-text-tertiary">
                 {formatMoney(today.cost, today.currency)} · {formatPercent(today.success_rate)}
               </span>
             </div>
           ) : (
-            <span className="text-2xs text-srapi-text-tertiary font-mono">
+            <span className="text-xs text-srapi-text-tertiary">
               {t("adminAccounts.todayIdle")}
             </span>
           )}
@@ -431,14 +425,14 @@ function AccountBulkBar({
 }) {
   const { t } = useLanguage();
   return (
-    <div className="anim-rise-sm border-srapi-border bg-srapi-card-muted flex flex-wrap items-center gap-3 border-b px-4 py-2.5">
-      <span className="text-2xs text-srapi-text-secondary font-mono">
+    <div className="anim-rise-sm flex flex-wrap items-center gap-3 border-b border-srapi-border bg-srapi-card-muted px-4 py-2.5">
+      <span className="text-xs font-medium text-srapi-text-secondary">
         {t("adminCommon.selectedCount", { count })}
       </span>
       <button
         type="button"
         onClick={onClear}
-        className="text-2xs text-srapi-text-tertiary hover:text-srapi-text-primary underline-offset-2 hover:underline"
+        className="text-xs text-srapi-text-tertiary underline-offset-2 hover:text-srapi-text-primary hover:underline"
       >
         {t("adminCommon.clearSelection")}
       </button>
@@ -452,24 +446,24 @@ function AccountCardSkeleton() {
     <div className="min-h-[55vh] p-3">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="border-srapi-border bg-srapi-card rounded-lg border">
-            <div className="px-4 pt-4 pb-3">
+          <div key={i} className="rounded-2xl border border-srapi-border bg-srapi-card">
+            <div className="px-5 pt-5 pb-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="space-y-2">
                   <Skeleton className="h-4 w-36" />
                   <Skeleton className="h-3 w-28" />
                 </div>
-                <Skeleton className="size-7 rounded-md" />
+                <Skeleton className="size-7 rounded-lg" />
               </div>
             </div>
-            <div className="border-srapi-border/50 border-t px-4 py-2.5">
+            <div className="border-t border-srapi-border/60 px-5 py-3">
               <Skeleton className="h-5 w-20" />
             </div>
-            <div className="border-srapi-border/50 grid grid-cols-2 gap-px border-t">
-              <div className="px-4 py-2.5">
+            <div className="grid grid-cols-2 gap-px border-t border-srapi-border/60">
+              <div className="px-5 py-3">
                 <Skeleton className="h-6 w-full" />
               </div>
-              <div className="px-4 py-2.5">
+              <div className="px-5 py-3">
                 <Skeleton className="h-6 w-full" />
               </div>
             </div>

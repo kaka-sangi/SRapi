@@ -173,12 +173,12 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
               ) : null}
               {/* Popover card */}
               <div
-                className="z-[10002] w-80 rounded-xl border border-srapi-border bg-srapi-card p-5 shadow-lg"
+                className="z-[10002] w-80 rounded-2xl border border-srapi-border bg-srapi-card p-5 shadow-lg"
                 style={popoverStyle}
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-serif text-lg text-srapi-text-primary">
+                  <h3 className="text-lg font-semibold tracking-tight text-srapi-text-primary">
                     {step.title}
                   </h3>
                   <button
@@ -193,7 +193,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
                   {step.content}
                 </p>
                 <div className="mt-4 flex items-center justify-between">
-                  <span className="font-mono text-2xs text-srapi-text-tertiary">
+                  <span className="text-xs font-medium tabular-nums text-srapi-text-tertiary">
                     {currentIndex + 1} / {steps.length}
                   </span>
                   <div className="flex gap-2">

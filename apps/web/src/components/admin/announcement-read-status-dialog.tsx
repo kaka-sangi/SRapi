@@ -41,7 +41,7 @@ export function AnnouncementReadStatusDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-lg font-semibold tracking-tight">
             {t("adminAnnouncements.readStatus")}
             {title ? <span className="text-srapi-text-tertiary"> · {title}</span> : null}
           </DialogTitle>
@@ -55,7 +55,7 @@ export function AnnouncementReadStatusDialog({
           >
             {(status) => (
               <>
-                <p className="mb-2 text-2xs text-srapi-text-tertiary">
+                <p className="mb-2 text-[11px] text-srapi-text-tertiary">
                   {t("adminAnnouncements.readStatusTotal", { count: status.total })}
                 </p>
                 <TableScroll minWidth={320}>
@@ -72,7 +72,7 @@ export function AnnouncementReadStatusDialog({
                           <TableCell className="text-srapi-text-secondary">
                             {userLookup.get(reader.user_id)}
                           </TableCell>
-                          <TableCell className="font-mono text-2xs text-srapi-text-tertiary tabular">
+                          <TableCell className="text-[12px] tabular text-srapi-text-tertiary">
                             {formatDateTime(reader.read_at)}
                           </TableCell>
                         </TableRow>

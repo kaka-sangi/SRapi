@@ -7,6 +7,7 @@ import { apiService } from "@/lib/api";
 import { meErrorMessage } from "@/lib/me-api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { IconBubble } from "@/components/ui/icon-bubble";
 
 /**
  * Landing page for the email-verification link the backend emails
@@ -37,22 +38,26 @@ export default function VerifyEmailPage() {
   return (
     <main className="flex min-h-dvh items-center justify-center px-6 py-10">
       <div className="animate-bloom w-full max-w-sm">
-        <Card className="card-raised p-8 text-center">
+        <Card className="p-8 text-center">
           {state.kind === "verifying" && (
             <>
-              <Loader2 className="mx-auto size-8 animate-spin text-srapi-text-tertiary" />
-              <h1 className="mt-4 font-serif text-xl text-srapi-text-primary">Verifying your email…</h1>
+              <IconBubble tone="neutral" size="lg" className="mx-auto">
+                <Loader2 className="animate-spin" />
+              </IconBubble>
+              <h1 className="mt-4 text-xl font-semibold tracking-tight text-srapi-text-primary">Verifying your email…</h1>
             </>
           )}
           {state.kind === "ok" && (
             <>
-              <CheckCircle2 className="mx-auto size-8 text-srapi-success" />
-              <h1 className="mt-4 font-serif text-xl text-srapi-text-primary">Email verified</h1>
+              <IconBubble tone="success" size="lg" className="mx-auto">
+                <CheckCircle2 />
+              </IconBubble>
+              <h1 className="mt-4 text-xl font-semibold tracking-tight text-srapi-text-primary">Email verified</h1>
               <p className="mt-2 text-sm text-srapi-text-secondary">
                 Your email address has been verified. You can now sign in.
               </p>
               <Link href="/" className="mt-6 block">
-                <Button variant="primary" size="lg" className="w-full">
+                <Button variant="primary" size="lg" className="h-11 w-full rounded-xl btn-raise">
                   Continue to sign in
                 </Button>
               </Link>
@@ -60,11 +65,13 @@ export default function VerifyEmailPage() {
           )}
           {state.kind === "error" && (
             <>
-              <XCircle className="mx-auto size-8 text-srapi-error" />
-              <h1 className="mt-4 font-serif text-xl text-srapi-text-primary">Verification failed</h1>
-              <p className="mt-2 text-sm text-srapi-text-secondary">{state.message}</p>
+              <IconBubble tone="error" size="lg" className="mx-auto">
+                <XCircle />
+              </IconBubble>
+              <h1 className="mt-4 text-xl font-semibold tracking-tight text-srapi-text-primary">Verification failed</h1>
+              <p className="mt-2 rounded-xl bg-srapi-error/10 px-3 py-2 text-sm text-srapi-error">{state.message}</p>
               <Link href="/" className="mt-6 block">
-                <Button variant="outline" size="lg" className="w-full">
+                <Button variant="outline" size="lg" className="h-11 w-full rounded-xl">
                   Back to sign in
                 </Button>
               </Link>

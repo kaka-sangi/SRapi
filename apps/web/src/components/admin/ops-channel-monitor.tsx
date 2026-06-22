@@ -244,7 +244,7 @@ function MonitorsTab() {
         <span className="text-srapi-text-secondary">
           {scopeLabel(r.scope)}
           {r.scope_ref ? (
-            <span className="ml-1 font-mono text-2xs text-srapi-text-tertiary">{r.scope_ref}</span>
+            <span className="ml-1 text-[12px] text-srapi-text-tertiary">{r.scope_ref}</span>
           ) : null}
         </span>
       ),
@@ -254,7 +254,7 @@ function MonitorsTab() {
       header: t("adminMonitor.model"),
       hideOnMobile: true,
       render: (r) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary">{r.model || "—"}</span>
+        <span className="text-[12px] text-srapi-text-tertiary">{r.model || "—"}</span>
       ),
     },
     {
@@ -263,7 +263,7 @@ function MonitorsTab() {
       align: "right",
       hideOnMobile: true,
       render: (r) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-[12px] tabular text-srapi-text-tertiary">
           {r.interval_seconds}s
         </span>
       ),
@@ -274,7 +274,7 @@ function MonitorsTab() {
       hideOnMobile: true,
       render: (r) => {
         if (!r.last_run_at) {
-          return <span className="text-2xs text-srapi-text-tertiary">{t("adminMonitor.neverRun")}</span>;
+          return <span className="text-[12px] text-srapi-text-tertiary">{t("adminMonitor.neverRun")}</span>;
         }
         const isOK = r.last_run_ok ?? false;
         const hasUptime =
@@ -291,18 +291,18 @@ function MonitorsTab() {
                 }
                 aria-hidden
               />
-              <span className="font-mono text-2xs text-srapi-text-tertiary">
+              <span className="text-[12px] text-srapi-text-tertiary">
                 {formatDateTime(r.last_run_at)}
               </span>
             </div>
             {typeof r.last_run_latency_ms === "number" ? (
-              <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+              <span className="text-[12px] tabular text-srapi-text-tertiary">
                 {formatLatency(r.last_run_latency_ms)}
               </span>
             ) : null}
             {hasUptime ? (
               <span
-                className="font-mono text-2xs text-srapi-text-tertiary tabular"
+                className="text-[12px] tabular text-srapi-text-tertiary"
                 title={t("adminMonitor.uptimeHint", {
                   count: formatInteger(r.recent_uptime_sample_count ?? 0),
                   days: r.recent_uptime_window_days ?? 7,
@@ -524,7 +524,7 @@ function TemplatesTab() {
       key: "method",
       header: t("adminMonitor.method"),
       render: (r) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary">
+        <span className="text-[12px] text-srapi-text-tertiary">
           {r.request?.method || t("adminMonitor.methodDefault")}
         </span>
       ),
@@ -858,7 +858,7 @@ function MultiWindowAvailabilityTab({ modeToggle }: { modeToggle: React.ReactNod
       align: "right",
       hideOnMobile: true,
       render: (r) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-[12px] tabular text-srapi-text-tertiary">
           {formatDateTime(r.last_checked_at)}
         </span>
       ),
@@ -937,7 +937,7 @@ function AvailabilityDetailDialog({
               status={quietStatusFor(account.status)}
               label={statusLabel(t, account.status)}
             />
-            <span className="font-mono text-2xs text-srapi-text-tertiary">
+            <span className="text-[12px] text-srapi-text-tertiary">
               {formatDateTime(account.last_checked_at)}
             </span>
           </DialogDescription>
@@ -1014,7 +1014,7 @@ function SingleWindowAvailabilityTab({ modeToggle }: { modeToggle: React.ReactNo
       align: "right",
       hideOnMobile: true,
       render: (r) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-[12px] tabular text-srapi-text-tertiary">
           {formatDateTime(r.last_checked_at)}
         </span>
       ),

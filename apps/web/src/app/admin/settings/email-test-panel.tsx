@@ -3,6 +3,7 @@ import { CheckCircle2, XCircle, Loader2, Mail } from "lucide-react";
 import { useSendTestEmail } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { Button } from "@/components/ui/button";
+import { IconBubble } from "@/components/ui/icon-bubble";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { adminErrorMessage } from "@/lib/admin-api";
@@ -31,14 +32,16 @@ export function EmailTestPanel() {
   }
 
   return (
-    <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
-      <div className="flex items-center gap-2">
-        <Mail className="size-4 text-srapi-text-tertiary" />
-        <span className="text-sm font-medium text-srapi-text-primary">
+    <div className="rounded-2xl border border-srapi-border/70 bg-srapi-card-muted/60 p-4">
+      <div className="flex items-center gap-2.5">
+        <IconBubble size="sm">
+          <Mail />
+        </IconBubble>
+        <span className="text-sm font-semibold tracking-tight text-srapi-text-primary">
           {t("adminSettings.testEmail.title")}
         </span>
       </div>
-      <p className="mt-1 text-2xs text-srapi-text-tertiary">
+      <p className="mt-1 text-xs text-srapi-text-tertiary">
         {t("adminSettings.testEmail.hint")}
       </p>
       <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
@@ -61,7 +64,7 @@ export function EmailTestPanel() {
       </div>
 
       {loading || result || sendMut.isError ? (
-        <div className="mt-3 rounded-lg border border-srapi-border bg-srapi-card p-3.5 font-mono text-xs">
+        <div className="mt-3 rounded-xl border border-srapi-border/70 bg-srapi-card p-3.5 font-mono text-xs">
           <div className="flex items-center gap-2">
             {loading ? (
               <>
@@ -90,7 +93,7 @@ export function EmailTestPanel() {
           ) : null}
 
           {!loading && checks && Object.keys(checks).length > 0 ? (
-            <dl className="mt-2.5 space-y-1 border-t border-srapi-border pt-2.5">
+            <dl className="mt-2.5 space-y-1 border-t border-srapi-border/70 pt-2.5">
               {Object.entries(checks).map(([k, v]) => (
                 <div key={k} className="flex items-baseline justify-between gap-3">
                   <dt className="text-srapi-text-tertiary">{k}</dt>
@@ -112,7 +115,7 @@ export function EmailTestPanel() {
           ) : null}
 
           {!loading && result?.checked_at ? (
-            <p className="mt-2.5 text-2xs text-srapi-text-tertiary">
+            <p className="mt-2.5 text-xs text-srapi-text-tertiary">
               {formatDateTime(result.checked_at)}
             </p>
           ) : null}

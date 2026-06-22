@@ -103,15 +103,19 @@ function NotificationTemplatesContent() {
                           <TableCell>
                             <div className="text-srapi-text-primary">{event.label}</div>
                             {event.description ? (
-                              <div className="mt-0.5 text-2xs text-srapi-text-tertiary">
+                              <div className="mt-0.5 text-xs text-srapi-text-tertiary">
                                 {event.description}
                               </div>
                             ) : null}
                           </TableCell>
                           <TableCell className="hidden sm:table-cell">
-                            <span className="font-mono text-2xs text-srapi-text-tertiary">
-                              {event.category || "—"}
-                            </span>
+                            {event.category ? (
+                              <span className="rounded-full bg-srapi-card-muted px-2 py-0.5 font-mono text-[11px] font-medium text-srapi-text-secondary">
+                                {event.category}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-srapi-text-tertiary">—</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             <QuietBadge
@@ -247,14 +251,14 @@ function TemplateEditor({ target, onClose }: { target: EditTarget; onClose: () =
           </div>
           {placeholders.length > 0 ? (
             <div>
-              <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+              <span className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                 {t("adminNotificationTemplates.placeholders")}
               </span>
               <div className="mt-1.5 flex flex-wrap gap-1">
                 {placeholders.map((name) => (
                   <code
                     key={name}
-                    className="rounded border border-srapi-border px-1.5 py-0.5 font-mono text-2xs text-srapi-text-secondary"
+                    className="rounded-full bg-srapi-card-muted px-2 py-0.5 font-mono text-[11px] font-medium text-srapi-text-secondary"
                   >
                     {name}
                   </code>
@@ -264,7 +268,7 @@ function TemplateEditor({ target, onClose }: { target: EditTarget; onClose: () =
           ) : null}
           {preview ? (
             <div>
-              <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+              <span className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                 {t("adminNotificationTemplates.previewTitle")}
               </span>
               <p className="mt-1.5 text-sm font-medium text-srapi-text-primary">{preview.subject}</p>
@@ -272,9 +276,9 @@ function TemplateEditor({ target, onClose }: { target: EditTarget; onClose: () =
                 title={t("adminNotificationTemplates.previewTitle")}
                 sandbox=""
                 srcDoc={preview.html}
-                className="mt-1.5 h-64 w-full rounded-lg border border-srapi-border bg-white"
+                className="mt-1.5 h-64 w-full rounded-xl border border-srapi-border/70 bg-white"
               />
-              <p className="mt-1 text-2xs text-srapi-text-tertiary">
+              <p className="mt-1 text-xs text-srapi-text-tertiary">
                 {t("adminNotificationTemplates.previewHint")}
               </p>
             </div>

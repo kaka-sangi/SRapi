@@ -159,30 +159,30 @@ export function LiveErrorsPanel() {
         description={t("adminLiveErrors.subtitle")}
       />
 
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-srapi-border bg-srapi-card p-3">
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-srapi-border bg-srapi-card p-3">
         <input
           value={accountId}
           onChange={(e) => setAccountId(e.target.value)}
           placeholder={t("adminLiveErrors.accountIdPlaceholder")}
-          className="h-8 w-32 rounded border border-srapi-border bg-srapi-card px-2 text-sm"
+          className="h-9 w-32 rounded-lg border border-srapi-border bg-srapi-card px-2.5 text-sm"
         />
         <input
           value={errorClass}
           onChange={(e) => setErrorClass(e.target.value)}
           placeholder={t("adminLiveErrors.errorClassPlaceholder")}
-          className="h-8 w-48 rounded border border-srapi-border bg-srapi-card px-2 text-sm"
+          className="h-9 w-48 rounded-lg border border-srapi-border bg-srapi-card px-2.5 text-sm"
         />
         <button
           type="button"
           onClick={applyFilters}
-          className="rounded border border-srapi-border px-3 py-1 text-xs hover:bg-srapi-card-muted"
+          className="rounded-lg border border-srapi-border px-3 py-1.5 text-xs font-medium text-srapi-text-secondary hover:bg-srapi-card-muted hover:text-srapi-text-primary"
         >
           {t("adminLiveErrors.applyFilters")}
         </button>
         <button
           type="button"
           onClick={clearFilters}
-          className="rounded border border-srapi-border px-3 py-1 text-xs hover:bg-srapi-card-muted"
+          className="rounded-lg border border-srapi-border px-3 py-1.5 text-xs font-medium text-srapi-text-secondary hover:bg-srapi-card-muted hover:text-srapi-text-primary"
         >
           {t("adminLiveErrors.clearFilters")}
         </button>
@@ -190,29 +190,29 @@ export function LiveErrorsPanel() {
         <button
           type="button"
           onClick={() => setPaused((p) => !p)}
-          className="rounded border border-srapi-border px-3 py-1 text-xs hover:bg-srapi-card-muted"
+          className="rounded-lg border border-srapi-border px-3 py-1.5 text-xs font-medium text-srapi-text-secondary hover:bg-srapi-card-muted hover:text-srapi-text-primary"
         >
           {paused ? t("adminLiveErrors.resume") : t("adminLiveErrors.pause")}
         </button>
         <button
           type="button"
           onClick={() => setEvents([])}
-          className="rounded border border-srapi-border px-3 py-1 text-xs hover:bg-srapi-card-muted"
+          className="rounded-lg border border-srapi-border px-3 py-1.5 text-xs font-medium text-srapi-text-secondary hover:bg-srapi-card-muted hover:text-srapi-text-primary"
         >
           {t("adminLiveErrors.clear")}
         </button>
         <span
           className={
-            "inline-flex items-center gap-1 rounded px-2 py-0.5 text-2xs " +
+            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium " +
             (connected
-              ? "bg-emerald-500/15 text-emerald-300"
-              : "bg-amber-500/15 text-amber-300")
+              ? "bg-srapi-success/12 text-srapi-success"
+              : "bg-srapi-warning/12 text-srapi-warning")
           }
         >
           <span
             className={
               "inline-block h-1.5 w-1.5 rounded-full " +
-              (connected ? "bg-emerald-400" : "bg-amber-400")
+              (connected ? "bg-srapi-success" : "bg-srapi-warning")
             }
           />
           {connected
@@ -222,66 +222,66 @@ export function LiveErrorsPanel() {
       </div>
 
       {formatted.length === 0 ? (
-        <div className="rounded-lg border border-srapi-border bg-srapi-card p-6 text-center text-sm text-srapi-text-tertiary">
-          <p className="font-medium text-srapi-text-secondary">
+        <div className="rounded-2xl border border-dashed border-srapi-border/70 bg-srapi-card-muted/40 p-8 text-center text-sm text-srapi-text-tertiary">
+          <p className="font-semibold tracking-tight text-srapi-text-primary">
             {t("adminLiveErrors.emptyTitle")}
           </p>
-          <p>{t("adminLiveErrors.emptyBody")}</p>
+          <p className="mt-1 text-srapi-text-secondary">{t("adminLiveErrors.emptyBody")}</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-srapi-border bg-srapi-card">
+        <div className="overflow-x-auto rounded-2xl border border-srapi-border bg-srapi-card">
           <table className="w-full table-fixed text-left text-sm">
             <thead className="border-b border-srapi-border bg-srapi-card-muted">
               <tr>
-                <th className="w-44 px-3 py-2 font-medium">{t("adminLiveErrors.time")}</th>
-                <th className="w-24 px-3 py-2 font-medium">{t("adminLiveErrors.status")}</th>
-                <th className="w-40 px-3 py-2 font-medium">{t("adminLiveErrors.errorClass")}</th>
-                <th className="w-56 px-3 py-2 font-medium">{t("adminLiveErrors.route")}</th>
-                <th className="w-56 px-3 py-2 font-medium">{t("adminLiveErrors.account")}</th>
-                <th className="w-48 px-3 py-2 font-medium">{t("adminLiveErrors.model")}</th>
-                <th className="px-3 py-2 font-medium">{t("adminLiveErrors.message")}</th>
-                <th className="w-56 px-3 py-2 font-medium">{t("adminLiveErrors.evidence")}</th>
+                <th className="w-44 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{t("adminLiveErrors.time")}</th>
+                <th className="w-24 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{t("adminLiveErrors.status")}</th>
+                <th className="w-40 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{t("adminLiveErrors.errorClass")}</th>
+                <th className="w-56 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{t("adminLiveErrors.route")}</th>
+                <th className="w-56 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{t("adminLiveErrors.account")}</th>
+                <th className="w-48 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{t("adminLiveErrors.model")}</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{t("adminLiveErrors.message")}</th>
+                <th className="w-56 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{t("adminLiveErrors.evidence")}</th>
               </tr>
             </thead>
             <tbody>
               {formatted.map((row, idx) => (
                 <tr
                   key={`${row.request_id}-${row.at_unix_ms}-${idx}`}
-                  className="border-t border-srapi-border"
+                  className="border-t border-srapi-border/70 transition-colors hover:bg-srapi-card-muted/50"
                 >
-                  <td className="px-3 py-2 text-xs text-srapi-text-tertiary">{row.atLabel}</td>
-                  <td className="px-3 py-2 text-xs">
+                  <td className="px-4 py-3 text-[12px] tabular text-srapi-text-tertiary">{row.atLabel}</td>
+                  <td className="px-4 py-3 text-xs">
                     <span
                       className={
-                        "rounded px-1.5 py-0.5 " +
+                        "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium " +
                         (row.status_code >= 500
-                          ? "bg-red-500/15 text-red-300"
+                          ? "bg-srapi-error/12 text-srapi-error"
                           : row.status_code >= 400
-                          ? "bg-amber-500/15 text-amber-300"
-                          : "bg-srapi-card text-srapi-text-secondary")
+                          ? "bg-srapi-warning/12 text-srapi-warning"
+                          : "bg-srapi-card-muted text-srapi-text-secondary")
                       }
                     >
                       {row.status_code || "-"}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-xs">
-                    <div className="font-mono text-srapi-error">{row.error_class ?? "-"}</div>
-                    <div className="mt-0.5 font-mono text-2xs text-srapi-text-tertiary">
+                  <td className="px-4 py-3 text-xs">
+                    <div className="text-srapi-error">{row.error_class ?? "-"}</div>
+                    <div className="mt-0.5 text-[11px] text-srapi-text-tertiary">
                       {[row.error_phase, row.error_owner].filter(Boolean).join(" / ") || "-"}
                     </div>
                   </td>
-                  <td className="px-3 py-2 text-xs text-srapi-text-tertiary">
-                    <div className="truncate font-mono text-srapi-text-secondary" title={row.source_endpoint ?? ""}>
+                  <td className="px-4 py-3 text-xs text-srapi-text-tertiary">
+                    <div className="truncate text-srapi-text-secondary" title={row.source_endpoint ?? ""}>
                       {row.source_endpoint ?? "-"}
                     </div>
                     <div
-                      className="mt-0.5 truncate font-mono text-2xs"
+                      className="mt-0.5 truncate text-[11px]"
                       title={protocolLabel(row.source_protocol, row.target_protocol)}
                     >
                       {protocolLabel(row.source_protocol, row.target_protocol)}
                     </div>
                   </td>
-                  <td className="px-3 py-2 text-xs text-srapi-text-tertiary">
+                  <td className="px-4 py-3 text-xs text-srapi-text-tertiary">
                     <div
                       className="truncate text-srapi-text-secondary"
                       title={identityLabel(row.provider_name, row.provider_id)}
@@ -289,29 +289,29 @@ export function LiveErrorsPanel() {
                       {identityLabel(row.provider_name, row.provider_id)}
                     </div>
                     <div
-                      className="mt-0.5 truncate text-2xs"
+                      className="mt-0.5 truncate text-[11px]"
                       title={identityLabel(row.account_name, row.account_id)}
                     >
                       {identityLabel(row.account_name, row.account_id)}
                     </div>
                   </td>
-                  <td className="px-3 py-2 text-xs text-srapi-text-tertiary">
+                  <td className="px-4 py-3 text-xs text-srapi-text-tertiary">
                     <div className="truncate text-srapi-text-secondary" title={row.model ?? ""}>
                       {row.model ?? "-"}
                     </div>
                     <div
-                      className="mt-0.5 truncate font-mono text-2xs"
+                      className="mt-0.5 truncate text-[11px]"
                       title={row.upstream_model ?? row.requested_model ?? ""}
                     >
                       {row.upstream_model || row.requested_model || "-"}
                     </div>
                   </td>
-                  <td className="px-3 py-2 text-xs">
+                  <td className="px-4 py-3 text-xs">
                     <div className="truncate" title={row.message ?? ""}>
                       {row.message ?? "-"}
                     </div>
                   </td>
-                  <td className="px-3 py-2 font-mono text-2xs text-srapi-text-tertiary">
+                  <td className="px-4 py-3 text-[11px] text-srapi-text-tertiary">
                     <div className="truncate" title={row.request_id}>
                       {row.request_id}
                     </div>
@@ -350,7 +350,7 @@ function LiveEventEvidenceLinks({ requestID, traceID }: { requestID?: string; tr
         <Link
           key={link.href}
           href={link.href}
-          className="inline-flex items-center gap-1 rounded border border-srapi-border px-1.5 py-0.5 text-2xs text-srapi-text-secondary hover:bg-srapi-card-muted hover:text-srapi-text-primary"
+          className="inline-flex items-center gap-1 rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-secondary hover:text-srapi-text-primary"
         >
           {link.label}
           <ExternalLink className="size-2.5" aria-hidden />

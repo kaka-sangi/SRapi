@@ -232,7 +232,7 @@ export function ApiKeyFormDialog({
         {plaintext ? (
           <>
             <DialogHeader>
-              <DialogTitle>{t("apiKeys.createdToast")}</DialogTitle>
+              <DialogTitle className="text-lg font-semibold tracking-tight">{t("apiKeys.createdToast")}</DialogTitle>
               <DialogDescription>{t("apiKeys.revealOnce")}</DialogDescription>
             </DialogHeader>
             <div className="flex items-center gap-2 rounded-xl border border-srapi-border bg-srapi-card-muted px-3 py-2.5">
@@ -254,7 +254,7 @@ export function ApiKeyFormDialog({
         ) : (
           <form onSubmit={onSubmit}>
             <DialogHeader>
-              <DialogTitle>{isEdit ? t("apiKeys.edit") : t("apiKeys.create")}</DialogTitle>
+              <DialogTitle className="text-lg font-semibold tracking-tight">{isEdit ? t("apiKeys.edit") : t("apiKeys.create")}</DialogTitle>
               <DialogDescription>{t("apiKeys.subtitle")}</DialogDescription>
             </DialogHeader>
             <div className="mt-4 space-y-4">
@@ -293,7 +293,7 @@ export function ApiKeyFormDialog({
                     ))}
                   </div>
                 ) : null}
-                <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("apiKeys.modelsHint")}</p>
+                <p className="mt-1 text-xs text-srapi-text-tertiary">{t("apiKeys.modelsHint")}</p>
               </div>
               <div>
                 <Label htmlFor="key-groups">{t("apiKeys.groups")}</Label>
@@ -309,10 +309,10 @@ export function ApiKeyFormDialog({
                   allowCustom
                   disabled={pending}
                 />
-                <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("apiKeys.groupsHint")}</p>
+                <p className="mt-1 text-xs text-srapi-text-tertiary">{t("apiKeys.groupsHint")}</p>
               </div>
-              <div className="border-t border-srapi-border pt-4">
-                <p className="text-2xs font-medium uppercase tracking-wide text-srapi-text-tertiary">
+              <div className="border-t border-srapi-border/70 pt-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                   {t("apiKeys.accessControl")}
                 </p>
               </div>
@@ -325,7 +325,7 @@ export function ApiKeyFormDialog({
                   disabled={pending}
                   placeholder="10.0.0.0/8, 203.0.113.7"
                 />
-                <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("apiKeys.allowedIpsHint")}</p>
+                <p className="mt-1 text-xs text-srapi-text-tertiary">{t("apiKeys.allowedIpsHint")}</p>
               </div>
               <div>
                 <Label htmlFor="key-denied-ips">{t("apiKeys.deniedIps")}</Label>
@@ -336,7 +336,7 @@ export function ApiKeyFormDialog({
                   disabled={pending}
                   placeholder="198.51.100.0/24"
                 />
-                <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("apiKeys.deniedIpsHint")}</p>
+                <p className="mt-1 text-xs text-srapi-text-tertiary">{t("apiKeys.deniedIpsHint")}</p>
               </div>
               <div>
                 <Label>{t("apiKeys.windowLimits")}</Label>
@@ -372,7 +372,7 @@ export function ApiKeyFormDialog({
                     disabled={pending}
                   />
                 </div>
-                <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("apiKeys.windowLimitsHint")}</p>
+                <p className="mt-1 text-xs text-srapi-text-tertiary">{t("apiKeys.windowLimitsHint")}</p>
               </div>
               <div>
                 <Label>{t("apiKeys.costLimits")}</Label>
@@ -410,10 +410,10 @@ export function ApiKeyFormDialog({
                     disabled={pending}
                   />
                 </div>
-                <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("apiKeys.costLimitsHint")}</p>
+                <p className="mt-1 text-xs text-srapi-text-tertiary">{t("apiKeys.costLimitsHint")}</p>
               </div>
               {isEdit && editKey ? (
-                <div className="grid grid-cols-2 gap-2 text-2xs text-srapi-text-secondary sm:grid-cols-4">
+                <div className="grid grid-cols-2 gap-2 text-xs text-srapi-text-secondary sm:grid-cols-4">
                   <CostUsed label={t("apiKeys.costUsed")} value={editKey.cost_used} />
                   <CostUsed label={t("apiKeys.costUsed5h")} value={editKey.cost_used_5h} />
                   <CostUsed label={t("apiKeys.costUsed1d")} value={editKey.cost_used_1d} />
@@ -454,7 +454,7 @@ export function ApiKeyFormDialog({
                     disabled={pending}
                   />
                 </div>
-                <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("apiKeys.throughputLimitsHint")}</p>
+                <p className="mt-1 text-xs text-srapi-text-tertiary">{t("apiKeys.throughputLimitsHint")}</p>
               </div>
               <div>
                 <Label htmlFor="key-expires">{t("apiKeys.expiresAt")}</Label>
@@ -465,7 +465,7 @@ export function ApiKeyFormDialog({
                   onChange={(e) => setExpiresAt(e.target.value)}
                   disabled={pending}
                 />
-                <p className="mt-1 text-2xs text-srapi-text-tertiary">
+                <p className="mt-1 text-xs text-srapi-text-tertiary">
                   {isEdit ? t("apiKeys.expiresAtEditHint") : t("apiKeys.expiresAtHint")}
                 </p>
               </div>
@@ -492,9 +492,9 @@ export function ApiKeyFormDialog({
 
 function CostUsed({ label, value }: { label: string; value?: string | null }) {
   return (
-    <div className="rounded-lg border border-srapi-border bg-srapi-card-muted px-2.5 py-2">
+    <div className="rounded-xl border border-srapi-border bg-srapi-card-muted px-2.5 py-2">
       <div className="text-srapi-text-tertiary">{label}</div>
-      <div className="mt-0.5 font-mono text-srapi-text-primary">{formatMoney(value ?? "0.00000000", "USD")}</div>
+      <div className="mt-0.5 tabular text-srapi-text-primary">{formatMoney(value ?? "0.00000000", "USD")}</div>
     </div>
   );
 }

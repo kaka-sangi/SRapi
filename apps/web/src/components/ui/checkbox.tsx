@@ -25,10 +25,11 @@ export const Checkbox = React.forwardRef<
         type="checkbox"
         checked={checked}
         className={cn(
-          "peer size-4 cursor-pointer appearance-none rounded border border-srapi-border-strong bg-srapi-card transition-[background-color,border-color,transform] duration-150 active:scale-90",
+          // 4px (rounded-md) soft square; terracotta fill when checked, hairline border at rest.
+          "peer size-4 cursor-pointer appearance-none rounded-md border border-srapi-border-strong bg-srapi-card transition-[background-color,border-color,transform] duration-150 active:scale-90",
           "checked:border-srapi-primary checked:bg-srapi-primary",
           "indeterminate:border-srapi-primary indeterminate:bg-srapi-primary",
-          "hover:border-srapi-text-tertiary",
+          "hover:border-srapi-primary",
           "disabled:cursor-not-allowed disabled:opacity-50",
           className,
         )}

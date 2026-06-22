@@ -122,16 +122,16 @@ export function AccountTestDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 text-lg font-semibold tracking-tight">
             <ShieldCheck className="size-4 text-srapi-text-tertiary" />
             {t("providers.testTitle")}
           </DialogTitle>
-          <DialogDescription className="truncate font-mono text-2xs">
+          <DialogDescription className="truncate font-mono text-xs">
             {accountName}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-3 rounded-lg border border-srapi-border bg-srapi-card-muted p-3.5 sm:grid-cols-2">
+        <div className="grid gap-3 rounded-xl border border-srapi-border bg-srapi-card-muted p-3.5 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="account-test-mode">{t("providers.testMode")}</Label>
             <Select value={mode} onValueChange={(next) => setMode(next as AccountTestMode)}>
@@ -176,7 +176,7 @@ export function AccountTestDialog({
         </div>
 
         {/* Result panel — mono, status-tinted */}
-        <div className="overflow-hidden rounded-lg border border-srapi-border bg-srapi-card-muted p-3.5 font-mono text-xs">
+        <div className="overflow-hidden rounded-xl border border-srapi-border bg-srapi-card-muted p-3.5 font-mono text-xs">
           <div className="flex items-center gap-2">
             {loading ? (
               <>
@@ -211,14 +211,14 @@ export function AccountTestDialog({
           ) : null}
 
           {hintKey ? (
-            <div className="mt-2 flex items-start gap-1.5 rounded-md border border-srapi-border bg-srapi-card px-2.5 py-2 text-2xs text-srapi-text-secondary">
+            <div className="mt-2 flex items-start gap-1.5 rounded-md border border-srapi-border bg-srapi-card px-2.5 py-2 text-xs text-srapi-text-secondary">
               <Lightbulb className="mt-0.5 size-3 shrink-0 text-srapi-text-tertiary" />
               <span className="[overflow-wrap:anywhere]">{t(`gatewayHints.${hintKey}`)}</span>
             </div>
           ) : null}
 
           {!loading && checks && Object.keys(checks).length > 0 ? (
-            <dl className="mt-2.5 space-y-1 border-t border-srapi-border pt-2.5">
+            <dl className="mt-2.5 space-y-1 border-t border-srapi-border/70 pt-2.5">
               {Object.entries(checks).map(([k, v]) => (
                 <div key={k} className="flex items-baseline justify-between gap-3">
                   <dt className="shrink-0 text-srapi-text-tertiary">{k}</dt>
@@ -240,7 +240,7 @@ export function AccountTestDialog({
           ) : null}
 
           {!loading && result?.checked_at ? (
-            <p className="mt-2.5 text-2xs text-srapi-text-tertiary">
+            <p className="mt-2.5 text-xs text-srapi-text-tertiary">
               {formatDateTime(result.checked_at)}
             </p>
           ) : null}

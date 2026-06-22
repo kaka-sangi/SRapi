@@ -211,7 +211,7 @@ function CommandPalette({
               className="h-12 w-full bg-transparent text-sm text-srapi-text-primary outline-none placeholder:text-srapi-text-tertiary"
               aria-label={t("commandPalette.placeholder")}
             />
-            <kbd className="hidden shrink-0 rounded border border-srapi-border px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary sm:block">
+            <kbd className="hidden shrink-0 rounded-md border border-srapi-border px-1.5 py-0.5 text-[11px] font-medium text-srapi-text-tertiary sm:block">
               ESC
             </kbd>
           </div>
@@ -225,7 +225,7 @@ function CommandPalette({
             ) : (
               groups.map(({ group, items }) => (
                 <div key={group} className="mb-1 last:mb-0">
-                  <div className="px-2 pb-1 pt-2 font-mono text-2xs uppercase tracking-wide text-srapi-text-tertiary">
+                  <div className="px-2 pb-1 pt-2 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                     {group}
                   </div>
                   {items.map(({ item, index }) => {
@@ -239,10 +239,10 @@ function CommandPalette({
                         onMouseMove={() => setActive(index)}
                         onClick={() => item.run()}
                         className={cn(
-                          "flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm outline-none transition-colors",
+                          "flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left text-sm outline-none transition-colors",
                           isActive
-                            ? "bg-srapi-card-muted text-srapi-text-primary"
-                            : "text-srapi-text-secondary",
+                            ? "bg-srapi-accent-soft font-medium text-srapi-primary"
+                            : "text-srapi-text-secondary hover:bg-srapi-card-muted/60",
                         )}
                       >
                         <Icon
@@ -264,7 +264,7 @@ function CommandPalette({
             )}
           </div>
 
-          <div className="flex items-center gap-4 border-t border-srapi-border px-4 py-2 font-mono text-2xs text-srapi-text-tertiary">
+          <div className="flex items-center gap-4 border-t border-srapi-border px-4 py-2 text-[11px] text-srapi-text-tertiary">
             <span className="flex items-center gap-1">
               <Key>↑</Key>
               <Key>↓</Key>
@@ -287,7 +287,7 @@ function CommandPalette({
 
 function Key({ children }: { children: React.ReactNode }) {
   return (
-    <kbd className="rounded border border-srapi-border px-1 py-px font-mono text-2xs text-srapi-text-secondary">
+    <kbd className="rounded-md border border-srapi-border px-1.5 py-px text-[11px] font-medium text-srapi-text-secondary">
       {children}
     </kbd>
   );

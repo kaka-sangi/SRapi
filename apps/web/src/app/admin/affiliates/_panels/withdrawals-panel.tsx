@@ -48,7 +48,7 @@ export function WithdrawalsPanel() {
       header: t("adminAffiliates.amount"),
       align: "right",
       render: (r) => (
-        <span className="font-mono text-srapi-text-secondary tabular">
+        <span className="text-sm font-medium tabular text-srapi-text-primary">
           {formatMoney(r.amount, r.currency)}
         </span>
       ),
@@ -76,7 +76,7 @@ export function WithdrawalsPanel() {
       align: "right",
       hideOnMobile: true,
       render: (r) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-[12px] tabular text-srapi-text-tertiary">
           {formatDateTime(r.created_at)}
         </span>
       ),

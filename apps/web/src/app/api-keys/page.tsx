@@ -121,7 +121,7 @@ function ApiKeysContent() {
                         <TableCell className="text-srapi-text-secondary">
                           {key.allowed_models.length === 0 ? t("common.all") : key.allowed_models.join(" · ")}
                         </TableCell>
-                        <TableCell className="font-mono text-srapi-text-tertiary tabular">
+                        <TableCell className="text-[12px] text-srapi-text-tertiary tabular">
                           {key.created_at.slice(0, 10)}
                         </TableCell>
                         <TableCell className="text-right">
@@ -193,7 +193,9 @@ function ApiKeysContent() {
       >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{t("apiKeys.onboardingAction")}</DialogTitle>
+            <DialogTitle className="font-sans text-lg font-semibold tracking-tight">
+              {t("apiKeys.onboardingAction")}
+            </DialogTitle>
             <DialogDescription>
               {connectKey ? `${connectKey.name} · ${connectKey.prefix}…` : null}
             </DialogDescription>
@@ -239,7 +241,7 @@ function KeyPrefixCopy({ prefix }: { prefix: string }) {
           setTimeout(() => setCopied(false), 1500);
         });
       }}
-      className="group inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 font-mono text-srapi-text-tertiary transition-colors hover:bg-srapi-card-muted hover:text-srapi-text-secondary"
+      className="group inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[12px] font-medium text-srapi-text-tertiary tabular transition-colors hover:bg-srapi-card-muted hover:text-srapi-text-secondary"
       title={prefix}
     >
       <span>{prefix}...</span>

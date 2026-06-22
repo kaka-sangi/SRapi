@@ -3,7 +3,7 @@
 import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AdminShell } from "@/components/layout/admin-shell";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useLanguage } from "@/context/LanguageContext";
 import { ErrorPassthroughPanel } from "./_panels/error-passthrough-panel";
 import { PayloadRulesPanel } from "./_panels/payload-rules-panel";
@@ -46,7 +46,7 @@ function Content() {
   const raw = params.get("tab");
   const active: Tab = isTab(raw) ? raw : DEFAULT_TAB;
 
-  function setTab(next: string) {
+  function setTab(next: Tab) {
     const q = new URLSearchParams();
     if (next !== DEFAULT_TAB) q.set("tab", next);
     const qs = q.toString();
@@ -55,15 +55,16 @@ function Content() {
 
   return (
     <>
-      <Tabs value={active} onValueChange={setTab}>
-        <TabsList className="flex flex-wrap">
-          <TabsTrigger value="error-passthrough">
-            {t("nav.adminErrorPassthrough")}
-          </TabsTrigger>
-          <TabsTrigger value="payload-rules">{t("nav.adminPayloadRules")}</TabsTrigger>
-          <TabsTrigger value="tls-profiles">{t("nav.adminTlsProfiles")}</TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <SegmentedControl<Tab>
+        value={active}
+        onChange={setTab}
+        ariaLabel={t("nav.adminGatewayPolicies")}
+        options={[
+          { value: "error-passthrough", label: t("nav.adminErrorPassthrough") },
+          { value: "payload-rules", label: t("nav.adminPayloadRules") },
+          { value: "tls-profiles", label: t("nav.adminTlsProfiles") },
+        ]}
+      />
 
       <div className="mt-4">
         {active === "error-passthrough" ? <ErrorPassthroughPanel /> : null}

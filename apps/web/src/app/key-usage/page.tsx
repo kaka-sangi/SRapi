@@ -80,7 +80,10 @@ export default function KeyUsagePage() {
   return (
     <div className="relative flex min-h-dvh flex-col">
       <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-6">
-        <Link href="/" className="font-serif text-2xl leading-none text-srapi-text-primary">
+        <Link
+          href="/"
+          className="text-2xl font-semibold tracking-tight leading-none text-srapi-text-primary"
+        >
           SRapi
         </Link>
         <div className="flex items-center gap-2">
@@ -90,8 +93,12 @@ export default function KeyUsagePage() {
       </header>
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 pb-16">
         <div className="animate-bloom">
-          <h1 className="font-serif text-3xl text-srapi-text-primary">{t("keyUsage.title")}</h1>
-          <p className="mt-1.5 max-w-xl text-sm text-srapi-text-secondary">{t("keyUsage.subtitle")}</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-srapi-text-primary">
+            {t("keyUsage.title")}
+          </h1>
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-srapi-text-secondary">
+            {t("keyUsage.subtitle")}
+          </p>
 
           <Card className="mt-6">
             <CardContent>
@@ -128,7 +135,7 @@ export default function KeyUsagePage() {
                   {t("keyUsage.lookup")}
                 </Button>
               </form>
-              <p className="mt-2 text-2xs text-srapi-text-tertiary">{t("keyUsage.privacyHint")}</p>
+              <p className="mt-2 text-[11px] text-srapi-text-tertiary">{t("keyUsage.privacyHint")}</p>
               {error ? (
                 <p role="alert" className="mt-2 text-sm text-srapi-error">
                   {error}
@@ -157,7 +164,7 @@ function UsageReport({ report }: { report: GatewayUsageResponse }) {
           label={report.isValid ? t("keyUsage.valid") : t("keyUsage.invalid")}
         />
         {typeof report.days_until_expiry === "number" ? (
-          <span className="text-2xs text-srapi-text-tertiary">
+          <span className="text-[12px] text-srapi-text-tertiary tabular">
             {t("keyUsage.expiresIn", { days: report.days_until_expiry })}
           </span>
         ) : null}
@@ -173,7 +180,9 @@ function UsageReport({ report }: { report: GatewayUsageResponse }) {
       {report.daily_usage.length > 0 ? (
         <Card>
           <CardContent>
-            <h2 className="font-serif text-lg text-srapi-text-primary">{t("adminUsage.byDay")}</h2>
+            <h2 className="text-lg font-semibold tracking-tight text-srapi-text-primary">
+              {t("adminUsage.byDay")}
+            </h2>
             <TableScroll minWidth={480}>
               <Table className="mt-3">
                 <TableHeader>
@@ -188,11 +197,11 @@ function UsageReport({ report }: { report: GatewayUsageResponse }) {
                 <TableBody>
                   {report.daily_usage.map((d) => (
                     <TableRow key={d.date}>
-                      <TableCell className="font-mono text-2xs text-srapi-text-secondary">{d.date}</TableCell>
-                      <TableCell className="text-right font-mono tabular">{d.requests}</TableCell>
-                      <TableCell className="text-right font-mono tabular">{d.input_tokens}</TableCell>
-                      <TableCell className="text-right font-mono tabular">{d.output_tokens}</TableCell>
-                      <TableCell className="text-right font-mono tabular">
+                      <TableCell className="text-[12px] text-srapi-text-secondary tabular">{d.date}</TableCell>
+                      <TableCell className="text-right text-sm tabular">{d.requests}</TableCell>
+                      <TableCell className="text-right text-sm tabular">{d.input_tokens}</TableCell>
+                      <TableCell className="text-right text-sm tabular">{d.output_tokens}</TableCell>
+                      <TableCell className="text-right text-sm font-medium tabular">
                         {formatMoney(d.cost, currency)}
                       </TableCell>
                     </TableRow>
@@ -207,7 +216,9 @@ function UsageReport({ report }: { report: GatewayUsageResponse }) {
       {report.model_stats.length > 0 ? (
         <Card>
           <CardContent>
-            <h2 className="font-serif text-lg text-srapi-text-primary">{t("keyUsage.byModel")}</h2>
+            <h2 className="text-lg font-semibold tracking-tight text-srapi-text-primary">
+              {t("keyUsage.byModel")}
+            </h2>
             <TableScroll minWidth={480}>
               <Table className="mt-3">
                 <TableHeader>
@@ -221,10 +232,10 @@ function UsageReport({ report }: { report: GatewayUsageResponse }) {
                 <TableBody>
                   {report.model_stats.map((m) => (
                     <TableRow key={m.model}>
-                      <TableCell className="font-mono text-2xs text-srapi-text-secondary">{m.model}</TableCell>
-                      <TableCell className="text-right font-mono tabular">{m.requests}</TableCell>
-                      <TableCell className="text-right font-mono tabular">{m.total_tokens}</TableCell>
-                      <TableCell className="text-right font-mono tabular">
+                      <TableCell className="text-[12px] text-srapi-text-secondary tabular">{m.model}</TableCell>
+                      <TableCell className="text-right text-sm tabular">{m.requests}</TableCell>
+                      <TableCell className="text-right text-sm tabular">{m.total_tokens}</TableCell>
+                      <TableCell className="text-right text-sm font-medium tabular">
                         {formatMoney(m.cost, currency)}
                       </TableCell>
                     </TableRow>
@@ -239,7 +250,9 @@ function UsageReport({ report }: { report: GatewayUsageResponse }) {
       {report.recent_requests.length > 0 ? (
         <Card>
           <CardContent>
-            <h2 className="font-serif text-lg text-srapi-text-primary">{t("keyUsage.recent")}</h2>
+            <h2 className="text-lg font-semibold tracking-tight text-srapi-text-primary">
+              {t("keyUsage.recent")}
+            </h2>
             <TableScroll minWidth={480}>
               <Table className="mt-3">
                 <TableHeader>
@@ -253,15 +266,15 @@ function UsageReport({ report }: { report: GatewayUsageResponse }) {
                 <TableBody>
                   {report.recent_requests.map((r, i) => (
                     <TableRow key={i}>
-                      <TableCell className="font-mono text-2xs text-srapi-text-secondary">{r.model}</TableCell>
+                      <TableCell className="text-[12px] text-srapi-text-secondary tabular">{r.model}</TableCell>
                       <TableCell>
                         <QuietBadge
                           status={r.success ? "active" : "disabled"}
                           label={r.success ? t("keyUsage.ok") : t("keyUsage.failed")}
                         />
                       </TableCell>
-                      <TableCell className="text-right font-mono tabular">{r.total_tokens}</TableCell>
-                      <TableCell className="text-right font-mono text-2xs text-srapi-text-tertiary tabular">
+                      <TableCell className="text-right text-sm tabular">{r.total_tokens}</TableCell>
+                      <TableCell className="text-right text-[12px] text-srapi-text-tertiary tabular">
                         {r.created_at.replace("T", " ").slice(0, 19)}
                       </TableCell>
                     </TableRow>

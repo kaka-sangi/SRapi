@@ -68,7 +68,7 @@ export function PlaygroundSettings({
               rows={4}
               className="max-h-40"
             />
-            <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("playground.systemPromptHint")}</p>
+            <p className="mt-1 text-[11px] text-srapi-text-tertiary">{t("playground.systemPromptHint")}</p>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>

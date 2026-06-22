@@ -65,7 +65,7 @@ export function BackupTab() {
         <Card>
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="font-serif text-lg text-srapi-text-primary">{t("adminSettings.export")}</h3>
+              <h3 className="text-lg font-semibold tracking-tight text-srapi-text-primary">{t("adminSettings.export")}</h3>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={() => snapshot.refetch()} loading={snapshot.isFetching}>
                   {t("adminSettings.fetchSnapshot")}
@@ -78,7 +78,7 @@ export function BackupTab() {
                 ) : null}
               </div>
             </div>
-            <p className="text-2xs text-srapi-text-tertiary">{t("adminSettings.exportHint")}</p>
+            <p className="text-xs text-srapi-text-tertiary">{t("adminSettings.exportHint")}</p>
             <Textarea
               readOnly
               className="min-h-64 font-mono text-xs"
@@ -90,8 +90,8 @@ export function BackupTab() {
 
         <Card>
           <CardContent className="space-y-3">
-            <h3 className="font-serif text-lg text-srapi-text-primary">{t("adminSettings.import")}</h3>
-            <p className="text-2xs text-srapi-text-tertiary">{t("adminSettings.importHint")}</p>
+            <h3 className="text-lg font-semibold tracking-tight text-srapi-text-primary">{t("adminSettings.import")}</h3>
+            <p className="text-xs text-srapi-text-tertiary">{t("adminSettings.importHint")}</p>
             <Textarea
               className="min-h-48 font-mono text-xs"
               spellCheck={false}
@@ -175,7 +175,7 @@ function DatabaseBackupsSection() {
     <Card>
       <CardContent className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="font-serif text-lg text-srapi-text-primary">
+          <h3 className="text-lg font-semibold tracking-tight text-srapi-text-primary">
             {t("adminSettings.databaseBackups")}
           </h3>
           <div className="flex gap-2">
@@ -199,21 +199,21 @@ function DatabaseBackupsSection() {
         </div>
 
         {rows.length === 0 ? (
-          <div className="rounded-md border border-srapi-border p-6 text-center text-sm text-srapi-text-tertiary">
-            <p className="font-medium text-srapi-text-secondary">{t("adminSettings.snapshotEmpty")}</p>
-            <p className="mt-1 text-xs">{t("adminSettings.snapshotEmptyBody")}</p>
+          <div className="rounded-2xl border border-dashed border-srapi-border/70 bg-srapi-card-muted/40 p-6 text-center text-sm text-srapi-text-tertiary">
+            <p className="font-semibold tracking-tight text-srapi-text-primary">{t("adminSettings.snapshotEmpty")}</p>
+            <p className="mt-1 text-xs leading-relaxed">{t("adminSettings.snapshotEmptyBody")}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-sm">
               <thead>
-                <tr className="border-b border-srapi-border text-left text-2xs uppercase tracking-wide text-srapi-text-tertiary">
-                  <th className="py-2 pr-3 font-medium">{t("adminSettings.snapshotStarted")}</th>
-                  <th className="py-2 pr-3 font-medium">{t("adminSettings.snapshotStatus")}</th>
-                  <th className="py-2 pr-3 font-medium">{t("adminSettings.snapshotKindScheduled")}/{t("adminSettings.snapshotKindManual")}</th>
-                  <th className="py-2 pr-3 font-medium">{t("adminSettings.snapshotSize")}</th>
-                  <th className="py-2 pr-3 font-medium">{t("adminSettings.snapshotChecksum")}</th>
-                  <th className="py-2 pr-3 font-medium text-right">Actions</th>
+                <tr className="border-b border-srapi-border/70 text-left text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
+                  <th className="py-2 pr-3">{t("adminSettings.snapshotStarted")}</th>
+                  <th className="py-2 pr-3">{t("adminSettings.snapshotStatus")}</th>
+                  <th className="py-2 pr-3">{t("adminSettings.snapshotKindScheduled")}/{t("adminSettings.snapshotKindManual")}</th>
+                  <th className="py-2 pr-3">{t("adminSettings.snapshotSize")}</th>
+                  <th className="py-2 pr-3">{t("adminSettings.snapshotChecksum")}</th>
+                  <th className="py-2 pr-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -265,33 +265,33 @@ function BackupRow({
   }
 
   return (
-    <tr className="border-b border-srapi-border hover:bg-srapi-card-muted">
-      <td className="py-2 pr-3 font-mono text-xs text-srapi-text-secondary">
+    <tr className="border-b border-srapi-border/70 transition-colors hover:bg-srapi-card-muted/50">
+      <td className="py-3 pr-3 text-[12px] tabular text-srapi-text-secondary">
         {startedAt ? startedAt.toLocaleString() : "—"}
       </td>
-      <td className="py-2 pr-3">
+      <td className="py-3 pr-3">
         <StatusBadge status={row.status} />
       </td>
-      <td className="py-2 pr-3 text-xs text-srapi-text-secondary">{kindLabel}</td>
-      <td className="py-2 pr-3 font-mono text-xs text-srapi-text-secondary">
+      <td className="py-3 pr-3 text-xs text-srapi-text-secondary">{kindLabel}</td>
+      <td className="py-3 pr-3 text-[12px] tabular text-srapi-text-secondary">
         {formatBytes(row.size_bytes)}
       </td>
-      <td className="py-2 pr-3">
+      <td className="py-3 pr-3">
         {row.sha256 ? (
           <button
             type="button"
             onClick={copyChecksum}
-            className="inline-flex items-center gap-1 font-mono text-2xs text-srapi-text-tertiary hover:text-srapi-text-primary"
+            className="inline-flex items-center gap-1 rounded-full bg-srapi-card-muted px-2 py-0.5 font-mono text-[11px] font-medium text-srapi-text-secondary transition-colors hover:text-srapi-text-primary"
             title={row.sha256}
           >
             <span>{row.sha256.slice(0, 12)}…</span>
             {copiedChecksum ? <Check className="size-3 text-srapi-success" /> : <Copy className="size-3" />}
           </button>
         ) : (
-          <span className="text-2xs text-srapi-text-tertiary">—</span>
+          <span className="text-xs text-srapi-text-tertiary">—</span>
         )}
       </td>
-      <td className="py-2 pr-3">
+      <td className="py-3 pr-3">
         <div className="flex justify-end gap-2">
           <Button variant="outline" size="sm" disabled={!downloadable} onClick={onDownload}>
             <Download className="size-4" />

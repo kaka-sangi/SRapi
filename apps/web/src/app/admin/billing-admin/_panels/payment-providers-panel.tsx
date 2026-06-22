@@ -248,7 +248,9 @@ export function PaymentProvidersPanel() {
       header: t("adminPayments.channel"),
       sortValue: (p) => p.provider,
       render: (p) => (
-        <span className="font-mono text-2xs uppercase text-srapi-text-secondary">{p.provider}</span>
+        <span className="inline-flex items-center rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium uppercase tracking-wider text-srapi-text-secondary">
+          {p.provider}
+        </span>
       ),
     },
     {
@@ -278,7 +280,7 @@ export function PaymentProvidersPanel() {
       header: t("adminPayments.config"),
       hideOnMobile: true,
       render: (p) => (
-        <span className="text-2xs text-srapi-text-tertiary">
+        <span className="text-xs text-srapi-text-tertiary">
           {p.supported_methods.length ? p.supported_methods.join(" · ") : "—"}
         </span>
       ),
@@ -290,7 +292,7 @@ export function PaymentProvidersPanel() {
       align: "right",
       sortValue: (p) => Number(p.fee_rate),
       render: (p) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-xs tabular text-srapi-text-tertiary">
           {(Number(p.fee_rate) * 100).toFixed(3)}%
         </span>
       ),
@@ -302,7 +304,7 @@ export function PaymentProvidersPanel() {
       align: "right",
       sortValue: (p) => p.weight,
       render: (p) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">{p.weight}</span>
+        <span className="text-xs tabular text-srapi-text-tertiary">{p.weight}</span>
       ),
     },
   ];
@@ -466,41 +468,61 @@ function PaymentPresetPicker({
 }) {
   const { t } = useLanguage();
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
       <div
-        className="w-full max-w-lg rounded-xl border border-srapi-border bg-srapi-card p-6 shadow-lg"
+        className="w-full max-w-lg rounded-2xl border border-srapi-border bg-srapi-card p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="font-serif text-xl text-srapi-text-primary">{t("adminPayments.selectPreset")}</h2>
-        <p className="mt-1 text-sm text-srapi-text-secondary">{t("adminPayments.selectPresetHint")}</p>
-        <div className="mt-5 space-y-2">
-          {PAYMENT_PRESETS.map((preset) => (
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold tracking-tight text-srapi-text-primary">
+            {t("adminPayments.selectPreset")}
+          </h2>
+          <p className="text-sm text-srapi-text-secondary">{t("adminPayments.selectPresetHint")}</p>
+        </div>
+        <div className="mt-5 space-y-2.5">
+          {PAYMENT_PRESETS.map((preset, idx) => (
             <button
               key={preset.key}
               type="button"
               onClick={() => onSelect(preset)}
-              className="flex w-full items-center gap-4 rounded-lg border border-srapi-border bg-srapi-card px-4 py-3.5 text-left transition-colors hover:border-srapi-border-strong hover:bg-srapi-card-muted active:scale-[0.995]"
+              style={{ "--stagger-index": idx } as React.CSSProperties}
+              className="anim-rise-sm group flex w-full items-center gap-4 rounded-2xl border border-srapi-border bg-srapi-card px-4 py-3.5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-srapi-primary/40 hover:bg-srapi-accent-soft/30 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-srapi-primary/40"
             >
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-srapi-card-muted font-mono text-xs font-bold text-srapi-text-secondary">
+              <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-srapi-accent-soft text-xs font-semibold uppercase tracking-wider text-srapi-primary">
                 {preset.key.slice(0, 2).toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium text-srapi-text-primary">{preset.name}</div>
+                <div className="text-sm font-semibold tracking-tight text-srapi-text-primary">
+                  {preset.name}
+                </div>
                 <div className="mt-0.5 text-xs text-srapi-text-tertiary">{preset.description}</div>
               </div>
               {preset.feeRate !== "0" ? (
-                <span className="shrink-0 font-mono text-2xs text-srapi-text-tertiary">
+                <span className="shrink-0 rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium tabular text-srapi-text-tertiary">
                   {(Number(preset.feeRate) * 100).toFixed(1)}%
                 </span>
               ) : null}
             </button>
           ))}
         </div>
-        <div className="mt-4 flex justify-between">
+        <div className="mt-5 flex items-center justify-between border-t border-srapi-border/70 pt-4">
           <button
             type="button"
-            onClick={() => { onSelect({ key: "custom", name: "Custom", description: "", provider: "", methods: [], feeRate: "0", configTemplate: {} }); }}
-            className="text-xs text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
+            onClick={() => {
+              onSelect({
+                key: "custom",
+                name: "Custom",
+                description: "",
+                provider: "",
+                methods: [],
+                feeRate: "0",
+                configTemplate: {},
+              });
+            }}
+            className="text-xs font-medium text-srapi-text-tertiary transition-colors hover:text-srapi-primary"
           >
             {t("adminPayments.customProvider")}
           </button>

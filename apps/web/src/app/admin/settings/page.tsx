@@ -195,7 +195,7 @@ function SettingsEditor({ initial }: { initial: Parameters<typeof createSettings
                 ))}
                 {tab.id === "email" ? <EmailTestPanel /> : null}
                 {tab.id === "security" ? <CaptchaSettingsPanel /> : null}
-                <div className="border-srapi-border flex justify-end border-t pt-4">
+                <div className="flex justify-end border-t border-srapi-border/70 pt-4">
                   <Button
                     variant="primary"
                     loading={updateMut.isPending}
@@ -245,8 +245,8 @@ function SettingsSaveState({ dirty, pending }: { dirty: boolean; pending: boolea
       : t("adminSettings.saveState.saved");
 
   return (
-    <div className="mt-3 flex items-center justify-end font-mono text-2xs text-srapi-text-tertiary">
-      <span className="inline-flex items-center gap-1.5 rounded-md border border-srapi-border px-2 py-1">
+    <div className="mt-3 flex items-center justify-end">
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-srapi-card-muted px-2.5 py-1 text-[11px] font-medium text-srapi-text-secondary">
         {icon}
         {label}
       </span>

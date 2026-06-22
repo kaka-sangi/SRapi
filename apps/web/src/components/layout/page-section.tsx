@@ -29,7 +29,7 @@ export function PageSection({
         <div className="min-w-0">
           <CardTitle>{title}</CardTitle>
           {description && (
-            <p className="mt-0.5 text-2xs text-srapi-text-tertiary">{description}</p>
+            <p className="mt-1 text-xs text-srapi-text-tertiary">{description}</p>
           )}
         </div>
         {action}

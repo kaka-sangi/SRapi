@@ -137,7 +137,7 @@ export function RateLimitDialog({
                 onChange={(e) => setConcurrency(e.target.value)}
               />
             </div>
-            <p className="text-2xs text-srapi-text-tertiary">{t("adminRateLimit.zeroHint")}</p>
+            <p className="text-xs text-srapi-text-tertiary">{t("adminRateLimit.zeroHint")}</p>
             <div className="flex items-center justify-between">
               <Label htmlFor="rl-enabled" className="mb-0">
                 {t("adminRateLimit.enabled")}

@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { QuietBadge, type QuietStatus } from "@/components/ui/quiet-badge";
+import { DataPill } from "@/components/ui/data-pill";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableScroll } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -236,13 +237,13 @@ export function StrategyContent() {
                         <div className="font-medium text-srapi-text-primary">
                           {strategyNameLabel(t, strategy.name)}
                         </div>
-                        <div className="font-mono text-2xs text-srapi-text-tertiary">
+                        <div className="text-xs text-srapi-text-tertiary tabular">
                           {strategy.version} · {strategy.config_hash}
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="font-mono text-2xs text-srapi-text-secondary">
+                      <div className="text-xs text-srapi-text-secondary">
                         {strategy.scope_type}
                         {strategy.scope_id ? `:${strategy.scope_id}` : ""}
                       </div>
@@ -531,9 +532,9 @@ function WeightSummary({ weights }: { weights: SchedulerStrategyWeights }) {
   return (
     <div className="flex max-w-[28rem] flex-wrap gap-1.5">
       {WEIGHT_KEYS.filter((key) => (weights[key] ?? 0) > 0).map((key) => (
-        <span key={key} className="rounded-md border border-srapi-border px-2 py-0.5 font-mono text-2xs text-srapi-text-secondary">
+        <DataPill key={key} tone="neutral" size="sm">
           {key}:{Number(weights[key] ?? 0).toFixed(2)}
-        </span>
+        </DataPill>
       ))}
     </div>
   );
@@ -548,12 +549,12 @@ function WinCounts({ label, counts }: { label: string; counts: Record<string, un
       </CardHeader>
       <CardContent className="space-y-1.5">
         {entries.length === 0 ? (
-          <span className="font-mono text-2xs text-srapi-text-tertiary">-</span>
+          <span className="text-xs text-srapi-text-tertiary">-</span>
         ) : (
           entries.map(([key, value]) => (
             <div key={key} className="flex items-center justify-between gap-3 text-sm">
-              <span className="truncate font-mono text-2xs text-srapi-text-tertiary">{key}</span>
-              <span className="font-serif tabular text-srapi-text-primary">{String(value)}</span>
+              <span className="truncate text-xs text-srapi-text-tertiary">{key}</span>
+              <span className="tabular text-srapi-text-primary font-semibold">{String(value)}</span>
             </div>
           ))
         )}

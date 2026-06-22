@@ -412,11 +412,11 @@ export function AccountImportDialog({
                   disabled={busy}
                 />
                 <div className="mt-1 flex items-center justify-between">
-                  <p className="text-2xs text-srapi-text-tertiary">
+                  <p className="text-[11px] text-srapi-text-tertiary">
                     {t("batchAdd.linesHint")}
                   </p>
                   {batchLines.trim() ? (
-                    <span className="font-mono text-2xs text-srapi-text-tertiary">
+                    <span className="font-mono text-[11px] text-srapi-text-tertiary">
                       {t("batchAdd.lineCount", { count: batchLines.split("\n").filter((l) => l.trim() && !l.trim().startsWith("#")).length })}
                     </span>
                   ) : null}
@@ -424,9 +424,9 @@ export function AccountImportDialog({
               </div>
               {batchProgress ? (
                 <div ref={batchProgressRef} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-2xs text-srapi-text-secondary">
+                  <div className="flex items-center justify-between text-xs text-srapi-text-secondary">
                     <span>{t("batchAdd.progress", { current: batchProgress.current, total: batchProgress.total })}</span>
-                    <span className="font-mono tabular">{Math.round((batchProgress.current / batchProgress.total) * 100)}%</span>
+                    <span className="text-sm font-semibold tabular text-srapi-text-primary">{Math.round((batchProgress.current / batchProgress.total) * 100)}%</span>
                   </div>
                   <div className="relative h-2 overflow-hidden rounded-full bg-srapi-border">
                     <div
@@ -437,13 +437,13 @@ export function AccountImportDialog({
                 </div>
               ) : null}
               {batchResult ? (
-                <div className="space-y-2 rounded-md border border-srapi-border bg-srapi-card-muted p-3">
+                <div className="space-y-3 rounded-2xl border border-srapi-border bg-srapi-card-muted p-3.5">
                   <div className="grid grid-cols-2 gap-2 text-center">
                     <ImportStat label={t("codexImport.created")} value={batchResult.created} tone="success" />
                     <ImportStat label={t("codexImport.failed")} value={batchResult.failed} tone="error" />
                   </div>
                   {batchResult.errors.length > 0 ? (
-                    <ul className="list-disc space-y-0.5 pl-4 text-2xs text-srapi-error">
+                    <ul className="list-disc space-y-0.5 pl-4 text-[11px] text-srapi-error">
                       {batchResult.errors.map((msg, idx) => (
                         <li key={idx}>{msg}</li>
                       ))}
@@ -495,7 +495,7 @@ export function AccountImportDialog({
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-srapi-text-primary">{t("crsSync.newAccounts")} ({crsPreview.new_accounts.length})</span>
-                      <div className="flex gap-2 text-2xs">
+                      <div className="flex gap-2 text-[11px]">
                         <button type="button" className="text-srapi-text-tertiary hover:text-srapi-text-secondary" onClick={() => setCrsSelected(new Set(crsPreview.new_accounts.map((a) => a.crs_account_id)))}>{t("adminQuickSetup.selectAll")}</button>
                         <button type="button" className="text-srapi-text-tertiary hover:text-srapi-text-secondary" onClick={() => setCrsSelected(new Set())}>{t("adminQuickSetup.selectNone")}</button>
                       </div>
@@ -510,7 +510,7 @@ export function AccountImportDialog({
                           });
                         }} />
                         <span className="text-srapi-text-primary">{a.name}</span>
-                        <span className="ml-auto font-mono text-2xs text-srapi-text-tertiary">{a.platform} · {a.type}</span>
+                        <span className="ml-auto font-mono text-[11px] text-srapi-text-tertiary">{a.platform} · {a.type}</span>
                       </label>
                     ))}
                     {crsPreview.existing_accounts.length > 0 && (
@@ -520,7 +520,7 @@ export function AccountImportDialog({
                           {crsPreview.existing_accounts.map((a) => (
                             <div key={a.crs_account_id} className="flex items-center gap-2 rounded-md border border-srapi-border/50 bg-srapi-card-muted px-3 py-2 text-sm opacity-60">
                               <span>{a.name}</span>
-                              <span className="ml-auto font-mono text-2xs text-srapi-text-tertiary">{a.platform}</span>
+                              <span className="ml-auto font-mono text-[11px] text-srapi-text-tertiary">{a.platform}</span>
                             </div>
                           ))}
                         </div>
@@ -530,7 +530,7 @@ export function AccountImportDialog({
                 </>
               )}
               {crsStep === "result" && crsResult && (
-                <div className="space-y-2 rounded-md border border-srapi-border bg-srapi-card-muted p-3">
+                <div className="space-y-3 rounded-2xl border border-srapi-border bg-srapi-card-muted p-3.5">
                   <div className="grid grid-cols-4 gap-2 text-center">
                     <ImportStat label={t("codexImport.created")} value={crsResult.created} tone="success" />
                     <ImportStat label={t("codexImport.updated")} value={crsResult.updated} />
@@ -558,7 +558,7 @@ export function AccountImportDialog({
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="mt-1 text-2xs text-srapi-text-tertiary">
+                <p className="mt-1 text-[11px] text-srapi-text-tertiary">
                   {t("adminAccounts.importTargetProviderHint")}
                 </p>
               </div>
@@ -833,7 +833,7 @@ export function AccountImportDialog({
 function ProviderImportResultPanel({ result }: { result: ProviderAccountImportResult }) {
   const { t } = useLanguage();
   return (
-    <div className="space-y-3 rounded-md border border-srapi-border bg-srapi-card-muted p-3">
+    <div className="space-y-3 rounded-2xl border border-srapi-border bg-srapi-card-muted p-3.5">
       <div className="grid grid-cols-4 gap-2 text-center">
         <ImportStat label={t("codexImport.created")} value={result.created_count} tone="success" />
         <ImportStat label={t("codexImport.updated")} value={result.updated_count} />
@@ -842,10 +842,10 @@ function ProviderImportResultPanel({ result }: { result: ProviderAccountImportRe
       </div>
       {result.errors.length > 0 ? (
         <div>
-          <p className="text-2xs font-medium text-srapi-text-secondary">
+          <p className="text-[11px] font-medium text-srapi-text-secondary">
             {t("adminAccounts.importErrorsTitle")}
           </p>
-          <ul className="mt-1 list-disc space-y-0.5 pl-4 text-2xs text-srapi-error">
+          <ul className="mt-1 list-disc space-y-0.5 pl-4 text-[11px] text-srapi-error">
             {result.errors.map((message, idx) => (
               <li key={idx}>{message}</li>
             ))}
@@ -882,9 +882,11 @@ function ImportStat({
         ? "text-srapi-error"
         : "text-srapi-text-primary";
   return (
-    <div>
-      <div className={`text-lg font-semibold ${toneClass}`}>{value}</div>
-      <div className="text-xs text-srapi-text-tertiary">{label}</div>
+    <div className="rounded-xl bg-srapi-card px-2 py-2">
+      <div className={`text-2xl font-semibold tracking-tight tabular ${toneClass}`}>{value}</div>
+      <div className="mt-0.5 text-[11px] font-medium uppercase tracking-[0.08em] text-srapi-text-tertiary">
+        {label}
+      </div>
     </div>
   );
 }

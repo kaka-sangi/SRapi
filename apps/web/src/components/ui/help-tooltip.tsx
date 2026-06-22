@@ -29,7 +29,10 @@ export function HelpTooltip({
           <HelpCircle className={cn("size-3.5", iconClassName)} />
         </button>
       </TooltipTrigger>
-      <TooltipContent side={side} className="max-w-72 text-wrap">
+      <TooltipContent
+        side={side}
+        className="max-w-72 rounded-xl border-srapi-text-primary bg-srapi-text-primary text-xs leading-relaxed text-srapi-bg text-wrap"
+      >
         {content}
       </TooltipContent>
     </Tooltip>

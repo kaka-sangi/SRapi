@@ -87,7 +87,7 @@ export function ManualAdjustmentsPanel() {
       key: "date",
       header: t("adminAffiliates.date"),
       render: (r) => (
-        <span className="whitespace-nowrap font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="whitespace-nowrap text-[12px] tabular text-srapi-text-tertiary">
           {formatDateTime(r.created_at)}
         </span>
       ),
@@ -108,7 +108,7 @@ export function ManualAdjustmentsPanel() {
         return (
           <span
             className={
-              "font-mono tabular " +
+              "text-sm font-semibold tabular " +
               (negative ? "text-srapi-error" : "text-srapi-success")
             }
           >

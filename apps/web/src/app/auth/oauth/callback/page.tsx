@@ -177,7 +177,7 @@ export default function OAuthCallbackPage() {
 
         {phase === "bind" && (
           <Card className="p-7 sm:p-8">
-            <h2 className="font-serif text-2xl text-srapi-text-primary">
+            <h2 className="text-2xl font-semibold tracking-tight text-srapi-text-primary">
               {t("oauthCallback.bindTitle")}
             </h2>
             <p className="mt-1.5 text-sm text-srapi-text-secondary">{t("oauthCallback.bindHint")}</p>
@@ -204,7 +204,7 @@ export default function OAuthCallbackPage() {
                 />
               </div>
               {error && (
-                <p role="alert" className="text-sm text-srapi-error">
+                <p role="alert" className="rounded-xl bg-srapi-error/10 px-3 py-2 text-sm text-srapi-error">
                   {error}
                 </p>
               )}
@@ -212,7 +212,7 @@ export default function OAuthCallbackPage() {
                 type="submit"
                 variant="primary"
                 size="lg"
-                className="w-full"
+                className="h-11 w-full rounded-xl btn-raise"
                 loading={busy}
                 disabled={busy || !email.trim() || !password}
               >
@@ -224,7 +224,7 @@ export default function OAuthCallbackPage() {
 
         {phase === "twofactor" && (
           <Card className="p-7 sm:p-8">
-            <h2 className="font-serif text-2xl text-srapi-text-primary">
+            <h2 className="text-2xl font-semibold tracking-tight text-srapi-text-primary">
               {t("login.twoFactorTitle")}
             </h2>
             <p className="mt-1.5 text-sm text-srapi-text-secondary">{t("login.twoFactorHint")}</p>
@@ -244,7 +244,7 @@ export default function OAuthCallbackPage() {
                 />
               </div>
               {error && (
-                <p role="alert" className="text-sm text-srapi-error">
+                <p role="alert" className="rounded-xl bg-srapi-error/10 px-3 py-2 text-sm text-srapi-error">
                   {error}
                 </p>
               )}
@@ -252,7 +252,7 @@ export default function OAuthCallbackPage() {
                 type="submit"
                 variant="primary"
                 size="lg"
-                className="w-full"
+                className="h-11 w-full rounded-xl btn-raise"
                 loading={busy}
                 disabled={busy || code.length < 6}
               >
@@ -264,7 +264,7 @@ export default function OAuthCallbackPage() {
 
         {phase === "create" && (
           <Card className="p-7 sm:p-8">
-            <h2 className="font-serif text-2xl text-srapi-text-primary">
+            <h2 className="text-2xl font-semibold tracking-tight text-srapi-text-primary">
               {t("oauthCallback.createTitle")}
             </h2>
             <p className="mt-1.5 text-sm text-srapi-text-secondary">
@@ -294,10 +294,10 @@ export default function OAuthCallbackPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
-                <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("authRegister.passwordHint")}</p>
+                <p className="mt-1.5 text-xs text-srapi-text-tertiary">{t("authRegister.passwordHint")}</p>
               </div>
               {error && (
-                <p role="alert" className="text-sm text-srapi-error">
+                <p role="alert" className="rounded-xl bg-srapi-error/10 px-3 py-2 text-sm text-srapi-error">
                   {error}
                 </p>
               )}
@@ -305,7 +305,7 @@ export default function OAuthCallbackPage() {
                 type="submit"
                 variant="primary"
                 size="lg"
-                className="w-full"
+                className="h-11 w-full rounded-xl btn-raise"
                 loading={busy}
                 disabled={busy || !password}
               >
@@ -317,7 +317,7 @@ export default function OAuthCallbackPage() {
 
         {phase === "email" && (
           <Card className="p-7 sm:p-8">
-            <h2 className="font-serif text-2xl text-srapi-text-primary">
+            <h2 className="text-2xl font-semibold tracking-tight text-srapi-text-primary">
               {t("oauthCallback.emailTitle")}
             </h2>
             <p className="mt-1.5 text-sm text-srapi-text-secondary">
@@ -362,7 +362,7 @@ export default function OAuthCallbackPage() {
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
                   />
-                  <p className="mt-1.5 text-2xs text-srapi-text-tertiary">
+                  <p className="mt-1.5 text-xs text-srapi-text-tertiary">
                     {t("oauthCallback.tokenHint", { email: email.trim() })}
                   </p>
                 </div>
@@ -388,14 +388,14 @@ export default function OAuthCallbackPage() {
 
         {phase === "error" && (
           <Card className="p-7 text-center sm:p-8">
-            <h2 className="font-serif text-xl text-srapi-text-primary">
+            <h2 className="text-xl font-semibold tracking-tight text-srapi-text-primary">
               {t("oauthCallback.errorTitle")}
             </h2>
             <p className="mt-2 text-sm text-srapi-text-secondary">{error}</p>
             <Button
               variant="outline"
               size="lg"
-              className="mt-6 w-full"
+              className="mt-6 h-11 w-full rounded-xl"
               onClick={() => router.replace(SIGN_IN_ROUTE)}
             >
               {t("oauthCallback.backToSignIn")}

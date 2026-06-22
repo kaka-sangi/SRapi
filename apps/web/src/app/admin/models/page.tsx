@@ -39,6 +39,7 @@ import { useToast } from "@/context/ToastContext";
 import { adminErrorMessage } from "@/lib/admin-api";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
+import { DataPill } from "@/components/ui/data-pill";
 import { rateLimitSummary } from "@/lib/rate-limit-format";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import {
@@ -226,8 +227,12 @@ function ModelsContent() {
       sortValue: (m) => m.canonical_name,
       render: (m) => (
         <div className="min-w-0">
-          <div className="truncate text-srapi-text-primary">{m.display_name}</div>
-          <div className="truncate font-mono text-2xs text-srapi-text-tertiary">{m.canonical_name}</div>
+          <div className="truncate text-sm font-medium text-srapi-text-primary">
+            {m.display_name}
+          </div>
+          <div className="truncate text-[11px] text-srapi-text-tertiary">
+            {m.canonical_name}
+          </div>
         </div>
       ),
     },
@@ -236,7 +241,7 @@ function ModelsContent() {
       header: t("adminModels.family"),
       hideOnMobile: true,
       sortValue: (m) => m.family ?? "",
-      render: (m) => <span className="text-srapi-text-secondary">{m.family || "—"}</span>,
+      render: (m) => <span className="text-sm text-srapi-text-secondary">{m.family || "—"}</span>,
     },
     {
       key: "context",
@@ -245,7 +250,7 @@ function ModelsContent() {
       hideOnMobile: true,
       sortValue: (m) => m.context_window ?? 0,
       render: (m) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-xs tabular text-srapi-text-secondary">
           {m.context_window != null ? m.context_window.toLocaleString() : "—"}
         </span>
       ),
@@ -257,12 +262,14 @@ function ModelsContent() {
       render: (m) => {
         const rl = rateLimitByModel.get(Number(m.id));
         if (!rl) {
-          return <span className="text-2xs text-srapi-text-tertiary">{t("adminRateLimit.none")}</span>;
+          return (
+            <span className="text-xs text-srapi-text-tertiary">{t("adminRateLimit.none")}</span>
+          );
         }
         return (
-          <span className="font-mono text-2xs text-srapi-text-secondary tabular">
+          <DataPill tone={rl.enabled ? "accent" : "neutral"}>
             {rl.enabled ? rateLimitSummary(rl) : t("adminRateLimit.off")}
-          </span>
+          </DataPill>
         );
       },
     },

@@ -175,8 +175,11 @@ export function PlansPanel() {
       header: t("adminSubscriptions.price"),
       align: "right",
       render: (p) => (
-        <span className="font-mono text-srapi-text-secondary tabular">
-          {formatMoney(p.price, p.currency)} / {t("adminSubscriptions.validity", { days: p.validity_days })}
+        <span className="text-sm font-medium tabular text-srapi-text-primary">
+          {formatMoney(p.price, p.currency)}{" "}
+          <span className="font-normal text-srapi-text-tertiary">
+            / {t("adminSubscriptions.validity", { days: p.validity_days })}
+          </span>
         </span>
       ),
     },
@@ -346,37 +349,63 @@ function PlanPresetPicker({
   t: (key: string) => string;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="w-full max-w-md rounded-xl border border-srapi-border bg-srapi-card p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
-        <h2 className="font-serif text-xl text-srapi-text-primary">{t("adminSubscriptions.selectTemplate")}</h2>
-        <p className="mt-1 text-sm text-srapi-text-secondary">{t("adminSubscriptions.selectTemplateHint")}</p>
-        <div className="mt-5 grid grid-cols-2 gap-2">
-          {PLAN_PRESETS.map((p) => (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-2xl rounded-2xl border border-srapi-border bg-srapi-card p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold tracking-tight text-srapi-text-primary">
+            {t("adminSubscriptions.selectTemplate")}
+          </h2>
+          <p className="text-sm text-srapi-text-secondary">
+            {t("adminSubscriptions.selectTemplateHint")}
+          </p>
+        </div>
+        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {PLAN_PRESETS.map((p, idx) => (
             <button
               key={p.key}
               type="button"
               onClick={() => onSelect({ ...emptySubscriptionPlanForm(), ...p.form })}
-              className="rounded-lg border border-srapi-border bg-srapi-card px-4 py-3 text-left transition-colors hover:border-srapi-border-strong hover:bg-srapi-card-muted"
+              style={{ "--stagger-index": idx } as React.CSSProperties}
+              className="anim-rise-sm group flex flex-col gap-2 rounded-2xl border border-srapi-border bg-srapi-card p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-srapi-primary/40 hover:bg-srapi-accent-soft/30 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-srapi-primary/40"
             >
-              <div className="text-sm font-medium text-srapi-text-primary">{p.name}</div>
-              <div className="mt-0.5 text-xs text-srapi-text-tertiary">{t(p.descKey)}</div>
-              {p.form.price && p.form.price !== "0" ? (
-                <div className="mt-2 font-mono text-sm text-srapi-text-secondary">${p.form.price}/mo</div>
-              ) : (
-                <div className="mt-2 font-mono text-sm text-srapi-text-tertiary">Free</div>
-              )}
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-base font-semibold tracking-tight text-srapi-text-primary">
+                  {p.name}
+                </div>
+                {p.form.price && p.form.price !== "0" ? (
+                  <div className="text-sm font-semibold tabular text-srapi-primary">
+                    ${p.form.price}
+                    <span className="text-[11px] font-medium text-srapi-text-tertiary">/mo</span>
+                  </div>
+                ) : (
+                  <div className="text-sm font-semibold tabular text-srapi-text-tertiary">
+                    Free
+                  </div>
+                )}
+              </div>
+              <div className="text-xs leading-relaxed text-srapi-text-secondary">
+                {t(p.descKey)}
+              </div>
             </button>
           ))}
         </div>
-        <div className="mt-4 flex justify-between">
+        <div className="mt-5 flex items-center justify-between border-t border-srapi-border/70 pt-4">
           <button
             type="button"
             onClick={() => onSelect(emptySubscriptionPlanForm())}
-            className="text-xs text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
+            className="text-xs font-medium text-srapi-text-tertiary transition-colors hover:text-srapi-primary"
           >
             {t("adminPayments.customProvider")}
           </button>
-          <Button variant="ghost" size="sm" onClick={onClose}>{t("common.cancel")}</Button>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            {t("common.cancel")}
+          </Button>
         </div>
       </div>
     </div>

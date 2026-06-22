@@ -17,8 +17,8 @@ export const SheetClose = DialogPrimitive.Close;
 type Side = "left" | "right" | "bottom";
 
 const SIDE_CLASSES: Record<Side, string> = {
-  left: "inset-y-0 left-0 h-full w-80 max-w-[85vw] overflow-y-auto border-r srapi-anim-sheet-left",
-  right: "inset-y-0 right-0 h-full w-80 max-w-[85vw] overflow-y-auto border-l srapi-anim-sheet-right",
+  left: "inset-y-0 left-0 h-full w-80 max-w-[85vw] overflow-y-auto border-r md:rounded-r-2xl srapi-anim-sheet-left",
+  right: "inset-y-0 right-0 h-full w-80 max-w-[85vw] overflow-y-auto border-l md:rounded-l-2xl srapi-anim-sheet-right",
   bottom: "inset-x-0 bottom-0 max-h-[85dvh] w-full overflow-y-auto rounded-t-2xl border-t srapi-anim-sheet-bottom",
 };
 
@@ -31,7 +31,7 @@ export const SheetContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed z-50 flex flex-col border-srapi-border bg-srapi-card shadow-lg",
+        "fixed z-50 flex flex-col border-srapi-border bg-srapi-card shadow-[0_24px_64px_-24px_rgba(28,24,20,0.28),0_8px_24px_-8px_rgba(28,24,20,0.12)]",
         SIDE_CLASSES[side],
         className,
       )}
@@ -53,7 +53,7 @@ export const SheetTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
-    className={cn("font-serif text-lg text-srapi-text-primary", className)}
+    className={cn("text-lg font-semibold tracking-tight text-srapi-text-primary", className)}
     {...props}
   />
 ));

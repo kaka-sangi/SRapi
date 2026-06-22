@@ -41,8 +41,8 @@ export function LinkedSignInsCard() {
     <Card>
       <CardContent className="space-y-4">
         <div>
-          <h3 className="font-serif text-lg text-srapi-text-primary">{t("account.linkedTitle")}</h3>
-          <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("account.linkedHint")}</p>
+          <h3 className="text-lg font-semibold tracking-tight text-srapi-text-primary">{t("account.linkedTitle")}</h3>
+          <p className="mt-1 text-xs text-srapi-text-tertiary">{t("account.linkedHint")}</p>
         </div>
         <PageQueryState
           query={identities}
@@ -51,7 +51,7 @@ export function LinkedSignInsCard() {
           emptyTitle={t("account.linkedEmpty")}
         >
           {(list) => (
-            <ul className="divide-y divide-srapi-border">
+            <ul className="divide-y divide-srapi-border/70">
               {list.data.map((identity) => {
                 const hint = identity.email || identity.display_name || identity.subject_hint;
                 const lastUsed = identity.last_used_at
@@ -63,10 +63,10 @@ export function LinkedSignInsCard() {
                     className="flex items-center justify-between gap-3 py-3"
                   >
                     <div className="min-w-0">
-                      <p className="text-sm text-srapi-text-primary">
+                      <p className="text-sm font-medium text-srapi-text-primary">
                         {PROVIDER_LABEL[identity.provider] ?? identity.provider}
                       </p>
-                      <p className="truncate text-2xs text-srapi-text-tertiary">
+                      <p className="truncate text-xs text-srapi-text-tertiary">
                         {hint ? `${hint} · ${lastUsed}` : lastUsed}
                       </p>
                     </div>
@@ -80,7 +80,7 @@ export function LinkedSignInsCard() {
                         {t("account.linkedUnbind")}
                       </Button>
                     ) : (
-                      <span className="text-2xs text-srapi-text-tertiary">
+                      <span className="text-xs text-srapi-text-tertiary">
                         {t("account.linkedUnbindBlocked")}
                       </span>
                     )}

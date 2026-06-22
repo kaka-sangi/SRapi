@@ -7,8 +7,10 @@ import { useLanguage } from "@/context/LanguageContext";
 import { cn } from "@/lib/cn";
 import { AmbientCanvas } from "@/components/visual/ambient-canvas";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DataPill } from "@/components/ui/data-pill";
 
 type HealthStatus = "checking" | "ok" | "error";
 
@@ -99,56 +101,53 @@ export default function SetupPage() {
     return (
       <div className="relative flex min-h-dvh items-center justify-center">
         <AmbientCanvas />
-        <p className="font-mono text-2xs text-srapi-text-tertiary">{t("setup.checking")}</p>
+        <p className="text-xs font-medium uppercase tracking-[0.12em] text-srapi-text-tertiary">{t("setup.checking")}</p>
       </div>
     );
   }
+
+  const stepTone = (active: boolean): "accent" | "neutral" => (active ? "accent" : "neutral");
 
   return (
     <div className="relative flex min-h-dvh flex-col">
       <AmbientCanvas />
       <main className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center px-6 py-10">
-        <div className="animate-bloom">
-          <div className="mb-8 flex items-center gap-3 font-mono text-2xs uppercase tracking-[0.18em] text-srapi-text-tertiary">
-            <span className="h-px w-7 bg-srapi-primary" />
-            {t("setup.eyebrow")}
-          </div>
-
-          {/* Step indicators */}
-          <div className="mb-6 flex items-center gap-2 font-mono text-2xs text-srapi-text-tertiary">
-            <span className={step === "health" ? "text-srapi-primary" : "text-srapi-text-tertiary"}>
-              {t("setup.stepHealth")}
-            </span>
-            <span className="h-px w-4 bg-srapi-border" />
-            <span className={step === "account" ? "text-srapi-primary" : "text-srapi-text-tertiary"}>
-              {t("setup.stepAccount")}
-            </span>
+        <div className="animate-bloom space-y-6">
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
+              {t("setup.eyebrow")}
+            </p>
+            <div className="flex items-center gap-2">
+              <DataPill tone={stepTone(step === "health")}>1 · {t("setup.stepHealth")}</DataPill>
+              <span className="h-px w-4 bg-srapi-border" />
+              <DataPill tone={stepTone(step === "account")}>2 · {t("setup.stepAccount")}</DataPill>
+            </div>
           </div>
 
           {step === "health" && (
-            <div>
-              <h1 className="font-serif text-4xl font-medium leading-tight text-srapi-text-primary">
+            <Card className="p-7 sm:p-8">
+              <h1 className="text-3xl font-semibold tracking-tight leading-tight text-srapi-text-primary">
                 {t("setup.healthTitle")}
               </h1>
-              <p className="mt-4 text-md leading-relaxed text-srapi-text-secondary">
+              <p className="mt-3 text-sm leading-relaxed text-srapi-text-secondary">
                 {t("setup.healthSubtitle")}
               </p>
 
-              <div className="mt-8 space-y-3 rounded-lg border border-srapi-border p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-srapi-text-secondary">{t("setup.apiServer")}</span>
+              <div className="mt-7 divide-y divide-srapi-border/70 rounded-xl border border-srapi-border bg-srapi-card-muted/40">
+                <div className="flex items-center justify-between gap-3 px-4 py-3">
+                  <span className="text-sm font-medium text-srapi-text-primary">{t("setup.apiServer")}</span>
                   <div className="flex items-center gap-2">
                     <StatusDot status={apiHealth} />
-                    <span className="font-mono text-2xs text-srapi-text-tertiary">
+                    <span className="text-xs font-medium text-srapi-text-secondary">
                       {apiHealth === "ok" ? t("setup.connected") : apiHealth === "error" ? t("setup.unreachable") : t("setup.checking")}
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-srapi-text-secondary">{t("setup.database")}</span>
+                <div className="flex items-center justify-between gap-3 px-4 py-3">
+                  <span className="text-sm font-medium text-srapi-text-primary">{t("setup.database")}</span>
                   <div className="flex items-center gap-2">
                     <StatusDot status={dbHealth} />
-                    <span className="font-mono text-2xs text-srapi-text-tertiary">
+                    <span className="text-xs font-medium text-srapi-text-secondary">
                       {dbHealth === "ok" ? t("setup.connected") : dbHealth === "error" ? t("setup.unreachable") : t("setup.checking")}
                     </span>
                   </div>
@@ -156,30 +155,30 @@ export default function SetupPage() {
               </div>
 
               <div className="mt-6 flex gap-3">
-                <Button variant="ghost" onClick={() => void checkHealth()} className="flex-1">
+                <Button variant="ghost" onClick={() => void checkHealth()} className="h-11 flex-1 rounded-xl">
                   {t("setup.recheckHealth")}
                 </Button>
                 <Button
                   variant="primary"
                   onClick={() => setStep("account")}
                   disabled={apiHealth !== "ok"}
-                  className="flex-1"
+                  className="h-11 flex-1 rounded-xl btn-raise"
                 >
                   {t("setup.continueToAccount")}
                 </Button>
               </div>
-            </div>
+            </Card>
           )}
 
           {step === "account" && (
-            <div>
-              <h1 className="font-serif text-4xl font-medium leading-tight text-srapi-text-primary">
+            <Card className="p-7 sm:p-8">
+              <h1 className="text-3xl font-semibold tracking-tight leading-tight text-srapi-text-primary">
                 {t("setup.title")}
               </h1>
-              <p className="mt-4 text-md leading-relaxed text-srapi-text-secondary">
+              <p className="mt-3 text-sm leading-relaxed text-srapi-text-secondary">
                 {t("setup.subtitle")}
               </p>
-              <form onSubmit={onSubmit} className="mt-8 space-y-4">
+              <form onSubmit={onSubmit} className="mt-7 space-y-4">
                 <div>
                   <Label htmlFor="setup-name">{t("setup.name")}</Label>
                   <Input id="setup-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" required />
@@ -198,24 +197,24 @@ export default function SetupPage() {
                     autoComplete="new-password"
                     required
                   />
-                  <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("setup.passwordHint")}</p>
+                  <p className="mt-1.5 text-xs text-srapi-text-tertiary">{t("setup.passwordHint")}</p>
                   {password.length > 0 && <PasswordStrength password={password} />}
                 </div>
                 {error && (
-                  <p role="alert" className="text-sm text-srapi-error">
+                  <p role="alert" className="rounded-xl bg-srapi-error/10 px-3 py-2 text-sm text-srapi-error">
                     {error}
                   </p>
                 )}
-                <div className="flex gap-3">
-                  <Button type="button" variant="ghost" onClick={() => setStep("health")} className="flex-1">
+                <div className="flex gap-3 pt-1">
+                  <Button type="button" variant="ghost" onClick={() => setStep("health")} className="h-11 flex-1 rounded-xl">
                     {t("setup.back")}
                   </Button>
-                  <Button type="submit" variant="primary" loading={submitting} className="flex-1">
+                  <Button type="submit" variant="primary" loading={submitting} className="h-11 flex-1 rounded-xl btn-raise">
                     {t("setup.submit")}
                   </Button>
                 </div>
               </form>
-            </div>
+            </Card>
           )}
         </div>
       </main>

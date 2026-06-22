@@ -244,7 +244,7 @@ function RedeemContent() {
       sortValue: (c) => c.code,
       render: (c) => (
         <span className="flex items-center gap-1.5">
-          <span className="font-mono text-srapi-text-primary">{c.code}</span>
+          <span className="text-sm font-semibold tabular text-srapi-text-primary">{c.code}</span>
           <CopyButton value={c.code} size="inline" />
         </span>
       ),
@@ -253,7 +253,7 @@ function RedeemContent() {
       key: "value",
       header: t("adminPromos.value"),
       render: (c) => (
-        <span className="font-mono text-srapi-text-secondary tabular">
+        <span className="text-sm font-medium tabular text-srapi-text-primary">
           {formatMoney(c.value, c.currency)}
         </span>
       ),
@@ -264,7 +264,7 @@ function RedeemContent() {
       align: "right",
       hideOnMobile: true,
       render: (c) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-xs tabular text-srapi-text-tertiary">
           {c.redeemed_count ?? 0}
           {c.max_redemptions ? ` / ${c.max_redemptions}` : ""}
         </span>
@@ -279,7 +279,7 @@ function RedeemContent() {
       // does this expire?" mental model.
       sortValue: (c) => c.expires_at ?? "",
       render: (c) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-[12px] tabular text-srapi-text-tertiary">
           {c.expires_at ? formatDateTime(c.expires_at) : "—"}
         </span>
       ),
@@ -646,7 +646,9 @@ function BulkEditDialog({
       <DialogContent>
         <form onSubmit={submit}>
           <DialogHeader>
-            <DialogTitle>{t("adminPromos.bulkEditTitle", { count })}</DialogTitle>
+            <DialogTitle className="text-lg font-semibold tracking-tight">
+              {t("adminPromos.bulkEditTitle", { count })}
+            </DialogTitle>
             <DialogDescription>{t("adminPromos.bulkEditBody")}</DialogDescription>
           </DialogHeader>
           <div className="mt-4 space-y-4">
@@ -710,7 +712,7 @@ function BulkEditDialog({
               />
             </BulkEditField>
             {error ? (
-              <p role="alert" className="text-2xs text-srapi-error">
+              <p role="alert" className="text-xs text-srapi-error">
                 {error}
               </p>
             ) : null}
@@ -803,11 +805,13 @@ function RedeemBatchDialog({ onClose }: { onClose: () => void }) {
         {generated ? (
           <>
             <DialogHeader>
-              <DialogTitle>{t("adminPromos.generatedTitle")}</DialogTitle>
+              <DialogTitle className="text-lg font-semibold tracking-tight">
+                {t("adminPromos.generatedTitle")}
+              </DialogTitle>
               <DialogDescription>{t("adminPromos.generatedBody")}</DialogDescription>
             </DialogHeader>
-            <div className="mt-2 max-h-72 overflow-y-auto rounded-xl border border-srapi-border bg-srapi-card-muted p-3">
-              <ul className="space-y-1 font-mono text-xs text-srapi-text-primary">
+            <div className="mt-2 max-h-72 overflow-y-auto rounded-xl border border-srapi-border bg-srapi-card-muted/60 p-4">
+              <ul className="space-y-1 text-xs tabular text-srapi-text-primary">
                 {generated.map((c) => (
                   <li key={c.id}>{c.code}</li>
                 ))}
@@ -826,7 +830,9 @@ function RedeemBatchDialog({ onClose }: { onClose: () => void }) {
         ) : (
           <form onSubmit={submit}>
             <DialogHeader>
-              <DialogTitle>{t("adminPromos.batchGenerate")}</DialogTitle>
+              <DialogTitle className="text-lg font-semibold tracking-tight">
+                {t("adminPromos.batchGenerate")}
+              </DialogTitle>
             </DialogHeader>
             <div className="mt-4 space-y-4">
               <div className="grid grid-cols-2 gap-3">
@@ -957,7 +963,9 @@ function BulkDisableDialog({
       <DialogContent>
         <form onSubmit={submit}>
           <DialogHeader>
-            <DialogTitle>{t("adminPromos.disableSelectedTitle", { count })}</DialogTitle>
+            <DialogTitle className="text-lg font-semibold tracking-tight">
+              {t("adminPromos.disableSelectedTitle", { count })}
+            </DialogTitle>
             <DialogDescription>{t("feedback.confirmDeleteBody")}</DialogDescription>
           </DialogHeader>
           <div className="mt-4 space-y-3">
@@ -975,7 +983,7 @@ function BulkDisableDialog({
               />
             </div>
             {error ? (
-              <p role="alert" className="text-2xs text-srapi-error">
+              <p role="alert" className="text-xs text-srapi-error">
                 {error}
               </p>
             ) : null}
@@ -1034,7 +1042,9 @@ function RedeemExtendDialog({
       <DialogContent>
         <form onSubmit={submit}>
           <DialogHeader>
-            <DialogTitle>{t("adminPromos.extendSelectedTitle", { count })}</DialogTitle>
+            <DialogTitle className="text-lg font-semibold tracking-tight">
+              {t("adminPromos.extendSelectedTitle", { count })}
+            </DialogTitle>
             <DialogDescription>{t("adminPromos.extendSelectedBody")}</DialogDescription>
           </DialogHeader>
           <div className="mt-4 space-y-3">
@@ -1050,7 +1060,7 @@ function RedeemExtendDialog({
               />
             </div>
             {error ? (
-              <p role="alert" className="text-2xs text-srapi-error">
+              <p role="alert" className="text-xs text-srapi-error">
                 {error}
               </p>
             ) : null}

@@ -96,13 +96,17 @@ function PromoContent() {
       header: t("adminPromos.code"),
       pinned: true,
       sortValue: (p) => p.code,
-      render: (p) => <span className="font-mono text-srapi-text-primary">{p.code}</span>,
+      render: (p) => (
+        <span className="text-sm font-semibold tracking-tight tabular text-srapi-text-primary">
+          {p.code}
+        </span>
+      ),
     },
     {
       key: "value",
       header: t("adminPromos.value"),
       render: (p) => (
-        <span className="font-mono text-srapi-text-secondary tabular">
+        <span className="text-sm font-medium tabular text-srapi-text-primary">
           {p.discount_type === "percent" ? `${p.discount_value}%` : p.discount_value}
         </span>
       ),
@@ -113,7 +117,7 @@ function PromoContent() {
       align: "right",
       hideOnMobile: true,
       render: (p) => (
-        <span className="font-mono text-srapi-text-tertiary tabular">
+        <span className="text-sm tabular text-srapi-text-secondary">
           {p.used_count ?? 0}
           {p.max_uses ? ` / ${p.max_uses}` : ""}
         </span>
@@ -124,7 +128,7 @@ function PromoContent() {
       header: t("adminPromos.limits"),
       hideOnMobile: true,
       render: (p) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-xs tabular text-srapi-text-tertiary">
           {p.per_user_limit ? `${p.per_user_limit}/user` : "—"}
           {p.min_order_amount ? ` · ≥ ${p.min_order_amount}` : ""}
         </span>
@@ -138,7 +142,7 @@ function PromoContent() {
       // ascending sort, matching the "when does this expire?" mental model.
       sortValue: (p) => p.expires_at ?? "",
       render: (p) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-[12px] tabular text-srapi-text-tertiary">
           {p.expires_at ? formatDateTime(p.expires_at) : "—"}
         </span>
       ),

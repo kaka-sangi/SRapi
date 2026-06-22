@@ -21,7 +21,7 @@ export function ReasoningBlock({ text }: { text: string }) {
       </button>
       {open ? (
         <div className="border-t border-srapi-border px-3 py-2">
-          <div className="whitespace-pre-wrap break-words font-serif text-xs leading-relaxed text-srapi-text-tertiary">
+          <div className="whitespace-pre-wrap break-words text-xs leading-relaxed text-srapi-text-tertiary">
             {text}
           </div>
         </div>

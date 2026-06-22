@@ -5,7 +5,8 @@ import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { formatInteger } from "@/lib/admin-format";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { SectionTitle } from "@/components/ui/section-title";
 import { ChartEmpty } from "@/components/charts/chart-empty";
 import type { OpsErrorDistributionItem } from "@/hooks/admin-queries/ops-charts";
 
@@ -82,12 +83,8 @@ export function OpsErrorDistributionChart({
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="not-italic font-sans text-base text-srapi-text-primary">
-          {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        <SectionTitle icon={<AlertTriangle aria-hidden />} label={title} />
         {loading && items.length === 0 ? (
           <div
             role="img"
@@ -136,10 +133,10 @@ export function OpsErrorDistributionChart({
                 })}
               </svg>
               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                <span className="font-serif text-xl text-srapi-text-primary tabular">
+                <span className="text-xl font-semibold tracking-tight tabular text-srapi-text-primary">
                   {formatInteger(total)}
                 </span>
-                <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                   {totalLabel}
                 </span>
               </div>
@@ -150,12 +147,12 @@ export function OpsErrorDistributionChart({
                 {segments.map((seg) => (
                   <span
                     key={seg.owner}
-                    className="inline-flex items-center gap-1.5 font-mono text-2xs text-srapi-text-tertiary"
+                    className="inline-flex items-center gap-1.5 text-[11px] text-srapi-text-tertiary"
                   >
                     <span
                       className={cn("inline-block h-2 w-2 rounded-full", OWNER_STYLE[seg.owner].dot)}
                     />
-                    <span className="text-srapi-text-secondary">{ownerLabels[seg.owner]}</span>
+                    <span className="font-medium text-srapi-text-secondary">{ownerLabels[seg.owner]}</span>
                     <span className="tabular">{Math.round((seg.count / total) * 100)}%</span>
                   </span>
                 ))}
@@ -173,13 +170,13 @@ export function OpsErrorDistributionChart({
                       <span
                         className={cn("inline-block h-2 w-2 shrink-0 rounded-full", OWNER_STYLE[owner].dot)}
                       />
-                      <span className="min-w-0 flex-1 truncate font-mono text-2xs text-srapi-text-secondary">
+                      <span className="min-w-0 flex-1 truncate text-[12px] text-srapi-text-secondary">
                         {item.error_class}
                       </span>
-                      <span className="shrink-0 font-mono text-2xs text-srapi-text-tertiary tabular">
+                      <span className="shrink-0 text-[12px] font-medium tabular text-srapi-text-tertiary">
                         {formatInteger(item.count)}
                       </span>
-                      <span className="w-10 shrink-0 text-right font-mono text-2xs text-srapi-text-tertiary tabular">
+                      <span className="w-10 shrink-0 text-right text-[12px] tabular text-srapi-text-tertiary">
                         {(item.share * 100).toFixed(1)}%
                       </span>
                     </>

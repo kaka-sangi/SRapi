@@ -35,7 +35,7 @@ export function MaintenanceTab({ value, onField, onSave, pending }: MaintenanceT
               <ShieldOff className="size-4 text-srapi-warning" aria-hidden />
               {t("adminSettings.maintenance.enabledLabel")}
             </Label>
-            <p className="text-2xs text-srapi-text-tertiary">
+            <p className="text-xs text-srapi-text-tertiary">
               {t("adminSettings.maintenance.enabledHelp")}
             </p>
           </div>
@@ -56,7 +56,7 @@ export function MaintenanceTab({ value, onField, onSave, pending }: MaintenanceT
             placeholder={t("adminSettings.maintenance.messagePlaceholder")}
             onChange={(e) => onField("message", e.target.value)}
           />
-          <p className="mt-1 text-right font-mono text-2xs text-srapi-text-tertiary">
+          <p className="mt-1 text-right text-xs tabular text-srapi-text-tertiary">
             {messageRemaining} / {MESSAGE_MAX_LEN}
           </p>
         </div>
@@ -71,19 +71,19 @@ export function MaintenanceTab({ value, onField, onSave, pending }: MaintenanceT
               onField("expected_recovery_at", datetimeLocalToISO(e.target.value) as never)
             }
           />
-          <p className="mt-1 text-2xs text-srapi-text-tertiary">
+          <p className="mt-1 text-xs text-srapi-text-tertiary">
             {t("adminSettings.maintenance.recoveryHelp")}
           </p>
         </div>
 
         {value.enabled ? (
-          <div className="flex items-start gap-2 rounded-md border border-srapi-warning/40 bg-srapi-warning/10 p-3 text-xs text-srapi-text-secondary">
+          <div className="flex items-start gap-2 rounded-xl border border-srapi-warning/40 bg-srapi-warning/10 p-3 text-xs text-srapi-text-secondary">
             <AlertTriangle className="mt-0.5 size-4 shrink-0 text-srapi-warning" aria-hidden />
             <p>{t("adminSettings.maintenance.activeBanner")}</p>
           </div>
         ) : null}
 
-        <div className="border-srapi-border flex justify-end border-t pt-4">
+        <div className="flex justify-end border-t border-srapi-border/70 pt-4">
           <Button variant="primary" loading={pending} onClick={onSave}>
             {t("adminSettings.saveSection")}
           </Button>

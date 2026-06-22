@@ -58,17 +58,17 @@ export function ChannelMonitorRunDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 text-lg font-semibold tracking-tight">
             <Play className="size-4 text-srapi-text-tertiary" />
             {t("adminMonitor.runTitle")}
           </DialogTitle>
-          <DialogDescription className="truncate font-mono text-2xs">
+          <DialogDescription className="truncate font-mono text-xs">
             {monitorName}
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex items-center justify-between">
-          <span className="text-2xs text-srapi-text-tertiary">
+          <span className="text-xs text-srapi-text-tertiary">
             {runMut.data
               ? t("adminMonitor.runSummary", {
                   ok: runMut.data.ok_count,
@@ -83,26 +83,26 @@ export function ChannelMonitorRunDialog({
         </div>
 
         {results.length > 0 ? (
-          <div className="space-y-1 rounded-lg border border-srapi-border bg-srapi-card-muted p-2.5">
+          <div className="space-y-1 rounded-xl border border-srapi-border bg-srapi-card-muted p-2.5">
             {results.map((result) => (
               <CheckRow key={`${result.account_id}-${result.model}`} result={result} />
             ))}
           </div>
         ) : runMut.data ? (
-          <p className="text-2xs text-srapi-text-tertiary">{t("adminMonitor.runNoTargets")}</p>
+          <p className="text-xs text-srapi-text-tertiary">{t("adminMonitor.runNoTargets")}</p>
         ) : null}
 
-        <div className="border-t border-srapi-border pt-3">
-          <div className="mb-1.5 flex items-center gap-1.5 text-2xs font-medium text-srapi-text-tertiary">
+        <div className="border-t border-srapi-border/70 pt-3">
+          <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
             <History className="size-3.5" />
             {t("adminMonitor.runHistory")}
           </div>
           {history.data && history.data.data.length > 0 ? (
-            <ul className="space-y-1">
+            <ul className="divide-y divide-srapi-border/70">
               {history.data.data.map((run) => (
                 <li
                   key={run.id}
-                  className="flex items-center justify-between gap-3 font-mono text-2xs text-srapi-text-secondary"
+                  className="flex items-center justify-between gap-3 py-2 text-xs text-srapi-text-secondary"
                 >
                   <span className="flex items-center gap-1.5">
                     {run.ok ? (
@@ -112,14 +112,14 @@ export function ChannelMonitorRunDialog({
                     )}
                     {t("adminMonitor.runSummary", { ok: run.ok_count, total: run.checked_count })}
                   </span>
-                  <span className="tabular text-srapi-text-tertiary">
+                  <span className="text-[12px] tabular text-srapi-text-tertiary">
                     {formatDateTime(run.created_at)}
                   </span>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-2xs text-srapi-text-tertiary">{t("adminMonitor.runNoHistory")}</p>
+            <p className="text-xs text-srapi-text-tertiary">{t("adminMonitor.runNoHistory")}</p>
           )}
         </div>
       </DialogContent>
@@ -129,16 +129,16 @@ export function ChannelMonitorRunDialog({
 
 function CheckRow({ result }: { result: ChannelMonitorCheckResult }) {
   return (
-    <div className="flex items-center justify-between gap-3 font-mono text-2xs">
+    <div className="flex items-center justify-between gap-3 py-1 text-xs">
       <span className="flex items-center gap-1.5 truncate">
         {result.ok ? (
           <CheckCircle2 className="size-3 shrink-0 text-srapi-success" />
         ) : (
           <XCircle className="size-3 shrink-0 text-srapi-error" />
         )}
-        <span className="truncate text-srapi-text-primary">{result.account_name}</span>
+        <span className="truncate font-medium text-srapi-text-primary">{result.account_name}</span>
         {result.model ? (
-          <span className="truncate text-srapi-text-tertiary">{result.model}</span>
+          <span className="truncate font-mono text-[11px] text-srapi-text-tertiary">{result.model}</span>
         ) : null}
       </span>
       <span className="flex shrink-0 items-center gap-2">

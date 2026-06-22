@@ -122,12 +122,12 @@ export function RequestLogFilesPanel() {
         description={t("adminRequestLogFiles.subtitle")}
       />
 
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-srapi-border bg-srapi-card p-3">
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-srapi-border bg-srapi-card p-3">
         <input
           value={prefix}
           onChange={(e) => setPrefix(e.target.value)}
           placeholder={t("adminRequestLogFiles.searchPlaceholder")}
-          className="h-8 flex-1 min-w-[180px] rounded border border-srapi-border bg-srapi-card px-2 text-sm"
+          className="h-9 flex-1 min-w-[180px] rounded-lg border border-srapi-border bg-srapi-card px-2.5 text-sm"
         />
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -148,38 +148,38 @@ export function RequestLogFilesPanel() {
       </div>
 
       {formattedRows.length === 0 ? (
-        <div className="rounded-lg border border-srapi-border bg-srapi-card p-6 text-center text-sm text-srapi-text-tertiary">
-          <p className="font-medium text-srapi-text-secondary">
+        <div className="rounded-2xl border border-dashed border-srapi-border/70 bg-srapi-card-muted/40 p-8 text-center text-sm text-srapi-text-tertiary">
+          <p className="text-base font-semibold tracking-tight text-srapi-text-primary">
             {t("adminRequestLogFiles.emptyTitle")}
           </p>
-          <p>{t("adminRequestLogFiles.emptyBody")}</p>
+          <p className="mt-1 text-srapi-text-secondary">{t("adminRequestLogFiles.emptyBody")}</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-srapi-border bg-srapi-card">
+        <div className="overflow-x-auto rounded-2xl border border-srapi-border bg-srapi-card">
           <table className="w-full table-fixed text-left text-sm">
             <thead className="border-b border-srapi-border bg-srapi-card-muted">
               <tr>
-                <th className="px-3 py-2 font-medium">{t("adminRequestLogFiles.name")}</th>
-                <th className="w-44 px-3 py-2 font-medium">
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{t("adminRequestLogFiles.name")}</th>
+                <th className="w-44 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                   {t("adminRequestLogFiles.requestId")}
                 </th>
-                <th className="w-40 px-3 py-2 font-medium">
+                <th className="w-40 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                   {t("adminRequestLogFiles.createdAt")}
                 </th>
-                <th className="w-24 px-3 py-2 font-medium">{t("adminRequestLogFiles.size")}</th>
-                <th className="w-56 px-3 py-2 font-medium">
+                <th className="w-24 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{t("adminRequestLogFiles.size")}</th>
+                <th className="w-56 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                   {t("adminRequestLogFiles.diagnosticSummary")}
                 </th>
-                <th className="w-36 px-3 py-2 font-medium">
+                <th className="w-36 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                   {t("adminRequestLogFiles.relatedEvidence")}
                 </th>
-                <th className="w-48 px-3 py-2 font-medium">&nbsp;</th>
+                <th className="w-48 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">&nbsp;</th>
               </tr>
             </thead>
             <tbody>
               {formattedRows.map((row) => (
-                <tr key={row.name} className="border-t border-srapi-border">
-                  <td className="px-3 py-2 font-mono text-xs">
+                <tr key={row.name} className="border-t border-srapi-border/70 transition-colors hover:bg-srapi-card-muted/50">
+                  <td className="px-4 py-3 text-xs">
                     <div className="flex min-w-0 items-center gap-2">
                       <button
                         type="button"
@@ -190,49 +190,49 @@ export function RequestLogFilesPanel() {
                         {row.name}
                       </button>
                       {row.is_error_only ? (
-                        <span className="shrink-0 rounded bg-red-500/15 px-1.5 py-0.5 text-2xs uppercase tracking-wide text-red-300">
+                        <span className="shrink-0 rounded-full bg-srapi-error/12 px-2 py-0.5 text-[11px] font-medium text-srapi-error">
                           error
                         </span>
                       ) : null}
                     </div>
                   </td>
-                  <td className="px-3 py-2 font-mono text-xs text-srapi-text-secondary">
+                  <td className="px-4 py-3 text-xs text-srapi-text-secondary">
                     <div className="truncate" title={row.request_id}>
                       {row.request_id}
                     </div>
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2 text-xs text-srapi-text-tertiary">
+                  <td className="whitespace-nowrap px-4 py-3 text-[12px] tabular text-srapi-text-tertiary">
                     {row.createdAtLabel}
                   </td>
-                  <td className="px-3 py-2 text-xs text-srapi-text-tertiary">
+                  <td className="px-4 py-3 text-[12px] text-srapi-text-tertiary">
                     {row.sizeLabel}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-3">
                     <RequestDumpDescriptorSummary file={row} />
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-3">
                     <RequestDumpEvidencePills file={row} />
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-3">
                     <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={() => openPreview(row)}
-                        className="rounded border border-srapi-border px-2 py-1 text-xs hover:bg-srapi-card-muted"
+                        className="rounded-lg border border-srapi-border px-2.5 py-1 text-xs font-medium text-srapi-text-secondary hover:bg-srapi-card-muted hover:text-srapi-text-primary"
                       >
                         {t("adminRequestLogFiles.preview")}
                       </button>
                       <button
                         type="button"
                         onClick={() => downloadFile(row)}
-                        className="rounded border border-srapi-border px-2 py-1 text-xs hover:bg-srapi-card-muted"
+                        className="rounded-lg border border-srapi-border px-2.5 py-1 text-xs font-medium text-srapi-text-secondary hover:bg-srapi-card-muted hover:text-srapi-text-primary"
                       >
                         {t("adminRequestLogFiles.download")}
                       </button>
                       <button
                         type="button"
                         onClick={() => setDeleteTarget(row)}
-                        className="rounded border border-red-500/30 px-2 py-1 text-xs text-red-300 hover:bg-red-500/10"
+                        className="rounded-lg border border-srapi-error/30 px-2.5 py-1 text-xs font-medium text-srapi-error hover:bg-srapi-error/10"
                       >
                         {t("adminRequestLogFiles.delete")}
                       </button>
@@ -310,7 +310,7 @@ function RequestDumpDescriptorSummary({
   const summary = file.summary ?? requestLogDescriptorSummary(file);
   if (!summary.hasSummary) {
     return (
-      <span className="rounded bg-srapi-card-muted px-1.5 py-0.5 text-2xs text-srapi-text-tertiary">
+      <span className="rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-tertiary">
         {t("adminRequestLogFiles.summaryMissing")}
       </span>
     );
@@ -323,27 +323,27 @@ function RequestDumpDescriptorSummary({
         : t("adminRequestLogFiles.summaryMissing");
   const outcomeClass =
     summary.success === true
-      ? "bg-emerald-500/15 text-emerald-300"
+      ? "bg-srapi-success/12 text-srapi-success"
       : summary.success === false
-        ? "bg-red-500/15 text-red-300"
+        ? "bg-srapi-error/12 text-srapi-error"
         : "bg-srapi-card-muted text-srapi-text-tertiary";
 
   return (
     <div className="space-y-1 text-xs">
       <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-        <span className={`rounded px-1.5 py-0.5 text-2xs font-medium ${outcomeClass}`}>
+        <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${outcomeClass}`}>
           {outcome}
         </span>
         {summary.statusCode !== undefined ? (
-          <span className="font-mono text-srapi-text-secondary">{summary.statusCode}</span>
+          <span className="text-srapi-text-secondary">{summary.statusCode}</span>
         ) : null}
         {summary.errorClass ? (
-          <span className="min-w-0 truncate font-mono text-2xs text-red-300" title={summary.errorClass}>
+          <span className="min-w-0 truncate text-[11px] text-srapi-error" title={summary.errorClass}>
             {summary.errorClass}
           </span>
         ) : null}
       </div>
-      <div className="flex min-w-0 flex-wrap gap-x-2 gap-y-1 text-2xs text-srapi-text-tertiary">
+      <div className="flex min-w-0 flex-wrap gap-x-2 gap-y-1 text-[11px] text-srapi-text-tertiary">
         {summary.latencyMS !== undefined ? (
           <span>{t("adminRequestLogFiles.latencyMs", { value: summary.latencyMS })}</span>
         ) : null}
@@ -355,7 +355,7 @@ function RequestDumpDescriptorSummary({
         </span>
       </div>
       {summary.sourceEndpoint ? (
-        <div className="truncate font-mono text-2xs text-srapi-text-tertiary" title={summary.sourceEndpoint}>
+        <div className="truncate text-[11px] text-srapi-text-tertiary" title={summary.sourceEndpoint}>
           {summary.sourceEndpoint}
         </div>
       ) : null}
@@ -369,14 +369,14 @@ function RequestDumpEvidencePills({ file }: { file: RequestLogFileDescriptor }) 
   const errorHref = adminErrorLogsHref({ request_id: file.request_id });
   const systemHref = adminSystemLogsHref({ request_id: file.request_id });
   if (!requestEvidenceHref && !errorHref && !systemHref) {
-    return <span className="font-mono text-2xs text-srapi-text-tertiary">—</span>;
+    return <span className="text-[11px] text-srapi-text-tertiary">—</span>;
   }
   return (
     <div className="flex flex-wrap gap-1.5">
       {requestEvidenceHref ? (
         <Link
           href={requestEvidenceHref}
-          className="rounded bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-secondary underline-offset-2 hover:text-srapi-text-primary hover:underline"
+          className="rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-secondary underline-offset-2 hover:text-srapi-text-primary hover:underline"
         >
           {t("adminRequestLogFiles.openRequestEvidence")}
         </Link>
@@ -384,7 +384,7 @@ function RequestDumpEvidencePills({ file }: { file: RequestLogFileDescriptor }) 
       {errorHref ? (
         <Link
           href={errorHref}
-          className="rounded bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-secondary underline-offset-2 hover:text-srapi-text-primary hover:underline"
+          className="rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-secondary underline-offset-2 hover:text-srapi-text-primary hover:underline"
         >
           {t("adminRequestLogFiles.openErrorLogs")}
         </Link>
@@ -392,7 +392,7 @@ function RequestDumpEvidencePills({ file }: { file: RequestLogFileDescriptor }) 
       {systemHref ? (
         <Link
           href={systemHref}
-          className="rounded bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-secondary underline-offset-2 hover:text-srapi-text-primary hover:underline"
+          className="rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-secondary underline-offset-2 hover:text-srapi-text-primary hover:underline"
         >
           {t("adminRequestLogFiles.openSystemLogs")}
         </Link>
@@ -409,8 +409,8 @@ function RequestDumpEvidenceLinks({ file }: { file: RequestLogFileDescriptor }) 
   if (!requestEvidenceHref && !errorHref && !systemHref) return null;
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-srapi-border bg-srapi-card-muted px-3 py-2">
-      <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-srapi-border bg-srapi-card-muted px-3 py-2">
+      <span className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
         {t("adminRequestLogFiles.relatedEvidence")}
       </span>
       <div className="flex flex-wrap gap-2">

@@ -10,6 +10,7 @@ import {
 import { FilterSelect } from "@/components/admin/list-toolbar";
 import { Pagination } from "@/components/ui/pagination";
 import { QuietBadge } from "@/components/ui/quiet-badge";
+import { DataPill } from "@/components/ui/data-pill";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import {
@@ -84,31 +85,31 @@ export function UserBalanceHistoryDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-lg font-semibold tracking-tight">
             {t("adminUsers.balanceHistory")}
-            <span className="font-mono text-srapi-text-tertiary"> · {email}</span>
+            <span className="ml-2 text-sm font-normal text-srapi-text-tertiary">· {email}</span>
           </DialogTitle>
         </DialogHeader>
 
         {/* Pinned user header */}
-        <div className="rounded-xl border border-srapi-border bg-srapi-card-muted p-4">
+        <div className="rounded-2xl border border-srapi-border bg-srapi-card-muted/60 p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="truncate text-sm font-medium text-srapi-text-primary">{email}</p>
-              <p className="mt-0.5 font-mono text-2xs text-srapi-text-tertiary">#{userId}</p>
+              <p className="mt-0.5 text-[12px] text-srapi-text-tertiary tabular">#{userId}</p>
             </div>
             <div className="flex-shrink-0 text-right">
-              <p className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                 {t("billing.currentBalance")}
               </p>
-              <p className="mt-0.5 font-serif text-2xl leading-none text-srapi-text-primary tabular">
+              <p className="mt-1 text-3xl font-semibold leading-none tracking-tight text-srapi-text-primary tabular">
                 {balance != null ? formatMoney(balance, currency) : "—"}
               </p>
             </div>
           </div>
           <div className="mt-3 flex items-center justify-between gap-4 border-t border-srapi-border/60 pt-3">
             <p
-              className="min-w-0 flex-1 truncate text-2xs text-srapi-text-tertiary"
+              className="min-w-0 flex-1 truncate text-[12px] text-srapi-text-tertiary"
               title={notes ?? ""}
             >
               {notes ? (
@@ -119,11 +120,11 @@ export function UserBalanceHistoryDialog({
                 <>&nbsp;</>
               )}
             </p>
-            <p className="ml-4 flex-shrink-0 text-2xs text-srapi-text-tertiary">
-              Total recharged:{" "}
-              <span className="font-mono font-semibold text-srapi-success tabular">
+            <p className="ml-4 flex flex-shrink-0 items-center gap-2 text-[12px] text-srapi-text-tertiary">
+              Total recharged:
+              <DataPill tone="success" size="sm" className="tabular">
                 {formatMoney(totalRecharged, currency)}
-              </span>
+              </DataPill>
             </p>
           </div>
         </div>
@@ -181,7 +182,7 @@ function BalanceHistoryRow({ entry }: { entry: BillingLedgerEntry }) {
   const positive = Number.isFinite(amount) && amount >= 0;
 
   return (
-    <div className="flex items-start justify-between gap-3 rounded-lg border border-srapi-border/70 p-3">
+    <div className="flex items-start justify-between gap-3 rounded-2xl border border-srapi-border/70 bg-srapi-card p-3 transition-colors hover:bg-srapi-card-muted/50">
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <QuietBadge
@@ -190,26 +191,26 @@ function BalanceHistoryRow({ entry }: { entry: BillingLedgerEntry }) {
           />
         </div>
         {entry.reference_type ? (
-          <p className="mt-1 truncate font-mono text-2xs text-srapi-text-tertiary">
+          <p className="mt-1 truncate text-[12px] text-srapi-text-tertiary tabular">
             {entry.reference_type}
             {entry.reference_id ? ` · ${entry.reference_id}` : ""}
           </p>
         ) : null}
-        <p className="mt-0.5 font-mono text-2xs text-srapi-text-tertiary tabular">
+        <p className="mt-0.5 text-[12px] text-srapi-text-tertiary tabular">
           {formatDateTime(entry.created_at)}
         </p>
       </div>
       <div className="flex-shrink-0 text-right">
         <p
           className={
-            "font-mono text-sm font-semibold tabular " +
+            "text-sm font-semibold tabular " +
             (positive ? "text-srapi-success" : "text-srapi-error")
           }
         >
           {positive ? "+" : ""}
           {formatMoney(entry.amount, entry.currency)}
         </p>
-        <p className="mt-0.5 font-mono text-2xs text-srapi-text-tertiary tabular">
+        <p className="mt-0.5 text-[12px] text-srapi-text-tertiary tabular">
           {formatMoney(entry.balance_before, entry.currency)}
           {" → "}
           {formatMoney(entry.balance_after, entry.currency)}

@@ -18,6 +18,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { useAdminCaptchaSettings, useUpdateCaptchaSettings } from "@/hooks/admin-queries";
 import { adminErrorMessage } from "@/lib/admin-api";
+import { cn } from "@/lib/cn";
 import type {
   CaptchaSettings,
   CaptchaSettingsWritable,
@@ -49,7 +50,7 @@ export function CaptchaSettingsPanel() {
     <PageQueryState
       query={query}
       skeleton={
-        <div className="border-t border-srapi-border pt-5 text-sm text-srapi-text-tertiary">
+        <div className="border-t border-srapi-border/70 pt-5 text-sm text-srapi-text-tertiary">
           {t("common.loading")}
         </div>
       }
@@ -100,10 +101,10 @@ function CaptchaSettingsEditor({ initial }: { initial: CaptchaSettings }) {
   const effectiveSecretConfigured = draft.secretKey.trim() !== "" || draft.secretKeyConfigured;
 
   return (
-    <section className="space-y-4 border-t border-srapi-border pt-5">
+    <section className="space-y-4 border-t border-srapi-border/70 pt-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-srapi-text-primary">
+          <h3 className="text-sm font-semibold tracking-tight text-srapi-text-primary">
             {t("adminSettings.captcha.title")}
           </h3>
           <p className="mt-1 max-w-2xl text-xs text-srapi-text-tertiary">
@@ -174,7 +175,7 @@ function CaptchaSettingsEditor({ initial }: { initial: CaptchaSettings }) {
             }
             onChange={(event) => patch({ secretKey: event.target.value })}
           />
-          <p className="mt-1 text-2xs text-srapi-text-tertiary">
+          <p className="mt-1 text-xs text-srapi-text-tertiary">
             {t("adminSettings.captcha.secretHint")}
           </p>
         </div>
@@ -191,12 +192,19 @@ function CaptchaSettingsEditor({ initial }: { initial: CaptchaSettings }) {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-srapi-border pt-4">
-        <div className="font-mono text-2xs text-srapi-text-tertiary">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-srapi-border/70 pt-4">
+        <span
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium",
+            effectiveSecretConfigured
+              ? "bg-srapi-success/10 text-srapi-success"
+              : "bg-srapi-card-muted text-srapi-text-tertiary",
+          )}
+        >
           {effectiveSecretConfigured
             ? t("adminSettings.captcha.secretStatusConfigured")
             : t("adminSettings.captcha.secretStatusMissing")}
-        </div>
+        </span>
         <Button
           type="button"
           variant="outline"
@@ -227,7 +235,7 @@ function ToggleRow({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex min-h-16 cursor-pointer items-start gap-3 rounded-md border border-srapi-border bg-srapi-card/40 px-3 py-3 text-sm has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
+    <label className="flex min-h-16 cursor-pointer items-start gap-3 rounded-xl border border-srapi-border/70 bg-srapi-card-muted/40 px-3 py-3 text-sm transition-colors hover:bg-srapi-card-muted/60 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
       <Checkbox
         id={id}
         aria-label={label}
@@ -257,7 +265,7 @@ function CaptchaSaveState({ dirty, pending }: { dirty: boolean; pending: boolean
       : t("adminSettings.captcha.saved");
 
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-md border border-srapi-border px-2 py-1 font-mono text-2xs text-srapi-text-tertiary">
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-srapi-card-muted px-2.5 py-1 text-[11px] font-medium text-srapi-text-secondary">
       {pending ? null : icon}
       {label}
     </span>

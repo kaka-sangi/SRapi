@@ -163,7 +163,7 @@ export function ScheduledTestsContent() {
         <span className="text-srapi-text-secondary">
           {scopeLabel(p.scope_type)}
           {p.scope_id != null ? (
-            <span className="ml-1 font-mono text-2xs text-srapi-text-tertiary">#{p.scope_id}</span>
+            <span className="ml-1 text-[11px] text-srapi-text-tertiary">#{p.scope_id}</span>
           ) : null}
         </span>
       ),
@@ -174,7 +174,7 @@ export function ScheduledTestsContent() {
       align: "right",
       hideOnMobile: true,
       render: (p) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-[12px] tabular text-srapi-text-tertiary">
           {p.interval_seconds}s
         </span>
       ),
@@ -185,7 +185,7 @@ export function ScheduledTestsContent() {
       hideOnMobile: true,
       render: (p) =>
         p.probe_model ? (
-          <span className="font-mono text-2xs text-srapi-text-secondary">{p.probe_model}</span>
+          <span className="text-[12px] text-srapi-text-secondary">{p.probe_model}</span>
         ) : (
           <QuietBadge status="limited" label={t("adminScheduledTests.metadataProbeModel")} />
         ),
@@ -207,7 +207,7 @@ export function ScheduledTestsContent() {
       hideOnMobile: true,
       render: (p) =>
         p.last_run_at ? (
-          <span className="text-2xs text-srapi-text-tertiary">{formatDateTime(p.last_run_at)}</span>
+          <span className="text-[12px] tabular text-srapi-text-tertiary">{formatDateTime(p.last_run_at)}</span>
         ) : (
           <span className="text-srapi-text-tertiary">{t("adminScheduledTests.never")}</span>
         ),
@@ -366,33 +366,33 @@ function RunHistoryDialog({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{t("adminScheduledTests.runHistoryFor", { name: plan.name })}</DialogTitle>
+          <DialogTitle className="text-lg font-semibold tracking-tight">{t("adminScheduledTests.runHistoryFor", { name: plan.name })}</DialogTitle>
           <DialogDescription>{t("adminScheduledTests.subtitle")}</DialogDescription>
         </DialogHeader>
         <div className="mt-2 max-h-[60vh] overflow-auto">
           {runs.data && runs.data.data.length > 0 ? (
             <table className="w-full text-left text-xs">
-              <thead className="text-2xs uppercase tracking-wide text-srapi-text-tertiary">
+              <thead className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                 <tr>
-                  <th className="py-1 pr-3">{t("adminScheduledTests.startedAt")}</th>
-                  <th className="py-1 pr-3">{t("adminScheduledTests.lastStatus")}</th>
-                  <th className="py-1 pr-3">{t("adminScheduledTests.summary")}</th>
+                  <th className="py-1.5 pr-3">{t("adminScheduledTests.startedAt")}</th>
+                  <th className="py-1.5 pr-3">{t("adminScheduledTests.lastStatus")}</th>
+                  <th className="py-1.5 pr-3">{t("adminScheduledTests.summary")}</th>
                 </tr>
               </thead>
               <tbody className="text-srapi-text-secondary">
                 {runs.data.data.map((run) => (
                   <tr key={run.id} className="border-t border-srapi-border/60">
-                    <td className="py-1.5 pr-3 align-top">
+                    <td className="py-2 pr-3 align-top">
                       <div className="text-srapi-text-primary">{formatDateTime(run.started_at)}</div>
-                      <div className="text-2xs text-srapi-text-tertiary">{triggerLabel(run.trigger)}</div>
+                      <div className="text-[11px] text-srapi-text-tertiary">{triggerLabel(run.trigger)}</div>
                     </td>
-                    <td className="py-1.5 pr-3 align-top">
+                    <td className="py-2 pr-3 align-top">
                       <QuietBadge
                         status={STATUS_TONE[run.status] ?? "disabled"}
                         label={statusLabel(run.status)}
                       />
                     </td>
-                    <td className="py-1.5 pr-3 align-top font-mono text-2xs text-srapi-text-tertiary">
+                    <td className="py-2 pr-3 align-top text-[11px] text-srapi-text-tertiary">
                       {run.summary || "—"}
                     </td>
                   </tr>

@@ -91,7 +91,7 @@ export function UsageExportDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 text-lg font-semibold tracking-tight">
             <Download className="size-4 text-srapi-text-secondary" aria-hidden />
             {t("usage.exportTitle")}
           </DialogTitle>
@@ -111,7 +111,7 @@ export function UsageExportDialog({
                   : t("usage.exportPreparing")}
               </span>
             </span>
-            <span className="font-mono text-srapi-text-primary tabular">{percent}%</span>
+            <span className="text-sm font-semibold tabular text-srapi-text-primary">{percent}%</span>
           </div>
 
           <div className="h-2 w-full overflow-hidden rounded-full bg-srapi-card-muted">
@@ -132,7 +132,7 @@ export function UsageExportDialog({
           </p>
 
           {progress.phase === "error" && progress.error ? (
-            <p className="text-2xs text-srapi-error" role="alert">
+            <p className="text-xs text-srapi-error" role="alert">
               {progress.error}
             </p>
           ) : null}

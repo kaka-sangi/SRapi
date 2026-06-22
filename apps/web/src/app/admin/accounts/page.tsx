@@ -54,6 +54,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
+import { DataPill } from "@/components/ui/data-pill";
 import {
   Dialog,
   DialogContent,
@@ -654,10 +655,10 @@ function AccountsContent() {
         const hasIdentity = identity.primary !== a.name || identity.secondary.length > 0;
         return (
           <div className="flex min-w-[12rem] flex-col gap-0.5">
-            <span className="text-srapi-text-primary truncate">{a.name}</span>
+            <span className="truncate text-sm font-medium text-srapi-text-primary">{a.name}</span>
             {hasIdentity ? (
               <span
-                className="text-2xs text-srapi-text-tertiary max-w-[16rem] truncate font-mono"
+                className="max-w-[16rem] truncate text-[11px] text-srapi-text-tertiary"
                 title={[identity.primary, ...identity.secondary].join(" · ")}
               >
                 {[identity.primary, ...identity.secondary.slice(0, 2)].join(" · ")}
@@ -672,7 +673,7 @@ function AccountsContent() {
       header: t("adminAccounts.provider"),
       sortValue: (a) => providerNameById.get(String(a.provider_id)) || a.provider_id,
       render: (a) => (
-        <span className="text-srapi-text-secondary">
+        <span className="text-sm text-srapi-text-secondary">
           {providerNameById.get(String(a.provider_id)) || a.provider_id}
         </span>
       ),
@@ -715,67 +716,54 @@ function AccountsContent() {
           <div className="flex max-w-[28rem] min-w-[18rem] flex-col gap-1.5">
             {hasIdentity ? (
               <span
-                className="text-2xs text-srapi-text-secondary max-w-[22rem] truncate font-mono"
+                className="max-w-[22rem] truncate text-[11px] text-srapi-text-secondary"
                 title={[identity.primary, ...identity.secondary].join(" · ")}
               >
                 {[identity.primary, ...identity.secondary.slice(0, 1)].join(" · ")}
               </span>
             ) : null}
             <div className="flex flex-wrap gap-1">
-              <span className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded-md border px-1.5 py-0.5 font-mono">
-                {accountModelPolicyLabel(t, a.metadata)}
-              </span>
+              <DataPill tone="neutral">{accountModelPolicyLabel(t, a.metadata)}</DataPill>
               {endpointFacts.map((fact) => (
-                <span
+                <DataPill
                   key={fact.key}
-                  className={cn(
-                    "text-2xs rounded-md border px-1.5 py-0.5 font-mono",
-                    fact.tone === "enabled"
-                      ? "border-srapi-success/30 bg-srapi-success/10 text-srapi-success"
-                      : "border-srapi-error/30 bg-srapi-error/10 text-srapi-error",
-                  )}
-                  title={`${fact.label}: ${fact.value}`}
+                  tone={fact.tone === "enabled" ? "success" : "error"}
                 >
-                  {fact.label}: {fact.value}
-                </span>
+                  <span title={`${fact.label}: ${fact.value}`}>
+                    {fact.label}: {fact.value}
+                  </span>
+                </DataPill>
               ))}
               {capacityFacts.slice(0, 3).map((fact) => (
-                <span
-                  key={fact.key}
-                  className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded-md border px-1.5 py-0.5 font-mono"
-                  title={`${fact.label}: ${fact.value}`}
-                >
-                  {fact.label}: {fact.value}
-                </span>
+                <DataPill key={fact.key} tone="neutral">
+                  <span title={`${fact.label}: ${fact.value}`}>
+                    {fact.label}: {fact.value}
+                  </span>
+                </DataPill>
               ))}
               {profileFacts.map((fact) => (
-                <span
+                <DataPill
                   key={fact.key}
-                  className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-tertiary max-w-[8.5rem] truncate rounded-md border px-1.5 py-0.5 font-mono"
-                  title={`${fact.label}: ${fact.value}`}
+                  tone="neutral"
+                  className="max-w-[8.5rem] truncate"
                 >
-                  {fact.label}: {fact.value}
-                </span>
+                  <span title={`${fact.label}: ${fact.value}`}>
+                    {fact.label}: {fact.value}
+                  </span>
+                </DataPill>
               ))}
-              <span className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-tertiary max-w-[8rem] truncate rounded-md border px-1.5 py-0.5 font-mono">
+              <DataPill tone="neutral" className="max-w-[8rem] truncate">
                 {groupLabel}
-              </span>
-              <span className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded-md border px-1.5 py-0.5 font-mono">
+              </DataPill>
+              <DataPill tone="neutral">
                 {a.proxy_id ? t("adminAccounts.proxyConfigured") : t("adminAccounts.noProxy")}
-              </span>
-              <span className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded-md border px-1.5 py-0.5 font-mono">
+              </DataPill>
+              <DataPill tone="neutral">
                 P{a.priority ?? 0} / W{a.weight ?? 1}
-              </span>
-              <span
-                className={cn(
-                  "text-2xs rounded-md border px-1.5 py-0.5 font-mono",
-                  today && today.requests > 0
-                    ? "border-srapi-success/30 bg-srapi-success/10 text-srapi-success"
-                    : "border-srapi-border bg-srapi-card-muted text-srapi-text-tertiary",
-                )}
-              >
+              </DataPill>
+              <DataPill tone={today && today.requests > 0 ? "success" : "neutral"}>
                 {todayLabel}
-              </span>
+              </DataPill>
             </div>
           </div>
         );
@@ -794,22 +782,13 @@ function AccountsContent() {
         const endpointFacts = accountEndpointCapabilityFacts(t, a);
         return (
           <div className="flex max-w-[16rem] flex-wrap gap-1">
-            <span className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded-md border px-1.5 py-0.5 font-mono">
-              {accountModelPolicyLabel(t, a.metadata)}
-            </span>
+            <DataPill tone="neutral">{accountModelPolicyLabel(t, a.metadata)}</DataPill>
             {endpointFacts.map((fact) => (
-              <span
-                key={fact.key}
-                className={cn(
-                  "text-2xs rounded-md border px-1.5 py-0.5 font-mono",
-                  fact.tone === "enabled"
-                    ? "border-srapi-success/30 bg-srapi-success/10 text-srapi-success"
-                    : "border-srapi-error/30 bg-srapi-error/10 text-srapi-error",
-                )}
-                title={`${fact.label}: ${fact.value}`}
-              >
-                {fact.label}: {fact.value}
-              </span>
+              <DataPill key={fact.key} tone={fact.tone === "enabled" ? "success" : "error"}>
+                <span title={`${fact.label}: ${fact.value}`}>
+                  {fact.label}: {fact.value}
+                </span>
+              </DataPill>
             ))}
           </div>
         );
@@ -826,18 +805,20 @@ function AccountsContent() {
       render: (a) => {
         const facts = accountProfileFacts(t, a).slice(0, 4);
         if (facts.length === 0) {
-          return <span className="text-2xs text-srapi-text-tertiary font-mono">—</span>;
+          return <span className="text-xs text-srapi-text-tertiary">—</span>;
         }
         return (
           <div className="flex max-w-[18rem] flex-wrap gap-1">
             {facts.map((fact) => (
-              <span
+              <DataPill
                 key={fact.key}
-                className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-tertiary max-w-[8.5rem] truncate rounded-md border px-1.5 py-0.5 font-mono"
-                title={`${fact.label}: ${fact.value}`}
+                tone="neutral"
+                className="max-w-[8.5rem] truncate"
               >
-                {fact.label}: {fact.value}
-              </span>
+                <span title={`${fact.label}: ${fact.value}`}>
+                  {fact.label}: {fact.value}
+                </span>
+              </DataPill>
             ))}
           </div>
         );
@@ -854,18 +835,20 @@ function AccountsContent() {
       render: (a) => {
         const facts = accountCapacityFacts(t, a);
         if (facts.length === 0) {
-          return <span className="text-2xs text-srapi-text-tertiary font-mono">—</span>;
+          return <span className="text-xs text-srapi-text-tertiary">—</span>;
         }
         return (
           <div className="flex max-w-[16rem] flex-wrap gap-1">
             {facts.map((fact) => (
-              <span
+              <DataPill
                 key={fact.key}
-                className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-tertiary max-w-[7rem] truncate rounded-md border px-1.5 py-0.5 font-mono"
-                title={`${fact.label}: ${fact.value}`}
+                tone="neutral"
+                className="max-w-[7rem] truncate"
               >
-                {fact.label}: {fact.value}
-              </span>
+                <span title={`${fact.label}: ${fact.value}`}>
+                  {fact.label}: {fact.value}
+                </span>
+              </DataPill>
             ))}
           </div>
         );
@@ -876,7 +859,7 @@ function AccountsContent() {
       header: t("adminAccounts.type"),
       hideOnMobile: true,
       render: (a) => (
-        <span className="text-2xs text-srapi-text-tertiary">
+        <span className="text-xs text-srapi-text-tertiary">
           {runtimeClassLabel(t, a.runtime_class)}
         </span>
       ),
@@ -889,7 +872,7 @@ function AccountsContent() {
         const ids = a.group_ids ?? [];
         if (ids.length === 0) {
           return (
-            <span className="text-2xs text-srapi-text-tertiary">
+            <span className="text-xs text-srapi-text-tertiary">
               {t("adminAccounts.ungrouped")}
             </span>
           );
@@ -899,12 +882,9 @@ function AccountsContent() {
             {ids.map((id) => {
               const name = groupNameById.get(String(id)) ?? `#${id}`;
               return (
-                <span
-                  key={String(id)}
-                  className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-tertiary inline-flex items-center rounded-md border px-1.5 py-0.5 font-mono"
-                >
+                <DataPill key={String(id)} tone="neutral">
                   {name}
-                </span>
+                </DataPill>
               );
             })}
           </div>
@@ -917,7 +897,7 @@ function AccountsContent() {
       hideOnMobile: true,
       sortValue: (a) => a.proxy_id ?? "",
       render: (a) => (
-        <span className="text-2xs text-srapi-text-tertiary font-mono">
+        <span className="text-xs text-srapi-text-tertiary">
           {a.proxy_id ? t("adminAccounts.proxyConfigured") : t("adminAccounts.noProxy")}
         </span>
       ),
@@ -929,16 +909,10 @@ function AccountsContent() {
       sortValue: (a) => `${a.priority}:${a.weight}:${a.risk_level ?? ""}`,
       render: (a) => (
         <div className="flex flex-wrap gap-1">
-          <span className="bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded-md px-1.5 py-0.5 font-mono">
-            P{a.priority ?? 0}
-          </span>
-          <span className="bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded-md px-1.5 py-0.5 font-mono">
-            W{a.weight ?? 1}
-          </span>
+          <DataPill tone="neutral" size="sm">P{a.priority ?? 0}</DataPill>
+          <DataPill tone="neutral" size="sm">W{a.weight ?? 1}</DataPill>
           {a.risk_level ? (
-            <span className="bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded-md px-1.5 py-0.5 font-mono">
-              {a.risk_level}
-            </span>
+            <DataPill tone="neutral" size="sm">{a.risk_level}</DataPill>
           ) : null}
         </div>
       ),
@@ -987,21 +961,21 @@ function AccountsContent() {
       render: (a) => {
         const today = todayByAccountId.get(a.id);
         if (!today) {
-          return <span className="text-2xs text-srapi-text-tertiary font-mono">—</span>;
+          return <span className="text-xs text-srapi-text-tertiary">—</span>;
         }
         if (today.requests === 0) {
           return (
-            <span className="text-2xs text-srapi-text-tertiary font-mono">
+            <span className="text-xs text-srapi-text-tertiary">
               {t("adminAccounts.todayIdle")}
             </span>
           );
         }
         return (
           <div className="flex flex-col gap-0.5">
-            <span className="text-2xs text-srapi-text-secondary tabular font-mono">
+            <span className="text-xs font-medium tabular text-srapi-text-secondary">
               {formatInteger(today.requests)} · {formatMoney(today.cost, today.currency)}
             </span>
-            <span className="text-2xs text-srapi-text-tertiary tabular font-mono">
+            <span className="text-[11px] tabular text-srapi-text-tertiary">
               {formatInteger(today.total_tokens || today.input_tokens + today.output_tokens)}{" "}
               {t("adminAccounts.usageTokens").toLowerCase()} · {formatPercent(today.success_rate)}
             </span>
@@ -1357,7 +1331,7 @@ function AccountsContent() {
         actionPending={batchAction.isPending || batchQuotaFetch.isPending}
       />
       {readOnlyHealthView && focusedAccountId ? (
-        <div className="border-srapi-border bg-srapi-card-muted text-2xs text-srapi-text-secondary mb-4 rounded-md border px-3 py-2 font-mono">
+        <div className="mb-4 rounded-xl border border-srapi-border bg-srapi-card-muted px-3.5 py-2.5 text-xs text-srapi-text-secondary">
           {focusedAccountTarget ? (
             <span>
               {t("adminAccounts.healthFocusActive", {
@@ -1714,10 +1688,10 @@ function BulkCredentialRotateDialog({
             value={raw}
             onChange={(e) => setRaw(e.target.value)}
             rows={Math.min(12, Math.max(4, selectedIds.length))}
-            className="border-srapi-border bg-srapi-bg-secondary w-full rounded border px-3 py-2 font-mono text-sm"
+            className="w-full rounded-xl border border-srapi-border bg-srapi-card px-3 py-2 font-mono text-sm text-srapi-text-primary placeholder:text-srapi-text-tertiary focus:outline-none focus:ring-2 focus:ring-srapi-primary/40"
             placeholder="123,refresh_token=abc123,api_key=sk-..."
           />
-          {error ? <p className="text-srapi-error text-xs">{error}</p> : null}
+          {error ? <p className="text-xs text-srapi-error">{error}</p> : null}
           <DialogFooter>
             <Button variant="ghost" type="button" onClick={onClose}>
               {t("common.cancel")}
@@ -1783,7 +1757,7 @@ function BulkConcurrencyDialog({
               />
             </div>
             {error ? (
-              <p role="alert" className="text-2xs text-srapi-error">
+              <p role="alert" className="text-xs text-srapi-error">
                 {error}
               </p>
             ) : null}
@@ -1976,7 +1950,7 @@ function BulkEditAccountDialog({
               disabled={isPending}
             >
               <select
-                className="border-srapi-border bg-srapi-card text-2xs w-full rounded-md border px-2 py-1.5"
+                className="w-full rounded-lg border border-srapi-border bg-srapi-card px-2.5 py-1.5 text-xs text-srapi-text-primary focus:outline-none focus:ring-2 focus:ring-srapi-primary/40"
                 value={statusValue}
                 disabled={!statusEnabled || isPending}
                 onChange={(e) => setStatusValue(e.target.value as ProviderAccountStatus)}
@@ -2054,7 +2028,7 @@ function BulkEditAccountDialog({
               disabled={isPending}
             >
               <select
-                className="border-srapi-border bg-srapi-card text-2xs w-full rounded-md border px-2 py-1.5"
+                className="w-full rounded-lg border border-srapi-border bg-srapi-card px-2.5 py-1.5 text-xs text-srapi-text-primary focus:outline-none focus:ring-2 focus:ring-srapi-primary/40"
                 value={proxyValue}
                 disabled={!proxyEnabled || isPending}
                 onChange={(e) => setProxyValue(e.target.value)}
@@ -2087,7 +2061,7 @@ function BulkEditAccountDialog({
               disabled={isPending}
             >
               <select
-                className="border-srapi-border bg-srapi-card text-2xs w-full rounded-md border px-2 py-1.5"
+                className="w-full rounded-lg border border-srapi-border bg-srapi-card px-2.5 py-1.5 text-xs text-srapi-text-primary focus:outline-none focus:ring-2 focus:ring-srapi-primary/40"
                 value={runtimeClassValue}
                 disabled={!runtimeClassEnabled || isPending}
                 onChange={(e) => setRuntimeClassValue(e.target.value)}
@@ -2112,7 +2086,7 @@ function BulkEditAccountDialog({
               disabled={isPending || groupOptions.length === 0}
             >
               <select
-                className="border-srapi-border bg-srapi-card text-2xs w-full rounded-md border px-2 py-1.5"
+                className="w-full rounded-lg border border-srapi-border bg-srapi-card px-2.5 py-1.5 text-xs text-srapi-text-primary focus:outline-none focus:ring-2 focus:ring-srapi-primary/40"
                 value={groupValue}
                 disabled={!groupEnabled || isPending || groupOptions.length === 0}
                 onChange={(e) => setGroupValue(e.target.value)}
@@ -2126,7 +2100,7 @@ function BulkEditAccountDialog({
               </select>
             </BulkEditRow>
             {error ? (
-              <p role="alert" className="text-2xs text-srapi-error">
+              <p role="alert" className="text-xs text-srapi-error">
                 {error}
               </p>
             ) : null}
@@ -2168,7 +2142,7 @@ function BulkEditRow({
         className="border-srapi-border size-4 rounded"
         aria-label={label}
       />
-      <Label className="text-2xs">{label}</Label>
+      <Label className="text-xs">{label}</Label>
       <div>{children}</div>
     </div>
   );

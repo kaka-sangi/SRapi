@@ -124,7 +124,7 @@ function OrdersContent() {
       pinned: true,
       sortValue: (o) => o.order_no,
       render: (o) => (
-        <span className="font-mono text-2xs text-srapi-text-secondary">{o.order_no}</span>
+        <span className="text-sm font-medium tabular text-srapi-text-primary">{o.order_no}</span>
       ),
     },
     {
@@ -147,7 +147,7 @@ function OrdersContent() {
       align: "right",
       sortValue: (o) => Number(o.amount),
       render: (o) => (
-        <span className="font-mono text-srapi-text-secondary tabular">
+        <span className="text-sm font-medium tabular text-srapi-text-primary">
           {formatMoney(o.amount, o.currency)}
         </span>
       ),
@@ -256,10 +256,12 @@ function AuditDialog({ order, onClose }: { order: PaymentOrder; onClose: () => v
     <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{t("adminOrders.audit.title")}</DialogTitle>
+          <DialogTitle className="text-lg font-semibold tracking-tight">
+            {t("adminOrders.audit.title")}
+          </DialogTitle>
           <DialogDescription>
             <span className="inline-flex items-center gap-1.5">
-              <span className="font-mono">{order.order_no}</span>
+              <span className="tabular text-srapi-text-secondary">{order.order_no}</span>
               <CopyButton value={order.order_no} size="inline" />
             </span>
           </DialogDescription>
@@ -290,31 +292,31 @@ function AuditLogItem({ log }: { log: PaymentAuditLog }) {
   const payloadJson = safeJson(log.payload);
   const hasPayload = payloadJson && payloadJson !== "null" && payloadJson !== "{}" && payloadJson !== "[]";
   return (
-    <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-3">
+    <div className="rounded-xl border border-srapi-border bg-srapi-card-muted/60 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="font-mono text-xs text-srapi-text-primary">{log.event_type}</span>
+        <span className="text-sm font-semibold tracking-tight text-srapi-text-primary">{log.event_type}</span>
         <QuietBadge
           status={log.signature_valid ? "active" : "error"}
           label={log.signature_valid ? t("adminOrders.audit.signatureValid") : t("adminOrders.audit.signatureInvalid")}
         />
       </div>
-      <dl className="mt-2 grid gap-1 text-2xs text-srapi-text-tertiary sm:grid-cols-2">
+      <dl className="mt-3 grid gap-2 text-xs text-srapi-text-tertiary sm:grid-cols-2">
         <div>
-          <dt>{t("adminOutbox.idempotency")}</dt>
-          <dd className="flex items-center gap-1.5 break-all font-mono text-srapi-text-secondary">
+          <dt className="text-xs font-medium text-srapi-text-tertiary">{t("adminOutbox.idempotency")}</dt>
+          <dd className="mt-0.5 flex items-center gap-1.5 break-all text-[12px] tabular text-srapi-text-secondary">
             <span className="break-all">{log.idempotency_key}</span>
             {log.idempotency_key ? <CopyButton value={log.idempotency_key} size="inline" /> : null}
           </dd>
         </div>
         <div>
-          <dt>{t("adminCommon.created")}</dt>
-          <dd className="font-mono text-srapi-text-secondary">{formatDateTime(log.created_at)}</dd>
+          <dt className="text-xs font-medium text-srapi-text-tertiary">{t("adminCommon.created")}</dt>
+          <dd className="mt-0.5 text-[12px] tabular text-srapi-text-secondary">{formatDateTime(log.created_at)}</dd>
         </div>
       </dl>
       <div className="mt-2 flex items-center justify-end">
         {hasPayload ? <CopyButton value={payloadJson} size="inline" /> : null}
       </div>
-      <pre className="overflow-auto rounded-md border border-srapi-border bg-srapi-card px-3 py-2 text-2xs text-srapi-text-secondary max-h-48">
+      <pre className="mt-2 max-h-48 overflow-auto rounded-lg border border-srapi-border bg-srapi-card px-3 py-2 text-[11px] tabular text-srapi-text-secondary">
         {payloadJson}
       </pre>
     </div>
@@ -372,25 +374,27 @@ function RefundDialog({ order, onClose }: { order: PaymentOrder; onClose: () => 
       <DialogContent>
         <form onSubmit={submit}>
           <DialogHeader>
-            <DialogTitle>{t("adminOrders.refundTitle")}</DialogTitle>
+            <DialogTitle className="text-lg font-semibold tracking-tight">
+              {t("adminOrders.refundTitle")}
+            </DialogTitle>
             <DialogDescription>
               <span className="inline-flex items-center gap-1.5">
-                <span className="font-mono">{order.order_no}</span>
+                <span className="tabular text-srapi-text-secondary">{order.order_no}</span>
                 <CopyButton value={order.order_no} size="inline" />
               </span>
             </DialogDescription>
           </DialogHeader>
           <div className="mt-4 space-y-4">
-            <dl className="rounded-xl border border-srapi-border bg-srapi-card-muted px-3.5 py-3 text-sm">
+            <dl className="rounded-xl border border-srapi-border bg-srapi-card-muted/60 px-4 py-3 text-sm">
               <div className="flex items-center justify-between">
                 <dt className="text-srapi-text-tertiary">{t("adminOrders.amount")}</dt>
-                <dd className="font-mono text-srapi-text-secondary tabular">
+                <dd className="text-sm font-medium tabular text-srapi-text-secondary">
                   {formatMoney(order.amount, order.currency)}
                 </dd>
               </div>
               <div className="mt-1.5 flex items-center justify-between">
                 <dt className="text-srapi-text-tertiary">{t("adminOrders.refundRemaining")}</dt>
-                <dd className="font-mono text-srapi-text-primary tabular">
+                <dd className="text-sm font-semibold tabular text-srapi-text-primary">
                   {formatMoney(order.amount, order.currency)}
                 </dd>
               </div>
@@ -407,7 +411,7 @@ function RefundDialog({ order, onClose }: { order: PaymentOrder; onClose: () => 
                 onChange={(e) => setForm((prev) => ({ ...prev, amount: e.target.value }))}
               />
               {exceeds ? (
-                <p role="alert" className="mt-1 text-2xs text-srapi-error">
+                <p role="alert" className="mt-1 text-xs text-srapi-error">
                   {t("adminOrders.refundExceeds")}
                 </p>
               ) : null}

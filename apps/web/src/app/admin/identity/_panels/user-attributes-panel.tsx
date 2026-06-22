@@ -101,7 +101,9 @@ export function UserAttributesPanel() {
       key: "dataType",
       header: t("adminUserAttributes.dataType"),
       render: (d) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary">{d.data_type}</span>
+        <span className="rounded-full bg-srapi-card-muted px-2 py-0.5 font-mono text-[11px] font-medium text-srapi-text-secondary">
+          {d.data_type}
+        </span>
       ),
     },
     {
@@ -121,7 +123,7 @@ export function UserAttributesPanel() {
       align: "right",
       hideOnMobile: true,
       render: (d) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">{d.display_order}</span>
+        <span className="text-[12px] tabular text-srapi-text-tertiary">{d.display_order}</span>
       ),
     },
     {

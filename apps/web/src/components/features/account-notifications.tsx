@@ -71,10 +71,10 @@ function NotificationPreferencesCard() {
     <Card>
       <CardContent className="space-y-4">
         <div>
-          <h3 className="font-serif text-lg text-srapi-text-primary">
+          <h3 className="text-lg font-semibold tracking-tight text-srapi-text-primary">
             {t("account.notifyPrefsTitle")}
           </h3>
-          <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("account.notifyPrefsHint")}</p>
+          <p className="mt-1 text-xs text-srapi-text-tertiary">{t("account.notifyPrefsHint")}</p>
         </div>
         <PageQueryState
           query={prefs}
@@ -83,7 +83,7 @@ function NotificationPreferencesCard() {
           emptyTitle={t("account.notifyPrefsEmpty")}
         >
           {(list) => (
-            <ul className="divide-y divide-srapi-border">
+            <ul className="divide-y divide-srapi-border/70">
               {list.data.map((pref) => {
                 const copy = EVENT_I18N[pref.event];
                 const label = copy ? t(copy.label) : pref.label;
@@ -91,9 +91,9 @@ function NotificationPreferencesCard() {
                 return (
                   <li key={pref.event} className="flex items-start justify-between gap-4 py-3">
                     <div>
-                      <p className="text-sm text-srapi-text-primary">{label}</p>
+                      <p className="text-sm font-medium text-srapi-text-primary">{label}</p>
                       {desc ? (
-                        <p className="text-2xs text-srapi-text-tertiary">{desc}</p>
+                        <p className="text-xs text-srapi-text-tertiary">{desc}</p>
                       ) : null}
                     </div>
                     <Switch
@@ -170,10 +170,10 @@ function NotificationContactsCard() {
     <Card>
       <CardContent className="space-y-4">
         <div>
-          <h3 className="font-serif text-lg text-srapi-text-primary">
+          <h3 className="text-lg font-semibold tracking-tight text-srapi-text-primary">
             {t("account.notifyContactsTitle")}
           </h3>
-          <p className="mt-1 text-2xs text-srapi-text-tertiary">
+          <p className="mt-1 text-xs text-srapi-text-tertiary">
             {t("account.notifyContactsHint")}
           </p>
         </div>
@@ -185,7 +185,7 @@ function NotificationContactsCard() {
           emptyTitle={t("account.notifyContactEmpty")}
         >
           {(list) => (
-            <ul className="divide-y divide-srapi-border">
+            <ul className="divide-y divide-srapi-border/70">
               {list.data.map((contact) => (
                 <li key={contact.id} className="flex items-center justify-between gap-3 py-3">
                   <div className="min-w-0">
@@ -232,7 +232,7 @@ function NotificationContactsCard() {
           )}
         </PageQueryState>
 
-        <div className="space-y-3 border-t border-srapi-border pt-4">
+        <div className="space-y-3 border-t border-srapi-border/70 pt-4">
           <div>
             <Label htmlFor="contact-email">{t("account.notifyContactEmail")}</Label>
             <div className="mt-1 flex gap-2">

@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QuietBadge } from "@/components/ui/quiet-badge";
+import { DataPill } from "@/components/ui/data-pill";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import { formatMoney, formatDate } from "@/lib/admin-format";
 import {
@@ -140,15 +141,15 @@ function BalanceTab() {
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Card>
+      <Card className="card-raised border-l-4 border-l-srapi-primary">
         <CardContent>
-          <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
             {t("billing.currentBalance")}
           </span>
           {balance.isLoading ? (
             <Skeleton className="mt-3 h-10 w-40" />
           ) : (
-            <div className="mt-2 font-serif text-4xl text-srapi-text-primary tabular">
+            <div className="mt-2 text-3xl font-semibold tracking-tight tabular text-srapi-text-primary">
               {balance.data ? formatMoney(balance.data.balance, balance.data.currency) : "—"}
             </div>
           )}
@@ -158,7 +159,7 @@ function BalanceTab() {
       <Card>
         <CardContent>
           <form onSubmit={topUp} className="space-y-4">
-            <h3 className="font-serif text-lg text-srapi-text-primary">{t("billing.topUp")}</h3>
+            <h3 className="text-lg font-semibold tracking-tight text-srapi-text-primary">{t("billing.topUp")}</h3>
             <div>
               <Label htmlFor="amount">{t("billing.amount")}</Label>
               <Input
@@ -172,7 +173,7 @@ function BalanceTab() {
             <div>
               <Label htmlFor="method">{t("billing.method")}</Label>
               {methodList.length === 0 ? (
-                <p className="text-2xs text-srapi-text-tertiary">{t("billing.noMethods")}</p>
+                <p className="text-xs text-srapi-text-tertiary">{t("billing.noMethods")}</p>
               ) : (
                 <Select
                   value={effectiveInstanceId}
@@ -192,22 +193,22 @@ function BalanceTab() {
               )}
             </div>
             {selected ? (
-              <dl className="rounded-lg border border-srapi-border bg-srapi-card-muted px-3.5 py-3 text-sm">
+              <dl className="rounded-xl border border-srapi-border bg-srapi-card-muted px-4 py-3 text-sm">
                 <div className="flex items-center justify-between">
                   <dt className="text-srapi-text-tertiary">{t("billing.feeCredit")}</dt>
-                  <dd className="font-mono text-srapi-text-secondary tabular">
+                  <dd className="tabular text-srapi-text-secondary">
                     {formatMoney(amount, paymentCurrency)}
                   </dd>
                 </div>
                 <div className="mt-1.5 flex items-center justify-between">
                   <dt className="text-srapi-text-tertiary">{t("billing.feeChannel")}</dt>
-                  <dd className="font-mono text-srapi-text-secondary tabular">
+                  <dd className="tabular text-srapi-text-secondary">
                     {feePreview ? formatMoney(feePreview.fee, paymentCurrency) : "-"}
                   </dd>
                 </div>
-                <div className="mt-1.5 flex items-center justify-between border-t border-srapi-border pt-1.5">
+                <div className="mt-2 flex items-center justify-between border-t border-srapi-border/70 pt-2">
                   <dt className="font-medium text-srapi-text-primary">{t("billing.feePayable")}</dt>
-                  <dd className="font-mono text-srapi-text-primary tabular">
+                  <dd className="text-base font-semibold tracking-tight tabular text-srapi-text-primary">
                     {feePreview ? formatMoney(feePreview.payable, paymentCurrency) : "-"}
                   </dd>
                 </div>
@@ -308,14 +309,14 @@ function OrdersTab() {
     {
       key: "order",
       header: t("billing.order"),
-      render: (o) => <span className="font-mono text-2xs text-srapi-text-secondary">{o.order_no}</span>,
+      render: (o) => <span className="font-mono text-xs text-srapi-text-secondary">{o.order_no}</span>,
     },
     {
       key: "amount",
       header: t("billing.amount"),
       align: "right",
       render: (o) => (
-        <span className="font-mono text-srapi-text-secondary tabular">
+        <span className="text-sm font-medium tabular text-srapi-text-primary">
           {formatMoney(o.amount, o.currency)}
         </span>
       ),
@@ -375,14 +376,14 @@ function SubscriptionsTab() {
     {
       key: "plan",
       header: t("billing.plan"),
-      render: (s) => <span className="font-mono text-2xs text-srapi-text-secondary">{s.plan_id}</span>,
+      render: (s) => <DataPill tone="neutral">{s.plan_id}</DataPill>,
     },
     {
       key: "period",
       header: t("billing.period"),
       hideOnMobile: true,
       render: (s) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-[12px] tabular text-srapi-text-tertiary">
           {formatDate(s.starts_at)} – {formatDate(s.expires_at)}
         </span>
       ),
@@ -436,7 +437,7 @@ function LedgerTab() {
       key: "date",
       header: t("billing.date"),
       render: (row) => (
-        <span className="whitespace-nowrap font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="whitespace-nowrap text-[12px] tabular text-srapi-text-tertiary">
           {formatDate(row.created_at)}
         </span>
       ),
@@ -444,14 +445,14 @@ function LedgerTab() {
     {
       key: "type",
       header: t("billing.entryType"),
-      render: (row) => <span className="text-srapi-text-secondary">{row.type}</span>,
+      render: (row) => <span className="text-sm text-srapi-text-secondary">{row.type}</span>,
     },
     {
       key: "amount",
       header: t("billing.amount"),
       align: "right",
       render: (row) => (
-        <span className="font-mono text-srapi-text-secondary tabular">
+        <span className="text-[12px] font-medium tabular text-srapi-text-primary">
           {formatMoney(row.amount, row.currency)}
         </span>
       ),
@@ -462,7 +463,7 @@ function LedgerTab() {
       align: "right",
       hideOnMobile: true,
       render: (row) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="text-[12px] tabular text-srapi-text-tertiary">
           {formatMoney(row.balance_after, row.currency)}
         </span>
       ),
@@ -473,12 +474,12 @@ function LedgerTab() {
       hideOnMobile: true,
       render: (row) =>
         row.reference_type ? (
-          <span className="font-mono text-2xs text-srapi-text-tertiary">
+          <span className="text-[12px] text-srapi-text-tertiary">
             {row.reference_type}
             {row.reference_id ? ` · ${row.reference_id}` : ""}
           </span>
         ) : (
-          <span className="text-2xs text-srapi-text-tertiary">—</span>
+          <span className="text-[12px] text-srapi-text-tertiary">—</span>
         ),
     },
   ];

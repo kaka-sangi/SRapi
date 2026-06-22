@@ -277,9 +277,10 @@ function ListTable<T>({
               <TableRow
                 key={id}
                 className={cn(
-                  "anim-rise-sm",
+                  "anim-rise-sm transition-colors",
+                  "hover:bg-srapi-card-muted/60",
                   dimRow?.(row) && "opacity-50",
-                  isSelected && "bg-srapi-card-muted",
+                  isSelected && "bg-srapi-accent-soft",
                 )}
                 style={{ "--stagger-index": stagger } as React.CSSProperties}
               >
@@ -344,14 +345,14 @@ function BulkBar({
 }) {
   const { t } = useLanguage();
   return (
-    <div className="anim-rise-sm flex flex-wrap items-center gap-3 border-b border-srapi-border bg-srapi-card-muted px-4 py-2.5">
-      <span className="font-mono text-2xs text-srapi-text-secondary">
+    <div className="anim-rise-sm flex flex-wrap items-center gap-3 border-b border-srapi-border bg-srapi-accent-soft px-4 py-2.5">
+      <span className="text-xs font-medium text-srapi-primary">
         {t("adminCommon.selectedCount", { count })}
       </span>
       <button
         type="button"
         onClick={onClear}
-        className="text-2xs text-srapi-text-tertiary underline-offset-2 hover:text-srapi-text-primary hover:underline"
+        className="text-xs text-srapi-text-tertiary underline-offset-2 hover:text-srapi-text-primary hover:underline"
       >
         {t("adminCommon.clearSelection")}
       </button>
@@ -387,7 +388,7 @@ function ListSkeleton() {
 export function ListCount({ total }: { total: number }) {
   const { t } = useLanguage();
   return (
-    <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+    <span className="text-xs font-medium tabular text-srapi-text-tertiary">
       {t("adminCommon.total", { count: total })}
     </span>
   );

@@ -14,6 +14,8 @@ import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
 import { Card } from "@/components/ui/card";
 import { QuietBadge } from "@/components/ui/quiet-badge";
+import { DataPill } from "@/components/ui/data-pill";
+import { IconBubble } from "@/components/ui/icon-bubble";
 import {
   useAdminPricingRules,
   useAdminPricingRulePresets,
@@ -255,11 +257,11 @@ function PricingContent() {
       sortValue: (r) => pricingRuleModelLabel(r, modelMap, t),
       render: (r) => (
         <div className="min-w-0">
-          <div className="text-2xs text-srapi-text-primary truncate">
+          <div className="text-sm text-srapi-text-primary truncate">
             {pricingRuleModelLabel(r, modelMap, t)}
           </div>
           {String(r.model_id) === "0" ? (
-            <div className="text-srapi-text-tertiary truncate text-2xs tracking-wide uppercase">
+            <div className="text-srapi-text-tertiary truncate text-xs">
               {t("adminPricing.modelFamily")}
             </div>
           ) : null}
@@ -272,7 +274,7 @@ function PricingContent() {
       hideOnMobile: true,
       sortValue: (r) => providerMap.get(String(r.provider_id)) ?? String(r.provider_id),
       render: (r) => (
-        <span className="text-2xs text-srapi-text-secondary">
+        <span className="text-sm text-srapi-text-secondary">
           {String(r.provider_id) === "0"
             ? t("adminPricing.anyProvider")
             : (providerMap.get(String(r.provider_id)) ?? r.provider_id)}
@@ -285,9 +287,7 @@ function PricingContent() {
       hideOnMobile: true,
       sortValue: (r) => r.billing_mode,
       render: (r) => (
-        <span className="text-2xs text-srapi-text-secondary">
-          {formatBillingMode(r.billing_mode, t)}
-        </span>
+        <DataPill tone="neutral" size="sm">{formatBillingMode(r.billing_mode, t)}</DataPill>
       ),
     },
     {
@@ -295,7 +295,7 @@ function PricingContent() {
       header: t("adminPricing.inputPrice"),
       align: "right",
       render: (r) => (
-        <span className="text-srapi-text-secondary tabular font-mono">
+        <span className="text-sm text-srapi-text-secondary tabular">
           {formatMoney(r.input_price_per_million_tokens, r.currency)}
         </span>
       ),
@@ -306,7 +306,7 @@ function PricingContent() {
       align: "right",
       hideOnMobile: true,
       render: (r) => (
-        <span className="text-srapi-text-secondary tabular font-mono">
+        <span className="text-sm text-srapi-text-secondary tabular">
           {formatMoney(r.output_price_per_million_tokens, r.currency)}
         </span>
       ),
@@ -317,7 +317,7 @@ function PricingContent() {
       align: "right",
       hideOnMobile: true,
       render: (r) => (
-        <span className="text-2xs text-srapi-text-tertiary tabular font-mono">
+        <span className="text-xs text-srapi-text-tertiary tabular">
           {r.intervals.length}
         </span>
       ),
@@ -465,7 +465,7 @@ function PricingContent() {
             value={importText}
             onChange={(e) => setImportText(e.target.value)}
             placeholder={`[\n  { "model_id": "...", "provider_id": "..." }\n]`}
-            className="text-2xs min-h-48 font-mono"
+            className="min-h-48 font-mono text-xs"
             spellCheck={false}
           />
           {importError ? (
@@ -525,12 +525,14 @@ function PricingPresetPanel({
   const samplePresets = presets.slice(0, 5);
 
   return (
-    <Card className="mb-4 p-4">
+    <Card className="mb-4 p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <Tag className="text-srapi-text-tertiary size-4" />
-            <h2 className="text-srapi-text-primary font-medium">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <IconBubble size="sm" tone="accent">
+              <Tag aria-hidden />
+            </IconBubble>
+            <h2 className="text-srapi-text-primary text-base font-semibold tracking-tight">
               {t("adminPricing.presetPanelTitle")}
             </h2>
             <QuietBadge
@@ -541,7 +543,7 @@ function PricingPresetPanel({
               })}
             />
           </div>
-          <p className="text-2xs text-srapi-text-tertiary mt-1 max-w-3xl">
+          <p className="text-sm text-srapi-text-secondary mt-1.5 max-w-3xl leading-relaxed">
             {t("adminPricing.presetPanelHint")}
           </p>
         </div>
@@ -569,7 +571,7 @@ function PricingPresetPanel({
         </div>
       </div>
 
-      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
         <PresetMetric label={t("adminPricing.presetTotal")} value={formatInteger(total)} />
         <PresetMetric
           label={t("adminPricing.presetMissingFamilies")}
@@ -582,13 +584,13 @@ function PricingPresetPanel({
       </div>
 
       {loading ? (
-        <p className="text-2xs text-srapi-text-tertiary mt-3">{t("adminPricing.presetLoading")}</p>
+        <p className="text-xs text-srapi-text-tertiary mt-3">{t("adminPricing.presetLoading")}</p>
       ) : missing > 0 ? (
-        <p className="text-2xs text-srapi-text-tertiary mt-3">
+        <p className="text-xs text-srapi-text-tertiary mt-3">
           {t("adminPricing.presetMissingPreview", { families: missingPreview })}
         </p>
       ) : (
-        <p className="text-2xs text-srapi-success mt-3">{t("adminPricing.presetAllCoveredHint")}</p>
+        <p className="text-xs text-srapi-success mt-3">{t("adminPricing.presetAllCoveredHint")}</p>
       )}
 
       {samplePresets.length > 0 ? (
@@ -596,13 +598,13 @@ function PricingPresetPanel({
           {samplePresets.map((preset) => (
             <span
               key={preset.model_family}
-              className="border-srapi-border bg-srapi-card-muted text-srapi-text-secondary text-2xs inline-flex max-w-full min-w-0 items-center gap-2 rounded-md border px-2.5 py-1 font-mono"
+              className="inline-flex max-w-full min-w-0 items-center gap-2 rounded-full bg-srapi-card-muted px-3 py-1 text-xs text-srapi-text-secondary"
               title={t("adminPricing.presetSource", {
                 source: preset.source ?? "built-in",
               })}
             >
-              <span className="text-srapi-text-primary truncate">{preset.model_family}</span>
-              <span className="text-srapi-text-tertiary">
+              <span className="text-srapi-text-primary truncate font-medium">{preset.model_family}</span>
+              <span className="text-srapi-text-tertiary tabular">
                 {t("adminPricing.presetTokenPrices", {
                   input: formatMoney(preset.input_price_per_million_tokens, preset.currency),
                   output: formatMoney(preset.output_price_per_million_tokens, preset.currency),
@@ -618,9 +620,9 @@ function PricingPresetPanel({
 
 function PresetMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="border-srapi-border bg-srapi-card-muted rounded-md border px-3 py-2">
-      <div className="text-srapi-text-tertiary text-2xs tracking-wide uppercase">{label}</div>
-      <div className="text-srapi-text-primary mt-1 font-mono text-sm">{value}</div>
+    <div className="rounded-xl border border-srapi-border bg-srapi-card-muted px-3.5 py-3">
+      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{label}</div>
+      <div className="text-srapi-text-primary mt-1 text-lg font-semibold tracking-tight tabular">{value}</div>
     </div>
   );
 }

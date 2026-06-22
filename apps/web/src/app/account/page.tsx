@@ -148,7 +148,7 @@ function UserAttributesCard() {
   return (
     <Card>
       <CardContent className="space-y-4">
-        <h3 className="font-serif text-lg text-srapi-text-primary">{t("account.profileAttributes")}</h3>
+        <h3 className="text-lg font-semibold tracking-tight text-srapi-text-primary">{t("account.profileAttributes")}</h3>
         {items.map((item) => (
           <div key={item.definition_id}>
             <Label htmlFor={`attr-${item.definition_id}`}>{item.name}</Label>
@@ -253,7 +253,7 @@ function ProfileForm({ user }: { user: User }) {
         <div>
           <Label>{t("account.avatar")}</Label>
           <div className="mt-1 flex items-center gap-4">
-            <span className="flex size-16 items-center justify-center overflow-hidden rounded-full border border-srapi-border bg-srapi-card-muted text-xl font-serif text-srapi-text-secondary">
+            <span className="flex size-16 items-center justify-center overflow-hidden rounded-full border border-srapi-border bg-srapi-card-muted text-xl font-semibold tracking-tight text-srapi-text-secondary">
               {avatarSrc ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={avatarSrc} alt="" className="size-full object-cover" />
@@ -282,7 +282,7 @@ function ProfileForm({ user }: { user: User }) {
                   </Button>
                 ) : null}
               </div>
-              <p className="text-2xs text-srapi-text-tertiary">{t("account.avatarHint")}</p>
+              <p className="text-xs text-srapi-text-tertiary">{t("account.avatarHint")}</p>
             </div>
             <input
               ref={fileInput}
@@ -347,7 +347,7 @@ function ChangePasswordCard() {
     <Card>
       <CardContent>
         <form onSubmit={submit} className="space-y-4">
-          <h3 className="font-serif text-lg text-srapi-text-primary">{t("account.changePassword")}</h3>
+          <h3 className="text-lg font-semibold tracking-tight text-srapi-text-primary">{t("account.changePassword")}</h3>
           <div>
             <Label htmlFor="cur">{t("account.currentPassword")}</Label>
             <Input id="cur" type="password" value={current} onChange={(e) => setCurrent(e.target.value)} />
@@ -355,7 +355,7 @@ function ChangePasswordCard() {
           <div>
             <Label htmlFor="new">{t("account.newPassword")}</Label>
             <Input id="new" type="password" value={next} onChange={(e) => setNext(e.target.value)} />
-            <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("account.passwordHint")}</p>
+            <p className="mt-1 text-xs text-srapi-text-tertiary">{t("account.passwordHint")}</p>
           </div>
           <div>
             <Label htmlFor="cfm">{t("account.confirmPassword")}</Label>
@@ -428,7 +428,7 @@ function TwoFactorCard() {
     <Card>
       <CardContent className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="font-serif text-lg text-srapi-text-primary">{t("account.twoFactor")}</h3>
+          <h3 className="text-lg font-semibold tracking-tight text-srapi-text-primary">{t("account.twoFactor")}</h3>
           <QuietBadge
             status={enabled ? "active" : "disabled"}
             label={enabled ? t("account.twoFactorOn") : t("account.twoFactorOff")}
@@ -454,7 +454,7 @@ function TwoFactorCard() {
           </div>
         ) : setup ? (
           <div className="space-y-3">
-            <p className="text-2xs text-srapi-text-tertiary">{t("account.totpHint")}</p>
+            <p className="text-xs text-srapi-text-tertiary">{t("account.totpHint")}</p>
             <div>
               <Label>{t("account.totpSecret")}</Label>
               <div className="flex items-center gap-2">
@@ -511,8 +511,8 @@ function SignOutEverywhereCard() {
     <Card>
       <CardContent className="space-y-4">
         <div>
-          <h3 className="font-serif text-lg text-srapi-text-primary">{t("account.signOutAll")}</h3>
-          <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("account.signOutAllHint")}</p>
+          <h3 className="text-lg font-semibold tracking-tight text-srapi-text-primary">{t("account.signOutAll")}</h3>
+          <p className="mt-1 text-xs text-srapi-text-tertiary">{t("account.signOutAllHint")}</p>
         </div>
         <div className="flex justify-end">
           <Button variant="danger" loading={revokeMut.isPending} onClick={revokeAll}>

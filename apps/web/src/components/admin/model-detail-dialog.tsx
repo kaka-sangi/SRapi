@@ -111,15 +111,15 @@ export function ModelDetailDialog({
         <DialogHeader>
           <DialogTitle>{t("adminModels.manageTitle")}</DialogTitle>
         </DialogHeader>
-        <p className="-mt-1 flex items-center gap-1.5 font-mono text-2xs text-srapi-text-tertiary">
-          <span>{model.canonical_name}</span>
+        <p className="-mt-1 flex items-center gap-1.5 text-xs text-srapi-text-tertiary">
+          <span className="font-mono">{model.canonical_name}</span>
           <CopyButton value={model.canonical_name} size="inline" />
         </p>
 
-        <div className="mt-4 max-h-[60vh] space-y-6 overflow-y-auto pr-1">
+        <div className="mt-5 max-h-[60vh] space-y-6 overflow-y-auto pr-1">
           <section>
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-medium text-srapi-text-secondary">
+              <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                 {t("adminModels.aliasesSection")}
               </h3>
               <Button variant="ghost" size="sm" onClick={onAddAlias}>
@@ -127,16 +127,16 @@ export function ModelDetailDialog({
               </Button>
             </div>
             {aliases.isLoading ? (
-              <p className="py-3 text-2xs text-srapi-text-tertiary">{t("common.loading")}</p>
+              <p className="py-3 text-xs text-srapi-text-tertiary">{t("common.loading")}</p>
             ) : aliasRows.length === 0 ? (
-              <p className="py-3 text-2xs text-srapi-text-tertiary">{t("adminModels.aliasesEmpty")}</p>
+              <p className="py-3 text-xs text-srapi-text-tertiary">{t("adminModels.aliasesEmpty")}</p>
             ) : (
-              <ul className="divide-y divide-srapi-border/60">
+              <ul className="divide-y divide-srapi-border/70">
                 {aliasRows.map((a) => {
                   const key = `alias:${a.id}`;
                   return (
-                    <li key={a.id} className="flex items-center justify-between gap-3 py-2">
-                      <span className="truncate font-mono text-2xs text-srapi-text-primary">{a.alias}</span>
+                    <li key={a.id} className="flex items-center justify-between gap-3 py-3">
+                      <span className="truncate font-mono text-xs text-srapi-text-primary">{a.alias}</span>
                       <div className="flex shrink-0 items-center gap-2">
                         <QuietBadge status={quietStatusFor(a.status)} label={statusLabel(t, a.status)} />
                         {onEditAlias && confirmKey !== key ? (
@@ -167,7 +167,7 @@ export function ModelDetailDialog({
 
           <section>
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-medium text-srapi-text-secondary">
+              <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                 {t("adminModels.mappingsSection")}
               </h3>
               <Button variant="ghost" size="sm" onClick={onAddMapping}>
@@ -175,19 +175,19 @@ export function ModelDetailDialog({
               </Button>
             </div>
             {mappings.isLoading ? (
-              <p className="py-3 text-2xs text-srapi-text-tertiary">{t("common.loading")}</p>
+              <p className="py-3 text-xs text-srapi-text-tertiary">{t("common.loading")}</p>
             ) : mappingRows.length === 0 ? (
-              <p className="py-3 text-2xs text-srapi-text-tertiary">{t("adminModels.mappingsEmpty")}</p>
+              <p className="py-3 text-xs text-srapi-text-tertiary">{t("adminModels.mappingsEmpty")}</p>
             ) : (
-              <ul className="divide-y divide-srapi-border/60">
+              <ul className="divide-y divide-srapi-border/70">
                 {mappingRows.map((m) => {
                   const key = `mapping:${m.id}`;
                   const provider = providerLabels.get(String(m.provider_id)) ?? `#${m.provider_id}`;
                   const serving = activeAccountsByProvider.get(String(m.provider_id)) ?? 0;
                   return (
-                    <li key={m.id} className="flex items-center justify-between gap-3 py-2">
-                      <span className="min-w-0 truncate text-2xs text-srapi-text-primary">
-                        <span className="text-srapi-text-secondary">{provider}</span>
+                    <li key={m.id} className="flex items-center justify-between gap-3 py-3">
+                      <span className="min-w-0 truncate text-xs text-srapi-text-primary">
+                        <span className="font-medium text-srapi-text-secondary">{provider}</span>
                         <span className="text-srapi-text-tertiary"> · </span>
                         <span className="font-mono">{m.upstream_model_name}</span>
                         {!accounts.isLoading ? (

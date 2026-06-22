@@ -71,7 +71,7 @@ function AlertEventsContent() {
       header: t("adminOpsAlertEvents.time"),
       pinned: true,
       render: (event) => (
-        <span className="whitespace-nowrap font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="whitespace-nowrap text-[12px] tabular text-srapi-text-tertiary">
           {formatDateTime(event.started_at)}
         </span>
       ),
@@ -83,7 +83,7 @@ function AlertEventsContent() {
       render: (event) => (
         <div className="min-w-0">
           <div className="truncate text-sm text-srapi-text-primary">{event.summary}</div>
-          <div className="truncate font-mono text-2xs text-srapi-text-tertiary">
+          <div className="truncate text-[11px] text-srapi-text-tertiary">
             {event.rule_id} · {event.fingerprint}
           </div>
         </div>
@@ -120,7 +120,7 @@ function AlertEventsContent() {
       hideOnMobile: true,
       sortValue: (event) => event.updated_at,
       render: (event) => (
-        <span className="whitespace-nowrap font-mono text-2xs text-srapi-text-tertiary tabular">
+        <span className="whitespace-nowrap text-[12px] tabular text-srapi-text-tertiary">
           {formatDateTime(event.updated_at)}
         </span>
       ),
@@ -216,7 +216,7 @@ function AlertEventsContent() {
               <AlertSignalSummary details={detail.details} />
               <AlertFingerprintPanel details={detail.details} />
               <div>
-                <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                   {t("adminOpsAlertEvents.evidence")}
                 </span>
                 <div className="mt-2">
@@ -242,7 +242,7 @@ function AlertFingerprintPanel({ details }: { details?: JsonObject }) {
     return (
       <section>
         <SectionLabel>{t("adminOpsAlertEvents.fingerprintAttribution")}</SectionLabel>
-        <div className="text-2xs text-srapi-text-tertiary">
+        <div className="text-[11px] text-srapi-text-tertiary">
           {t("adminOpsAlertEvents.fingerprintsLoading")}
         </div>
       </section>
@@ -252,7 +252,7 @@ function AlertFingerprintPanel({ details }: { details?: JsonObject }) {
     return (
       <section>
         <SectionLabel>{t("adminOpsAlertEvents.fingerprintAttribution")}</SectionLabel>
-        <div className="text-2xs text-srapi-error">
+        <div className="text-[11px] text-srapi-error">
           {t("adminOpsAlertEvents.fingerprintsFailed")}
         </div>
       </section>
@@ -266,7 +266,7 @@ function AlertFingerprintPanel({ details }: { details?: JsonObject }) {
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <SectionLabel>{t("adminOpsAlertEvents.fingerprintAttribution")}</SectionLabel>
         {meta ? (
-          <span className="font-mono text-2xs text-srapi-text-tertiary">
+          <span className="text-[11px] text-srapi-text-tertiary">
             {t("adminOpsAlertEvents.fingerprintsMeta", {
               total: meta.total,
               scanned: meta.scanned,
@@ -276,7 +276,7 @@ function AlertFingerprintPanel({ details }: { details?: JsonObject }) {
         ) : null}
       </div>
       {data.length === 0 ? (
-        <div className="text-2xs text-srapi-text-tertiary">
+        <div className="text-[11px] text-srapi-text-tertiary">
           {t("adminOpsAlertEvents.fingerprintsEmpty")}
         </div>
       ) : (
@@ -298,10 +298,10 @@ function AlertFingerprintItem({ item }: { item: OpsErrorFingerprint }) {
     <div className="rounded border border-srapi-border p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
-          <div className="truncate font-mono text-xs text-srapi-text-primary">
+          <div className="truncate text-xs font-medium text-srapi-text-primary">
             {item.message_pattern || item.error_class || item.fingerprint}
           </div>
-          <div className="mt-1 truncate font-mono text-2xs text-srapi-text-tertiary">
+          <div className="mt-1 truncate text-[11px] text-srapi-text-tertiary">
             {[
               item.source_endpoint,
               item.model,
@@ -328,8 +328,8 @@ function AlertFingerprintItem({ item }: { item: OpsErrorFingerprint }) {
           ) : null}
         </div>
       </div>
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-2xs text-srapi-text-tertiary">
-        <span className="font-mono">
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-srapi-text-tertiary">
+        <span className="tabular">
           {formatDateTime(item.first_occurred_at)} → {formatDateTime(item.last_occurred_at)}
         </span>
         <div className="flex flex-wrap items-center gap-1">
@@ -368,13 +368,13 @@ function AlertSignalSummary({ details }: { details?: JsonObject }) {
     <div className="grid gap-3 lg:grid-cols-2">
       {sections.map((section) => (
         <div key={section.title} className="rounded border border-srapi-border p-3">
-          <div className="mb-2 font-mono text-2xs uppercase text-srapi-text-tertiary">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
             {section.title}
           </div>
           <div className="grid gap-1.5">
             {section.items.map((item) => (
               <div key={`${section.title}:${item.label}`} className="grid grid-cols-[7rem_1fr] gap-2 text-xs">
-                <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                   {item.label}
                 </span>
                 <span className="min-w-0 break-words font-mono text-srapi-text-secondary">
@@ -583,7 +583,7 @@ function AlertEvidenceLinks({ links }: { links: OpsAlertEvidenceLinks }) {
     { href: links.accountHealth, label: t("adminOps.evidence.accountHealth") },
   ].filter((item): item is { href: string; label: string } => Boolean(item.href));
   if (actions.length === 0) {
-    return <span className="font-mono text-2xs text-srapi-text-tertiary">—</span>;
+    return <span className="text-[11px] text-srapi-text-tertiary">—</span>;
   }
   return (
     <div className="flex flex-wrap gap-1">
@@ -599,10 +599,10 @@ function AlertEvidenceLinks({ links }: { links: OpsAlertEvidenceLinks }) {
 function Meta({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline gap-3">
-      <span className="w-28 shrink-0 font-mono text-2xs uppercase text-srapi-text-tertiary">
+      <span className="w-28 shrink-0 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
         {label}
       </span>
-      <span className="break-all font-mono text-xs text-srapi-text-secondary">{value}</span>
+      <span className="break-all text-xs text-srapi-text-secondary">{value}</span>
     </div>
   );
 }
@@ -611,7 +611,7 @@ function JsonBlock({ label, value }: { label: string; value: unknown }) {
   return (
     <div>
       <SectionLabel>{label}</SectionLabel>
-      <pre className="mt-1.5 max-h-48 overflow-auto rounded-lg bg-srapi-card-muted p-3 font-mono text-2xs text-srapi-text-secondary">
+      <pre className="mt-1.5 max-h-48 overflow-auto rounded-lg bg-srapi-card-muted p-3 font-mono text-[11px] text-srapi-text-secondary">
         {safeJson(value)}
       </pre>
     </div>
@@ -619,5 +619,5 @@ function JsonBlock({ label, value }: { label: string; value: unknown }) {
 }
 
 function SectionLabel({ children }: { children: string }) {
-  return <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">{children}</span>;
+  return <span className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{children}</span>;
 }

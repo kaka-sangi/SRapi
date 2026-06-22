@@ -16,7 +16,7 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { PageQueryState } from "@/components/layout/page-query-state";
@@ -52,24 +52,24 @@ export function ApiKeyUsageDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-lg font-semibold tracking-tight">
             {t("apiKeys.usageTitle")}
             {keyName ? <span className="text-srapi-text-tertiary"> · {keyName}</span> : null}
           </DialogTitle>
         </DialogHeader>
 
         <div className="mt-2 flex items-center gap-2">
-          <span className="text-2xs text-srapi-text-tertiary">{t("apiKeys.usageWindowLabel")}</span>
-          {WINDOWS.map((w) => (
-            <Button
-              key={w}
-              variant={days === w ? "primary" : "outline"}
-              size="sm"
-              onClick={() => setDays(w)}
-            >
-              {t("apiKeys.usageWindowDays", { days: w })}
-            </Button>
-          ))}
+          <span className="text-xs text-srapi-text-tertiary">{t("apiKeys.usageWindowLabel")}</span>
+          <SegmentedControl
+            value={String(days)}
+            onChange={(next) => setDays(Number(next))}
+            options={WINDOWS.map((w) => ({
+              value: String(w),
+              label: t("apiKeys.usageWindowDays", { days: w }),
+            }))}
+            ariaLabel={t("apiKeys.usageWindowLabel")}
+            size="sm"
+          />
         </div>
 
         <div className="mt-3 max-h-[60vh] overflow-y-auto">
@@ -96,7 +96,7 @@ function UsageBody({ usage }: { usage: GatewayUsageResponse }) {
         <Stat label={t("apiKeys.usageTokens")} value={totals.total_tokens.toLocaleString()} />
         <Stat label={t("apiKeys.usageCost")} value={formatMoney(totals.cost, currency)} />
       </dl>
-      <div className="grid grid-cols-2 gap-2 text-2xs text-srapi-text-tertiary sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 text-xs text-srapi-text-tertiary sm:grid-cols-4">
         <span>{t("usage.costIn")} {formatMoney(totals.input_cost ?? "0", currency)}</span>
         <span>{t("usage.costOut")} {formatMoney(totals.output_cost ?? "0", currency)}</span>
         <span>{t("usage.costCacheRead")} {formatMoney(totals.cache_read_cost ?? "0", currency)}</span>
@@ -109,7 +109,7 @@ function UsageBody({ usage }: { usage: GatewayUsageResponse }) {
 
       {usage.model_stats.length > 0 ? (
         <section>
-          <h4 className="mb-2 text-2xs font-medium uppercase tracking-wide text-srapi-text-tertiary">
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
             {t("apiKeys.usageModelsTitle")}
           </h4>
           <TableScroll minWidth={420}>
@@ -125,7 +125,7 @@ function UsageBody({ usage }: { usage: GatewayUsageResponse }) {
               <TableBody>
                 {usage.model_stats.map((m) => (
                   <TableRow key={m.model}>
-                    <TableCell className="font-mono text-2xs text-srapi-text-primary">{m.model}</TableCell>
+                    <TableCell className="font-mono text-xs text-srapi-text-primary">{m.model}</TableCell>
                     <TableCell className="tabular">{m.requests.toLocaleString()}</TableCell>
                     <TableCell className="tabular">{m.total_tokens.toLocaleString()}</TableCell>
                     <TableCell className="tabular">{formatMoney(m.cost, m.currency)}</TableCell>
@@ -139,7 +139,7 @@ function UsageBody({ usage }: { usage: GatewayUsageResponse }) {
 
       {usage.recent_requests.length > 0 ? (
         <section>
-          <h4 className="mb-2 text-2xs font-medium uppercase tracking-wide text-srapi-text-tertiary">
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
             {t("apiKeys.usageRecentTitle")}
           </h4>
           <TableScroll minWidth={520}>
@@ -156,10 +156,10 @@ function UsageBody({ usage }: { usage: GatewayUsageResponse }) {
               <TableBody>
                 {usage.recent_requests.slice(0, 20).map((req) => (
                   <TableRow key={req.request_id}>
-                    <TableCell className="font-mono text-2xs text-srapi-text-tertiary tabular">
+                    <TableCell className="text-[12px] tabular text-srapi-text-tertiary">
                       {formatDateTime(req.created_at)}
                     </TableCell>
-                    <TableCell className="font-mono text-2xs text-srapi-text-secondary">{req.model}</TableCell>
+                    <TableCell className="font-mono text-xs text-srapi-text-secondary">{req.model}</TableCell>
                     <TableCell className="tabular">{req.total_tokens.toLocaleString()}</TableCell>
                     <TableCell className="tabular">{req.latency_ms}ms</TableCell>
                     <TableCell>
@@ -182,8 +182,8 @@ function UsageBody({ usage }: { usage: GatewayUsageResponse }) {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-srapi-border bg-srapi-card-muted px-3 py-2">
-      <dt className="text-2xs text-srapi-text-tertiary">{label}</dt>
-      <dd className="mt-0.5 font-mono text-sm text-srapi-text-primary tabular">{value}</dd>
+      <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">{label}</dt>
+      <dd className="mt-0.5 text-sm font-semibold tabular text-srapi-text-primary">{value}</dd>
     </div>
   );
 }

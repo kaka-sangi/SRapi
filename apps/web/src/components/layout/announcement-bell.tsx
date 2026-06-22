@@ -56,19 +56,19 @@ export function AnnouncementBell() {
         <button
           type="button"
           aria-label={t("announcements.title")}
-          className="relative flex size-9 items-center justify-center rounded-lg border border-srapi-border bg-srapi-card text-srapi-text-secondary transition-colors hover:border-srapi-text-tertiary hover:text-srapi-text-primary"
+          className="relative flex size-9 items-center justify-center rounded-xl border border-srapi-border bg-srapi-card text-srapi-text-secondary transition-colors hover:border-srapi-text-tertiary hover:text-srapi-text-primary"
         >
           <Bell className="size-4" />
           {hasUnread ? (
-            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-srapi-primary px-1 font-mono text-2xs font-medium leading-none text-srapi-invert-fg">
+            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-srapi-primary px-1 text-[10px] font-semibold leading-none tabular text-srapi-invert-fg">
               {unread > 9 ? "9+" : unread}
             </span>
           ) : null}
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[22rem] max-w-[calc(100vw-2rem)] p-0">
-        <div className="flex items-center justify-between border-b border-srapi-border px-3.5 py-2.5">
-          <span className="font-serif text-base text-srapi-text-primary">
+        <div className="flex items-center justify-between border-b border-srapi-border px-4 py-3">
+          <span className="text-sm font-semibold tracking-tight text-srapi-text-primary">
             {t("announcements.title")}
           </span>
           {hasUnread ? (
@@ -76,7 +76,7 @@ export function AnnouncementBell() {
               type="button"
               onClick={handleMarkAll}
               disabled={markRead.isPending}
-              className="font-mono text-2xs text-srapi-primary transition-colors hover:text-srapi-primary-hover disabled:opacity-50"
+              className="text-xs font-medium text-srapi-primary transition-colors hover:text-srapi-primary-hover disabled:opacity-50"
             >
               {t("announcements.markAllRead")}
             </button>
@@ -91,14 +91,16 @@ export function AnnouncementBell() {
               ))}
             </div>
           ) : items.length === 0 ? (
-            <div className="flex flex-col items-center gap-1.5 px-4 py-10 text-center">
-              <Bell className="size-5 text-srapi-text-tertiary" />
-              <p className="font-mono text-2xs text-srapi-text-tertiary">
+            <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
+              <span className="grid size-9 place-items-center rounded-xl bg-srapi-accent-soft text-srapi-primary">
+                <Bell className="size-4" />
+              </span>
+              <p className="text-xs text-srapi-text-tertiary">
                 {t("announcements.empty")}
               </p>
             </div>
           ) : (
-            <ul className="divide-y divide-srapi-border">
+            <ul className="divide-y divide-srapi-border/70">
               {items.map((item) => {
                 const a = item.announcement;
                 return (
@@ -107,8 +109,8 @@ export function AnnouncementBell() {
                       type="button"
                       onClick={() => handleSelect(item)}
                       className={cn(
-                        "flex w-full gap-2.5 px-3.5 py-3 text-left transition-colors hover:bg-srapi-card-muted",
-                        !item.read && "bg-srapi-primary/[0.04]",
+                        "flex w-full gap-2.5 px-4 py-3 text-left transition-colors hover:bg-srapi-card-muted/60",
+                        !item.read && "bg-srapi-accent-soft",
                       )}
                     >
                       <span
@@ -132,7 +134,7 @@ export function AnnouncementBell() {
                           >
                             {a.title}
                           </span>
-                          <span className="shrink-0 font-mono text-2xs text-srapi-text-tertiary tabular">
+                          <span className="shrink-0 text-[11px] tabular text-srapi-text-tertiary">
                             {relativeTime(a.created_at, t("announcements.justNow"))}
                           </span>
                         </span>

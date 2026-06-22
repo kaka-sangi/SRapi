@@ -300,7 +300,7 @@ export function PlaygroundChat({ models, defaultModel }: { models: string[]; def
                   </button>
                 </div>
                 {errorHint ? (
-                  <div className="mt-2 flex items-start gap-1.5 border-t border-srapi-error/20 pt-2 text-2xs text-srapi-text-secondary">
+                  <div className="mt-2 flex items-start gap-1.5 border-t border-srapi-error/20 pt-2 text-[11px] text-srapi-text-secondary">
                     <Lightbulb className="mt-0.5 size-3 shrink-0 text-srapi-text-tertiary" />
                     <span className="[overflow-wrap:anywhere]">{errorHint}</span>
                   </div>
@@ -343,7 +343,7 @@ export function PlaygroundChat({ models, defaultModel }: { models: string[]; def
           hidden
           onChange={(e) => void onPickFiles(e.currentTarget.files)}
         />
-        <p className="mt-1.5 px-1 text-center text-2xs text-srapi-text-tertiary">{t("playground.billingHint")}</p>
+        <p className="mt-1.5 px-1 text-center text-[11px] text-srapi-text-tertiary">{t("playground.billingHint")}</p>
       </div>
     </div>
   );
@@ -354,12 +354,15 @@ function EmptyState() {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4 px-4 text-center">
       <div
-        className="anim-rise flex size-14 items-center justify-center rounded-2xl bg-srapi-primary/10"
+        className="anim-rise grid size-14 place-items-center rounded-2xl bg-srapi-accent-soft text-srapi-primary [&>svg]:size-7"
         style={rise(0)}
       >
-        <Bot className="size-7 text-srapi-primary" />
+        <Bot aria-hidden />
       </div>
-      <h2 className="anim-rise font-serif text-2xl text-srapi-text-primary" style={rise(1)}>
+      <h2
+        className="anim-rise text-2xl font-semibold tracking-tight text-srapi-text-primary"
+        style={rise(1)}
+      >
         {t("playground.greeting")}
       </h2>
     </div>
@@ -470,7 +473,7 @@ function AssistantFooter({
   return (
     <div className="flex min-h-5 items-center gap-2.5 pt-0.5">
       {meta ? (
-        <div className="flex items-center gap-1.5 font-mono text-2xs text-srapi-text-tertiary">
+        <div className="flex items-center gap-1.5 text-[11px] text-srapi-text-tertiary tabular">
           {meta.servedModel ? (
             <span className="flex items-center gap-1">
               <Cpu className="size-3" />

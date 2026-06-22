@@ -91,7 +91,7 @@ export function CopyButton({
           onClick={handleCopy}
           aria-label={name}
           className={cn(
-            "inline-flex shrink-0 items-center justify-center rounded-md text-srapi-text-tertiary transition-colors hover:bg-srapi-card-muted hover:text-srapi-text-primary active:scale-95",
+            "inline-flex shrink-0 items-center justify-center rounded-lg text-srapi-text-tertiary transition-colors hover:bg-srapi-card-muted hover:text-srapi-text-primary active:scale-95",
             size === "icon" ? "size-7" : "size-5",
             className,
           )}

@@ -190,17 +190,17 @@ export function CredentialsForm({
           {hasMultipleAuth && (
             <div>
               <Label>{t("adminQuickSetup.credentials")}</Label>
-              <div className="flex gap-2">
+              <div className="inline-flex items-center gap-0.5 rounded-xl border border-srapi-border bg-srapi-card/80 p-1">
                 {platform.authTypes.map((a) => (
                   <button
                     key={a}
                     type="button"
                     onClick={() => onAuthTypeChange(a)}
                     className={cn(
-                      "rounded-lg border px-3 py-1.5 font-mono text-xs transition-colors",
+                      "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-srapi-primary/40",
                       a === authType
-                        ? "border-srapi-text-secondary bg-srapi-card-muted text-srapi-text-primary"
-                        : "border-srapi-border bg-srapi-card text-srapi-text-tertiary hover:border-srapi-text-tertiary",
+                        ? "bg-srapi-accent-soft text-srapi-primary shadow-[0_1px_2px_rgba(26,24,20,0.04)]"
+                        : "text-srapi-text-tertiary hover:text-srapi-text-secondary",
                     )}
                   >
                     {a}
@@ -256,7 +256,7 @@ export function CredentialsForm({
                 onChange={(e) => onBaseUrlChange(e.target.value)}
                 placeholder="https://api.example.com/v1"
               />
-              <p className="mt-1 text-2xs text-srapi-text-tertiary">
+              <p className="mt-1 text-xs text-srapi-text-tertiary">
                 {t("adminAccounts.baseUrlHint")}
               </p>
             </div>
@@ -304,14 +304,14 @@ export function CredentialsForm({
                     onChange={(e) => onBaseUrlChange(e.target.value)}
                     placeholder={t("adminAccounts.baseUrlPlaceholder")}
                   />
-                  <p className="mt-1 text-2xs text-srapi-text-tertiary">
+                  <p className="mt-1 text-xs text-srapi-text-tertiary">
                     {t("adminAccounts.baseUrlHint")}
                   </p>
                 </div>
               )}
               <div>
                 <Label>{t("adminQuickSetup.proxy")}</Label>
-                <p className="mb-1.5 text-2xs text-srapi-text-tertiary">
+                <p className="mb-1.5 text-xs text-srapi-text-tertiary">
                   {t("adminQuickSetup.proxyHint")}
                 </p>
                 <Select value={proxyId} onValueChange={onProxyIdChange}>
@@ -334,7 +334,7 @@ export function CredentialsForm({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="qs-priority">{t("adminQuickSetup.priority")}</Label>
-                  <p className="mb-1.5 text-2xs text-srapi-text-tertiary">
+                  <p className="mb-1.5 text-xs text-srapi-text-tertiary">
                     {t("adminQuickSetup.priorityHint")}
                   </p>
                   <Input
@@ -348,7 +348,7 @@ export function CredentialsForm({
                 </div>
                 <div>
                   <Label htmlFor="qs-weight">{t("adminQuickSetup.weight")}</Label>
-                  <p className="mb-1.5 text-2xs text-srapi-text-tertiary">
+                  <p className="mb-1.5 text-xs text-srapi-text-tertiary">
                     {t("adminQuickSetup.weightHint")}
                   </p>
                   <Input
@@ -376,21 +376,21 @@ export function CredentialsForm({
                   <button
                     type="button"
                     onClick={onSelectAll}
-                    className="text-2xs text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
+                    className="text-xs text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
                   >
                     {t("adminQuickSetup.selectAll")}
                   </button>
-                  <span className="text-2xs text-srapi-border">|</span>
+                  <span className="text-xs text-srapi-border">|</span>
                   <button
                     type="button"
                     onClick={onClearModels}
-                    className="text-2xs text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
+                    className="text-xs text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
                   >
                     {t("adminQuickSetup.selectNone")}
                   </button>
                 </div>
               </div>
-              <p className="mb-3 text-2xs text-srapi-text-tertiary">
+              <p className="mb-3 text-xs text-srapi-text-tertiary">
                 {t("adminQuickSetup.modelCatalogHint")}
               </p>
               <div className="flex flex-wrap gap-2">
@@ -402,10 +402,10 @@ export function CredentialsForm({
                       type="button"
                       onClick={() => onToggleModel(m)}
                       className={cn(
-                        "rounded-lg border px-2.5 py-1 font-mono text-xs transition-colors",
+                        "rounded-full px-3 py-1 font-mono text-xs font-medium transition-colors",
                         selected
-                          ? "border-srapi-text-secondary bg-srapi-card-muted text-srapi-text-primary"
-                          : "border-srapi-border bg-srapi-card text-srapi-text-tertiary hover:border-srapi-text-tertiary",
+                          ? "bg-srapi-accent-soft text-srapi-primary"
+                          : "bg-srapi-card-muted text-srapi-text-tertiary hover:text-srapi-text-secondary",
                       )}
                     >
                       {m}
@@ -414,16 +414,16 @@ export function CredentialsForm({
                 })}
               </div>
               {selectedModels.size > 0 && (
-                <p className="mt-3 text-2xs text-srapi-text-tertiary">
+                <p className="mt-3 text-xs text-srapi-text-tertiary tabular">
                   {selectedModels.size} / {platform.defaultModels.length}
                 </p>
               )}
             </div>
           )}
           {platform.custom && (
-            <div className="rounded-xl border border-srapi-border bg-srapi-card p-5">
+            <div className="rounded-2xl border border-srapi-border bg-srapi-card p-5">
               <Label className="mb-2 block">{t("adminQuickSetup.modelCatalog")}</Label>
-              <p className="mb-3 text-2xs text-srapi-text-tertiary">
+              <p className="mb-3 text-xs text-srapi-text-tertiary">
                 {t("adminQuickSetup.modelCatalogHint")}
               </p>
               <textarea
@@ -431,7 +431,7 @@ export function CredentialsForm({
                 onChange={(e) => onCustomModelsChange(e.target.value)}
                 rows={6}
                 placeholder={"gpt-4o\ndeepseek-chat\nllama-3.3-70b"}
-                className="w-full rounded-lg border border-srapi-border bg-srapi-card px-3 py-2 font-mono text-xs text-srapi-text-primary placeholder:text-srapi-text-tertiary focus:border-srapi-text-secondary focus:outline-none"
+                className="w-full rounded-xl border border-srapi-border bg-srapi-card px-3 py-2 font-mono text-xs text-srapi-text-primary placeholder:text-srapi-text-tertiary focus:border-srapi-primary focus:outline-none"
               />
             </div>
           )}
@@ -453,7 +453,7 @@ export function CredentialsForm({
             : t("adminQuickSetup.submit")}
         </Button>
         {submitHint && !isPending ? (
-          <p className="mt-1.5 text-2xs text-srapi-text-tertiary">{submitHint}</p>
+          <p className="mt-1.5 text-xs text-srapi-text-tertiary">{submitHint}</p>
         ) : null}
       </div>
     </div>

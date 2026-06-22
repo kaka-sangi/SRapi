@@ -36,9 +36,9 @@ export const TableHeader = React.forwardRef<
   <thead
     ref={ref}
     className={cn(
-      // Header row sits on a sandy wash so it visually anchors the table to the
-      // page even when the parent card has no header chrome.
-      "border-b border-srapi-border-strong bg-srapi-card-muted/40 text-left font-mono text-2xs uppercase tracking-[0.12em] text-srapi-text-tertiary [&_th]:font-medium",
+      // Modern table header: small caps eyebrow row sitting directly on the card
+      // surface, separated from rows by a single hairline rule.
+      "text-left text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary [&_th]:border-b [&_th]:border-srapi-border",
       className,
     )}
     {...props}
@@ -50,7 +50,7 @@ export const TableBody = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, ...props }, ref) => (
-  <tbody ref={ref} className={cn("divide-y divide-srapi-border", className)} {...props} />
+  <tbody ref={ref} className={cn(className)} {...props} />
 ));
 TableBody.displayName = "TableBody";
 
@@ -60,7 +60,10 @@ export const TableRow = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <tr
     ref={ref}
-    className={cn("transition-colors hover:bg-srapi-card-muted/60", className)}
+    className={cn(
+      "border-b border-srapi-border/60 transition-colors last:border-0 hover:bg-srapi-card-muted/50",
+      className,
+    )}
     {...props}
   />
 ));
@@ -76,8 +79,8 @@ export const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      "h-11 px-3 align-middle first:pl-5 last:pr-5",
-      numeric && "text-right font-mono tabular",
+      "whitespace-nowrap px-4 py-3 text-left align-middle",
+      numeric && "text-right tabular",
       className,
     )}
     {...props}
@@ -92,8 +95,8 @@ export const TableCell = React.forwardRef<
   <td
     ref={ref}
     className={cn(
-      "px-3 py-3 align-middle first:pl-5 last:pr-5",
-      numeric && "text-right font-mono tabular",
+      "px-4 py-3 text-sm align-middle",
+      numeric && "text-right tabular",
       className,
     )}
     {...props}

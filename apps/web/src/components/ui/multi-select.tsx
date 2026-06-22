@@ -115,15 +115,15 @@ export function MultiSelect({
         <div
           ref={boxRef}
           className={cn(
-            "flex min-h-10 flex-wrap items-center gap-1.5 rounded-xl border border-srapi-border bg-srapi-card-muted px-2 py-1.5 transition-colors",
-            open ? "border-srapi-text-secondary" : "hover:border-srapi-text-tertiary",
+            "flex min-h-10 flex-wrap items-center gap-1.5 rounded-xl border border-srapi-border bg-srapi-card px-2 py-1.5 transition-colors",
+            open ? "border-srapi-border-strong" : "hover:border-srapi-border-strong",
             disabled && "pointer-events-none opacity-50",
           )}
         >
           {value.map((v) => (
             <span
               key={v}
-              className="inline-flex items-center gap-1 rounded-full border border-srapi-border bg-srapi-card px-2 py-0.5 font-mono text-2xs text-srapi-text-primary"
+              className="inline-flex items-center gap-1 rounded-full bg-srapi-card-muted px-2 py-0.5 text-xs font-medium text-srapi-text-primary"
             >
               {labelByValue.get(v) ?? v}
               <button
@@ -223,7 +223,7 @@ export function MultiSelect({
             </button>
           ) : null}
           {filtered.length === 0 && !canAddCustom ? (
-            <p className="px-2.5 py-3 text-center text-2xs text-srapi-text-tertiary">{emptyText}</p>
+            <p className="px-2.5 py-3 text-center text-xs text-srapi-text-tertiary">{emptyText}</p>
           ) : null}
         </div>
       </PopoverContent>

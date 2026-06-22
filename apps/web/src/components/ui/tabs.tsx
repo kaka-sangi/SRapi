@@ -28,12 +28,9 @@ export const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "relative inline-flex items-center justify-center rounded-lg px-3.5 py-1.5 text-sm font-medium text-srapi-text-secondary transition-[color,background-color] duration-150 ease-[var(--ease-out-quint)]",
+      "inline-flex items-center justify-center rounded-lg px-3.5 py-1.5 text-sm font-medium text-srapi-text-secondary transition-[color,background-color] duration-150 ease-[var(--ease-out-quint)]",
       "hover:text-srapi-text-primary data-[state=inactive]:hover:bg-srapi-card/60",
-      "data-[state=active]:bg-srapi-card data-[state=active]:text-srapi-text-primary data-[state=active]:shadow-[0_1px_2px_rgba(28,26,23,0.06),inset_0_1px_0_rgba(255,255,255,0.65)]",
-      // A 2px terracotta underline appears under the active tab — printed,
-      // not glowing. Animates in via inline width transition.
-      "after:pointer-events-none after:absolute after:inset-x-3 after:bottom-0.5 after:h-[2px] after:rounded-full after:bg-srapi-primary after:opacity-0 after:transition-opacity after:duration-200 data-[state=active]:after:opacity-100",
+      "data-[state=active]:bg-srapi-accent-soft data-[state=active]:text-srapi-primary",
       className,
     )}
     {...props}

@@ -332,7 +332,7 @@ export function BulkAddAccountsDialog({
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           {/* LEFT — defaults form */}
           <div className="space-y-3" data-testid="bulk-defaults">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-srapi-text-tertiary">
+            <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
               {t("adminAccounts.bulkAddDefaultsHeading")}
             </h3>
             <div>
@@ -465,44 +465,48 @@ export function BulkAddAccountsDialog({
 
           {/* RIGHT — items textarea + result panel */}
           <div className="space-y-3" data-testid="bulk-items">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-srapi-text-tertiary">
+            <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
               {t("adminAccounts.bulkAddItemsHeading")}
             </h3>
             {result ? (
-              <div className="space-y-2">
-                <h4 className="text-xs font-semibold uppercase tracking-wide text-srapi-text-tertiary">
+              <div className="space-y-3">
+                <h4 className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                   {t("adminAccounts.bulkAddResultsHeading")}
                 </h4>
-                <div className="grid grid-cols-2 gap-2 text-center">
-                  <div className="rounded-md border border-srapi-border bg-srapi-card-muted p-2">
-                    <div className="text-2xs uppercase text-srapi-text-tertiary">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-xl border border-srapi-border bg-srapi-card p-3">
+                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                       {t("adminAccounts.bulkAddSucceeded", { count: result.succeeded })}
                     </div>
-                    <div className="font-mono text-lg text-srapi-success tabular">{result.succeeded}</div>
+                    <div className="mt-1 text-2xl font-semibold tracking-tight tabular text-srapi-success">
+                      {result.succeeded}
+                    </div>
                   </div>
-                  <div className="rounded-md border border-srapi-border bg-srapi-card-muted p-2">
-                    <div className="text-2xs uppercase text-srapi-text-tertiary">
+                  <div className="rounded-xl border border-srapi-border bg-srapi-card p-3">
+                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
                       {t("adminAccounts.bulkAddFailed", { count: result.failed })}
                     </div>
-                    <div className="font-mono text-lg text-srapi-error tabular">{result.failed}</div>
+                    <div className="mt-1 text-2xl font-semibold tracking-tight tabular text-srapi-error">
+                      {result.failed}
+                    </div>
                   </div>
                 </div>
                 <ul
-                  className="max-h-64 space-y-1 overflow-y-auto rounded-md border border-srapi-border bg-srapi-card-muted p-2"
+                  className="max-h-64 space-y-1 overflow-y-auto rounded-xl border border-srapi-border bg-srapi-card-muted p-2"
                   data-testid="bulk-result-list"
                 >
                   {result.results.map((row) => (
                     <li
                       key={`${row.index}-${row.name}`}
-                      className="flex items-center justify-between gap-2 font-mono text-2xs"
+                      className="flex items-center justify-between gap-2 rounded-md px-1.5 py-1 text-[11px]"
                     >
-                      <span className="truncate text-srapi-text-secondary">{row.name}</span>
+                      <span className="truncate font-medium text-srapi-text-secondary">{row.name}</span>
                       {row.error && !row.account_id ? (
-                        <span className="shrink-0 text-srapi-error" title={row.error}>
+                        <span className="shrink-0 font-medium text-srapi-error" title={row.error}>
                           ✗ {row.error}
                         </span>
                       ) : (
-                        <span className="shrink-0 text-srapi-success">
+                        <span className="shrink-0 font-medium text-srapi-success">
                           ✓ {t("adminAccounts.bulkAddRowOk")}{row.account_id ? ` (#${row.account_id})` : ""}
                         </span>
                       )}
@@ -515,6 +519,7 @@ export function BulkAddAccountsDialog({
                     size="sm"
                     onClick={() => retryFailed()}
                     loading={batchCreate.isPending}
+                    className="btn-raise"
                   >
                     {t("adminAccounts.bulkAddRetryFailed")}
                   </Button>
@@ -534,7 +539,7 @@ export function BulkAddAccountsDialog({
                   data-testid="bulk-items-textarea"
                 />
                 <div className="flex items-center justify-between">
-                  <label className="flex items-center gap-2 text-2xs text-srapi-text-tertiary">
+                  <label className="flex items-center gap-2 text-xs text-srapi-text-tertiary">
                     <Switch
                       checked={stripComments}
                       onCheckedChange={setStripComments}
@@ -542,7 +547,7 @@ export function BulkAddAccountsDialog({
                     />
                     {t("adminAccounts.bulkAddStripComments")}
                   </label>
-                  <span className="font-mono text-2xs text-srapi-text-tertiary" data-testid="bulk-counts">
+                  <span className="text-xs tabular text-srapi-text-tertiary" data-testid="bulk-counts">
                     {t("adminAccounts.bulkAddValidCount", { count: validCount })}
                     {invalidCount > 0
                       ? ` · ${t("adminAccounts.bulkAddInvalidCount", { count: invalidCount })}`
@@ -550,12 +555,12 @@ export function BulkAddAccountsDialog({
                   </span>
                 </div>
                 {overLimit ? (
-                  <p className="text-2xs text-srapi-error">
+                  <p className="text-xs text-srapi-error">
                     {t("adminAccounts.bulkAddMaxItemsExceeded", { max: MAX_ITEMS })}
                   </p>
                 ) : null}
                 {submitError ? (
-                  <p className="text-2xs text-srapi-error">{submitError}</p>
+                  <p className="text-xs text-srapi-error">{submitError}</p>
                 ) : null}
               </>
             )}
