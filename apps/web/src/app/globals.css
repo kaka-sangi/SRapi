@@ -74,12 +74,12 @@
   --text-6xl--line-height: 0.98;
   --text-6xl--letter-spacing: -0.032em;
 
-  /* 圆角语言（重塑：放大半径，更接近 Claude / ChatGPT / Discourse 卡片）*/
-  --radius-sm: 0.5rem;       /* 8px */
-  --radius-md: 0.75rem;      /* 12px */
-  --radius-lg: 1rem;          /* 16px */
-  --radius-xl: 1.25rem;       /* 20px */
-  --radius-2xl: 1.5rem;       /* 24px — 大卡片 hero */
+  /* 圆角语言 */
+  --radius-sm: 0.25rem;       /* 4px */
+  --radius-md: 0.5rem;        /* 8px */
+  --radius-lg: 0.625rem;      /* 10px */
+  --radius-xl: 0.75rem;       /* 12px */
+  --radius-2xl: 1rem;         /* 16px — 大卡片 hero */
   --radius-pill: 9999px;
 
   /* 缓动 —— bloom 用于克制进场；spring 系列提供「有存在感」的弹性 */
@@ -134,8 +134,8 @@ html {
   /* 平滑滚动 —— 配合 ScrollProgress 让长表/日志页的滚动体验更跟手；
      prefers-reduced-motion 在 §9.2 处统一关闭。 */
   scroll-behavior: smooth;
-  /* 防止键盘导航时滚动条出现回跳 —— 主流浏览器现已支持 */
-  scrollbar-gutter: stable;
+  /* 隐藏滚动条（Firefox 标准属性） */
+  scrollbar-width: none;
 }
 html.dark {
   color-scheme: dark;
@@ -305,9 +305,12 @@ textarea:focus-visible,
   .srapi-pet-blink { animation: none !important }
 }
 
-/* 滚动条 */
-::-webkit-scrollbar {
-  width: 8px;
+/* 滚动条：隐藏竖向，保留横向 */
+::-webkit-scrollbar:vertical {
+  width: 0;
+  display: none;
+}
+::-webkit-scrollbar:horizontal {
   height: 8px;
 }
 ::-webkit-scrollbar-thumb {
