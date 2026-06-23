@@ -765,13 +765,18 @@ func (s *Server) handleDeleteCurrentUserAvatar(w http.ResponseWriter, r *http.Re
 
 func (s *Server) handleGetUserAvatar(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
-	if _, err := s.requireConsoleSession(r); err != nil {
+	session, err := s.requireConsoleSession(r)
+	if err != nil {
 		writeStandardError(w, http.StatusUnauthorized, apiopenapi.UNAUTHORIZED, "unauthorized", requestID)
 		return
 	}
 	userID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil || userID <= 0 {
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid user id", requestID)
+		return
+	}
+	if userID != session.User.ID && !userHasAdminSurfaceAccess(session.User) {
+		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "avatar not found", requestID)
 		return
 	}
 	if s.runtime.userAvatars == nil {
