@@ -316,6 +316,11 @@ type runtimeState struct {
 	// streaming request. Keyed by RequestID; entries expire after 5 minutes.
 	streamBillingDedup *localcache.Cache[bool]
 
+	// authRateLimit tracks per-IP login attempt counts to prevent brute-force
+	// attacks. Each entry holds the count of attempts in the current window;
+	// entries expire after 15 minutes.
+	authRateLimit *localcache.Cache[int]
+
 	// requestLogFiles holds the optional file-based per-request capture
 	// (gateway HTTP envelope dumps). Lazily populated by
 	// ensureRequestLogFilesState; nil until the first call. Disabling
@@ -1129,6 +1134,10 @@ func assembleRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOp
 		streamBillingDedup: localcache.New[bool](localcache.Config{
 			MaxEntries: 4096,
 			DefaultTTL: 5 * time.Minute,
+		}),
+		authRateLimit: localcache.New[int](localcache.Config{
+			MaxEntries: 8192,
+			DefaultTTL: 15 * time.Minute,
 		}),
 		billingBreaker: circuitbreaker.New(circuitbreaker.Config{
 			FailureThreshold: 5,

@@ -28,6 +28,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math/rand/v2"
 	"runtime/debug"
 	"sync"
 	"time"
@@ -331,6 +332,17 @@ func (w *Worker) refreshPass(ctx context.Context) (Result, error) {
 			case sem <- struct{}{}:
 			}
 			defer func() { <-sem }()
+			// Jitter between refreshes to avoid synchronized bursts against
+			// upstream OAuth servers when many accounts expire together.
+			if jitter := refreshJitter(len(due)); jitter > 0 {
+				timer := time.NewTimer(jitter)
+				select {
+				case <-ctx.Done():
+					timer.Stop()
+					return
+				case <-timer.C:
+				}
+			}
 			refreshCtx, cancel := context.WithTimeout(ctx, w.timeout)
 			defer cancel()
 			outcome, err := w.accounts.RefreshAccessTokenWithOutcome(refreshCtx, account.ID, adapter)
@@ -508,4 +520,14 @@ func positiveOrDefault(value int, fallback int) int {
 		return fallback
 	}
 	return value
+}
+
+// refreshJitter returns a random delay [0, 2s) scaled by the number of due
+// accounts, so bursts of simultaneous refreshes are spread over a few seconds
+// instead of hitting the OAuth server at the same instant across all nodes.
+func refreshJitter(dueCount int) time.Duration {
+	if dueCount <= 1 {
+		return 0
+	}
+	return time.Duration(rand.Int64N(int64(2 * time.Second)))
 }

@@ -147,6 +147,23 @@ func (rt *runtimeState) markStreamingBillingRecorded(_ context.Context, requestI
 	rt.streamBillingDedup.Set(requestID, true)
 }
 
+const authRateLimitMaxAttempts = 10
+
+// checkAuthRateLimit enforces a per-IP login attempt limit. Returns true if the
+// request is allowed, false if the IP has exceeded the threshold.
+func (rt *runtimeState) checkAuthRateLimit(ip string) bool {
+	if rt.authRateLimit == nil || ip == "" {
+		return true
+	}
+	key := "auth:" + ip
+	count, _ := rt.authRateLimit.Get(key)
+	if count >= authRateLimitMaxAttempts {
+		return false
+	}
+	rt.authRateLimit.Set(key, count+1)
+	return true
+}
+
 func (rt *runtimeState) releaseGatewaySchedulerLease(ctx context.Context, result schedulercontract.ScheduleResult, reason string) {
 	if rt == nil || rt.scheduler == nil || result.Lease.ID == "" {
 		return

@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -1143,10 +1144,10 @@ func headersSent(w http.ResponseWriter) bool {
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
-		if origin != "" {
+		if origin != "" && corsOriginAllowed(r, origin) {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token, X-Request-ID")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token, X-Request-ID, Idempotency-Key, Authorization")
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Max-Age", "86400")
 		}
@@ -1156,6 +1157,32 @@ func corsMiddleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// corsOriginAllowed validates the request Origin against the same-site host.
+// Only same-origin requests (scheme+host match) and requests where the origin
+// host matches the request Host header are allowed to carry credentials. This
+// prevents a malicious site from making credential-bearing cross-origin
+// requests to the admin API.
+func corsOriginAllowed(r *http.Request, origin string) bool {
+	parsed, err := url.Parse(origin)
+	if err != nil || parsed.Host == "" {
+		return false
+	}
+	requestHost := r.Host
+	if requestHost == "" {
+		requestHost = r.URL.Host
+	}
+	if requestHost == "" {
+		return false
+	}
+	// Strip port from request host for comparison when origin omits it.
+	originHost := parsed.Hostname()
+	reqHostname := requestHost
+	if h, _, err := net.SplitHostPort(requestHost); err == nil {
+		reqHostname = h
+	}
+	return strings.EqualFold(originHost, reqHostname)
 }
 
 func requestIDMiddleware(next http.Handler) http.Handler {

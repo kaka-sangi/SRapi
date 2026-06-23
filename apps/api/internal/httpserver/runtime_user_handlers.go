@@ -73,6 +73,11 @@ func (s *Server) verifyCaptcha(w http.ResponseWriter, r *http.Request, requestID
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
+	ip := clientIP(r)
+	if !s.runtime.checkAuthRateLimit(ip) {
+		writeStandardError(w, http.StatusTooManyRequests, apiopenapi.INVALIDREQUEST, "too many login attempts, try again later", requestID)
+		return
+	}
 	if !s.verifyCaptcha(w, r, requestID) {
 		return
 	}
@@ -122,6 +127,11 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
+	ip := clientIP(r)
+	if !s.runtime.checkAuthRateLimit(ip) {
+		writeStandardError(w, http.StatusTooManyRequests, apiopenapi.INVALIDREQUEST, "too many attempts, try again later", requestID)
+		return
+	}
 	settings, err := s.runtime.adminControl.GetAdminSettings(r.Context())
 	if err != nil {
 		writeAdminControlError(w, err, requestID)
