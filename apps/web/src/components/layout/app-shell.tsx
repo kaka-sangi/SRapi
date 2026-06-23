@@ -8,7 +8,6 @@ import { CommandPaletteProvider } from "./command-palette";
 import { TourProvider } from "@/components/onboarding/tour-provider";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { CopilotPet } from "@/components/admin/copilot-pet";
-import { PageTransition } from "@/components/visual/page-transition";
 import { ScrollProgress } from "@/components/visual/scroll-progress";
 import { useRuntimeStatus } from "@/hooks/queries";
 
@@ -75,11 +74,9 @@ function ShellInner({ children }: { children: React.ReactNode }) {
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
             <TopNav user={user} onOpenNav={() => setNavOpen(true)} live={live} />
             <main className="flex-1 overflow-y-auto overscroll-contain">
-              <PageTransition>
-                <div className="mx-auto w-full max-w-[1360px] space-y-8 px-5 py-7 sm:px-8 sm:py-9 lg:px-10">
-                  {children}
-                </div>
-              </PageTransition>
+              <div className="mx-auto w-full max-w-[1360px] space-y-8 px-5 py-7 sm:px-8 sm:py-9 lg:px-10">
+                {children}
+              </div>
             </main>
           </div>
         </TourProvider>
