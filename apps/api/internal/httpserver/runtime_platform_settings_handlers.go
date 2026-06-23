@@ -62,6 +62,7 @@ func (s *Server) handleSiteConfig(w http.ResponseWriter, r *http.Request) {
 			"privacy_policy":       settings.Agreement.PrivacyPolicy,
 			"maintenance":          publicMaintenanceSummary(settings.Maintenance),
 			"email_login_available": settings.Email.SMTPConfigured,
+			"payments_enabled":     settings.Features.PaymentsEnabled,
 		},
 		"request_id": requestID,
 	})

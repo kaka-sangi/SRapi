@@ -3695,6 +3695,8 @@ export const zh: Messages = {
     emptySubs: "暂无订阅",
     emptySubsBody: "你还没有有效订阅。",
     noMethods: "尚未配置支付方式。",
+    noMethodsTitle: "暂无可用支付方式",
+    noMethodsHint: "站点管理员尚未配置任何支付提供商，请联系客服。",
     feeCredit: "充值金额",
     feeChannel: "渠道手续费",
     feePayable: "应付金额",

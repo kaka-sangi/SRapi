@@ -108,6 +108,7 @@ function BalanceTab() {
   const [error, setError] = useState<string | null>(null);
 
   const methodList = methods.data?.data ?? [];
+  const noPaymentMethods = !methods.isLoading && methodList.length === 0;
   const effectiveInstanceId = instanceId || methodList[0]?.provider_instance_id || "";
   const selected =
     methodList.find((m) => m.provider_instance_id === effectiveInstanceId) ?? methodList[0] ?? null;
@@ -158,6 +159,13 @@ function BalanceTab() {
 
       <Card>
         <CardContent>
+          {noPaymentMethods ? (
+            <div className="space-y-2 py-4 text-center">
+              <CreditCard className="mx-auto size-8 text-srapi-text-tertiary" />
+              <p className="text-sm font-medium text-srapi-text-primary">{t("billing.noMethodsTitle")}</p>
+              <p className="text-xs text-srapi-text-tertiary">{t("billing.noMethodsHint")}</p>
+            </div>
+          ) : (
           <form onSubmit={topUp} className="space-y-4">
             <h3 className="text-lg font-semibold tracking-tight text-srapi-text-primary">{t("billing.topUp")}</h3>
             <FloatingInput
@@ -246,6 +254,7 @@ function BalanceTab() {
               {t("billing.createOrder")}
             </Button>
           </form>
+          )}
         </CardContent>
       </Card>
     </div>

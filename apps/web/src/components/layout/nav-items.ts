@@ -36,10 +36,11 @@ import {
 } from "lucide-react";
 import { ADMIN_ROUTES, USER_ROUTES, USER_HOME_ROUTE } from "@/lib/routes";
 
-interface NavItem {
+export interface NavItem {
   href: string;
   labelKey: string;
   icon: LucideIcon;
+  requiresPayment?: boolean;
 }
 
 export interface NavSection {
@@ -64,8 +65,8 @@ const ACCOUNT_SECTION: NavSection = {
   titleKey: "nav.sectionAccount",
   items: [
     { href: USER_ROUTES.account, labelKey: "nav.account", icon: CircleUser },
-    { href: USER_ROUTES.billing, labelKey: "nav.billing", icon: Wallet },
-    { href: USER_ROUTES.redeem, labelKey: "nav.redeem", icon: Gem },
+    { href: USER_ROUTES.billing, labelKey: "nav.billing", icon: Wallet, requiresPayment: true },
+    { href: USER_ROUTES.redeem, labelKey: "nav.redeem", icon: Gem, requiresPayment: true },
     { href: USER_ROUTES.affiliate, labelKey: "nav.affiliate", icon: Handshake },
   ],
 };

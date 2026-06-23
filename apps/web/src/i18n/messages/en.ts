@@ -3775,6 +3775,8 @@ export const en = {
     emptySubs: "No subscriptions",
     emptySubsBody: "You have no active subscriptions.",
     noMethods: "No payment methods are configured.",
+    noMethodsTitle: "No payment methods available",
+    noMethodsHint: "The site operator has not configured any payment providers yet. Please contact support.",
     feeCredit: "Top-up credit",
     feeChannel: "Channel fee",
     feePayable: "Payable",

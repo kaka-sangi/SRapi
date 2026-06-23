@@ -8,7 +8,7 @@ import { BrandMark } from "@/components/visual/brand-mark";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAdminSettings } from "@/hooks/admin-queries";
 import { useSiteConfig } from "@/hooks/queries";
-import { navSectionsForRole } from "./nav-items";
+import { navSectionsForRole, type NavItem } from "./nav-items";
 import type { CustomMenuItem } from "../../../../../packages/sdk/typescript/src/types.gen";
 
 interface CustomMenu {
@@ -62,8 +62,13 @@ export function SidebarNav({
 }) {
   const pathname = usePathname();
   const { t } = useLanguage();
-  const sections = navSectionsForRole(role);
+  const rawSections = navSectionsForRole(role);
   const siteConfig = useSiteConfig();
+  const paymentsEnabled = (siteConfig.data as Record<string, unknown> | undefined)?.payments_enabled === true;
+  const sections = rawSections.map((section) => ({
+    ...section,
+    items: section.items.filter((item: NavItem) => !item.requiresPayment || paymentsEnabled),
+  })).filter((section) => section.items.length > 0);
   const adminSettings = useAdminSettings({ enabled: role === "admin" });
   const rawCustomMenus: CustomMenuItem[] | undefined =
     role === "admin"
