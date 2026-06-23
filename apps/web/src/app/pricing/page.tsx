@@ -2,8 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { CheckCircle2, Sparkles, Star } from "lucide-react";
+import { CheckCircle2, Sparkles, Star, CreditCard, Zap } from "lucide-react";
 import { apiService } from "@/lib/api";
 import { CheckoutRedirect } from "@/components/features/checkout-redirect";
 import {
@@ -28,15 +27,16 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ThemeToggle } from "@/components/layout/theme-toggle";
-import { LanguageToggle } from "@/components/layout/language-toggle";
-import { formatMoney } from "@/lib/admin-format";
+import { SectionHero } from "@/components/visual/section-hero";
 import { AppShell } from "@/components/layout/app-shell";
+import { cn } from "@/lib/cn";
+import { formatMoney } from "@/lib/admin-format";
 import type { PaymentOrder, SubscriptionPlan } from "@/lib/sdk-types";
 
 export default function PricingPage() {
@@ -52,77 +52,54 @@ function PricingContent() {
   const plans = usePublicSubscriptionPlans();
   const [selected, setSelected] = useState<SubscriptionPlan | null>(null);
 
-  // Sorted by sort_order; plans without one fall to the end.
   const sortedPlans = useMemo(() => {
     const list = plans.data?.data ?? [];
     return [...list].sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
   }, [plans.data]);
 
-  // Highlight the middle plan as the "popular" tier when 3+ are available;
-  // the visual treatment uses a soft accent border-l-4 instead of any badge.
   const highlightIndex = sortedPlans.length >= 3 ? Math.floor(sortedPlans.length / 2) : -1;
 
   return (
-    <div className="relative flex min-h-dvh flex-col">
-      <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
-        <Link href="/" className="text-2xl font-semibold leading-none tracking-tight text-srapi-text-primary">
-          SRapi
-        </Link>
-        <div className="flex items-center gap-2">
-          <LanguageToggle />
-          <ThemeToggle />
-          <Link href="/">
-            <Button variant="outline" size="sm">
-              {t("pricing.signIn")}
-            </Button>
-          </Link>
-        </div>
-      </header>
+    <>
+      <SectionHero
+        eyebrow="Account · Plans"
+        title={t("pricing.title")}
+        description={t("pricing.subtitle")}
+      />
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-6 pb-16">
-        <div className="mx-auto max-w-2xl text-center">
-          <h1 className="text-4xl font-semibold tracking-tight text-srapi-text-primary sm:text-5xl">
-            {t("pricing.title")}
-          </h1>
-          <p className="mt-3 text-srapi-text-secondary">{t("pricing.subtitle")}</p>
+      {plans.isLoading ? (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <Skeleton className="h-80 rounded-2xl" />
+          <Skeleton className="h-80 rounded-2xl" />
+          <Skeleton className="h-80 rounded-2xl" />
         </div>
-
-        <div className="mt-12">
-          {plans.isLoading ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              <Skeleton className="h-72" />
-              <Skeleton className="h-72" />
-              <Skeleton className="h-72" />
-            </div>
-          ) : plans.error ? (
-            <p className="text-center text-sm text-srapi-error">{meErrorMessage(plans.error)}</p>
-          ) : sortedPlans.length === 0 ? (
-            <EmptyState />
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {sortedPlans.map((plan, idx) => (
-                <PlanCard
-                  key={plan.id}
-                  plan={plan}
-                  highlight={idx === highlightIndex}
-                  onSubscribe={() => setSelected(plan)}
-                />
-              ))}
-            </div>
-          )}
+      ) : plans.error ? (
+        <p className="text-center text-sm text-srapi-error">{meErrorMessage(plans.error)}</p>
+      ) : sortedPlans.length === 0 ? (
+        <IllustratedEmptyState
+          illust="chart"
+          title={t("pricing.emptyTitle")}
+          description={t("pricing.emptyBody")}
+        />
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {sortedPlans.map((plan, idx) => (
+            <PlanCard
+              key={plan.id}
+              plan={plan}
+              highlight={idx === highlightIndex}
+              onSubscribe={() => setSelected(plan)}
+            />
+          ))}
         </div>
-      </main>
+      )}
 
-      {/* Re-keying on the plan ID resets the dialog's internal state (selected
-          payment method, error, created order) whenever the user opens it for
-          a different plan or re-opens it after closing — no setState-in-effect
-          dance required. */}
       <SubscribeDialog
         key={selected?.id ?? "none"}
         plan={selected}
         onClose={() => setSelected(null)}
       />
-    </div>
+    </>
   );
 }
 
@@ -139,58 +116,87 @@ function PlanCard({
   const entitlements = entitlementLines(plan);
 
   return (
-    <Card
-      className={`flex h-full flex-col ${
-        highlight ? "border-l-4 border-l-srapi-primary" : ""
-      }`}
-    >
-      <CardContent className="flex flex-1 flex-col">
+    <Card className={cn(
+      "group relative flex h-full flex-col overflow-hidden rounded-2xl transition-shadow hover:shadow-lg",
+      highlight
+        ? "border-2 border-srapi-primary shadow-md ring-1 ring-srapi-primary/20"
+        : "border border-srapi-border",
+    )}>
+      {/* Decorative gradient top bar */}
+      <div className={cn(
+        "h-1.5 w-full",
+        highlight
+          ? "bg-gradient-to-r from-srapi-primary via-srapi-primary/70 to-srapi-accent"
+          : "bg-gradient-to-r from-srapi-border-strong/60 to-srapi-border-strong/20",
+      )} />
+
+      <CardContent className="flex flex-1 flex-col p-6">
+        {/* Header */}
         <div className="flex items-start justify-between gap-3">
-          <h3 className="text-xl font-semibold tracking-tight text-srapi-text-primary">
-            {plan.name}
-          </h3>
-          {highlight ? (
+          <div className="flex items-center gap-2">
+            <div className={cn(
+              "grid size-9 place-items-center rounded-lg",
+              highlight ? "bg-srapi-primary/10 text-srapi-primary" : "bg-srapi-card-muted text-srapi-text-tertiary",
+            )}>
+              {highlight ? <Zap className="size-4" /> : <CreditCard className="size-4" />}
+            </div>
+            <h3 className="text-lg font-semibold tracking-tight text-srapi-text-primary">
+              {plan.name}
+            </h3>
+          </div>
+          {highlight && (
             <DataPill tone="accent" size="sm">
               <Star className="size-3" aria-hidden />
-              {t("pricing.popular") || "Popular"}
+              {t("pricing.popular")}
             </DataPill>
-          ) : null}
+          )}
         </div>
-        {plan.description ? (
-          <p className="mt-2 text-sm leading-relaxed text-srapi-text-secondary">
+
+        {plan.description && (
+          <p className="mt-3 text-sm leading-relaxed text-srapi-text-secondary">
             {plan.description}
           </p>
-        ) : null}
-        <div className="mt-6 flex items-baseline gap-2">
-          <span className="text-3xl font-semibold tracking-tight tabular text-srapi-text-primary">
+        )}
+
+        {/* Price */}
+        <div className="mt-5 flex items-baseline gap-1">
+          <span className="text-3xl font-bold tracking-tight tabular text-srapi-text-primary">
             {formatMoney(plan.price, plan.currency)}
           </span>
+          <span className="text-sm text-srapi-text-tertiary">
+            / {plan.validity_days}{t("pricing.days")}
+          </span>
         </div>
-        <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
-          {t("pricing.perPeriod", { days: plan.validity_days })}
-        </p>
 
-        {entitlements.length > 0 ? (
-          <ul className="mt-6 space-y-2">
+        {/* Divider */}
+        <div className="my-5 h-px bg-srapi-border/70" />
+
+        {/* Entitlements */}
+        {entitlements.length > 0 && (
+          <ul className="space-y-2.5">
             {entitlements.map((line) => (
-              <li key={line} className="flex items-start gap-2 text-sm text-srapi-text-secondary">
-                <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-srapi-success" aria-hidden />
+              <li key={line} className="flex items-start gap-2.5 text-sm text-srapi-text-secondary">
+                <CheckCircle2 className={cn(
+                  "mt-0.5 size-4 shrink-0",
+                  highlight ? "text-srapi-primary" : "text-srapi-success",
+                )} aria-hidden />
                 <span>{line}</span>
               </li>
             ))}
           </ul>
-        ) : null}
+        )}
 
         <div className="flex-1" />
 
+        {/* CTA */}
         <Button
           type="button"
-          variant="primary"
+          variant={highlight ? "primary" : "outline"}
           size="lg"
-          className="mt-6 w-full"
+          className={cn("mt-6 w-full rounded-xl", highlight && "shadow-sm")}
           onClick={onSubscribe}
         >
-          <Sparkles className="size-4" aria-hidden />
+          {highlight && <Sparkles className="size-4" aria-hidden />}
           {t("pricing.subscribe")}
         </Button>
       </CardContent>
@@ -198,22 +204,6 @@ function PlanCard({
   );
 }
 
-function EmptyState() {
-  const { t } = useLanguage();
-  return (
-    <IllustratedEmptyState
-      illust="chart"
-      title={t("pricing.emptyTitle")}
-      description={t("pricing.emptyBody")}
-    />
-  );
-}
-
-// Subscribe flow: if no session, redirect to login with ?next=/pricing so the
-// user lands back here after sign-in. If signed in, pick a payment method and
-// create an order — the backend's POST /payment/orders with
-// product_type='subscription_plan' is already wired and the webhook fulfillment
-// path activates the subscription on payment receipt.
 function SubscribeDialog({
   plan,
   onClose,
@@ -233,105 +223,78 @@ function SubscribeDialog({
   const isAuthed = apiService.getCurrentUser() !== null;
   const methodList = methods.data?.data ?? [];
   const effectiveInstanceId = instanceId || methodList[0]?.provider_instance_id || "";
-  const selected =
+  const selectedMethod =
     methodList.find((m) => m.provider_instance_id === effectiveInstanceId) ?? methodList[0] ?? null;
-
-  function goSignIn() {
-    router.push("/?next=/pricing");
-  }
 
   async function subscribe(event: React.FormEvent) {
     event.preventDefault();
     if (!plan) return;
     setError(null);
-    if (!selected) {
+    if (!selectedMethod) {
       setError(t("billing.noMethods"));
       return;
     }
     try {
       const order = await createMut.mutateAsync({
-        method: selected.method,
         amount: plan.price,
         currency: plan.currency,
+        method: selectedMethod.provider_instance_id,
         product_type: "subscription_plan",
-        product_id: String(plan.id),
+        product_id: plan.id,
       });
-      setCreatedOrder(order);
+      if (order) {
+        setCreatedOrder(order as PaymentOrder);
+      }
     } catch (err) {
       setError(meErrorMessage(err));
     }
   }
 
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) onClose();
-      }}
-    >
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
-            {plan
-              ? t("pricing.subscribeTo", { name: plan.name })
-              : t("pricing.subscribe")}
-          </DialogTitle>
-          {plan ? (
-            <DialogDescription>
-              {formatMoney(plan.price, plan.currency)} · {t("pricing.perPeriod", { days: plan.validity_days })}
-            </DialogDescription>
-          ) : null}
-        </DialogHeader>
+  if (createdOrder) {
+    return <CheckoutRedirect order={createdOrder} />;
+  }
 
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t("pricing.subscribeTo", { plan: plan?.name ?? "" })}</DialogTitle>
+          <DialogDescription>{t("pricing.subscribeHint")}</DialogDescription>
+        </DialogHeader>
         {!isAuthed ? (
-          <div className="space-y-4 py-2">
+          <div className="space-y-4 py-2 text-center">
             <p className="text-sm text-srapi-text-secondary">{t("pricing.signInRequired")}</p>
-            <Button type="button" variant="primary" className="w-full" onClick={goSignIn}>
+            <Button variant="primary" onClick={() => router.push("/login?from=/pricing")}>
               {t("pricing.signIn")}
             </Button>
           </div>
-        ) : createdOrder ? (
-          <SubscriptionOrderStatus order={createdOrder} onClose={onClose} />
+        ) : methodList.length === 0 ? (
+          <div className="space-y-2 py-4 text-center">
+            <CreditCard className="mx-auto size-8 text-srapi-text-tertiary" />
+            <p className="text-sm text-srapi-text-secondary">{t("billing.noMethodsTitle")}</p>
+          </div>
         ) : (
-          <form onSubmit={subscribe} className="space-y-4 py-2">
+          <form onSubmit={subscribe} className="space-y-4">
             <div>
-              <Label htmlFor="pricing-method">{t("billing.paymentMethod")}</Label>
-              {methods.isLoading ? (
-                <Skeleton className="mt-1 h-10 w-full" />
-              ) : methodList.length === 0 ? (
-                <p className="mt-1 text-xs text-srapi-text-tertiary">{t("billing.noMethods")}</p>
-              ) : (
-                <Select
-                  value={effectiveInstanceId}
-                  onValueChange={(value) => setInstanceId(value)}
-                >
-                  <SelectTrigger id="pricing-method" className="mt-1">
-                    <SelectValue placeholder={t("billing.paymentMethod")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {methodList.map((m) => (
-                      <SelectItem key={m.provider_instance_id} value={m.provider_instance_id}>
-                        {m.name || m.method}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+              <Label>{t("billing.method")}</Label>
+              <Select value={effectiveInstanceId} onValueChange={setInstanceId}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {methodList.map((m) => (
+                    <SelectItem key={m.provider_instance_id} value={m.provider_instance_id}>
+                      {m.name || m.method}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            {error ? (
-              <p role="alert" className="text-sm text-srapi-error">
-                {error}
-              </p>
-            ) : null}
-            <Button
-              type="submit"
-              variant="primary"
-              className="w-full"
-              loading={createMut.isPending}
-              disabled={methodList.length === 0 || !selected}
-            >
-              {t("pricing.subscribe")}
-            </Button>
+            {error && <p className="text-sm text-srapi-error">{error}</p>}
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={onClose}>{t("common.cancel")}</Button>
+              <Button type="submit" variant="primary" loading={createMut.isPending}>
+                {t("pricing.confirmPay", { amount: formatMoney(plan?.price ?? "0", plan?.currency ?? "USD") })}
+              </Button>
+            </DialogFooter>
           </form>
         )}
       </DialogContent>
@@ -339,48 +302,26 @@ function SubscribeDialog({
   );
 }
 
-function SubscriptionOrderStatus({
-  order,
-  onClose,
-}: {
-  order: PaymentOrder;
-  onClose: () => void;
-}) {
-  const { t } = useLanguage();
-  return (
-    <div className="py-2">
-      <CheckoutRedirect
-        order={order}
-        variant="card"
-        successAction={
-          <Button asChild variant="primary" className="w-full">
-            <Link href="/billing">{t("pricing.viewBilling")}</Link>
-          </Button>
-        }
-        failureAction={
-          <Button type="button" variant="outline" className="w-full" onClick={onClose}>
-            {t("pricing.close")}
-          </Button>
-        }
-      />
-    </div>
-  );
-}
-
 function entitlementLines(plan: SubscriptionPlan): string[] {
-  if (!plan.entitlements) return [];
   const lines: string[] = [];
-  for (const [key, raw] of Object.entries(plan.entitlements)) {
-    if (raw === null || raw === undefined || raw === false) continue;
-    if (raw === true) {
-      lines.push(prettifyKey(key));
-      continue;
+  const e = (plan.entitlements ?? {}) as Record<string, unknown>;
+  const reqQuota = Number(e.request_quota ?? e.included_request_quota ?? 0);
+  if (reqQuota > 0) lines.push(`${reqQuota.toLocaleString()} requests`);
+  const tokenQuota = Number(e.token_quota ?? e.included_token_quota ?? 0);
+  if (tokenQuota > 0) lines.push(`${tokenQuota.toLocaleString()} tokens`);
+  const credit = String(e.balance_credit ?? e.included_balance_credit ?? "0");
+  if (parseFloat(credit) > 0) lines.push(`${formatMoney(credit, plan.currency)} balance credit`);
+  const features = e.features;
+  if (Array.isArray(features)) {
+    for (const f of features) {
+      if (typeof f === "string" && f.trim()) lines.push(f.trim());
     }
-    lines.push(`${prettifyKey(key)}: ${String(raw)}`);
+  }
+  const desc = e.description;
+  if (typeof desc === "string" && desc.trim()) {
+    for (const line of desc.split("\n")) {
+      if (line.trim()) lines.push(line.trim());
+    }
   }
   return lines;
-}
-
-function prettifyKey(key: string): string {
-  return key.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
