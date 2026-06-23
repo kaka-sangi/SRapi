@@ -490,7 +490,7 @@ export function AccountFormDialog({
             ) : null}
           </DialogHeader>
 
-          <div className="mt-4 max-h-[62vh] space-y-5 overflow-y-auto pr-1">
+          <div className="mt-4 min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain pr-1">
             {/* ── Section: Identity ── */}
             {mode === "create" ? (
               <div>

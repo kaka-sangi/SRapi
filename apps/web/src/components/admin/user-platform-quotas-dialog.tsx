@@ -106,7 +106,7 @@ export function UserPlatformQuotasDialog({
           <DialogTitle>{t("adminUserQuota.title")}</DialogTitle>
           <DialogDescription>{t("adminUserQuota.subtitle", { user: userLabel })}</DialogDescription>
         </DialogHeader>
-        <div className="mt-2 max-h-[64vh] space-y-4 overflow-y-auto pr-1">
+        <div className="mt-2 min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain pr-1">
           <PageQueryState query={query} skeleton={<DialogListSkeleton rows={2} />}>
             {(list) =>
               list.data.length === 0 ? (

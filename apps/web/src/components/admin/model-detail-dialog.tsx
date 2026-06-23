@@ -208,7 +208,7 @@ export function ModelDetailDialog({
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="aliases" className="max-h-[55vh] overflow-y-auto pr-1">
+          <TabsContent value="aliases" className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
             <div className="mb-2 flex items-center justify-end">
               <Button variant="ghost" size="sm" onClick={onAddAlias}>
                 <Plus className="size-3.5" /> {t("adminModels.addAlias")}
@@ -266,7 +266,7 @@ export function ModelDetailDialog({
             )}
           </TabsContent>
 
-          <TabsContent value="mappings" className="max-h-[55vh] overflow-y-auto pr-1">
+          <TabsContent value="mappings" className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
             <div className="mb-2 flex items-center justify-end">
               <Button variant="ghost" size="sm" onClick={onAddMapping}>
                 <Plus className="size-3.5" /> {t("adminModels.addMapping")}

@@ -261,7 +261,7 @@ export function UserBalanceHistoryDialog({
         </div>
 
         {/* History list */}
-        <div className="max-h-[28rem] overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <PageQueryState
             query={query}
             skeleton={<DialogListSkeleton rows={5} />}

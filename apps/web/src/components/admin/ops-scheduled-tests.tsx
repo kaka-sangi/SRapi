@@ -413,7 +413,7 @@ function RunHistoryDialog({
           <DialogTitle className="text-lg font-semibold tracking-tight">{t("adminScheduledTests.runHistoryFor", { name: plan.name })}</DialogTitle>
           <DialogDescription>{t("adminScheduledTests.subtitle")}</DialogDescription>
         </DialogHeader>
-        <div className="mt-2 max-h-[60vh] overflow-auto">
+        <div className="mt-2 min-h-0 flex-1 overflow-auto overscroll-contain">
           {runs.data && runs.data.data.length > 0 ? (
             <table className="w-full text-left text-xs">
               <thead className="text-xs font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">

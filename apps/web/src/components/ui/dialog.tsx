@@ -34,7 +34,7 @@ export const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "srapi-anim-dialog fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-w-lg max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto overscroll-contain rounded-xl border border-srapi-border bg-srapi-card p-7 shadow-[0_16px_48px_-12px_rgba(0,0,0,0.18)]",
+        "srapi-anim-dialog fixed left-1/2 top-1/2 z-50 flex w-[calc(100%-2rem)] max-w-lg max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto overscroll-contain rounded-xl border border-srapi-border bg-srapi-card p-7 shadow-[0_16px_48px_-12px_rgba(0,0,0,0.18)]",
         className,
       )}
       {...props}

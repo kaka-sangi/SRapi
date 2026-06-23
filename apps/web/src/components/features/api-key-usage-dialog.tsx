@@ -74,7 +74,7 @@ export function ApiKeyUsageDialog({
           />
         </div>
 
-        <div className="mt-3 max-h-[60vh] overflow-y-auto">
+        <div className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <PageQueryState query={query} skeleton={<DialogListSkeleton rows={5} />}>
             {(usage) => <UsageBody usage={usage} />}
           </PageQueryState>
