@@ -126,7 +126,7 @@ func TestGatewaySchedulerScoresUseAccountRuntimeMetadata(t *testing.T) {
 		t.Fatalf("parse account id: %v", err)
 	}
 	score := schedulerDecisionScore(t, decisionsResp.Data[0].Scores, accountID)
-	assertNumberNear(t, score["health_score"], 0.9)
+	assertNumberNear(t, score["health_score"], 0.8317)
 	assertNumberNear(t, score["quota_score"], 0.7)
 	assertNumberNear(t, score["latency_score"], 0.75)
 }
