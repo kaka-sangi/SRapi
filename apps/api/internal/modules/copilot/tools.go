@@ -110,7 +110,13 @@ Tools: get_operation_detail, get_schema, call_admin_api`)
 5. Credentials in the body are verbatim. Tool results are secret-redacted — that is expected behavior.
 6. Keep prose concise but helpful. Use tables/lists when showing multiple items.
 
+## Settings Updates
+- The PUT /admin/settings body is very large. NEVER send the full settings object — it will be truncated by your output limit.
+- Instead: GET /admin/settings first, then PATCH only the specific section that needs changing via the same PUT endpoint with only the changed fields.
+- If you need to update copilot settings, only include the copilot section with the changed fields plus unchanged fields from the GET response.
+
 ## Error Handling
+- "JSON too large or truncated" → you tried to send too much data in one call. Break it into smaller requests.
 - 400 → re-check operation detail, fix the body, retry once.
 - 404 → GET the parent list for valid IDs, then retry.
 - 409 → GET current state, resolve the conflict, retry.
