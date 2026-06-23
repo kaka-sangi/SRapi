@@ -37,6 +37,8 @@ import { CopilotTab } from "./copilot-tab";
 import { BackupTab } from "./backup-tab";
 import { CaptchaSettingsPanel } from "./captcha-settings-panel";
 import { MaintenanceTab } from "./maintenance-tab";
+import { SecurityTab } from "./security-tab";
+import { PaymentTab } from "./payment-tab";
 import type { AdminSettingsMaintenance } from "../../../../../../packages/sdk/typescript/src/types.gen";
 
 export default function AdminSettingsPage() {
@@ -220,6 +222,28 @@ function SettingsEditor({ initial }: { initial: Parameters<typeof createSettings
               onSave={() => requestSave("maintenance")}
               pending={updateMut.isPending}
             />
+          ) : tab.id === "security" ? (
+            <SecurityTab
+              value={draft.value.security as Record<string, unknown>}
+              draft={draft}
+              onField={(key, v) => setSectionField("security", key, v)}
+              onSpecial={setSpecial}
+              onSave={() => requestSave("security")}
+              pending={updateMut.isPending}
+              modelOptions={modelOptions}
+            />
+          ) : tab.id === "payment" ? (
+            <PaymentTab
+              paymentValue={draft.value.payment as Record<string, unknown>}
+              featuresValue={draft.value.features as Record<string, unknown>}
+              draft={draft}
+              onPaymentField={(key, v) => setSectionField("payment", key, v)}
+              onFeaturesField={(key, v) => setSectionField("features", key, v)}
+              onSpecial={setSpecial}
+              onSave={() => requestSave("payment")}
+              pending={updateMut.isPending}
+              modelOptions={modelOptions}
+            />
           ) : (
             <Card>
               <CardContent className="space-y-5">
@@ -238,7 +262,6 @@ function SettingsEditor({ initial }: { initial: Parameters<typeof createSettings
                   />
                 ))}
                 {tab.id === "email" ? <EmailTestPanel /> : null}
-                {tab.id === "security" ? <CaptchaSettingsPanel /> : null}
                 <div className="flex justify-end border-t border-srapi-border/70 pt-4">
                   <Button
                     variant="primary"

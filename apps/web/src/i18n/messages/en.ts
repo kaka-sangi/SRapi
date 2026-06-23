@@ -3214,6 +3214,27 @@ export const en = {
       backup: "Backup",
       maintenance: "Maintenance",
     },
+    security: {
+      adminApiKey: "Admin API Key",
+      adminApiKeyHint: "A bearer token for headless admin API access (CI, scripts, copilot). Not required for console login.",
+      adminApiKeyWarning: "The admin API key grants full admin privileges. Treat it like a root password — rotate regularly and never expose it in client-side code.",
+      adminApiKeyConfigured: "An admin API key is configured.",
+      adminApiKeyNotConfigured: "No admin API key configured.",
+      registration: "Registration",
+      registrationHint: "Controls whether new users can sign up. When disabled, only existing users and admin-created accounts can log in.",
+      oauth: "OAuth / SSO",
+      oauthHint: "Enable third-party sign-in (GitHub, Google, OIDC, WeChat, DingTalk, LinuxDo). Configure provider credentials below.",
+    },
+    payment: {
+      masterSwitch: "Payment Feature",
+      masterSwitchHint: "Controls whether the payment and billing system is visible to users across the platform.",
+      paymentsEnabledHint: "When disabled, the recharge page, billing dashboard, and all payment-related UI are hidden from users.",
+      system: "Payment System",
+      systemHint: "Configure payment processing. Requires at least one payment provider (Stripe, Alipay, WeChat Pay, etc.).",
+      systemEnabled: "Activate payment processing",
+      subscriptionPlans: "Subscription Plans",
+      subscriptionPlansHint: "Allow users to purchase subscription plans with bundled quotas. Requires the payment system to be active.",
+    },
     maintenance: {
       enabledLabel: "Maintenance mode",
       enabledHelp:
