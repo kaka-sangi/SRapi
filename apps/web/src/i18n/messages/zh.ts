@@ -259,6 +259,7 @@ export const zh: Messages = {
     err2fa: "验证码无效或已过期，请重试。",
     err2faExpired: "验证会话已过期，请重新登录。",
     back: "返回登录",
+    passwordlessButton: "发送邮箱登录链接",
   },
   authReset: {
     eyebrow: "自托管 AI 网关",
@@ -288,6 +289,8 @@ export const zh: Messages = {
     invalid: "请填写名称、邮箱，以及至少 8 位的密码。",
     haveAccount: "已有账号？",
     signIn: "登录",
+    emailExists: "该邮箱已注册，请直接登录。",
+    emailDomainBlocked: "该邮箱域名不允许注册。",
     userAgreement: "用户协议",
     privacyPolicy: "隐私政策",
   },

@@ -155,7 +155,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !registrationEmailSuffixAllowed(string(body.Email), settings.Security.RegistrationEmailSuffixAllowlist) {
-		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid registration request", requestID)
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "email domain not allowed for registration", requestID)
 		return
 	}
 	inviteCode := optionalStringValue(body.InviteCode)
@@ -179,8 +179,10 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		switch {
-		case errors.Is(err, usersservice.ErrInvalidInput), errors.Is(err, usersservice.ErrUserAlreadyExists):
-			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid registration request", requestID)
+		case errors.Is(err, usersservice.ErrUserAlreadyExists):
+			writeStandardError(w, http.StatusConflict, apiopenapi.RESOURCECONFLICT, "email already registered", requestID)
+		case errors.Is(err, usersservice.ErrInvalidInput):
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid email or password (min 8 characters)", requestID)
 		default:
 			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "registration failed", requestID)
 		}
@@ -212,6 +214,16 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	s.setSessionCookie(w, result)
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, user.ID, "user.register", "user", strconv.Itoa(user.ID), nil, userAuditSnapshot(user)))
+
+	// Trigger email verification for the new account. Best-effort: a failure
+	// here does not block the registration — the user can request another
+	// verification email from their account settings.
+	if s.runtime.auth != nil {
+		go func() {
+			ctx := context.WithoutCancel(r.Context())
+			_, _ = s.runtime.auth.RequestEmailVerification(ctx, string(body.Email))
+		}()
+	}
 
 	writeJSONAny(w, http.StatusCreated, apiopenapi.LoginResponse{
 		Data: apiopenapi.SessionData{

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { CurrentUserAttribute, apiService } from "@/lib/api";
 import { meErrorMessage } from "@/lib/me-api";
-import { USER_HOME_ROUTE } from "@/lib/routes";
+import { ADMIN_HOME_ROUTE, USER_HOME_ROUTE } from "@/lib/routes";
 import { useLanguage } from "@/context/LanguageContext";
 import { cn } from "@/lib/cn";
 import { Card } from "@/components/ui/card";
@@ -96,8 +96,9 @@ export default function RegisterPage() {
       // referral/rebate is recorded on sign-up (read at submit time — runs on
       // the client). The backend RegisterRequest applies it.
       const inviteCode = new URLSearchParams(window.location.search).get("invite_code") || "";
-      await apiService.register(email, name.trim(), password, captcha.token, values, inviteCode || undefined);
-      router.replace(USER_HOME_ROUTE);
+      const user = await apiService.register(email, name.trim(), password, captcha.token, values, inviteCode || undefined);
+      const home = user.role === "admin" ? ADMIN_HOME_ROUTE : USER_HOME_ROUTE;
+      router.replace(home);
     } catch (err) {
       setError(meErrorMessage(err));
       setSubmitting(false);

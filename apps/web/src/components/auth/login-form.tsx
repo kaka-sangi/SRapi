@@ -291,7 +291,7 @@ export function LoginForm() {
           disabled={submitting || !email || (captcha.required && !captcha.token)}
           onClick={requestPasswordless}
         >
-          Send email sign-in link
+          {t("login.passwordlessButton")}
         </Button>
         {passwordlessSent ? (
           <p className="text-center text-xs text-srapi-text-secondary">

@@ -259,6 +259,7 @@ export const en = {
     err2fa: "Invalid or expired code. Try again.",
     err2faExpired: "Your verification challenge expired. Please sign in again.",
     back: "Back to sign in",
+    passwordlessButton: "Send email sign-in link",
   },
   authReset: {
     eyebrow: "Self-hosted AI Gateway",
@@ -289,6 +290,8 @@ export const en = {
     invalid: "Enter a name, email and a password of at least 8 characters.",
     haveAccount: "Already have an account?",
     signIn: "Sign in",
+    emailExists: "This email is already registered. Try signing in instead.",
+    emailDomainBlocked: "This email domain is not allowed for registration.",
     userAgreement: "User agreement",
     privacyPolicy: "Privacy policy",
   },
