@@ -46,10 +46,13 @@ export function SecurityTab({ value, draft, onField, onSpecial, onSave, pending,
             <span>{t("adminSettings.security.adminApiKeyWarning")}</span>
           </div>
           <div className="text-sm text-srapi-text-secondary">
-            {value.admin_api_key
+            {(value.admin_api_key as { configured?: boolean } | undefined)?.configured
               ? t("adminSettings.security.adminApiKeyConfigured")
               : t("adminSettings.security.adminApiKeyNotConfigured")}
           </div>
+          <p className="text-xs text-srapi-text-tertiary">
+            {t("adminSettings.security.adminApiKeyEnvHint")}
+          </p>
         </CardContent>
       </Card>
 

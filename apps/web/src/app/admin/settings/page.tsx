@@ -275,7 +275,6 @@ function SettingsEditor({ initial }: { initial: Parameters<typeof createSettings
               onSpecial={setSpecial}
               onSave={() => requestSave("features")}
               pending={updateMut.isPending}
-              modelOptions={modelOptions}
             />
           ) : tab.id === "users" ? (
             <UsersTab

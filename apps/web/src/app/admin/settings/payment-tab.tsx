@@ -4,10 +4,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { type MultiSelectOption } from "@/components/ui/multi-select";
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/multi-select";
 import { type AdminSettingsDraft } from "@/lib/admin-settings-form";
-import { SPECIAL_FIELDS } from "./settings-fields";
-import { SpecialFieldRow } from "./special-field-row";
+
+const PAYMENT_PROVIDER_OPTIONS: MultiSelectOption[] = [
+  { value: "stripe", label: "Stripe" },
+  { value: "alipay", label: "Alipay (支付宝)" },
+  { value: "wechat", label: "WeChat Pay (微信支付)" },
+  { value: "easypay", label: "EasyPay" },
+  { value: "airwallex", label: "Airwallex" },
+  { value: "linuxdo", label: "LinuxDo" },
+];
 
 interface PaymentTabProps {
   paymentValue: Record<string, unknown>;
@@ -101,15 +108,18 @@ export function PaymentTab({
 
             {paymentSystemEnabled && (
               <div className="space-y-4 rounded-xl border border-srapi-border/70 bg-srapi-card-muted/30 p-4">
-                {(SPECIAL_FIELDS.payment ?? []).map((field) => (
-                  <SpecialFieldRow
-                    key={String(field.key)}
-                    field={field}
-                    draft={draft}
-                    onChange={onSpecial}
-                    modelOptions={modelOptions}
+                <div>
+                  <Label>{t("adminSettings.payment.providers")}</Label>
+                  <p className="mb-1 text-xs text-srapi-text-tertiary">
+                    {t("adminSettings.payment.providersHint")}
+                  </p>
+                  <MultiSelect
+                    options={PAYMENT_PROVIDER_OPTIONS}
+                    value={Array.isArray(draft.paymentProviders) ? draft.paymentProviders : []}
+                    onChange={(next) => onSpecial("paymentProviders", next)}
+                    placeholder={t("adminSettings.payment.providersPlaceholder")}
                   />
-                ))}
+                </div>
               </div>
             )}
           </CardContent>

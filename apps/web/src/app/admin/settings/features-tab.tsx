@@ -4,10 +4,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { type MultiSelectOption } from "@/components/ui/multi-select";
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/multi-select";
+import { useAdminGroups } from "@/hooks/admin-queries";
 import { type AdminSettingsDraft } from "@/lib/admin-settings-form";
-import { SPECIAL_FIELDS } from "./settings-fields";
-import { SpecialFieldRow } from "./special-field-row";
 
 interface Props {
   value: Record<string, unknown>;
@@ -16,11 +15,15 @@ interface Props {
   onSpecial: (key: keyof AdminSettingsDraft, v: unknown) => void;
   onSave: () => void;
   pending: boolean;
-  modelOptions: MultiSelectOption[];
 }
 
-export function FeaturesTab({ value, draft, onField, onSpecial, onSave, pending, modelOptions }: Props) {
+export function FeaturesTab({ value, draft, onField, onSpecial, onSave, pending }: Props) {
   const { t } = useLanguage();
+  const groups = useAdminGroups();
+  const channelOptions: MultiSelectOption[] = (groups.data?.data ?? []).map((g) => ({
+    value: g.name,
+    label: g.name,
+  }));
 
   return (
     <div className="space-y-6">
@@ -33,9 +36,15 @@ export function FeaturesTab({ value, draft, onField, onSpecial, onSave, pending,
               <p className="text-xs text-srapi-text-tertiary">{t("adminSettings.features.channelsHint")}</p>
             </div>
           </div>
-          {(SPECIAL_FIELDS.features ?? []).map((field) => (
-            <SpecialFieldRow key={String(field.key)} field={field} draft={draft} onChange={onSpecial} modelOptions={modelOptions} />
-          ))}
+          <div>
+            <Label>{t("adminSettings.features.channelsLabel")}</Label>
+            <MultiSelect
+              options={channelOptions}
+              value={Array.isArray(draft.enabledChannels) ? draft.enabledChannels : []}
+              onChange={(next) => onSpecial("enabledChannels", next)}
+              placeholder={t("adminSettings.features.channelsPlaceholder")}
+            />
+          </div>
         </CardContent>
       </Card>
 
