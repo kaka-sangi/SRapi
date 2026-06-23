@@ -340,10 +340,14 @@ func parseCallAdminArgs(argsJSON string) (method, path string, body []byte, err 
 	}
 	raw := orEmptyJSON(argsJSON)
 	if err = json.Unmarshal([]byte(raw), &args); err != nil {
-		if len(raw) > 2000 {
-			return "", "", nil, fmt.Errorf("JSON too large or truncated (%d bytes) — split the request into smaller calls instead of sending the entire settings object", len(raw))
+		preview := raw
+		if len(preview) > 500 {
+			preview = preview[:500] + "…"
 		}
-		return "", "", nil, err
+		if len(raw) > 2000 {
+			return "", "", nil, fmt.Errorf("JSON too large or truncated (%d bytes, starts: %s) — split the request into smaller calls", len(raw), preview)
+		}
+		return "", "", nil, fmt.Errorf("%w (input length: %d, preview: %s)", err, len(raw), preview)
 	}
 	method = strings.ToUpper(strings.TrimSpace(args.Method))
 	path = strings.TrimSpace(args.Path)
