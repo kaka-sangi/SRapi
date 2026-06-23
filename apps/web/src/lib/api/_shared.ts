@@ -60,6 +60,7 @@ export async function fetchApiJSON<T>(path: string, init: RequestInit = {}): Pro
     if (csrfToken) {
       headers.set('X-CSRF-Token', csrfToken);
     }
+    headers.set('X-CSRF-Rotation', 'supported');
   }
 
   const response = await fetchWithTimeout(buildApiUrl(path), {
@@ -68,6 +69,11 @@ export async function fetchApiJSON<T>(path: string, init: RequestInit = {}): Pro
     headers,
     credentials: 'include'
   });
+
+  const rotatedCSRF = response.headers.get('X-CSRF-Token-Rotated');
+  if (rotatedCSRF) {
+    localStorage.setItem(CSRF_STORAGE_KEY, rotatedCSRF);
+  }
 
   if (!response.ok) {
     const message = await response.text();

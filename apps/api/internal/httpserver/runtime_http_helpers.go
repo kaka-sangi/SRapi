@@ -815,11 +815,56 @@ func validateCSRF(session authcontract.Session, token string) error {
 	return authservice.ValidateCSRF(session, token)
 }
 
-// csrfRotationMiddleware wraps admin handlers so that after a successful
-// state-changing request (POST/PUT/PATCH/DELETE with 2xx), the CSRF token is
-// rotated and the new token is sent via the X-CSRF-Token-Rotated header.
-// The frontend should pick this up and use the new token for subsequent
-// requests. This limits the window of a compromised CSRF token.
+// withCSRFRotation wraps a handler so that on successful (2xx) responses, a new
+// CSRF token is generated, sent via X-CSRF-Token-Rotated, and committed to the
+// session store. The pre-generated token is set as a header before the handler
+// writes; the store commit is deferred until the response succeeds. The old
+// token remains valid for the current request (already validated by the handler).
+func (s *Server) withCSRFRotation(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-CSRF-Rotation") == "" {
+			next(w, r)
+			return
+		}
+		session, err := s.requireConsoleSession(r)
+		if err != nil {
+			next(w, r)
+			return
+		}
+		newToken, genErr := authservice.GenerateCSRFToken()
+		if genErr != nil {
+			next(w, r)
+			return
+		}
+		w.Header().Set("X-CSRF-Token-Rotated", newToken)
+		rec := &statusRecorder{ResponseWriter: w}
+		next(rec, r)
+		if rec.status >= 200 && rec.status < 300 {
+			rotator, ok := s.runtime.sessionStore.(authcontract.CSRFRotator)
+			if ok {
+				_ = rotator.UpdateCSRFToken(r.Context(), session.Session.ID, newToken)
+			}
+		}
+	}
+}
+
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (r *statusRecorder) WriteHeader(code int) {
+	r.status = code
+	r.ResponseWriter.WriteHeader(code)
+}
+
+func (r *statusRecorder) Write(b []byte) (int, error) {
+	if r.status == 0 {
+		r.status = http.StatusOK
+	}
+	return r.ResponseWriter.Write(b)
+}
+
 func (s *Server) rotateCSRFTokenQuiet(ctx context.Context, sessionID string) string {
 	if sessionID == "" {
 		return ""
