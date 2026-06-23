@@ -55,17 +55,17 @@ const PAYMENT_PRESETS: PaymentPreset[] = [
   {
     key: "linuxdo",
     name: "Linux.do Credit",
-    description: "LinuxDo 社区积分支付（EasyPay 协议）",
+    description: "Linux.do 社区积分支付 (credit.linux.do)",
     provider: "linuxdo",
     methods: ["linuxdo"],
     feeRate: "0",
     configTemplate: {
       gateway_url: "https://credit.linux.do",
-      merchant_id: "",
-      signing_secret: "",
-      exchange_rate: "1",
+      client_id: "",
+      client_secret: "",
       notify_url: "",
       return_url: "",
+      exchange_rate: "1",
     },
   },
   {

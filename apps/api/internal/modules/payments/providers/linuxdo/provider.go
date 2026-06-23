@@ -30,27 +30,27 @@ func New() Provider {
 	return Provider{}
 }
 
-// CreateSession creates a payment order via the EasyPay-compatible
-// /pay/submit.php endpoint on a Linux.do Credit instance.
+// CreateSession creates a payment order via the Linux.do Credit EasyPay-compatible
+// /epay/pay/submit.php endpoint.
 //
 // Required config keys:
-//   - gateway_url / base_url: Credit instance URL (e.g. https://credit.linux.do)
-//   - merchant_id / pid:      merchant ID on the Credit platform
-//   - signing_secret / key:   merchant signing secret
-//   - notify_url:             webhook callback URL
+//   - gateway_url / base_url: Credit instance URL (default: https://credit.linux.do)
+//   - client_id / pid:        application Client ID from the Credit console
+//   - client_secret / key:    application Client Secret
+//   - notify_url:             webhook callback URL (e.g. https://yourdomain/api/v1/webhooks/payments/linuxdo)
 //   - return_url:             user redirect after payment
 //
 // Optional:
 //   - exchange_rate / rate:   multiplier to convert platform currency to Credit amount (default 1.0)
-//   - sign_type:              MD5 (default) or HMAC-SHA256
+//   - sign_type:              MD5 (default) — matches Credit's EasyPay compat protocol
 func (p Provider) CreateSession(req checkoutprovider.Request) (checkoutprovider.Session, error) {
 	gatewayURL := configString(req.Config, "gateway_url", "base_url")
 	if gatewayURL == "" {
-		return checkoutprovider.Session{}, checkoutprovider.ErrInvalidConfig
+		gatewayURL = "https://credit.linux.do"
 	}
 	gatewayURL = strings.TrimRight(gatewayURL, "/")
-	merchantID := configString(req.Config, "merchant_id", "pid")
-	signingSecret := configString(req.Config, "signing_secret", "key", "secret")
+	merchantID := configString(req.Config, "client_id", "pid", "merchant_id")
+	signingSecret := configString(req.Config, "client_secret", "key", "signing_secret", "secret")
 	notifyURL := configString(req.Config, "notify_url", "webhook_url")
 	returnURL := configString(req.Config, "return_url", "success_url")
 	if merchantID == "" || signingSecret == "" || notifyURL == "" || returnURL == "" {
@@ -70,16 +70,21 @@ func (p Provider) CreateSession(req checkoutprovider.Request) (checkoutprovider.
 		}
 	}
 
-	submitURL, err := url.Parse(gatewayURL + "/pay/submit.php")
+	submitURL, err := url.Parse(gatewayURL + "/epay/pay/submit.php")
 	if err != nil {
 		return checkoutprovider.Session{}, checkoutprovider.ErrInvalidConfig
 	}
 
+	siteName := configString(req.Config, "site_name", "sitename")
+	if siteName == "" {
+		siteName = "SRapi"
+	}
+
 	params := submitURL.Query()
 	params.Set("pid", merchantID)
-	params.Set("type", "linuxdo")
+	params.Set("type", "epay")
 	params.Set("out_trade_no", req.OrderNo)
-	params.Set("name", "SRapi · "+req.OrderNo)
+	params.Set("name", siteName+" · "+req.OrderNo)
 	params.Set("money", amount)
 	params.Set("notify_url", notifyURL)
 	if strings.Contains(returnURL, "?") {
@@ -88,7 +93,6 @@ func (p Provider) CreateSession(req checkoutprovider.Request) (checkoutprovider.
 		returnURL += "?order_no=" + req.OrderNo
 	}
 	params.Set("return_url", returnURL)
-	params.Set("sitename", configString(req.Config, "site_name", "sitename"))
 
 	signType := strings.ToUpper(configString(req.Config, "sign_type"))
 	if signType == "" {
@@ -114,11 +118,11 @@ func (p Provider) CreateSession(req checkoutprovider.Request) (checkoutprovider.
 func (p Provider) Refund(req checkoutprovider.RefundRequest) (checkoutprovider.RefundResult, error) {
 	apiURL := configString(req.Config, "gateway_url", "base_url", "api_url")
 	if apiURL == "" {
-		return checkoutprovider.RefundResult{}, checkoutprovider.ErrInvalidConfig
+		apiURL = "https://credit.linux.do"
 	}
-	apiURL = strings.TrimRight(apiURL, "/") + "/api.php"
-	merchantID := configString(req.Config, "merchant_id", "pid")
-	signingSecret := configString(req.Config, "signing_secret", "key", "secret")
+	apiURL = strings.TrimRight(apiURL, "/") + "/epay/api.php"
+	merchantID := configString(req.Config, "client_id", "pid", "merchant_id")
+	signingSecret := configString(req.Config, "client_secret", "key", "signing_secret", "secret")
 	if merchantID == "" || signingSecret == "" {
 		return checkoutprovider.RefundResult{}, checkoutprovider.ErrInvalidConfig
 	}
@@ -153,11 +157,11 @@ func (p Provider) Refund(req checkoutprovider.RefundRequest) (checkoutprovider.R
 func (p Provider) QueryOrder(req checkoutprovider.QueryRequest) (checkoutprovider.QueryResult, error) {
 	apiURL := configString(req.Config, "gateway_url", "base_url", "api_url")
 	if apiURL == "" {
-		return checkoutprovider.QueryResult{}, checkoutprovider.ErrInvalidConfig
+		apiURL = "https://credit.linux.do"
 	}
-	apiURL = strings.TrimRight(apiURL, "/") + "/api.php"
-	merchantID := configString(req.Config, "merchant_id", "pid")
-	signingSecret := configString(req.Config, "signing_secret", "key", "secret")
+	apiURL = strings.TrimRight(apiURL, "/") + "/epay/api.php"
+	merchantID := configString(req.Config, "client_id", "pid", "merchant_id")
+	signingSecret := configString(req.Config, "client_secret", "key", "signing_secret", "secret")
 	if merchantID == "" || signingSecret == "" {
 		return checkoutprovider.QueryResult{}, checkoutprovider.ErrInvalidConfig
 	}

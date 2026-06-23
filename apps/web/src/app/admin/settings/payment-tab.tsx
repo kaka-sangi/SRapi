@@ -13,7 +13,7 @@ const PAYMENT_PROVIDER_OPTIONS: MultiSelectOption[] = [
   { value: "wechat", label: "WeChat Pay (微信支付)" },
   { value: "easypay", label: "EasyPay" },
   { value: "airwallex", label: "Airwallex" },
-  { value: "linuxdo", label: "LinuxDo" },
+  { value: "linuxdo", label: "Linux.do Credit" },
 ];
 
 interface PaymentTabProps {
