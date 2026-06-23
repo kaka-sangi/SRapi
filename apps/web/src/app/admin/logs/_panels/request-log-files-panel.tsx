@@ -374,7 +374,7 @@ export function RequestLogFilesPanel() {
             </DialogDescription>
           </DialogHeader>
           {downloadQuery.isError ? (
-            <p className="text-sm text-red-300">{t("adminRequestLogFiles.detailLoadFailed")}</p>
+            <p className="text-sm text-srapi-error">{t("adminRequestLogFiles.detailLoadFailed")}</p>
           ) : (
             <div className="space-y-3">
               {selected ? <RequestDumpEvidenceLinks file={selected} /> : null}

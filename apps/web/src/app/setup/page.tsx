@@ -19,7 +19,7 @@ function StatusDot({ status }: { status: HealthStatus }) {
     status === "ok"
       ? "bg-emerald-500"
       : status === "error"
-        ? "bg-red-400"
+        ? "bg-srapi-error"
         : "bg-srapi-text-tertiary animate-pulse";
   return <span className={`inline-block h-2 w-2 rounded-full ${color}`} />;
 }

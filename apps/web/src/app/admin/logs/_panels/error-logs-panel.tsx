@@ -233,7 +233,7 @@ export function ErrorLogsPanel() {
           code != null && code >= 500
             ? "text-srapi-error"
             : code != null && code >= 400
-              ? "text-amber-500"
+              ? "text-srapi-warning"
               : "text-srapi-text-tertiary";
         // Status-code breakdown on hover: phase + owner + protocol so ops can
         // see «what kind of failure» without opening the dialog.
