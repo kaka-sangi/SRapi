@@ -3592,6 +3592,10 @@ export type AdminSettingsCopilot = {
      */
     auto_run_reads: boolean;
     /**
+     * Maximum output tokens for the copilot's LLM calls. 0 uses the default (8192). Increase if the copilot truncates large tool call arguments.
+     */
+    max_output_tokens?: number;
+    /**
      * Enable the copilot's public-web search tool (works with any model).
      */
     web_search_enabled: boolean;
@@ -8403,6 +8407,10 @@ export type AdminSettingsCopilotWritable = {
      * Auto-execute read-only (GET) tool calls without confirmation.
      */
     auto_run_reads: boolean;
+    /**
+     * Maximum output tokens for the copilot's LLM calls. 0 uses the default (8192). Increase if the copilot truncates large tool call arguments.
+     */
+    max_output_tokens?: number;
     /**
      * Enable the copilot's public-web search tool (works with any model).
      */

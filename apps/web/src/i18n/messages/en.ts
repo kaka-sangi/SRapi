@@ -3528,6 +3528,8 @@ export const en = {
     keyPlaceholder: "Enter API key",
     fieldAutoRunReads: "Auto-run read calls",
     fieldAutoRunReadsHint: "Run GET/read calls without asking. Changes always need approval.",
+    fieldMaxTokens: "Max output tokens",
+    fieldMaxTokensHint: "Maximum tokens the copilot model can generate per turn. 0 = default (8192). Increase if tool calls get truncated on large payloads.",
     fieldOwnerOnly: "Owner only",
     fieldOwnerOnlyHint: "Restrict the copilot to owner-role admins.",
     fieldWebSearch: "Web search",

@@ -25107,6 +25107,9 @@ components:
         auto_run_reads:
           type: boolean
           description: Auto-execute read-only (GET) tool calls without confirmation.
+        max_output_tokens:
+          type: integer
+          description: Maximum output tokens for the copilot's LLM calls. 0 uses the default (8192). Increase if the copilot truncates large tool call arguments.
         web_search_enabled:
           type: boolean
           description: Enable the copilot's public-web search tool (works with any model).

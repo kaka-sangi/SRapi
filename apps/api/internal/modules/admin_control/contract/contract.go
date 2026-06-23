@@ -111,6 +111,8 @@ type AdminSettingsCopilot struct {
 	// Web search lets the copilot look things up on the public web. Like the
 	// dedicated key, WebSearchAPIKeyCiphertext is encrypted at rest and never
 	// crosses the API boundary (only a "configured" indicator is exposed).
+	MaxOutputTokens           int    `json:"max_output_tokens"`
+
 	WebSearchEnabled          bool   `json:"web_search_enabled"`
 	WebSearchProvider         string `json:"web_search_provider"`
 	WebSearchBaseURL          string `json:"web_search_base_url"`

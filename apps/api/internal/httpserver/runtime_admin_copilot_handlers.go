@@ -162,9 +162,12 @@ func (s *Server) buildCopilotLLM(settings copilot.Settings, ciphertext, override
 	if model == "" {
 		model = settings.Model
 	}
-	maxTokens := 8192
-	if budget := copilotEffortBudget(effort); budget > 0 {
-		maxTokens = budget + 4096 // leave room for output beyond the thinking budget
+	maxTokens := settings.MaxOutputTokens
+	if maxTokens <= 0 {
+		maxTokens = 8192
+	}
+	if budget := copilotEffortBudget(effort); budget > 0 && budget+4096 > maxTokens {
+		maxTokens = budget + 4096
 	}
 	return func(ctx context.Context, system string, messages []provideradaptercontract.ConversationMessage, tools []map[string]any, onDelta func(kind, text string)) (provideradaptercontract.ConversationResponse, error) {
 		req := provideradaptercontract.ConversationRequest{
@@ -512,6 +515,7 @@ func (s *Server) copilotSettings(ctx context.Context) (copilot.Settings, string,
 		DedicatedBaseURL:  c.DedicatedBaseURL,
 		OwnerOnly:         c.OwnerOnly,
 		AutoRunReads:      c.AutoRunReads,
+		MaxOutputTokens:   c.MaxOutputTokens,
 
 		WebSearchEnabled:          c.WebSearchEnabled,
 		WebSearchProvider:         c.WebSearchProvider,

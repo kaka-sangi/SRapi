@@ -5251,6 +5251,9 @@ type AdminSettingsCopilot struct {
 	// Enabled Master switch for the copilot chat endpoint.
 	Enabled bool `json:"enabled"`
 
+	// MaxOutputTokens Maximum output tokens for the copilot's LLM calls. 0 uses the default (8192). Increase if the copilot truncates large tool call arguments.
+	MaxOutputTokens *int `json:"max_output_tokens,omitempty"`
+
 	// Model Default upstream model the copilot calls (e.g. claude-3-5-sonnet, gpt-4o).
 	Model string `json:"model"`
 

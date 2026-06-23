@@ -3456,6 +3456,8 @@ export const zh: Messages = {
     keyPlaceholder: "输入 API Key",
     fieldAutoRunReads: "自动执行读取调用",
     fieldAutoRunReadsHint: "读取（GET）调用无需确认直接执行；变更操作始终需要批准。",
+    fieldMaxTokens: "最大输出 Token 数",
+    fieldMaxTokensHint: "Copilot 模型每轮生成的最大 token 数。0 = 默认值（8192）。如果工具调用因数据量大被截断，请增大此值。",
     fieldOwnerOnly: "仅限所有者",
     fieldOwnerOnlyHint: "仅允许所有者角色的管理员使用副驾驶。",
     fieldWebSearch: "联网搜索",

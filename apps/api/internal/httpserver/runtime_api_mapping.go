@@ -1682,6 +1682,13 @@ func ptrString(value string) *string { return &value }
 
 func ptrInt(value int) *int { return &value }
 
+func derefIntPtr(p *int) int {
+	if p == nil {
+		return 0
+	}
+	return *p
+}
+
 func cloneIntPtr(value *int) *int {
 	if value == nil {
 		return nil

@@ -267,10 +267,24 @@ export function CopilotTab({
           </div>
         </div>
 
-        <div className="flex justify-end border-t border-srapi-border/70 pt-4">
-          <Button variant="primary" loading={pending} onClick={onSave}>
-            {t("adminSettings.saveSection")}
-          </Button>
+        <div className="border-t border-srapi-border/70 pt-4">
+          <div className="mb-4">
+            <Label htmlFor="copilot-maxtokens">{t("copilot.fieldMaxTokens")}</Label>
+            <p className="mt-0.5 mb-1.5 text-xs text-srapi-text-tertiary">{t("copilot.fieldMaxTokensHint")}</p>
+            <Input
+              id="copilot-maxtokens"
+              type="number"
+              min={0}
+              placeholder="8192"
+              value={value.max_output_tokens || ""}
+              onChange={(e) => onField("max_output_tokens", e.target.value === "" ? 0 : Number(e.target.value))}
+            />
+          </div>
+          <div className="flex justify-end">
+            <Button variant="primary" loading={pending} onClick={onSave}>
+              {t("adminSettings.saveSection")}
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

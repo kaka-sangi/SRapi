@@ -18,6 +18,7 @@ type Settings struct {
 	DedicatedBaseURL  string
 	OwnerOnly         bool
 	AutoRunReads      bool
+	MaxOutputTokens   int
 
 	// SystemSummary is an optional runtime snapshot (account counts, health, etc.)
 	// injected into the system prompt so the model starts with situational awareness.
