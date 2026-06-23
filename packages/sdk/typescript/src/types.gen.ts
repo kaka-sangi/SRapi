@@ -92,6 +92,48 @@ export type HealthResponse = {
     request_id: RequestId;
 };
 
+export type ResourceStatus = 'active' | 'disabled' | 'pending' | 'archived';
+
+export type DeleteResponse = {
+    data: {
+        deleted: boolean;
+    };
+    request_id: RequestId;
+};
+
+export type BatchOperationResult = {
+    requested: number;
+    succeeded: number;
+    failed: number;
+    failed_ids?: Array<Id>;
+    /**
+     * Per-id reason for each code processed. Keys are the redeem-code id (stringified). Values: admin_action, already_disabled, expired, not_found.
+     */
+    per_item_reasons?: {
+        [key: string]: string;
+    };
+    /**
+     * Aggregate counts grouped by reason. Same value vocabulary as per_item_reasons.
+     */
+    disabled_reason_breakdown?: {
+        [key: string]: number;
+    };
+};
+
+export type BatchOperationResponse = {
+    data: BatchOperationResult;
+    request_id: RequestId;
+};
+
+export type TimeWindow = {
+    start: Timestamp;
+    end: Timestamp;
+};
+
+export type SecretConfigured = {
+    configured: boolean;
+};
+
 /**
  * Role name. Built-in roles are owner, admin, operator, and user; custom roles are managed through the admin roles API.
  */
@@ -141,6 +183,231 @@ export type RoleListResponse = {
 };
 
 export type UserStatus = 'active' | 'disabled' | 'pending';
+
+export type User = {
+    id: Id;
+    email: string;
+    name: string;
+    status: UserStatus;
+    roles: Array<UserRole>;
+    /**
+     * Decimal string balance.
+     */
+    balance: string;
+    currency: string;
+    rpm_limit?: number | null;
+    last_login_at?: string | null;
+    email_verified_at?: string | null;
+    /**
+     * Relative URL for the user's SRapi-hosted avatar image, when configured.
+     */
+    avatar_url?: string;
+    /**
+     * Normalized avatar MIME type.
+     */
+    avatar_mime?: 'image/png';
+    avatar_byte_size?: number;
+    avatar_sha256?: string;
+    avatar_updated_at?: string | null;
+    created_at: Timestamp;
+};
+
+export type UserAvatar = {
+    user_id: Id;
+    /**
+     * Relative URL that serves the normalized avatar image.
+     */
+    url: string;
+    content_type: 'image/png';
+    byte_size: number;
+    sha256: string;
+    width: number;
+    height: number;
+    updated_at: Timestamp;
+};
+
+export type UserAvatarResponse = {
+    data: UserAvatar;
+    request_id: RequestId;
+};
+
+export type CreateAdminUserRequest = {
+    email: string;
+    name: string;
+    password: string;
+    roles?: Array<UserRole>;
+    status?: UserStatus;
+    balance?: string;
+    currency?: string;
+    rpm_limit?: number | null;
+};
+
+export type UpdateAdminUserRequest = {
+    email?: string;
+    name?: string;
+    password?: string;
+    roles?: Array<UserRole>;
+    status?: UserStatus;
+    rpm_limit?: number | null;
+};
+
+export type UpdateUserBalanceRequest = {
+    /**
+     * Decimal string amount.
+     */
+    amount: string;
+    operation: 'set' | 'increment' | 'decrement';
+    currency?: string;
+    note?: string;
+};
+
+export type UserBalance = {
+    user_id: Id;
+    /**
+     * Decimal string balance.
+     */
+    balance: string;
+    currency: string;
+};
+
+export type UserBalanceResponse = {
+    data: UserBalance;
+    request_id: RequestId;
+};
+
+export type UpdateUserRpmLimitRequest = {
+    rpm_limit: number | null;
+};
+
+export type BatchUpdateUsersRequest = {
+    user_ids: Array<Id>;
+    status?: UserStatus;
+    rpm_limit?: number | null;
+    roles?: Array<UserRole>;
+};
+
+export type BatchUpdateUsersResult = {
+    updated_count: number;
+    updated_ids: Array<Id>;
+    errors: Array<string>;
+};
+
+export type BatchUpdateUsersResponse = {
+    data: BatchUpdateUsersResult;
+    request_id: RequestId;
+};
+
+export type UserListResponse = {
+    data: Array<User>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type UserResponse = {
+    data: User;
+    request_id: RequestId;
+};
+
+export type CreateUserSubscriptionRequest = {
+    user_id: Id;
+    plan_id: Id;
+    status?: UserSubscriptionStatus;
+    starts_at?: string;
+    expires_at?: string;
+    source_type?: string;
+    source_id?: string;
+};
+
+export type UserAttributeDefinition = {
+    id: number;
+    key: string;
+    name: string;
+    data_type: 'string' | 'number' | 'boolean' | 'select';
+    options: Array<string>;
+    required: boolean;
+    display_order: number;
+    enabled: boolean;
+    created_at: string;
+    updated_at: string;
+};
+
+export type CreateUserAttributeDefinitionRequest = {
+    key: string;
+    name: string;
+    data_type: 'string' | 'number' | 'boolean' | 'select';
+    options?: Array<string>;
+    required?: boolean;
+    display_order?: number;
+    enabled?: boolean;
+};
+
+export type UpdateUserAttributeDefinitionRequest = {
+    name?: string;
+    data_type?: 'string' | 'number' | 'boolean' | 'select';
+    options?: Array<string>;
+    required?: boolean;
+    display_order?: number;
+    enabled?: boolean;
+};
+
+export type UserAttributeValue = {
+    definition_id: number;
+    key: string;
+    name: string;
+    data_type: string;
+    options: Array<string>;
+    required: boolean;
+    value: string;
+    updated_at?: string;
+};
+
+export type UserAttributeValueWithUserId = UserAttributeValue & {
+    user_id: Id;
+};
+
+export type BatchUserAttributeValuesResponse = {
+    data: Array<UserAttributeValueWithUserId>;
+    request_id: RequestId;
+};
+
+export type SetUserAttributeValueRequest = {
+    value?: string;
+};
+
+export type UserAttributeValueInput = {
+    definition_id: number;
+    value: string;
+};
+
+export type UpdateCurrentUserAttributesRequest = {
+    values: Array<UserAttributeValueInput>;
+};
+
+export type UserAttributeDefinitionResponse = {
+    data: UserAttributeDefinition;
+    request_id: RequestId;
+};
+
+export type UserAttributeDefinitionListResponse = {
+    data: Array<UserAttributeDefinition>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type UserAttributeValueListResponse = {
+    data: Array<UserAttributeValue>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type SetUserAttributeValueResponse = {
+    data: {
+        definition_id: number;
+        value: string;
+        updated_at?: string;
+    };
+    request_id: RequestId;
+};
 
 export type AuthIdentityProvider = 'email' | 'oidc' | 'github' | 'google' | 'linuxdo' | 'wechat' | 'dingtalk';
 
@@ -278,130 +545,11 @@ export type OAuthProviderConfig = {
     scopes: Array<string>;
 };
 
-export type User = {
-    id: Id;
-    email: string;
-    name: string;
-    status: UserStatus;
-    roles: Array<UserRole>;
-    /**
-     * Decimal string balance.
-     */
-    balance: string;
-    currency: string;
-    rpm_limit?: number | null;
-    last_login_at?: string | null;
-    email_verified_at?: string | null;
-    /**
-     * Relative URL for the user's SRapi-hosted avatar image, when configured.
-     */
-    avatar_url?: string;
-    /**
-     * Normalized avatar MIME type.
-     */
-    avatar_mime?: 'image/png';
-    avatar_byte_size?: number;
-    avatar_sha256?: string;
-    avatar_updated_at?: string | null;
-    created_at: Timestamp;
-};
-
-export type UserAvatar = {
-    user_id: Id;
-    /**
-     * Relative URL that serves the normalized avatar image.
-     */
-    url: string;
-    content_type: 'image/png';
-    byte_size: number;
-    sha256: string;
-    width: number;
-    height: number;
-    updated_at: Timestamp;
-};
-
-export type UserAvatarResponse = {
-    data: UserAvatar;
-    request_id: RequestId;
-};
-
-export type CreateAdminUserRequest = {
-    email: string;
-    name: string;
-    password: string;
-    roles?: Array<UserRole>;
-    status?: UserStatus;
-    balance?: string;
-    currency?: string;
-    rpm_limit?: number | null;
-};
-
-export type UpdateAdminUserRequest = {
-    email?: string;
-    name?: string;
-    password?: string;
-    roles?: Array<UserRole>;
-    status?: UserStatus;
-    rpm_limit?: number | null;
-};
-
-export type UpdateUserBalanceRequest = {
-    /**
-     * Decimal string amount.
-     */
-    amount: string;
-    operation: 'set' | 'increment' | 'decrement';
-    currency?: string;
-    note?: string;
-};
-
-export type UserBalance = {
-    user_id: Id;
-    /**
-     * Decimal string balance.
-     */
-    balance: string;
-    currency: string;
-};
-
-export type UserBalanceResponse = {
-    data: UserBalance;
-    request_id: RequestId;
-};
-
 export type UpdateCurrentUserProfileRequest = {
     /**
      * Current user's display name.
      */
     name: string;
-};
-
-export type UpdateUserRpmLimitRequest = {
-    rpm_limit: number | null;
-};
-
-export type BatchUpdateUsersRequest = {
-    user_ids: Array<Id>;
-    status?: UserStatus;
-    rpm_limit?: number | null;
-    roles?: Array<UserRole>;
-};
-
-export type BatchUpdateUsersResult = {
-    updated_count: number;
-    updated_ids: Array<Id>;
-    errors: Array<string>;
-};
-
-export type BatchUpdateUsersResponse = {
-    data: BatchUpdateUsersResult;
-    request_id: RequestId;
-};
-
-export type UserListResponse = {
-    data: Array<User>;
-    pagination: Pagination;
-    request_id: RequestId;
 };
 
 export type LoginRequest = {
@@ -587,96 +735,6 @@ export type EmailVerificationAcceptedResponse = {
     request_id: RequestId;
 };
 
-export type NotificationUnsubscribeRequest = {
-    token: string;
-};
-
-export type NotificationUnsubscribe = {
-    event: 'balance.low' | 'subscription.expiry_reminder' | 'account.quota_alert';
-    done: boolean;
-};
-
-export type NotificationUnsubscribeResponse = {
-    data: NotificationUnsubscribe;
-    request_id: RequestId;
-};
-
-export type NotificationPreferenceEventName = 'balance.low' | 'subscription.expiry_reminder' | 'account.quota_alert';
-
-export type NotificationPreference = {
-    event: NotificationPreferenceEventName;
-    label: string;
-    description: string;
-    category: string;
-    /**
-     * True when the current user is subscribed to this optional notification event.
-     */
-    subscribed: boolean;
-    updated_at?: Timestamp;
-};
-
-export type NotificationPreferenceUpdate = {
-    event: NotificationPreferenceEventName;
-    subscribed: boolean;
-};
-
-export type UpdateNotificationPreferencesRequest = {
-    preferences: Array<NotificationPreferenceUpdate>;
-};
-
-export type NotificationPreferenceListResponse = {
-    data: Array<NotificationPreference>;
-    request_id: RequestId;
-};
-
-export type NotificationContact = {
-    id: string;
-    email: string;
-    /**
-     * SHA-256 hash of the normalized contact email.
-     */
-    email_hash: string;
-    verified: boolean;
-    disabled: boolean;
-    created_at: Timestamp;
-    updated_at: Timestamp;
-    verified_at?: Timestamp;
-};
-
-export type NotificationContactListResponse = {
-    data: Array<NotificationContact>;
-    request_id: RequestId;
-};
-
-export type NotificationContactVerificationRequest = {
-    email: string;
-};
-
-export type NotificationContactVerificationAccepted = {
-    accepted: boolean;
-    contact: NotificationContact;
-    verification_sent: boolean;
-    expires_at?: Timestamp;
-};
-
-export type NotificationContactVerificationResponse = {
-    data: NotificationContactVerificationAccepted;
-    request_id: RequestId;
-};
-
-export type NotificationContactConfirmRequest = {
-    token: string;
-};
-
-export type UpdateNotificationContactRequest = {
-    disabled: boolean;
-};
-
-export type NotificationContactResponse = {
-    data: NotificationContact;
-    request_id: RequestId;
-};
-
 export type ChangeCurrentUserPasswordRequest = {
     current_password: string;
     new_password: string;
@@ -755,13 +813,6 @@ export type TotpEnableResponse = {
     data: TotpEnableResult;
     request_id: RequestId;
 };
-
-export type UserResponse = {
-    data: User;
-    request_id: RequestId;
-};
-
-export type ResourceStatus = 'active' | 'disabled' | 'pending' | 'archived';
 
 export type ApiKeyStatus = 'active' | 'disabled' | 'expired';
 
@@ -931,6 +982,323 @@ export type ApiKeyResponse = {
 
 export type DeleteApiKeyResponse = {
     ok: boolean;
+    request_id: RequestId;
+};
+
+export type EnabledOAuthProvider = {
+    provider: AuthIdentityProvider;
+    /**
+     * Stable provider instance key; pass back as the provider_key query param when starting authorization.
+     */
+    provider_key: string;
+    /**
+     * Non-secret label to render on the sign-in button.
+     */
+    display_name: string;
+};
+
+export type EnabledOAuthProviderListResponse = {
+    data: Array<EnabledOAuthProvider>;
+    request_id: RequestId;
+};
+
+export type CaptchaConfig = {
+    /**
+     * Whether human-verification is enforced on auth endpoints.
+     */
+    enabled: boolean;
+    /**
+     * Captcha provider widget to render (turnstile | hcaptcha | recaptcha).
+     */
+    provider: string;
+    /**
+     * Public site key for the provider widget. Empty when captcha is unconfigured. Never secret.
+     */
+    site_key: string;
+};
+
+export type CaptchaConfigResponse = {
+    data: CaptchaConfig;
+    request_id: RequestId;
+};
+
+export type CaptchaSettings = {
+    /**
+     * When true, admin settings override environment captcha config.
+     */
+    managed: boolean;
+    enabled: boolean;
+    provider: 'turnstile' | 'hcaptcha' | 'recaptcha';
+    site_key: string;
+    readonly secret_key_configured: boolean;
+    verify_url: string;
+};
+
+export type CaptchaSettingsResponse = {
+    data: CaptchaSettings;
+    request_id: RequestId;
+};
+
+export type NotificationUnsubscribeRequest = {
+    token: string;
+};
+
+export type NotificationUnsubscribe = {
+    event: 'balance.low' | 'subscription.expiry_reminder' | 'account.quota_alert';
+    done: boolean;
+};
+
+export type NotificationUnsubscribeResponse = {
+    data: NotificationUnsubscribe;
+    request_id: RequestId;
+};
+
+export type NotificationPreferenceEventName = 'balance.low' | 'subscription.expiry_reminder' | 'account.quota_alert';
+
+export type NotificationPreference = {
+    event: NotificationPreferenceEventName;
+    label: string;
+    description: string;
+    category: string;
+    /**
+     * True when the current user is subscribed to this optional notification event.
+     */
+    subscribed: boolean;
+    updated_at?: Timestamp;
+};
+
+export type NotificationPreferenceUpdate = {
+    event: NotificationPreferenceEventName;
+    subscribed: boolean;
+};
+
+export type UpdateNotificationPreferencesRequest = {
+    preferences: Array<NotificationPreferenceUpdate>;
+};
+
+export type NotificationPreferenceListResponse = {
+    data: Array<NotificationPreference>;
+    request_id: RequestId;
+};
+
+export type NotificationContact = {
+    id: string;
+    email: string;
+    /**
+     * SHA-256 hash of the normalized contact email.
+     */
+    email_hash: string;
+    verified: boolean;
+    disabled: boolean;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+    verified_at?: Timestamp;
+};
+
+export type NotificationContactListResponse = {
+    data: Array<NotificationContact>;
+    request_id: RequestId;
+};
+
+export type NotificationContactVerificationRequest = {
+    email: string;
+};
+
+export type NotificationContactVerificationAccepted = {
+    accepted: boolean;
+    contact: NotificationContact;
+    verification_sent: boolean;
+    expires_at?: Timestamp;
+};
+
+export type NotificationContactVerificationResponse = {
+    data: NotificationContactVerificationAccepted;
+    request_id: RequestId;
+};
+
+export type NotificationContactConfirmRequest = {
+    token: string;
+};
+
+export type UpdateNotificationContactRequest = {
+    disabled: boolean;
+};
+
+export type NotificationContactResponse = {
+    data: NotificationContact;
+    request_id: RequestId;
+};
+
+export type NotificationEmailTemplateEventName = 'auth.password_reset' | 'auth.email_verification' | 'auth.oauth_pending_email_completion' | 'notification.contact_verification' | 'balance.low' | 'subscription.expiry_reminder' | 'account.quota_alert';
+
+export type NotificationEmailTemplateEvent = {
+    event: NotificationEmailTemplateEventName;
+    label: string;
+    description: string;
+    category: string;
+    /**
+     * True when recipients may unsubscribe from this event.
+     */
+    optional: boolean;
+    placeholders: Array<string>;
+};
+
+export type NotificationEmailTemplate = {
+    event: NotificationEmailTemplateEventName;
+    subject: string;
+    html: string;
+    is_custom: boolean;
+    placeholders: Array<string>;
+};
+
+export type NotificationEmailTemplateList = {
+    events: Array<NotificationEmailTemplateEvent>;
+    templates: Array<NotificationEmailTemplate>;
+    placeholders: Array<string>;
+};
+
+export type NotificationEmailTemplateResponse = {
+    data: NotificationEmailTemplate;
+    request_id: RequestId;
+};
+
+export type NotificationEmailTemplateListResponse = {
+    data: NotificationEmailTemplateList;
+    request_id: RequestId;
+};
+
+export type UpdateNotificationEmailTemplateRequest = {
+    subject: string;
+    html: string;
+};
+
+export type PreviewNotificationEmailTemplateRequest = {
+    event: NotificationEmailTemplateEventName;
+    /**
+     * Template subject to preview. Empty string uses the saved or built-in subject.
+     */
+    subject: string;
+    /**
+     * Template HTML to preview. Empty string uses the saved or built-in HTML.
+     */
+    html: string;
+    variables?: {
+        [key: string]: string;
+    };
+};
+
+export type NotificationEmailTemplatePreview = {
+    subject: string;
+    html: string;
+};
+
+export type NotificationEmailTemplatePreviewResponse = {
+    data: NotificationEmailTemplatePreview;
+    request_id: RequestId;
+};
+
+export type AnnouncementStatus = 'draft' | 'published' | 'archived';
+
+export type AnnouncementSeverity = 'info' | 'warning' | 'critical';
+
+export type AnnouncementAudience = 'all' | 'users' | 'admins';
+
+/**
+ * One AND-group of audience conditions. An announcement is delivered when it has no segments (audience-only) or any segment matches the recipient. Within a segment every non-empty condition must match.
+ */
+export type AnnouncementSegment = {
+    /**
+     * Match users holding any of these roles (e.g. owner, admin, user).
+     */
+    roles?: Array<string>;
+    /**
+     * Match these specific user ids.
+     */
+    user_ids?: Array<Id>;
+    /**
+     * Match users whose email domain is in this list (case-insensitive).
+     */
+    email_domains?: Array<string>;
+};
+
+export type AnnouncementReader = {
+    user_id: Id;
+    read_at: Timestamp;
+};
+
+export type AnnouncementReadStatus = {
+    announcement_id: Id;
+    /**
+     * Number of recent readers returned (capped).
+     */
+    total: number;
+    readers: Array<AnnouncementReader>;
+};
+
+export type AnnouncementReadStatusResponse = {
+    data: AnnouncementReadStatus;
+    request_id: RequestId;
+};
+
+export type Announcement = {
+    id: Id;
+    title: string;
+    content: string;
+    status: AnnouncementStatus;
+    severity: AnnouncementSeverity;
+    audience: AnnouncementAudience;
+    /**
+     * Optional audience-targeting segments that refine the audience.
+     */
+    segments?: Array<AnnouncementSegment>;
+    starts_at?: Timestamp;
+    ends_at?: Timestamp;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+};
+
+export type CreateAnnouncementRequest = {
+    title: string;
+    content: string;
+    status?: AnnouncementStatus;
+    severity?: AnnouncementSeverity;
+    audience?: AnnouncementAudience;
+    /**
+     * Optional audience-targeting segments that refine the audience.
+     */
+    segments?: Array<AnnouncementSegment>;
+    starts_at?: Timestamp;
+    ends_at?: Timestamp;
+};
+
+export type UpdateAnnouncementRequest = CreateAnnouncementRequest;
+
+export type AnnouncementResponse = {
+    data: Announcement;
+    request_id: RequestId;
+};
+
+export type AnnouncementListResponse = {
+    data: Array<Announcement>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type UserAnnouncement = {
+    announcement: Announcement;
+    read: boolean;
+    read_at?: Timestamp;
+};
+
+export type UserAnnouncementResponse = {
+    data: UserAnnouncement;
+    request_id: RequestId;
+};
+
+export type UserAnnouncementListResponse = {
+    data: Array<UserAnnouncement>;
+    pagination: Pagination;
+    unread: number;
     request_id: RequestId;
 };
 
@@ -1259,16 +1627,6 @@ export type UserSubscription = {
     updated_at: Timestamp;
 };
 
-export type CreateUserSubscriptionRequest = {
-    user_id: Id;
-    plan_id: Id;
-    status?: UserSubscriptionStatus;
-    starts_at?: string;
-    expires_at?: string;
-    source_type?: string;
-    source_id?: string;
-};
-
 export type UserSubscriptionResponse = {
     data: UserSubscription;
     request_id: RequestId;
@@ -1453,6 +1811,26 @@ export type PricingRulePresetInstallResponse = {
     request_id: RequestId;
 };
 
+export type BillingLedgerEntry = {
+    id: Id;
+    user_id: Id;
+    type: 'usage_charge' | 'payment_credit' | 'refund' | 'adjustment' | 'compensation' | 'affiliate_transfer' | 'redeem_code_credit';
+    amount: string;
+    currency: string;
+    balance_before: string;
+    balance_after: string;
+    reference_type: string;
+    reference_id: string;
+    metadata: JsonObject;
+    created_at: Timestamp;
+};
+
+export type BillingLedgerListResponse = {
+    data: Array<BillingLedgerEntry>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
 export type ProviderProtocol = 'openai-compatible' | 'anthropic-compatible' | 'gemini-compatible' | 'rerank-compatible';
 
 export type ProviderAdapterType = 'openai-compatible' | 'generic-reverse-proxy' | 'anthropic-compatible' | 'gemini-compatible' | 'rerank-compatible' | 'native-openai' | 'native-anthropic' | 'native-gemini' | 'native-grok' | 'openrouter' | 'reverse-proxy-chatgpt-web' | 'reverse-proxy-codex-cli' | 'reverse-proxy-claude-web' | 'reverse-proxy-claude-code-cli' | 'reverse-proxy-gemini-cli' | 'reverse-proxy-antigravity' | 'custom';
@@ -1542,67 +1920,6 @@ export type AdminQuickSetupResult = {
 export type AdminQuickSetupResponse = {
     data: AdminQuickSetupResult;
     request_id: RequestId;
-};
-
-export type ProviderOAuthConfig = {
-    provider_id: Id;
-    provider_name: string;
-    config: AccountOAuthProviderConfig;
-};
-
-export type ProviderOAuthConfigResponse = {
-    data: ProviderOAuthConfig;
-    request_id: RequestId;
-};
-
-export type AdminTestResult = {
-    ok: boolean;
-    status: 'ok' | 'failed';
-    provider_id?: Id;
-    account_id?: Id;
-    latency_ms?: number;
-    message?: string;
-    checks?: JsonObject;
-    checked_at: Timestamp;
-};
-
-export type AdminAccountManualPauseRequest = {
-    until: Timestamp;
-    /**
-     * Optional operator-supplied free-form context surfaced to other operators (e.g. "investigating slow upstream", "rotating proxy"). Trimmed and truncated server-side.
-     */
-    reason?: string;
-};
-
-export type AdminAccountTestRequest = {
-    /**
-     * Use `live` for a real upstream round-trip; default only validates local configuration.
-     */
-    mode?: 'default' | 'live' | 'responses_compact';
-    /**
-     * Optional registered canonical model name or alias for live/compact probes.
-     */
-    model?: string;
-    /**
-     * Backward-compatible alias for `model`.
-     */
-    model_id?: string;
-    /**
-     * Optional user prompt for live/compact probes. When omitted, SRapi uses a minimal OK probe.
-     */
-    prompt?: string;
-};
-
-export type AdminTestResultResponse = {
-    data: AdminTestResult;
-    request_id: RequestId;
-};
-
-export type AdminSendTestEmailRequest = {
-    /**
-     * Mailbox to deliver the probe to. Defaults to the requesting admin's own account email when omitted.
-     */
-    recipient?: string;
 };
 
 export type CapabilityDescriptor = {
@@ -1734,254 +2051,58 @@ export type ModelProviderMappingPagedListResponse = {
     request_id: RequestId;
 };
 
-export type GatewayProviderResourceStatus = 'ready' | 'limited' | 'blocked';
-
-export type GatewayProviderResourceReason = 'provider_disabled' | 'no_active_models' | 'no_model_mappings' | 'no_active_accounts' | 'no_routable_accounts' | 'proxy_attention' | 'no_api_keys' | 'pricing_uncovered';
-
-export type GatewayResourceFixArea = 'providers' | 'models' | 'model_mappings' | 'accounts' | 'proxies' | 'api_keys' | 'pricing' | 'endpoints';
-
-export type GatewayResourceFixSeverity = 'critical' | 'warning' | 'info';
-
-export type GatewayResourceFix = {
-    severity: GatewayResourceFixSeverity;
-    area: GatewayResourceFixArea;
-    reason: GatewayProviderResourceReason;
-    /**
-     * Number of resource rows or affected accounts represented by this fix item.
-     */
-    count: number;
-    /**
-     * Admin console route that lets the operator fix or investigate the issue.
-     */
-    href: string;
+export type CapabilityDefinition = {
+    key: string;
+    version: string;
+    category: string;
+    status: 'stable' | 'experimental' | 'deprecated';
+    description: string;
+    schema?: JsonObject;
+    replacement_key?: string | null;
 };
 
-export type GatewayAccountBlockers = {
-    /**
-     * Accounts under this provider that are not active and therefore cannot be scheduled.
-     */
-    inactive: number;
-    /**
-     * Active accounts blocked by health status or an open circuit.
-     */
-    health: number;
-    /**
-     * Active accounts blocked by exhausted runtime quota.
-     */
-    quota: number;
-    /**
-     * Active accounts blocked by a missing, disabled, expired, or otherwise unavailable proxy binding.
-     */
-    proxy: number;
-};
-
-export type GatewayResourceTrafficLastError = {
-    /**
-     * Time of the most recent failed gateway request.
-     */
-    occurred_at: string;
-    request_id?: string | null;
-    error_class?: string | null;
-    error_phase?: string | null;
-    error_owner?: string | null;
-    /**
-     * Final upstream or gateway HTTP status when available.
-     */
-    status_code?: number | null;
-    upstream_request_id?: string | null;
-    /**
-     * Bounded upstream or gateway error message safe for inline operator display.
-     */
-    message?: string | null;
-};
-
-export type GatewayResourceTraffic = {
-    /**
-     * Rolling runtime usage window used for the traffic counters.
-     */
-    window_seconds: number;
-    /**
-     * Gateway requests observed in the rolling window.
-     */
-    request_count: number;
-    /**
-     * Failed gateway requests observed in the rolling window.
-     */
-    error_count: number;
-    /**
-     * Successful requests divided by request_count. Zero when request_count is zero.
-     */
-    success_rate: number;
-    /**
-     * Most recent gateway request observed for this resource.
-     */
-    last_request_at?: string | null;
-    last_error?: GatewayResourceTrafficLastError;
-};
-
-export type GatewayProviderResourceRow = {
-    provider: Provider;
-    total_accounts: number;
-    routable_accounts: number;
-    attention_accounts: number;
-    account_blockers: GatewayAccountBlockers;
-    proxied_accounts: number;
-    proxy_attention_accounts: number;
-    active_model_mappings: number;
-    api_key_count: number;
-    scoped_key_count: number;
-    traffic: GatewayResourceTraffic;
-    status: GatewayProviderResourceStatus;
-    reasons: Array<GatewayProviderResourceReason>;
-};
-
-export type GatewayEndpointResourceRow = {
-    key: 'chat_completions' | 'responses' | 'responses_websocket' | 'responses_compact' | 'responses_input_items' | 'messages' | 'anthropic_count_tokens' | 'gemini_generate_content' | 'gemini_count_tokens' | 'embeddings' | 'image_generations' | 'image_edits' | 'image_variations' | 'videos' | 'audio_transcriptions' | 'audio_speech' | 'moderations' | 'rerank' | 'realtime_websocket';
-    /**
-     * Gateway route or route template represented by this endpoint readiness row.
-     */
-    source_endpoint: string;
-    routable_accounts: number;
-    /**
-     * Active, provider-routable accounts considered for this model route before endpoint capability and model availability filters.
-     */
-    candidate_accounts: number;
-    /**
-     * Candidate accounts whose effective capabilities do not include this endpoint.
-     */
-    unsupported_accounts: number;
-    /**
-     * Candidate accounts whose effective model mapping is blocked by excluded_models or supported_models metadata.
-     */
-    unavailable_model_accounts: number;
-    status: GatewayProviderResourceStatus;
-};
-
-export type GatewayEndpointResourceSummaryRow = {
-    key: 'chat_completions' | 'responses' | 'responses_websocket' | 'responses_compact' | 'responses_input_items' | 'messages' | 'anthropic_count_tokens' | 'gemini_generate_content' | 'gemini_count_tokens' | 'embeddings' | 'image_generations' | 'image_edits' | 'image_variations' | 'videos' | 'audio_transcriptions' | 'audio_speech' | 'moderations' | 'rerank' | 'realtime_websocket';
-    /**
-     * Gateway route or route template represented by this endpoint readiness row.
-     */
-    source_endpoint: string;
-    /**
-     * Active model rows with at least one routable account for this endpoint.
-     */
-    ready_models: number;
-    /**
-     * Active model rows evaluated for this endpoint.
-     */
-    models: number;
-    /**
-     * Active model-provider route rows with at least one routable account for this endpoint.
-     */
-    ready_routes: number;
-    /**
-     * Active model-provider route rows evaluated for this endpoint.
-     */
-    routes: number;
-    /**
-     * Sum of routable account-route observations across active model-provider route rows.
-     */
-    routable_account_routes: number;
-    /**
-     * Sum of candidate account-route observations before endpoint capability and model availability filters.
-     */
-    candidate_account_routes: number;
-    /**
-     * Sum of account-route observations whose effective capabilities do not include this endpoint.
-     */
-    unsupported_account_routes: number;
-    /**
-     * Sum of account-route observations whose effective model mapping is blocked by excluded_models or supported_models metadata.
-     */
-    unavailable_model_account_routes: number;
-    traffic: GatewayResourceTraffic;
-    status: GatewayProviderResourceStatus;
-};
-
-export type GatewayPricingCoverageStatus = 'priced' | 'estimated_zero' | 'error';
-
-export type GatewayPricingCoverageSource = 'mapping_override' | 'pricing_rule' | 'default_zero' | 'pricing_error';
-
-export type GatewayPricingCoverage = {
-    status: GatewayPricingCoverageStatus;
-    source: GatewayPricingCoverageSource;
-    pricing_rule_id?: number | null;
-    priced_routes: number;
-    total_routes: number;
-    currency?: string;
-    billing_mode?: BillingMode;
-};
-
-export type GatewayModelResourceRow = {
-    model: Model;
-    active_providers: number;
-    active_model_mappings: number;
-    routable_accounts: number;
-    endpoints: Array<GatewayEndpointResourceRow>;
-    pricing: GatewayPricingCoverage;
-    api_key_count: number;
-    scoped_key_count: number;
-    traffic: GatewayResourceTraffic;
-    status: GatewayProviderResourceStatus;
-    reasons: Array<GatewayProviderResourceReason>;
-};
-
-export type GatewayRouteResourceRow = {
-    model: Model;
-    provider: Provider;
-    mapping_id: Id;
-    upstream_model: string;
-    routable_accounts: number;
-    endpoints: Array<GatewayEndpointResourceRow>;
-    pricing: GatewayPricingCoverage;
-    api_key_count: number;
-    scoped_key_count: number;
-    traffic: GatewayResourceTraffic;
-    status: GatewayProviderResourceStatus;
-    reasons: Array<GatewayProviderResourceReason>;
-};
-
-export type GatewayResourceSummary = {
-    providers: number;
-    active_providers: number;
-    active_models: number;
-    active_model_mappings: number;
-    active_api_keys: number;
-    active_accounts: number;
-    routable_accounts: number;
-    active_proxies: number;
-    available_proxies: number;
-    expired_proxies: number;
-    proxied_accounts: number;
-    proxy_attention_accounts: number;
-    scoped_api_keys: number;
-    fixes: Array<GatewayResourceFix>;
-    rows: Array<GatewayProviderResourceRow>;
-    model_rows: Array<GatewayModelResourceRow>;
-    route_rows: Array<GatewayRouteResourceRow>;
-    endpoint_rows: Array<GatewayEndpointResourceSummaryRow>;
-};
-
-export type GatewayResourceSummaryResponse = {
-    data: GatewayResourceSummary;
+export type CapabilityListResponse = {
+    data: Array<CapabilityDefinition>;
+    pagination: Pagination;
     request_id: RequestId;
 };
 
-export type AdminQuickMapModelsRequest = {
+export type ProviderOAuthConfig = {
     provider_id: Id;
-    models: Array<string>;
+    provider_name: string;
+    config: AccountOAuthProviderConfig;
 };
 
-export type AdminQuickMapModelsResult = {
-    models_created: number;
-    mappings_created: number;
-    warnings: Array<string>;
-};
-
-export type AdminQuickMapModelsResponse = {
-    data: AdminQuickMapModelsResult;
+export type ProviderOAuthConfigResponse = {
+    data: ProviderOAuthConfig;
     request_id: RequestId;
+};
+
+export type AdminAccountManualPauseRequest = {
+    until: Timestamp;
+    /**
+     * Optional operator-supplied free-form context surfaced to other operators (e.g. "investigating slow upstream", "rotating proxy"). Trimmed and truncated server-side.
+     */
+    reason?: string;
+};
+
+export type AdminAccountTestRequest = {
+    /**
+     * Use `live` for a real upstream round-trip; default only validates local configuration.
+     */
+    mode?: 'default' | 'live' | 'responses_compact';
+    /**
+     * Optional registered canonical model name or alias for live/compact probes.
+     */
+    model?: string;
+    /**
+     * Backward-compatible alias for `model`.
+     */
+    model_id?: string;
+    /**
+     * Optional user prompt for live/compact probes. When omitted, SRapi uses a minimal OK probe.
+     */
+    prompt?: string;
 };
 
 export type RuntimeClass = 'api_key' | 'oauth_refresh' | 'oauth_device_code' | 'web_session_cookie' | 'cli_client_token' | 'custom_reverse_proxy' | 'service_account_json';
@@ -2502,365 +2623,6 @@ export type BindProviderAccountProxyRequest = {
     proxy_id: string | null;
 };
 
-/**
- * Proxy transport type. Use socks5h when DNS resolution must happen through the proxy.
- */
-export type ProxyDefinitionType = 'http' | 'https' | 'socks5' | 'socks5h';
-
-export type ProxyDefinitionStatus = 'active' | 'disabled';
-
-/**
- * Runtime behavior when an active proxy is past expires_at.
- */
-export type ProxyFallbackMode = 'none' | 'direct' | 'proxy';
-
-export type ProxyDefinition = {
-    id: Id;
-    name: string;
-    type: ProxyDefinitionType;
-    status: ProxyDefinitionStatus;
-    /**
-     * True when an encrypted proxy URL is stored. Raw URLs are never returned.
-     */
-    url_configured: boolean;
-    metadata?: JsonObject;
-    /**
-     * ISO-3166-1 alpha-2 country code, operator-supplied.
-     */
-    country_code?: string | null;
-    /**
-     * Display name for the country, snapshotted at write time.
-     */
-    country_name?: string | null;
-    /**
-     * Optional operator-defined expiry. Expired active proxies follow fallback_mode.
-     */
-    expires_at?: string | null;
-    fallback_mode?: ProxyFallbackMode;
-    /**
-     * Proxy definition id used when fallback_mode is proxy.
-     */
-    backup_proxy_id?: string | null;
-    /**
-     * Last time the proxy probe worker tested this proxy.
-     */
-    last_probed_at?: string | null;
-    /**
-     * Successful probes since the last counter reset (rolling ~7-day window — counters reset weekly, NOT a strict trailing-7d window).
-     */
-    probe_success_count: number;
-    /**
-     * Failed probes since the last counter reset.
-     */
-    probe_failure_count: number;
-    /**
-     * Latency of the most recent successful probe in milliseconds. 0 if no successful probe yet.
-     */
-    last_probe_latency_ms: number;
-    /**
-     * Rolling availability percentage. Null when never probed since last reset.
-     */
-    probe_success_pct_7d?: number | null;
-    created_at: Timestamp;
-    updated_at: Timestamp;
-};
-
-export type CreateProxyDefinitionRequest = {
-    name: string;
-    type: ProxyDefinitionType;
-    status?: ProxyDefinitionStatus;
-    metadata?: JsonObject;
-    /**
-     * ISO-3166-1 alpha-2 country code, operator-supplied.
-     */
-    country_code?: string | null;
-    /**
-     * Localized display name for the country, snapshotted at write time.
-     */
-    country_name?: string | null;
-    /**
-     * Optional operator-defined expiry. Past values force fallback immediately.
-     */
-    expires_at?: string;
-    fallback_mode?: ProxyFallbackMode;
-    backup_proxy_id?: Id;
-};
-
-export type UpdateProxyDefinitionRequest = {
-    name?: string;
-    type?: ProxyDefinitionType;
-    status?: ProxyDefinitionStatus;
-    metadata?: JsonObject;
-    /**
-     * ISO-3166-1 alpha-2 country code, operator-supplied.
-     */
-    country_code?: string | null;
-    /**
-     * Localized display name for the country, snapshotted at write time.
-     */
-    country_name?: string | null;
-    /**
-     * Replacement expiry. Omit to keep the existing value.
-     */
-    expires_at?: string;
-    /**
-     * Clears expires_at when true.
-     */
-    clear_expires_at?: boolean;
-    fallback_mode?: ProxyFallbackMode;
-    backup_proxy_id?: Id;
-    /**
-     * Clears backup_proxy_id when true. Non-proxy fallback modes also clear it.
-     */
-    clear_backup_proxy_id?: boolean;
-};
-
-export type SnapshotProxyDefinition = {
-    name: string;
-    type: ProxyDefinitionType;
-    status: ProxyDefinitionStatus;
-    /**
-     * True when an encrypted proxy URL exists in the source environment. Raw URLs are never exported.
-     */
-    url_configured: boolean;
-    metadata?: JsonObject;
-    /**
-     * ISO-3166-1 alpha-2 country code, operator-supplied.
-     */
-    country_code?: string | null;
-    /**
-     * Localized display name for the country, snapshotted at write time.
-     */
-    country_name?: string | null;
-    /**
-     * Optional operator-defined expiry.
-     */
-    expires_at?: string | null;
-    fallback_mode?: ProxyFallbackMode;
-    /**
-     * Proxy definition name used when fallback_mode is proxy. Prefer this in config imports because proxy ids are environment-local.
-     */
-    backup_proxy_name?: string | null;
-};
-
-export type ImportProxyDefinition = {
-    name: string;
-    type: ProxyDefinitionType;
-    status?: ProxyDefinitionStatus;
-    metadata?: JsonObject;
-    /**
-     * ISO-3166-1 alpha-2 country code, operator-supplied.
-     */
-    country_code?: string | null;
-    /**
-     * Localized display name for the country, snapshotted at write time.
-     */
-    country_name?: string | null;
-    /**
-     * Optional operator-defined expiry.
-     */
-    expires_at?: string | null;
-    fallback_mode?: ProxyFallbackMode;
-    /**
-     * Proxy definition name used when fallback_mode is proxy. Prefer this in config imports because proxy ids are environment-local.
-     */
-    backup_proxy_name?: string | null;
-};
-
-export type BatchCreateProxiesRequest = {
-    proxies: Array<CreateProxyDefinitionRequest>;
-};
-
-export type BatchCreateProxiesSkippedRow = {
-    /**
-     * Zero-based index in the request `proxies` array.
-     */
-    index: number;
-    name: string;
-    reason: string;
-};
-
-export type BatchCreateProxiesErrorRow = {
-    index: number;
-    message: string;
-};
-
-export type BatchCreateProxiesResult = {
-    /**
-     * Number of new proxies actually inserted.
-     */
-    created_count: number;
-    created: Array<ProxyDefinition>;
-    /**
-     * Rows that hit a soft-skip rule (e.g. duplicate name) — not errors.
-     */
-    skipped: Array<BatchCreateProxiesSkippedRow>;
-    /**
-     * Rows that hard-failed validation. The other rows still apply.
-     */
-    errors: Array<BatchCreateProxiesErrorRow>;
-};
-
-export type BatchCreateProxiesResponse = {
-    data: BatchCreateProxiesResult;
-    request_id: RequestId;
-};
-
-export type TestProxyRequest = {
-    /**
-     * Optional URL to probe. Defaults to a small, dependable HTTPS endpoint when omitted.
-     */
-    target_url?: string;
-};
-
-export type ProxyTestResult = {
-    /**
-     * True when the upstream returned a 2xx within the timeout.
-     */
-    ok: boolean;
-    /**
-     * Wall-clock latency of the probe in ms (0 when the request didn't get far enough to time).
-     */
-    latency_ms: number;
-    /**
-     * HTTP status of the upstream, when one was received. 0 when the transport failed before headers.
-     */
-    status_code: number;
-    /**
-     * Empty when ok=true. Otherwise one of: bad_proxy_url, bad_target_url,
-     * timeout, transport_error, bad_status.
-     *
-     */
-    error_class: string;
-    /**
-     * URL that was actually probed (echoed back so the UI can show the resolved default).
-     */
-    target_url: string;
-};
-
-export type ProxyTestResultResponse = {
-    data: ProxyTestResult;
-    request_id: RequestId;
-};
-
-export type BatchTestProxiesRequest = {
-    proxy_ids: Array<Id>;
-};
-
-export type ProxyBatchTestRow = {
-    proxy_id: Id;
-    result: ProxyTestResult;
-};
-
-export type BatchTestProxiesResponse = {
-    data: Array<ProxyBatchTestRow>;
-    request_id: RequestId;
-};
-
-export type BatchDeleteProxiesRequest = {
-    proxy_ids: Array<Id>;
-};
-
-export type BatchDeleteProxiesErrorRow = {
-    id: Id;
-    message: string;
-};
-
-export type BatchDeleteProxiesResult = {
-    deleted_count: number;
-    deleted_ids: Array<Id>;
-    /**
-     * Per-id failures (e.g. proxy not found). Other ids still succeeded.
-     */
-    errors: Array<BatchDeleteProxiesErrorRow>;
-};
-
-export type BatchDeleteProxiesResponse = {
-    data: BatchDeleteProxiesResult;
-    request_id: RequestId;
-};
-
-export type ProxyDefinitionResponse = {
-    data: ProxyDefinition;
-    request_id: RequestId;
-};
-
-export type ProxyDefinitionListResponse = {
-    data: Array<ProxyDefinition>;
-    pagination: Pagination;
-    request_id: RequestId;
-};
-
-/**
- * scheduled = worker-driven daily run; manual = operator-triggered.
- */
-export type BackupSnapshotKind = 'scheduled' | 'manual';
-
-/**
- * running = pg_dump in flight; success = file written and checksummed;
- * failed = pg_dump/IO error; superseded = retention deleted the file.
- *
- */
-export type BackupSnapshotStatus = 'running' | 'success' | 'failed' | 'superseded';
-
-export type BackupSnapshot = {
-    id: Id;
-    kind: BackupSnapshotKind;
-    status: BackupSnapshotStatus;
-    started_at: Timestamp;
-    /**
-     * Set when the run finished (success or failed); null while running.
-     */
-    completed_at?: string | null;
-    /**
-     * On-disk size of the dump file. 0 for failed/running rows.
-     */
-    size_bytes: number;
-    /**
-     * Hex-encoded SHA-256 of the dump file. Empty for failed/superseded rows.
-     */
-    sha256: string;
-    /**
-     * Path of the dump on the API host's disk. Empty when retention has wiped it.
-     */
-    file_path: string;
-    /**
-     * Stderr / system error captured on failed runs. Empty otherwise.
-     */
-    error_message: string;
-    /**
-     * Admin user id that pressed "Snapshot now". 0 for scheduled runs.
-     */
-    triggered_by_user_id: number;
-};
-
-export type BackupSnapshotResponse = {
-    data: BackupSnapshot;
-    request_id: RequestId;
-};
-
-export type BackupSnapshotPagination = {
-    total: number;
-    offset: number;
-    limit: number;
-};
-
-export type BackupSnapshotListResponse = {
-    data: Array<BackupSnapshot>;
-    pagination: BackupSnapshotPagination;
-    request_id: RequestId;
-};
-
-export type DeleteAdminBackupSnapshotResult = {
-    id: Id;
-    deleted: boolean;
-};
-
-export type DeleteAdminBackupSnapshotResponse = {
-    data: DeleteAdminBackupSnapshotResult;
-    request_id: RequestId;
-};
-
 export type ProviderAccountExportItem = {
     provider_id: Id;
     name: string;
@@ -3345,19 +3107,170 @@ export type AccountModelDiscoveryResponse = {
     request_id: RequestId;
 };
 
-export type CapabilityDefinition = {
-    key: string;
-    version: string;
-    category: string;
-    status: 'stable' | 'experimental' | 'deprecated';
-    description: string;
-    schema?: JsonObject;
-    replacement_key?: string | null;
+export type AccountGroupRateLimit = {
+    account_group_id: number;
+    rpm_limit: number;
+    tpm_limit: number;
+    max_concurrency: number;
+    enabled: boolean;
+    created_at: string;
+    updated_at: string;
 };
 
-export type CapabilityListResponse = {
-    data: Array<CapabilityDefinition>;
+export type AccountAvailabilityRollup = {
+    date: string;
+    provider_id: number;
+    total_samples: number;
+    healthy_samples: number;
+    availability_ratio: number;
+    avg_success_rate: number;
+    computed_at: string;
+};
+
+export type AccountAvailabilitySummary = {
+    account_id: number;
+    account_name: string;
+    provider_id: number;
+    status: string;
+    overall_uptime: number;
+    window_days: number;
+    last_checked_at?: string | null;
+};
+
+export type AccountsAvailabilitySummaryResponse = {
+    data: Array<AccountAvailabilitySummary>;
     pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type AccountAvailabilityResponse = {
+    data: {
+        account_id: number;
+        window_days: number;
+        overall_uptime: number;
+        daily_availability: Array<AccountAvailabilityRollup>;
+    };
+    request_id: RequestId;
+};
+
+export type AccountQuotaSignal = {
+    quota_type: string;
+    remaining: string;
+    used: string;
+    quota_limit: string;
+    remaining_ratio: number;
+    reset_at?: string;
+};
+
+export type AccountQuotaReport = {
+    provider: string;
+    supported: boolean;
+    source: string;
+    plan: string;
+    credits_remaining: string;
+    credits_used: string;
+    credits_limit: string;
+    currency: string;
+    status_code: number;
+    fetched_at: string;
+    quota_signals: Array<AccountQuotaSignal>;
+};
+
+export type AccountQuotaReportResponse = {
+    data: AccountQuotaReport;
+    request_id: RequestId;
+};
+
+export type AdminTestResult = {
+    ok: boolean;
+    status: 'ok' | 'failed';
+    provider_id?: Id;
+    account_id?: Id;
+    latency_ms?: number;
+    message?: string;
+    checks?: JsonObject;
+    checked_at: Timestamp;
+};
+
+export type AdminTestResultResponse = {
+    data: AdminTestResult;
+    request_id: RequestId;
+};
+
+export type AdminSendTestEmailRequest = {
+    /**
+     * Mailbox to deliver the probe to. Defaults to the requesting admin's own account email when omitted.
+     */
+    recipient?: string;
+};
+
+/**
+ * scheduled = worker-driven daily run; manual = operator-triggered.
+ */
+export type BackupSnapshotKind = 'scheduled' | 'manual';
+
+/**
+ * running = pg_dump in flight; success = file written and checksummed;
+ * failed = pg_dump/IO error; superseded = retention deleted the file.
+ *
+ */
+export type BackupSnapshotStatus = 'running' | 'success' | 'failed' | 'superseded';
+
+export type BackupSnapshot = {
+    id: Id;
+    kind: BackupSnapshotKind;
+    status: BackupSnapshotStatus;
+    started_at: Timestamp;
+    /**
+     * Set when the run finished (success or failed); null while running.
+     */
+    completed_at?: string | null;
+    /**
+     * On-disk size of the dump file. 0 for failed/running rows.
+     */
+    size_bytes: number;
+    /**
+     * Hex-encoded SHA-256 of the dump file. Empty for failed/superseded rows.
+     */
+    sha256: string;
+    /**
+     * Path of the dump on the API host's disk. Empty when retention has wiped it.
+     */
+    file_path: string;
+    /**
+     * Stderr / system error captured on failed runs. Empty otherwise.
+     */
+    error_message: string;
+    /**
+     * Admin user id that pressed "Snapshot now". 0 for scheduled runs.
+     */
+    triggered_by_user_id: number;
+};
+
+export type BackupSnapshotResponse = {
+    data: BackupSnapshot;
+    request_id: RequestId;
+};
+
+export type BackupSnapshotPagination = {
+    total: number;
+    offset: number;
+    limit: number;
+};
+
+export type BackupSnapshotListResponse = {
+    data: Array<BackupSnapshot>;
+    pagination: BackupSnapshotPagination;
+    request_id: RequestId;
+};
+
+export type DeleteAdminBackupSnapshotResult = {
+    id: Id;
+    deleted: boolean;
+};
+
+export type DeleteAdminBackupSnapshotResponse = {
+    data: DeleteAdminBackupSnapshotResult;
     request_id: RequestId;
 };
 
@@ -3390,42 +3303,6 @@ export type AdminDashboard = AdminOverview;
 export type AdminDashboardResponse = {
     data: AdminDashboard;
     request_id: RequestId;
-};
-
-export type DeleteResponse = {
-    data: {
-        deleted: boolean;
-    };
-    request_id: RequestId;
-};
-
-export type BatchOperationResult = {
-    requested: number;
-    succeeded: number;
-    failed: number;
-    failed_ids?: Array<Id>;
-    /**
-     * Per-id reason for each code processed. Keys are the redeem-code id (stringified). Values: admin_action, already_disabled, expired, not_found.
-     */
-    per_item_reasons?: {
-        [key: string]: string;
-    };
-    /**
-     * Aggregate counts grouped by reason. Same value vocabulary as per_item_reasons.
-     */
-    disabled_reason_breakdown?: {
-        [key: string]: number;
-    };
-};
-
-export type BatchOperationResponse = {
-    data: BatchOperationResult;
-    request_id: RequestId;
-};
-
-export type TimeWindow = {
-    start: Timestamp;
-    end: Timestamp;
 };
 
 export type AdminDashboardInventory = {
@@ -3474,29 +3351,6 @@ export type AdminDashboardPerformance = {
     p95_latency_ms: number;
 };
 
-export type DashboardModelDistribution = {
-    model: string;
-    request_count: number;
-    token_count: number;
-    cost: string;
-    currency: string;
-};
-
-export type DashboardTrendPoint = {
-    bucket_start: Timestamp;
-    request_count: number;
-    token_count: number;
-    cost: string;
-};
-
-export type DashboardUserUsageTrend = {
-    user_id: Id;
-    email?: string | null;
-    request_count: number;
-    token_count: number;
-    cost: string;
-};
-
 export type AdminDashboardSnapshot = {
     window: TimeWindow;
     inventory: AdminDashboardInventory;
@@ -3513,407 +3367,6 @@ export type AdminDashboardSnapshot = {
 export type AdminDashboardSnapshotResponse = {
     data: AdminDashboardSnapshot;
     request_id: RequestId;
-};
-
-export type OpsOverview = {
-    window: TimeWindow;
-    request_count: number;
-    success_count: number;
-    error_count: number;
-    error_rate: number;
-    latency_p50_ms: number;
-    latency_p95_ms: number;
-    latency_p99_ms: number;
-    average_latency_ms: number;
-    rpm: number;
-    tpm: number;
-    active_users: number;
-    generated_at: Timestamp;
-};
-
-export type OpsOverviewResponse = {
-    data: OpsOverview;
-    request_id: RequestId;
-};
-
-export type OpsRealtimeRateSummary = {
-    /**
-     * Rate observed in the final minute of the window.
-     */
-    current: number;
-    /**
-     * Highest one-minute bucket observed in the window.
-     */
-    peak: number;
-    /**
-     * Full-window average rate per minute.
-     */
-    average: number;
-};
-
-export type OpsRealtimeTraffic = {
-    window: TimeWindow;
-    requests_per_min: OpsRealtimeRateSummary;
-    tokens_per_min: OpsRealtimeRateSummary;
-    /**
-     * Deduplicated request attempts in the selected window.
-     */
-    total_requests: number;
-    /**
-     * Failed request attempts, including error-only ops logs.
-     */
-    error_count: number;
-    error_rate: number;
-    /**
-     * Usage rows scanned for the selected window.
-     */
-    usage_log_count: number;
-    /**
-     * Ops error rows scanned for the selected window.
-     */
-    ops_error_log_count: number;
-    generated_at: Timestamp;
-};
-
-export type OpsRealtimeTrafficResponse = {
-    data: OpsRealtimeTraffic;
-    request_id: RequestId;
-};
-
-export type OpsThroughputTrendPoint = {
-    bucket_start: Timestamp;
-    request_count: number;
-    token_count: number;
-    rpm: number;
-    tpm: number;
-    cost: string;
-};
-
-export type OpsThroughputTrend = {
-    window: TimeWindow;
-    bucket: 'hour' | 'day';
-    points: Array<OpsThroughputTrendPoint>;
-};
-
-export type OpsThroughputTrendResponse = {
-    data: OpsThroughputTrend;
-    request_id: RequestId;
-};
-
-export type OpsErrorTrendPoint = {
-    bucket_start: Timestamp;
-    request_count: number;
-    error_count: number;
-    error_rate: number;
-};
-
-export type OpsErrorTrend = {
-    window: TimeWindow;
-    bucket: 'hour' | 'day';
-    points: Array<OpsErrorTrendPoint>;
-};
-
-export type OpsErrorTrendResponse = {
-    data: OpsErrorTrend;
-    request_id: RequestId;
-};
-
-export type OpsErrorDistributionItem = {
-    error_class: string;
-    owner: string;
-    count: number;
-    share: number;
-};
-
-export type OpsErrorDistribution = {
-    window: TimeWindow;
-    items: Array<OpsErrorDistributionItem>;
-};
-
-export type OpsErrorDistributionResponse = {
-    data: OpsErrorDistribution;
-    request_id: RequestId;
-};
-
-export type OpsLatencyBucket = {
-    label: string;
-    lower_ms: number;
-    upper_ms?: number | null;
-    count: number;
-    share: number;
-};
-
-export type OpsLatencyHistogram = {
-    window: TimeWindow;
-    buckets: Array<OpsLatencyBucket>;
-};
-
-export type OpsLatencyHistogramResponse = {
-    data: OpsLatencyHistogram;
-    request_id: RequestId;
-};
-
-/**
- * Operator-facing record of a single upstream failure observed by the
- * gateway hot path. Body excerpts are sanitised and credential-like
- * keys are redacted to "[REDACTED]" before persistence.
- *
- */
-export type OpsErrorLog = {
-    id?: string;
-    occurred_at?: string;
-    request_id?: string;
-    trace_id?: string;
-    user_id?: Id;
-    api_key_id?: Id;
-    api_key_prefix?: string;
-    account_id?: Id;
-    provider_id?: Id;
-    platform?: string;
-    source_endpoint?: string;
-    /**
-     * Alias for platform, kept for error-log UI parity.
-     */
-    source_protocol?: string;
-    target_protocol?: string;
-    model?: string;
-    status_code?: number;
-    upstream_request_id?: string;
-    /**
-     * Low-cardinality terminal state for gateway streaming requests.
-     * Empty when the request was not streamed or the state was not
-     * observed; never contains provider-native frames or response bodies.
-     *
-     */
-    stream_completion_state?: 'completed' | 'interrupted' | 'idle_timeout' | 'failed' | 'unknown';
-    attempt_no?: number;
-    latency_ms?: number;
-    input_tokens?: number;
-    output_tokens?: number;
-    usage_estimated?: boolean;
-    error_class?: string;
-    error_phase?: string;
-    error_owner?: string;
-    error_source?: string;
-    error_message?: string;
-    error_body_excerpt?: string;
-    upstream_errors?: Array<UpstreamErrorEvent>;
-    resolution?: 'open' | 'investigating' | 'resolved' | 'muted';
-    resolution_note?: string;
-    created_at?: string;
-    updated_at?: string;
-    resolved_at?: string;
-    resolved_by_user_id?: Id;
-    [key: string]: unknown;
-};
-
-export type OpsErrorLogListResponse = {
-    data: Array<OpsErrorLog>;
-    pagination: Pagination;
-    request_id: RequestId;
-};
-
-export type OpsErrorLogResponse = {
-    data: OpsErrorLog;
-    request_id: RequestId;
-};
-
-/**
- * Real-time grouping of ops_error_logs rows by stable, low-sensitivity
- * failure dimensions. It is intended for operator triage and is not a
- * durable long-term rollup.
- *
- */
-export type OpsErrorFingerprint = {
-    /**
-     * Stable hash over low-sensitivity grouping dimensions.
-     */
-    fingerprint: string;
-    count: number;
-    open_count: number;
-    investigating_count: number;
-    resolved_count: number;
-    muted_count: number;
-    first_occurred_at: string;
-    last_occurred_at: string;
-    example_error_log_id?: Id;
-    example_request_id?: string;
-    example_error_message?: string;
-    source_endpoint: string;
-    target_protocol: string;
-    model: string;
-    status_code?: number;
-    status_class: '1xx' | '2xx' | '3xx' | '4xx' | '5xx' | 'unknown';
-    error_class: string;
-    error_phase: string;
-    error_owner: string;
-    error_source: string;
-    /**
-     * Normalized error message with request ids, URLs, hashes, and numbers replaced.
-     */
-    message_pattern: string;
-};
-
-export type OpsErrorFingerprintListMeta = {
-    /**
-     * Number of discovered fingerprint groups before the response limit is applied. When truncated is true, this only covers scanned rows.
-     */
-    total: number;
-    /**
-     * Number of ops_error_logs rows scanned for this real-time summary.
-     */
-    scanned: number;
-    /**
-     * True when matching rows exceeded the bounded live scan cap.
-     */
-    truncated: boolean;
-    window_start?: string;
-    window_end?: string;
-};
-
-export type OpsErrorFingerprintListResponse = {
-    data: Array<OpsErrorFingerprint>;
-    meta: OpsErrorFingerprintListMeta;
-    request_id: RequestId;
-};
-
-export type OpsErrorLogResolutionUpdate = {
-    resolution: 'open' | 'investigating' | 'resolved' | 'muted';
-    note?: string;
-};
-
-export type OpsConcurrency = {
-    active_gateway_requests: number;
-    active_realtime_slots: number;
-    active_by_api_key: {
-        [key: string]: number;
-    };
-};
-
-export type OpsConcurrencyResponse = {
-    data: OpsConcurrency;
-    request_id: RequestId;
-};
-
-export type OpsSystemLogLevel = 'debug' | 'info' | 'warn' | 'error';
-
-export type OpsSystemLog = {
-    id: Id;
-    level: OpsSystemLogLevel;
-    message: string;
-    source: string;
-    request_id?: string;
-    trace_id?: string;
-    metadata?: JsonObject;
-    created_at: Timestamp;
-};
-
-export type OpsSystemLogListResponse = {
-    data: Array<OpsSystemLog>;
-    pagination: Pagination;
-    request_id: RequestId;
-};
-
-export type OpsSystemLogHealth = {
-    storage_mode: 'durable' | 'unavailable';
-    writable: boolean;
-    degraded: boolean;
-    stale: boolean;
-    total_count: number;
-    level_counts: {
-        [key: string]: number;
-    };
-    last_log_at?: Timestamp;
-    last_error_at?: Timestamp;
-    last_error_source?: string;
-    last_error_message?: string;
-    error_evidence_recorder: OpsErrorEvidenceRecorderHealth;
-    checked_at: Timestamp;
-};
-
-export type OpsErrorEvidenceRecorderHealth = {
-    enabled: boolean;
-    started: boolean;
-    draining: boolean;
-    degraded: boolean;
-    queue_depth: number;
-    queue_capacity: number;
-    enqueued_count: number;
-    processed_count: number;
-    recorded_count: number;
-    dropped_count: number;
-    write_failed_count: number;
-};
-
-export type OpsSystemLogHealthResponse = {
-    data: OpsSystemLogHealth;
-    request_id: RequestId;
-};
-
-export type OpsSystemLogCleanupRequest = {
-    level?: OpsSystemLogLevel;
-    source?: string;
-    q?: string;
-    request_id?: string;
-    trace_id?: string;
-    start?: Timestamp;
-    end?: Timestamp;
-    dry_run?: boolean;
-    max_delete?: number;
-};
-
-export type OpsSystemLogCleanupResult = {
-    matched: number;
-    deleted: number;
-    dry_run: boolean;
-    max_delete: number;
-    limited: boolean;
-};
-
-export type OpsSystemLogCleanupResponse = {
-    data: OpsSystemLogCleanupResult;
-    request_id: RequestId;
-};
-
-/**
- * Bounded filter for operator on-demand usage-record cleanup. At least one of model, start or end must be supplied so a cleanup can never match the entire table by accident.
- */
-export type UsageCleanupRequest = {
-    /**
-     * Canonical model name; matched case-insensitively.
-     */
-    model?: string;
-    start?: Timestamp;
-    end?: Timestamp;
-    dry_run?: boolean;
-    max_delete?: number;
-};
-
-export type UsageCleanupResult = {
-    matched: number;
-    deleted: number;
-    dry_run: boolean;
-    max_delete: number;
-    limited: boolean;
-};
-
-export type UsageCleanupResponse = {
-    data: UsageCleanupResult;
-    request_id: RequestId;
-};
-
-export type OpsSettings = {
-    auto_refresh_enabled: boolean;
-    refresh_interval_seconds: number;
-};
-
-export type OpsSettingsResponse = {
-    data: OpsSettings;
-    request_id: RequestId;
-};
-
-export type SecretConfigured = {
-    configured: boolean;
 };
 
 export type AdminSettingsGeneral = {
@@ -4111,10 +3564,6 @@ export type AdminSettingsCopilot = {
      */
     provider_account_id: number;
     /**
-     * Account group id used when source is "account" (0 = unset). When set, the copilot randomly picks a member account each turn for load distribution.
-     */
-    provider_account_group_id: number;
-    /**
      * Default upstream model the copilot calls (e.g. claude-3-5-sonnet, gpt-4o).
      */
     model: string;
@@ -4301,39 +3750,253 @@ export type AdminCopilotChatRequest = {
     reasoning_effort?: 'off' | 'low' | 'medium' | 'high';
 };
 
-export type PlaygroundImage = {
-    mime_type: string;
+export type GatewayProviderResourceStatus = 'ready' | 'limited' | 'blocked';
+
+export type GatewayProviderResourceReason = 'provider_disabled' | 'no_active_models' | 'no_model_mappings' | 'no_active_accounts' | 'no_routable_accounts' | 'proxy_attention' | 'no_api_keys' | 'pricing_uncovered';
+
+export type GatewayResourceFixArea = 'providers' | 'models' | 'model_mappings' | 'accounts' | 'proxies' | 'api_keys' | 'pricing' | 'endpoints';
+
+export type GatewayResourceFixSeverity = 'critical' | 'warning' | 'info';
+
+export type GatewayResourceFix = {
+    severity: GatewayResourceFixSeverity;
+    area: GatewayResourceFixArea;
+    reason: GatewayProviderResourceReason;
     /**
-     * Base64-encoded image bytes (no data URL prefix).
+     * Number of resource rows or affected accounts represented by this fix item.
      */
-    data: string;
-};
-
-export type PlaygroundMessage = {
-    role: 'user' | 'assistant';
-    content?: string;
-    images?: Array<PlaygroundImage>;
-};
-
-export type PlaygroundChatRequest = {
-    messages: Array<PlaygroundMessage>;
-    model: string;
-    reasoning_effort?: 'off' | 'low' | 'medium' | 'high';
+    count: number;
     /**
-     * Optional system prompt prepended to the conversation.
+     * Admin console route that lets the operator fix or investigate the issue.
      */
-    system?: string;
-    temperature?: number;
-    max_tokens?: number;
+    href: string;
 };
 
-export type PlaygroundModel = {
-    id: string;
-    name: string;
+export type GatewayAccountBlockers = {
+    /**
+     * Accounts under this provider that are not active and therefore cannot be scheduled.
+     */
+    inactive: number;
+    /**
+     * Active accounts blocked by health status or an open circuit.
+     */
+    health: number;
+    /**
+     * Active accounts blocked by exhausted runtime quota.
+     */
+    quota: number;
+    /**
+     * Active accounts blocked by a missing, disabled, expired, or otherwise unavailable proxy binding.
+     */
+    proxy: number;
 };
 
-export type PlaygroundModelsResponse = {
-    data: Array<PlaygroundModel>;
+export type GatewayResourceTrafficLastError = {
+    /**
+     * Time of the most recent failed gateway request.
+     */
+    occurred_at: string;
+    request_id?: string | null;
+    error_class?: string | null;
+    error_phase?: string | null;
+    error_owner?: string | null;
+    /**
+     * Final upstream or gateway HTTP status when available.
+     */
+    status_code?: number | null;
+    upstream_request_id?: string | null;
+    /**
+     * Bounded upstream or gateway error message safe for inline operator display.
+     */
+    message?: string | null;
+};
+
+export type GatewayResourceTraffic = {
+    /**
+     * Rolling runtime usage window used for the traffic counters.
+     */
+    window_seconds: number;
+    /**
+     * Gateway requests observed in the rolling window.
+     */
+    request_count: number;
+    /**
+     * Failed gateway requests observed in the rolling window.
+     */
+    error_count: number;
+    /**
+     * Successful requests divided by request_count. Zero when request_count is zero.
+     */
+    success_rate: number;
+    /**
+     * Most recent gateway request observed for this resource.
+     */
+    last_request_at?: string | null;
+    last_error?: GatewayResourceTrafficLastError;
+};
+
+export type GatewayProviderResourceRow = {
+    provider: Provider;
+    total_accounts: number;
+    routable_accounts: number;
+    attention_accounts: number;
+    account_blockers: GatewayAccountBlockers;
+    proxied_accounts: number;
+    proxy_attention_accounts: number;
+    active_model_mappings: number;
+    api_key_count: number;
+    scoped_key_count: number;
+    traffic: GatewayResourceTraffic;
+    status: GatewayProviderResourceStatus;
+    reasons: Array<GatewayProviderResourceReason>;
+};
+
+export type GatewayEndpointResourceRow = {
+    key: 'chat_completions' | 'responses' | 'responses_websocket' | 'responses_compact' | 'responses_input_items' | 'messages' | 'anthropic_count_tokens' | 'gemini_generate_content' | 'gemini_count_tokens' | 'embeddings' | 'image_generations' | 'image_edits' | 'image_variations' | 'videos' | 'audio_transcriptions' | 'audio_speech' | 'moderations' | 'rerank' | 'realtime_websocket';
+    /**
+     * Gateway route or route template represented by this endpoint readiness row.
+     */
+    source_endpoint: string;
+    routable_accounts: number;
+    /**
+     * Active, provider-routable accounts considered for this model route before endpoint capability and model availability filters.
+     */
+    candidate_accounts: number;
+    /**
+     * Candidate accounts whose effective capabilities do not include this endpoint.
+     */
+    unsupported_accounts: number;
+    /**
+     * Candidate accounts whose effective model mapping is blocked by excluded_models or supported_models metadata.
+     */
+    unavailable_model_accounts: number;
+    status: GatewayProviderResourceStatus;
+};
+
+export type GatewayEndpointResourceSummaryRow = {
+    key: 'chat_completions' | 'responses' | 'responses_websocket' | 'responses_compact' | 'responses_input_items' | 'messages' | 'anthropic_count_tokens' | 'gemini_generate_content' | 'gemini_count_tokens' | 'embeddings' | 'image_generations' | 'image_edits' | 'image_variations' | 'videos' | 'audio_transcriptions' | 'audio_speech' | 'moderations' | 'rerank' | 'realtime_websocket';
+    /**
+     * Gateway route or route template represented by this endpoint readiness row.
+     */
+    source_endpoint: string;
+    /**
+     * Active model rows with at least one routable account for this endpoint.
+     */
+    ready_models: number;
+    /**
+     * Active model rows evaluated for this endpoint.
+     */
+    models: number;
+    /**
+     * Active model-provider route rows with at least one routable account for this endpoint.
+     */
+    ready_routes: number;
+    /**
+     * Active model-provider route rows evaluated for this endpoint.
+     */
+    routes: number;
+    /**
+     * Sum of routable account-route observations across active model-provider route rows.
+     */
+    routable_account_routes: number;
+    /**
+     * Sum of candidate account-route observations before endpoint capability and model availability filters.
+     */
+    candidate_account_routes: number;
+    /**
+     * Sum of account-route observations whose effective capabilities do not include this endpoint.
+     */
+    unsupported_account_routes: number;
+    /**
+     * Sum of account-route observations whose effective model mapping is blocked by excluded_models or supported_models metadata.
+     */
+    unavailable_model_account_routes: number;
+    traffic: GatewayResourceTraffic;
+    status: GatewayProviderResourceStatus;
+};
+
+export type GatewayPricingCoverageStatus = 'priced' | 'estimated_zero' | 'error';
+
+export type GatewayPricingCoverageSource = 'mapping_override' | 'pricing_rule' | 'default_zero' | 'pricing_error';
+
+export type GatewayPricingCoverage = {
+    status: GatewayPricingCoverageStatus;
+    source: GatewayPricingCoverageSource;
+    pricing_rule_id?: number | null;
+    priced_routes: number;
+    total_routes: number;
+    currency?: string;
+    billing_mode?: BillingMode;
+};
+
+export type GatewayModelResourceRow = {
+    model: Model;
+    active_providers: number;
+    active_model_mappings: number;
+    routable_accounts: number;
+    endpoints: Array<GatewayEndpointResourceRow>;
+    pricing: GatewayPricingCoverage;
+    api_key_count: number;
+    scoped_key_count: number;
+    traffic: GatewayResourceTraffic;
+    status: GatewayProviderResourceStatus;
+    reasons: Array<GatewayProviderResourceReason>;
+};
+
+export type GatewayRouteResourceRow = {
+    model: Model;
+    provider: Provider;
+    mapping_id: Id;
+    upstream_model: string;
+    routable_accounts: number;
+    endpoints: Array<GatewayEndpointResourceRow>;
+    pricing: GatewayPricingCoverage;
+    api_key_count: number;
+    scoped_key_count: number;
+    traffic: GatewayResourceTraffic;
+    status: GatewayProviderResourceStatus;
+    reasons: Array<GatewayProviderResourceReason>;
+};
+
+export type GatewayResourceSummary = {
+    providers: number;
+    active_providers: number;
+    active_models: number;
+    active_model_mappings: number;
+    active_api_keys: number;
+    active_accounts: number;
+    routable_accounts: number;
+    active_proxies: number;
+    available_proxies: number;
+    expired_proxies: number;
+    proxied_accounts: number;
+    proxy_attention_accounts: number;
+    scoped_api_keys: number;
+    fixes: Array<GatewayResourceFix>;
+    rows: Array<GatewayProviderResourceRow>;
+    model_rows: Array<GatewayModelResourceRow>;
+    route_rows: Array<GatewayRouteResourceRow>;
+    endpoint_rows: Array<GatewayEndpointResourceSummaryRow>;
+};
+
+export type GatewayResourceSummaryResponse = {
+    data: GatewayResourceSummary;
+    request_id: RequestId;
+};
+
+export type AdminQuickMapModelsRequest = {
+    provider_id: Id;
+    models: Array<string>;
+};
+
+export type AdminQuickMapModelsResult = {
+    models_created: number;
+    mappings_created: number;
+    warnings: Array<string>;
+};
+
+export type AdminQuickMapModelsResponse = {
+    data: AdminQuickMapModelsResult;
     request_id: RequestId;
 };
 
@@ -4379,584 +4042,342 @@ export type AvailableModelListResponse = {
     request_id: RequestId;
 };
 
-export type NotificationEmailTemplateEventName = 'auth.password_reset' | 'auth.email_verification' | 'auth.oauth_pending_email_completion' | 'notification.contact_verification' | 'balance.low' | 'subscription.expiry_reminder' | 'account.quota_alert';
+/**
+ * Proxy transport type. Use socks5h when DNS resolution must happen through the proxy.
+ */
+export type ProxyDefinitionType = 'http' | 'https' | 'socks5' | 'socks5h';
 
-export type NotificationEmailTemplateEvent = {
-    event: NotificationEmailTemplateEventName;
-    label: string;
-    description: string;
-    category: string;
-    /**
-     * True when recipients may unsubscribe from this event.
-     */
-    optional: boolean;
-    placeholders: Array<string>;
-};
-
-export type NotificationEmailTemplate = {
-    event: NotificationEmailTemplateEventName;
-    subject: string;
-    html: string;
-    is_custom: boolean;
-    placeholders: Array<string>;
-};
-
-export type NotificationEmailTemplateList = {
-    events: Array<NotificationEmailTemplateEvent>;
-    templates: Array<NotificationEmailTemplate>;
-    placeholders: Array<string>;
-};
-
-export type NotificationEmailTemplateResponse = {
-    data: NotificationEmailTemplate;
-    request_id: RequestId;
-};
-
-export type NotificationEmailTemplateListResponse = {
-    data: NotificationEmailTemplateList;
-    request_id: RequestId;
-};
-
-export type UpdateNotificationEmailTemplateRequest = {
-    subject: string;
-    html: string;
-};
-
-export type PreviewNotificationEmailTemplateRequest = {
-    event: NotificationEmailTemplateEventName;
-    /**
-     * Template subject to preview. Empty string uses the saved or built-in subject.
-     */
-    subject: string;
-    /**
-     * Template HTML to preview. Empty string uses the saved or built-in HTML.
-     */
-    html: string;
-    variables?: {
-        [key: string]: string;
-    };
-};
-
-export type NotificationEmailTemplatePreview = {
-    subject: string;
-    html: string;
-};
-
-export type NotificationEmailTemplatePreviewResponse = {
-    data: NotificationEmailTemplatePreview;
-    request_id: RequestId;
-};
-
-export type AnnouncementStatus = 'draft' | 'published' | 'archived';
-
-export type AnnouncementSeverity = 'info' | 'warning' | 'critical';
-
-export type AnnouncementAudience = 'all' | 'users' | 'admins';
+export type ProxyDefinitionStatus = 'active' | 'disabled';
 
 /**
- * One AND-group of audience conditions. An announcement is delivered when it has no segments (audience-only) or any segment matches the recipient. Within a segment every non-empty condition must match.
+ * Runtime behavior when an active proxy is past expires_at.
  */
-export type AnnouncementSegment = {
-    /**
-     * Match users holding any of these roles (e.g. owner, admin, user).
-     */
-    roles?: Array<string>;
-    /**
-     * Match these specific user ids.
-     */
-    user_ids?: Array<Id>;
-    /**
-     * Match users whose email domain is in this list (case-insensitive).
-     */
-    email_domains?: Array<string>;
-};
+export type ProxyFallbackMode = 'none' | 'direct' | 'proxy';
 
-export type AnnouncementReader = {
-    user_id: Id;
-    read_at: Timestamp;
-};
-
-export type AnnouncementReadStatus = {
-    announcement_id: Id;
-    /**
-     * Number of recent readers returned (capped).
-     */
-    total: number;
-    readers: Array<AnnouncementReader>;
-};
-
-export type AnnouncementReadStatusResponse = {
-    data: AnnouncementReadStatus;
-    request_id: RequestId;
-};
-
-export type Announcement = {
+export type ProxyDefinition = {
     id: Id;
-    title: string;
-    content: string;
-    status: AnnouncementStatus;
-    severity: AnnouncementSeverity;
-    audience: AnnouncementAudience;
+    name: string;
+    type: ProxyDefinitionType;
+    status: ProxyDefinitionStatus;
     /**
-     * Optional audience-targeting segments that refine the audience.
+     * True when an encrypted proxy URL is stored. Raw URLs are never returned.
      */
-    segments?: Array<AnnouncementSegment>;
-    starts_at?: Timestamp;
-    ends_at?: Timestamp;
-    created_at: Timestamp;
-    updated_at: Timestamp;
-};
-
-export type CreateAnnouncementRequest = {
-    title: string;
-    content: string;
-    status?: AnnouncementStatus;
-    severity?: AnnouncementSeverity;
-    audience?: AnnouncementAudience;
+    url_configured: boolean;
+    metadata?: JsonObject;
     /**
-     * Optional audience-targeting segments that refine the audience.
+     * ISO-3166-1 alpha-2 country code, operator-supplied.
      */
-    segments?: Array<AnnouncementSegment>;
-    starts_at?: Timestamp;
-    ends_at?: Timestamp;
-};
-
-export type UpdateAnnouncementRequest = CreateAnnouncementRequest;
-
-export type AnnouncementResponse = {
-    data: Announcement;
-    request_id: RequestId;
-};
-
-export type AnnouncementListResponse = {
-    data: Array<Announcement>;
-    pagination: Pagination;
-    request_id: RequestId;
-};
-
-export type UserAnnouncement = {
-    announcement: Announcement;
-    read: boolean;
-    read_at?: Timestamp;
-};
-
-export type UserAnnouncementResponse = {
-    data: UserAnnouncement;
-    request_id: RequestId;
-};
-
-export type UserAnnouncementListResponse = {
-    data: Array<UserAnnouncement>;
-    pagination: Pagination;
-    unread: number;
-    request_id: RequestId;
-};
-
-export type EnabledOAuthProvider = {
-    provider: AuthIdentityProvider;
+    country_code?: string | null;
     /**
-     * Stable provider instance key; pass back as the provider_key query param when starting authorization.
+     * Display name for the country, snapshotted at write time.
      */
-    provider_key: string;
+    country_name?: string | null;
     /**
-     * Non-secret label to render on the sign-in button.
-     */
-    display_name: string;
-};
-
-export type EnabledOAuthProviderListResponse = {
-    data: Array<EnabledOAuthProvider>;
-    request_id: RequestId;
-};
-
-export type CaptchaConfig = {
-    /**
-     * Whether human-verification is enforced on auth endpoints.
-     */
-    enabled: boolean;
-    /**
-     * Captcha provider widget to render (turnstile | hcaptcha | recaptcha).
-     */
-    provider: string;
-    /**
-     * Public site key for the provider widget. Empty when captcha is unconfigured. Never secret.
-     */
-    site_key: string;
-};
-
-export type CaptchaConfigResponse = {
-    data: CaptchaConfig;
-    request_id: RequestId;
-};
-
-export type CaptchaSettings = {
-    /**
-     * When true, admin settings override environment captcha config.
-     */
-    managed: boolean;
-    enabled: boolean;
-    provider: 'turnstile' | 'hcaptcha' | 'recaptcha';
-    site_key: string;
-    readonly secret_key_configured: boolean;
-    verify_url: string;
-};
-
-export type CaptchaSettingsResponse = {
-    data: CaptchaSettings;
-    request_id: RequestId;
-};
-
-export type RedeemCodeStatus = 'active' | 'redeemed' | 'disabled' | 'expired';
-
-export type RedeemCodeType = 'balance' | 'subscription';
-
-export type RedeemCode = {
-    id: Id;
-    code: string;
-    type: RedeemCodeType;
-    status: RedeemCodeStatus;
-    /**
-     * Balance amount for balance codes, or subscription plan id for subscription codes.
-     */
-    value: string;
-    currency: string;
-    max_redemptions: number;
-    redeemed_count: number;
-    expires_at?: Timestamp;
-    /**
-     * Free-text audit comment last applied to this code (set by bulk-disable).
-     */
-    note?: string;
-    /**
-     * Why this code is in disabled status, if applicable. Empty for active/used codes.
-     */
-    disabled_reason?: string;
-    created_at: Timestamp;
-    updated_at: Timestamp;
-};
-
-export type CreateRedeemCodeRequest = {
-    code: string;
-    type: RedeemCodeType;
-    /**
-     * Balance amount for balance codes, or subscription plan id for subscription codes.
-     */
-    value: string;
-    currency?: string;
-    max_redemptions?: number;
-    expires_at?: Timestamp;
-};
-
-export type RedeemCodeRedemptionRequest = {
-    code: string;
-};
-
-export type RedeemCodeRedemption = {
-    id: Id;
-    user_id: Id;
-    redeem_code_id: Id;
-    type: RedeemCodeType;
-    amount: string;
-    currency: string;
-    balance_before: string;
-    balance_after: string;
-    billing_ledger_id?: Id;
-    user_subscription_id?: Id;
-    redeemed_at: Timestamp;
-    created_at: Timestamp;
-    updated_at: Timestamp;
-};
-
-export type RedeemCodeRedemptionResult = {
-    redemption: RedeemCodeRedemption;
-    redeem_code: RedeemCode;
-    already_redeemed: boolean;
-};
-
-export type RedeemCodeRedemptionResponse = {
-    data: RedeemCodeRedemptionResult;
-    request_id: RequestId;
-};
-
-export type BatchGenerateRedeemCodesRequest = {
-    prefix?: string;
-    count: number;
-    type: RedeemCodeType;
-    /**
-     * Balance amount for balance codes, or subscription plan id for subscription codes.
-     */
-    value: string;
-    currency?: string;
-    max_redemptions?: number;
-    expires_at?: Timestamp;
-};
-
-export type BatchDisableRedeemCodesRequest = {
-    ids: Array<Id>;
-    /**
-     * Free-text audit comment recorded against every code disabled by this call.
-     */
-    note?: string | null;
-};
-
-export type BatchUpdateRedeemCodeItem = {
-    id: Id;
-    /**
-     * New redemption amount (decimal string > 0; balance codes only). Null leaves unchanged.
-     */
-    amount?: string | null;
-    /**
-     * New max-redemption cap. Null leaves unchanged.
-     */
-    max_redemptions?: number | null;
-    /**
-     * New expiry (RFC3339). Null in the JSON body clears the expiry (NullableTimeUpdate semantics from sub2api).
+     * Optional operator-defined expiry. Expired active proxies follow fallback_mode.
      */
     expires_at?: string | null;
+    fallback_mode?: ProxyFallbackMode;
     /**
-     * New operator note (free text). Null leaves unchanged.
+     * Proxy definition id used when fallback_mode is proxy.
      */
-    note?: string | null;
+    backup_proxy_id?: string | null;
+    /**
+     * Last time the proxy probe worker tested this proxy.
+     */
+    last_probed_at?: string | null;
+    /**
+     * Successful probes since the last counter reset (rolling ~7-day window — counters reset weekly, NOT a strict trailing-7d window).
+     */
+    probe_success_count: number;
+    /**
+     * Failed probes since the last counter reset.
+     */
+    probe_failure_count: number;
+    /**
+     * Latency of the most recent successful probe in milliseconds. 0 if no successful probe yet.
+     */
+    last_probe_latency_ms: number;
+    /**
+     * Rolling availability percentage. Null when never probed since last reset.
+     */
+    probe_success_pct_7d?: number | null;
+    created_at: Timestamp;
+    updated_at: Timestamp;
 };
 
-export type BatchUpdateRedeemCodesRequest = {
-    items: Array<BatchUpdateRedeemCodeItem>;
+export type CreateProxyDefinitionRequest = {
+    name: string;
+    type: ProxyDefinitionType;
+    status?: ProxyDefinitionStatus;
+    metadata?: JsonObject;
+    /**
+     * ISO-3166-1 alpha-2 country code, operator-supplied.
+     */
+    country_code?: string | null;
+    /**
+     * Localized display name for the country, snapshotted at write time.
+     */
+    country_name?: string | null;
+    /**
+     * Optional operator-defined expiry. Past values force fallback immediately.
+     */
+    expires_at?: string;
+    fallback_mode?: ProxyFallbackMode;
+    backup_proxy_id?: Id;
 };
 
-export type BatchUpdateRedeemCodeErrorRow = {
+export type UpdateProxyDefinitionRequest = {
+    name?: string;
+    type?: ProxyDefinitionType;
+    status?: ProxyDefinitionStatus;
+    metadata?: JsonObject;
+    /**
+     * ISO-3166-1 alpha-2 country code, operator-supplied.
+     */
+    country_code?: string | null;
+    /**
+     * Localized display name for the country, snapshotted at write time.
+     */
+    country_name?: string | null;
+    /**
+     * Replacement expiry. Omit to keep the existing value.
+     */
+    expires_at?: string;
+    /**
+     * Clears expires_at when true.
+     */
+    clear_expires_at?: boolean;
+    fallback_mode?: ProxyFallbackMode;
+    backup_proxy_id?: Id;
+    /**
+     * Clears backup_proxy_id when true. Non-proxy fallback modes also clear it.
+     */
+    clear_backup_proxy_id?: boolean;
+};
+
+export type SnapshotProxyDefinition = {
+    name: string;
+    type: ProxyDefinitionType;
+    status: ProxyDefinitionStatus;
+    /**
+     * True when an encrypted proxy URL exists in the source environment. Raw URLs are never exported.
+     */
+    url_configured: boolean;
+    metadata?: JsonObject;
+    /**
+     * ISO-3166-1 alpha-2 country code, operator-supplied.
+     */
+    country_code?: string | null;
+    /**
+     * Localized display name for the country, snapshotted at write time.
+     */
+    country_name?: string | null;
+    /**
+     * Optional operator-defined expiry.
+     */
+    expires_at?: string | null;
+    fallback_mode?: ProxyFallbackMode;
+    /**
+     * Proxy definition name used when fallback_mode is proxy. Prefer this in config imports because proxy ids are environment-local.
+     */
+    backup_proxy_name?: string | null;
+};
+
+export type ImportProxyDefinition = {
+    name: string;
+    type: ProxyDefinitionType;
+    status?: ProxyDefinitionStatus;
+    metadata?: JsonObject;
+    /**
+     * ISO-3166-1 alpha-2 country code, operator-supplied.
+     */
+    country_code?: string | null;
+    /**
+     * Localized display name for the country, snapshotted at write time.
+     */
+    country_name?: string | null;
+    /**
+     * Optional operator-defined expiry.
+     */
+    expires_at?: string | null;
+    fallback_mode?: ProxyFallbackMode;
+    /**
+     * Proxy definition name used when fallback_mode is proxy. Prefer this in config imports because proxy ids are environment-local.
+     */
+    backup_proxy_name?: string | null;
+};
+
+export type BatchCreateProxiesRequest = {
+    proxies: Array<CreateProxyDefinitionRequest>;
+};
+
+export type BatchCreateProxiesSkippedRow = {
+    /**
+     * Zero-based index in the request `proxies` array.
+     */
+    index: number;
+    name: string;
+    reason: string;
+};
+
+export type BatchCreateProxiesErrorRow = {
+    index: number;
+    message: string;
+};
+
+export type BatchCreateProxiesResult = {
+    /**
+     * Number of new proxies actually inserted.
+     */
+    created_count: number;
+    created: Array<ProxyDefinition>;
+    /**
+     * Rows that hit a soft-skip rule (e.g. duplicate name) — not errors.
+     */
+    skipped: Array<BatchCreateProxiesSkippedRow>;
+    /**
+     * Rows that hard-failed validation. The other rows still apply.
+     */
+    errors: Array<BatchCreateProxiesErrorRow>;
+};
+
+export type BatchCreateProxiesResponse = {
+    data: BatchCreateProxiesResult;
+    request_id: RequestId;
+};
+
+export type TestProxyRequest = {
+    /**
+     * Optional URL to probe. Defaults to a small, dependable HTTPS endpoint when omitted.
+     */
+    target_url?: string;
+};
+
+export type ProxyTestResult = {
+    /**
+     * True when the upstream returned a 2xx within the timeout.
+     */
+    ok: boolean;
+    /**
+     * Wall-clock latency of the probe in ms (0 when the request didn't get far enough to time).
+     */
+    latency_ms: number;
+    /**
+     * HTTP status of the upstream, when one was received. 0 when the transport failed before headers.
+     */
+    status_code: number;
+    /**
+     * Empty when ok=true. Otherwise one of: bad_proxy_url, bad_target_url,
+     * timeout, transport_error, bad_status.
+     *
+     */
+    error_class: string;
+    /**
+     * URL that was actually probed (echoed back so the UI can show the resolved default).
+     */
+    target_url: string;
+};
+
+export type ProxyTestResultResponse = {
+    data: ProxyTestResult;
+    request_id: RequestId;
+};
+
+export type BatchTestProxiesRequest = {
+    proxy_ids: Array<Id>;
+};
+
+export type ProxyBatchTestRow = {
+    proxy_id: Id;
+    result: ProxyTestResult;
+};
+
+export type BatchTestProxiesResponse = {
+    data: Array<ProxyBatchTestRow>;
+    request_id: RequestId;
+};
+
+export type BatchDeleteProxiesRequest = {
+    proxy_ids: Array<Id>;
+};
+
+export type BatchDeleteProxiesErrorRow = {
     id: Id;
     message: string;
 };
 
-export type BatchUpdateRedeemCodesResult = {
-    updated_count: number;
+export type BatchDeleteProxiesResult = {
+    deleted_count: number;
+    deleted_ids: Array<Id>;
     /**
-     * Per-id failures (invalid id, invalid value, already-redeemed gate, store error). NotFound is idempotent.
+     * Per-id failures (e.g. proxy not found). Other ids still succeeded.
      */
-    errors: Array<BatchUpdateRedeemCodeErrorRow>;
+    errors: Array<BatchDeleteProxiesErrorRow>;
 };
 
-export type BatchUpdateRedeemCodesResponse = {
-    data: BatchUpdateRedeemCodesResult;
+export type BatchDeleteProxiesResponse = {
+    data: BatchDeleteProxiesResult;
     request_id: RequestId;
 };
 
-export type BatchExtendRedeemCodesRequest = {
-    ids: Array<Id>;
-    expires_at: Timestamp;
-};
-
-export type RedeemCodeResponse = {
-    data: RedeemCode;
+export type ProxyDefinitionResponse = {
+    data: ProxyDefinition;
     request_id: RequestId;
 };
 
-export type RedeemCodeListResponse = {
-    data: Array<RedeemCode>;
+export type ProxyDefinitionListResponse = {
+    data: Array<ProxyDefinition>;
     pagination: Pagination;
     request_id: RequestId;
 };
 
-export type RedeemCodeStats = {
-    total: number;
-    active: number;
-    redeemed: number;
-    disabled: number;
-    expired: number;
-};
-
-export type RedeemCodeStatsResponse = {
-    data: RedeemCodeStats;
-    request_id: RequestId;
-};
-
-export type PromoCodeStatus = 'active' | 'disabled' | 'expired';
-
-export type PromoDiscountType = 'amount' | 'percent';
-
-export type PromoCode = {
-    id: Id;
-    code: string;
-    status: PromoCodeStatus;
-    discount_type: PromoDiscountType;
-    discount_value: string;
+export type DashboardModelDistribution = {
+    model: string;
+    request_count: number;
+    token_count: number;
+    cost: string;
     currency: string;
-    max_uses: number;
-    /**
-     * Maximum active uses per user. Zero means no per-user limit.
-     */
-    per_user_limit: number;
-    /**
-     * Minimum original order amount required before the discount applies. Blank means no minimum.
-     */
-    min_order_amount: string;
-    used_count: number;
-    starts_at?: Timestamp;
-    expires_at?: Timestamp;
-    created_at: Timestamp;
-    updated_at: Timestamp;
 };
 
-export type CreatePromoCodeRequest = {
-    code: string;
-    discount_type: PromoDiscountType;
-    discount_value: string;
-    currency?: string;
-    max_uses?: number;
-    /**
-     * Maximum active uses per user. Zero means no per-user limit.
-     */
-    per_user_limit?: number;
-    /**
-     * Minimum original order amount required before the discount applies. Omit for no minimum.
-     */
-    min_order_amount?: string;
-    status?: PromoCodeStatus;
-    starts_at?: Timestamp;
-    expires_at?: Timestamp;
+export type DashboardTrendPoint = {
+    bucket_start: Timestamp;
+    request_count: number;
+    token_count: number;
+    cost: string;
 };
 
-export type UpdatePromoCodeRequest = CreatePromoCodeRequest;
-
-export type PromoCodeResponse = {
-    data: PromoCode;
-    request_id: RequestId;
-};
-
-export type PromoCodeListResponse = {
-    data: Array<PromoCode>;
-    pagination: Pagination;
-    request_id: RequestId;
-};
-
-export type PromoCodeUsage = {
-    id: Id;
+export type DashboardUserUsageTrend = {
     user_id: Id;
-    promo_code_id: Id;
-    payment_order_id: Id;
-    order_no: string;
-    original_amount: string;
-    discount_amount: string;
-    final_amount: string;
-    currency: string;
-    discount_type: PromoDiscountType;
-    applied_at: Timestamp;
-};
-
-export type PromoCodeUsageListResponse = {
-    data: Array<PromoCodeUsage>;
-    request_id: RequestId;
-};
-
-export type RiskControlMode = 'monitor' | 'enforce';
-
-export type RiskControlConfig = {
-    enabled: boolean;
-    mode: RiskControlMode;
-    max_failed_requests_per_minute: number;
-    max_cost_per_day: string;
-    cooldown_seconds: number;
-    blocked_countries: Array<string>;
-    blocked_ips: Array<string>;
-};
-
-export type RiskControlConfigResponse = {
-    data: RiskControlConfig;
-    request_id: RequestId;
-};
-
-export type RiskControlStatus = {
-    enabled: boolean;
-    mode: RiskControlMode;
-    active_blocks: number;
-    recent_events: number;
-    evaluated_at: Timestamp;
-};
-
-export type RiskControlStatusResponse = {
-    data: RiskControlStatus;
-    request_id: RequestId;
-};
-
-export type RiskControlLog = {
-    id: Id;
-    level: 'info' | 'warn' | 'block';
-    action: string;
-    reason: string;
-    subject?: string | null;
-    metadata?: JsonObject;
-    created_at: Timestamp;
-};
-
-export type RiskControlLogListResponse = {
-    data: Array<RiskControlLog>;
-    pagination: Pagination;
-    request_id: RequestId;
-};
-
-export type ContentSafetyMode = 'monitor' | 'enforce';
-
-export type ContentSafetyConfig = {
-    enabled: boolean;
-    mode: ContentSafetyMode;
-    redact_pii: boolean;
-    block_pii: boolean;
-    block_prompt_injection: boolean;
-    block_custom_keywords: boolean;
-    custom_keywords: Array<string>;
-    /**
-     * Canonical model names or prefix scopes ending in '*'. Empty means all models.
-     */
-    model_scopes: Array<string>;
-    moderation: ContentSafetyModerationConfig;
+    email?: string | null;
+    request_count: number;
+    token_count: number;
+    cost: string;
 };
 
 /**
- * Upstream classification pass that runs after the local regex/keyword scan. Only the OpenAI Moderation contract is wired today; future providers register under the `provider` key once their client lands. The API key is encrypted at rest; the wire schema exposes only a write-only `api_key` and a read-only `api_key_configured` indicator.
+ * Bounded filter for operator on-demand usage-record cleanup. At least one of model, start or end must be supplied so a cleanup can never match the entire table by accident.
  */
-export type ContentSafetyModerationConfig = {
+export type UsageCleanupRequest = {
     /**
-     * Master switch for the upstream moderation pass.
+     * Canonical model name; matched case-insensitively.
      */
-    enabled: boolean;
-    /**
-     * Upstream classifier vendor. Only `openai` is supported today.
-     */
-    provider: 'openai';
-    /**
-     * Upstream model id (e.g. `omni-moderation-latest`).
-     */
-    model: string;
-    /**
-     * HTTPS base URL for OpenAI-compatible deployments.
-     */
-    base_url: string;
-    /**
-     * When mode is `enforce`, refuse the request once the upstream returns flagged or a category exceeds its threshold.
-     */
-    block_on_flag: boolean;
-    /**
-     * Per-category minimum score in [0, 1] to flag. Empty falls back to the upstream `flagged` boolean.
-     */
-    categories: {
-        [key: string]: number;
-    };
-    /**
-     * HTTP call timeout for the upstream moderation request.
-     */
-    timeout_ms: number;
-    /**
-     * In-process LRU TTL; 0 disables the cache.
-     */
-    cache_ttl_seconds: number;
-    /**
-     * True when a moderation API key is stored.
-     */
-    api_key_configured: boolean;
+    model?: string;
+    start?: Timestamp;
+    end?: Timestamp;
+    dry_run?: boolean;
+    max_delete?: number;
 };
 
-export type ContentSafetyConfigResponse = {
-    data: ContentSafetyConfig;
+export type UsageCleanupResult = {
+    matched: number;
+    deleted: number;
+    dry_run: boolean;
+    max_delete: number;
+    limited: boolean;
+};
+
+export type UsageCleanupResponse = {
+    data: UsageCleanupResult;
     request_id: RequestId;
 };
 
@@ -5272,588 +4693,373 @@ export type UsageDistributionBucket = {
     percentage: number;
 };
 
-export type ErrorLog = {
-    id: Id;
+export type OpsOverview = {
+    window: TimeWindow;
+    request_count: number;
+    success_count: number;
+    error_count: number;
+    error_rate: number;
+    latency_p50_ms: number;
+    latency_p95_ms: number;
+    latency_p99_ms: number;
+    average_latency_ms: number;
+    rpm: number;
+    tpm: number;
+    active_users: number;
+    generated_at: Timestamp;
+};
+
+export type OpsOverviewResponse = {
+    data: OpsOverview;
     request_id: RequestId;
-    created_at: Timestamp;
-    user_id: Id;
-    api_key_id: Id;
-    account_id?: string | null;
-    provider_id?: string | null;
-    model: string;
-    source_endpoint: string;
-    source_protocol: string;
-    target_protocol: string;
-    error_class?: string | null;
+};
+
+export type OpsRealtimeRateSummary = {
     /**
-     * Verbatim upstream error message (sub2api parity).
+     * Rate observed in the final minute of the window.
      */
-    error_message?: string | null;
+    current: number;
     /**
-     * Compacted upstream error envelope.
+     * Highest one-minute bucket observed in the window.
      */
-    error_body_excerpt?: string | null;
+    peak: number;
     /**
-     * Upstream HTTP status code (omitted when no HTTP response).
+     * Full-window average rate per minute.
      */
-    status_code?: number | null;
+    average: number;
+};
+
+export type OpsRealtimeTraffic = {
+    window: TimeWindow;
+    requests_per_min: OpsRealtimeRateSummary;
+    tokens_per_min: OpsRealtimeRateSummary;
     /**
-     * Upstream provider request id (x-request-id / openai-request-id).
+     * Deduplicated request attempts in the selected window.
      */
-    upstream_request_id?: string | null;
+    total_requests: number;
     /**
-     * request | auth | routing | upstream | network | internal
+     * Failed request attempts, including error-only ops logs.
      */
-    error_phase?: string | null;
+    error_count: number;
+    error_rate: number;
     /**
-     * client | provider | platform
+     * Usage rows scanned for the selected window.
      */
-    error_owner?: string | null;
+    usage_log_count: number;
     /**
-     * client_request | upstream_http | gateway
+     * Ops error rows scanned for the selected window.
      */
-    error_source?: string | null;
-    /**
-     * Operator acknowledgement flag.
-     */
-    resolved: boolean;
-    resolved_by?: string | null;
-    resolved_at?: Timestamp;
-    upstream_errors?: Array<UpstreamErrorEvent> | null;
-    latency_ms: number;
-    input_tokens: number;
-    output_tokens: number;
-    attempt_no: number;
-    usage_estimated: boolean;
+    ops_error_log_count: number;
+    generated_at: Timestamp;
+};
+
+export type OpsRealtimeTrafficResponse = {
+    data: OpsRealtimeTraffic;
+    request_id: RequestId;
+};
+
+export type OpsThroughputTrendPoint = {
+    bucket_start: Timestamp;
+    request_count: number;
+    token_count: number;
+    rpm: number;
+    tpm: number;
+    cost: string;
+};
+
+export type OpsThroughputTrend = {
+    window: TimeWindow;
+    bucket: 'hour' | 'day';
+    points: Array<OpsThroughputTrendPoint>;
+};
+
+export type OpsThroughputTrendResponse = {
+    data: OpsThroughputTrend;
+    request_id: RequestId;
+};
+
+export type OpsErrorTrendPoint = {
+    bucket_start: Timestamp;
+    request_count: number;
+    error_count: number;
+    error_rate: number;
+};
+
+export type OpsErrorTrend = {
+    window: TimeWindow;
+    bucket: 'hour' | 'day';
+    points: Array<OpsErrorTrendPoint>;
+};
+
+export type OpsErrorTrendResponse = {
+    data: OpsErrorTrend;
+    request_id: RequestId;
+};
+
+export type OpsErrorDistributionItem = {
+    error_class: string;
+    owner: string;
+    count: number;
+    share: number;
+};
+
+export type OpsErrorDistribution = {
+    window: TimeWindow;
+    items: Array<OpsErrorDistributionItem>;
+};
+
+export type OpsErrorDistributionResponse = {
+    data: OpsErrorDistribution;
+    request_id: RequestId;
+};
+
+export type OpsLatencyBucket = {
+    label: string;
+    lower_ms: number;
+    upper_ms?: number | null;
+    count: number;
+    share: number;
+};
+
+export type OpsLatencyHistogram = {
+    window: TimeWindow;
+    buckets: Array<OpsLatencyBucket>;
+};
+
+export type OpsLatencyHistogramResponse = {
+    data: OpsLatencyHistogram;
+    request_id: RequestId;
 };
 
 /**
- * One failed candidate attempt within a gateway request's failover history
- * (sub2api ops_upstream_error_events parity).
+ * Operator-facing record of a single upstream failure observed by the
+ * gateway hot path. Body excerpts are sanitised and credential-like
+ * keys are redacted to "[REDACTED]" before persistence.
  *
  */
-export type UpstreamErrorEvent = {
-    at_unix_ms: number;
-    attempt_no: number;
-    account_id?: string | null;
-    account_name: string;
-    upstream_status_code: number;
-    upstream_request_id: string;
-    upstream_url: string;
-    /**
-     * http_error | request_error | retry_exhausted | failover
-     */
-    kind: string;
-    message: string;
-    body_excerpt: string;
-};
-
-export type ErrorLogListResponse = {
-    data: Array<ErrorLog>;
-    pagination: Pagination;
-    request_id: RequestId;
-};
-
-export type RequestLogFileDescriptor = {
-    /**
-     * On-disk filename such as request-<unix_ms>-<request_id>.log.
-     */
-    name: string;
-    size: number;
-    created_at: Timestamp;
-    request_id: string;
-    is_error_only: boolean;
-    /**
-     * User identifier captured in REQUEST INFO, when present.
-     */
-    user_id?: string;
-    /**
-     * API key identifier captured in REQUEST INFO, when present.
-     */
-    api_key_id?: string;
-    /**
-     * Provider account identifier captured in REQUEST INFO, when present.
-     */
-    account_id?: string;
-    /**
-     * Gateway protocol captured in REQUEST INFO, such as openai-compatible.
-     */
-    source_protocol?: string;
-    /**
-     * Source endpoint captured in REQUEST INFO.
-     */
-    source_endpoint?: string;
-    started_at?: Timestamp;
-    /**
-     * Final outcome parsed from the SUMMARY section, when present.
-     */
-    success?: boolean;
-    /**
-     * Final upstream or gateway status parsed from SUMMARY.
-     */
-    status_code?: number;
-    /**
-     * Error class parsed from SUMMARY for failed requests.
-     */
-    error_class?: string;
-    /**
-     * Request latency parsed from SUMMARY.
-     */
-    latency_ms?: number;
-    /**
-     * Highest numbered outbound REQUEST section observed in the captured dump.
-     */
-    attempt_count?: number;
-    /**
-     * Count of upstream RESPONSE sections observed in the captured dump.
-     */
-    response_count?: number;
-    /**
-     * Whether the descriptor parser found a SUMMARY section.
-     */
-    has_summary?: boolean;
-};
-
-export type RequestLogFileListResponse = {
-    data: Array<RequestLogFileDescriptor>;
-    pagination: Pagination;
-    request_id: RequestId;
-};
-
-export type RequestLogFileResponse = {
-    data: RequestLogFileDescriptor;
-    request_id: RequestId;
-};
-
-export type RequestEvidenceKind = 'success' | 'error' | 'unknown';
-
-export type RequestEvidenceSource = 'usage' | 'ops_error' | 'request_dump' | 'system_log' | 'scheduler_decision';
-
-export type RequestEvidenceRow = {
-    kind: RequestEvidenceKind;
-    evidence_source: RequestEvidenceSource;
-    created_at: Timestamp;
-    request_id: string;
-    usage_log_id?: Id;
-    ops_error_log_id?: Id;
+export type OpsErrorLog = {
+    id?: string;
+    occurred_at?: string;
+    request_id?: string;
+    trace_id?: string;
     user_id?: Id;
     api_key_id?: Id;
-    account_id?: string;
-    provider_id?: string;
-    source_protocol?: string;
+    api_key_prefix?: string;
+    account_id?: Id;
+    provider_id?: Id;
+    platform?: string;
     source_endpoint?: string;
+    /**
+     * Alias for platform, kept for error-log UI parity.
+     */
+    source_protocol?: string;
     target_protocol?: string;
     model?: string;
     status_code?: number;
-    success?: boolean;
-    error_class?: string;
-    /**
-     * Bounded, redacted upstream error message when available.
-     */
-    error_message?: string;
-    error_phase?: string;
-    error_owner?: string;
-    error_source?: string;
     upstream_request_id?: string;
     /**
-     * Low-cardinality terminal state for gateway streaming requests when
-     * available from ops_error_logs. Empty when the request was not
-     * streamed or the state was not observed.
+     * Low-cardinality terminal state for gateway streaming requests.
+     * Empty when the request was not streamed or the state was not
+     * observed; never contains provider-native frames or response bodies.
      *
      */
-    stream_completion_state?: 'completed' | 'interrupted' | 'idle_timeout' | 'failed' | 'unknown';
+    stream_completion_state?: 'completed' | 'interrupted' | 'idle_timeout' | 'client_disconnect' | 'failed' | 'unknown';
     attempt_no?: number;
     latency_ms?: number;
     input_tokens?: number;
     output_tokens?: number;
-    total_tokens?: number;
     usage_estimated?: boolean;
+    error_class?: string;
+    error_phase?: string;
+    error_owner?: string;
+    error_source?: string;
+    error_message?: string;
+    error_body_excerpt?: string;
+    upstream_errors?: Array<UpstreamErrorEvent>;
     resolution?: 'open' | 'investigating' | 'resolved' | 'muted';
-    has_usage_log: boolean;
-    has_ops_error_log: boolean;
-    has_request_dump: boolean;
-    has_system_log: boolean;
-    has_scheduler_decision: boolean;
-    request_dump_count: number;
-    request_dump_error_count: number;
-    system_log_count: number;
-    scheduler_decision_count: number;
-    scheduler_decision_id?: Id;
-    scheduler_candidate_count?: number;
-    scheduler_rejected_count?: number;
-    scheduler_strategy?: string;
-    /**
-     * Non-sensitive scheduler explanation from the latest linked decision.
-     */
-    scheduler_selection_rationale?: string;
-    latest_request_dump_name?: string;
-    latest_request_dump_created_at?: Timestamp;
+    resolution_note?: string;
+    created_at?: string;
+    updated_at?: string;
+    resolved_at?: string;
+    resolved_by_user_id?: Id;
+    [key: string]: unknown;
 };
 
-export type RequestEvidenceListResponse = {
-    data: Array<RequestEvidenceRow>;
+export type OpsErrorLogListResponse = {
+    data: Array<OpsErrorLog>;
     pagination: Pagination;
     request_id: RequestId;
 };
 
-export type RequestEvidenceSummary = {
-    kind: RequestEvidenceKind;
-    primary_source: RequestEvidenceSource;
-    attempt_count: number;
-    usage_log_count: number;
-    ops_error_log_count: number;
-    request_dump_count: number;
-    request_dump_error_count: number;
-    scheduler_decision_count: number;
-    has_usage_log: boolean;
-    has_ops_error_log: boolean;
-    has_request_dump: boolean;
-    has_scheduler_decision: boolean;
-    scheduler_decision_id?: Id;
-    scheduler_candidate_count?: number;
-    scheduler_rejected_count?: number;
-    scheduler_strategy?: string;
-    /**
-     * Non-sensitive scheduler explanation from the latest linked decision.
-     */
-    scheduler_selection_rationale?: string;
-    /**
-     * Sum of known attempt latencies for the request.
-     */
-    latency_ms?: number;
-    input_tokens?: number;
-    output_tokens?: number;
-    total_tokens?: number;
-    status_code?: number;
-    error_class?: string;
-    error_message?: string;
-    error_phase?: string;
-    error_owner?: string;
-    error_source?: string;
-    upstream_request_id?: string;
-    /**
-     * Latest low-cardinality terminal state among linked gateway
-     * streaming attempts when available.
-     *
-     */
-    stream_completion_state?: 'completed' | 'interrupted' | 'idle_timeout' | 'failed' | 'unknown';
+export type OpsErrorLogResponse = {
+    data: OpsErrorLog;
+    request_id: RequestId;
 };
 
-export type RequestEvidenceDumpDescriptor = {
-    name: string;
+/**
+ * Real-time grouping of ops_error_logs rows by stable, low-sensitivity
+ * failure dimensions. It is intended for operator triage and is not a
+ * durable long-term rollup.
+ *
+ */
+export type OpsErrorFingerprint = {
+    /**
+     * Stable hash over low-sensitivity grouping dimensions.
+     */
+    fingerprint: string;
+    count: number;
+    open_count: number;
+    investigating_count: number;
+    resolved_count: number;
+    muted_count: number;
+    first_occurred_at: string;
+    last_occurred_at: string;
+    example_error_log_id?: Id;
+    example_request_id?: string;
+    example_error_message?: string;
+    source_endpoint: string;
+    target_protocol: string;
+    model: string;
+    status_code?: number;
+    status_class: '1xx' | '2xx' | '3xx' | '4xx' | '5xx' | 'unknown';
+    error_class: string;
+    error_phase: string;
+    error_owner: string;
+    error_source: string;
+    /**
+     * Normalized error message with request ids, URLs, hashes, and numbers replaced.
+     */
+    message_pattern: string;
+};
+
+export type OpsErrorFingerprintListMeta = {
+    /**
+     * Number of discovered fingerprint groups before the response limit is applied. When truncated is true, this only covers scanned rows.
+     */
+    total: number;
+    /**
+     * Number of ops_error_logs rows scanned for this real-time summary.
+     */
+    scanned: number;
+    /**
+     * True when matching rows exceeded the bounded live scan cap.
+     */
+    truncated: boolean;
+    window_start?: string;
+    window_end?: string;
+};
+
+export type OpsErrorFingerprintListResponse = {
+    data: Array<OpsErrorFingerprint>;
+    meta: OpsErrorFingerprintListMeta;
+    request_id: RequestId;
+};
+
+export type OpsErrorLogResolutionUpdate = {
+    resolution: 'open' | 'investigating' | 'resolved' | 'muted';
+    note?: string;
+};
+
+export type OpsConcurrency = {
+    active_gateway_requests: number;
+    active_realtime_slots: number;
+    active_by_api_key: {
+        [key: string]: number;
+    };
+};
+
+export type OpsConcurrencyResponse = {
+    data: OpsConcurrency;
+    request_id: RequestId;
+};
+
+export type OpsSystemLogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+export type OpsSystemLog = {
+    id: Id;
+    level: OpsSystemLogLevel;
+    message: string;
+    source: string;
+    request_id?: string;
+    trace_id?: string;
+    metadata?: JsonObject;
     created_at: Timestamp;
-    size_bytes: number;
-    request_id: string;
-    is_error_only: boolean;
-    user_id?: string;
-    api_key_id?: string;
-    account_id?: string;
-    source_protocol?: string;
-    source_endpoint?: string;
-    started_at?: Timestamp;
-    success?: boolean;
-    status_code?: number;
-    error_class?: string;
-    latency_ms?: number;
-    attempt_count: number;
-    response_count: number;
-    has_summary: boolean;
 };
 
-export type RequestEvidenceSystemLogSummary = {
-    /**
-     * Total sanitized system logs linked to this exact request id.
-     */
+export type OpsSystemLogListResponse = {
+    data: Array<OpsSystemLog>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type OpsSystemLogHealth = {
+    storage_mode: 'durable' | 'unavailable';
+    writable: boolean;
+    degraded: boolean;
+    stale: boolean;
     total_count: number;
     level_counts: {
         [key: string]: number;
     };
-    latest_level?: OpsSystemLogLevel;
-    latest_message?: string;
-    latest_source?: string;
-    latest_at?: Timestamp;
+    last_log_at?: Timestamp;
+    last_error_at?: Timestamp;
+    last_error_source?: string;
+    last_error_message?: string;
+    error_evidence_recorder: OpsErrorEvidenceRecorderHealth;
+    checked_at: Timestamp;
 };
 
-export type RequestEvidenceDetailResponse = {
-    /**
-     * Exact gateway request id being investigated.
-     */
-    evidence_request_id: string;
-    summary: RequestEvidenceSummary;
-    attempts: Array<RequestEvidenceRow>;
-    request_dumps: Array<RequestEvidenceDumpDescriptor>;
-    system_log_summary: RequestEvidenceSystemLogSummary;
-    /**
-     * Latest sanitized system logs linked to this exact request id.
-     */
-    system_logs: Array<OpsSystemLog>;
-    first_seen_at?: Timestamp;
-    last_seen_at?: Timestamp;
+export type OpsErrorEvidenceRecorderHealth = {
+    enabled: boolean;
+    started: boolean;
+    draining: boolean;
+    degraded: boolean;
+    queue_depth: number;
+    queue_capacity: number;
+    enqueued_count: number;
+    processed_count: number;
+    recorded_count: number;
+    dropped_count: number;
+    write_failed_count: number;
+};
+
+export type OpsSystemLogHealthResponse = {
+    data: OpsSystemLogHealth;
     request_id: RequestId;
 };
 
-export type DeleteRequestLogFileResponse = {
-    success: boolean;
+export type OpsSystemLogCleanupRequest = {
+    level?: OpsSystemLogLevel;
+    source?: string;
+    q?: string;
+    request_id?: string;
+    trace_id?: string;
+    start?: Timestamp;
+    end?: Timestamp;
+    dry_run?: boolean;
+    max_delete?: number;
+};
+
+export type OpsSystemLogCleanupResult = {
+    matched: number;
+    deleted: number;
+    dry_run: boolean;
+    max_delete: number;
+    limited: boolean;
+};
+
+export type OpsSystemLogCleanupResponse = {
+    data: OpsSystemLogCleanupResult;
     request_id: RequestId;
 };
 
-export type AuditLog = {
-    id: Id;
-    actor_user_id?: string | null;
-    action: string;
-    resource_type: string;
-    resource_id: string;
-    before: JsonObject;
-    after: JsonObject;
-    ip: string;
-    user_agent: string;
-    trace_id: string;
-    created_at: Timestamp;
+export type OpsSettings = {
+    auto_refresh_enabled: boolean;
+    refresh_interval_seconds: number;
 };
 
-export type AuditLogListResponse = {
-    data: Array<AuditLog>;
-    pagination: Pagination;
-    request_id: RequestId;
-};
-
-export type BillingLedgerEntry = {
-    id: Id;
-    user_id: Id;
-    type: 'usage_charge' | 'payment_credit' | 'refund' | 'adjustment' | 'compensation' | 'affiliate_transfer' | 'redeem_code_credit';
-    amount: string;
-    currency: string;
-    balance_before: string;
-    balance_after: string;
-    reference_type: string;
-    reference_id: string;
-    metadata: JsonObject;
-    created_at: Timestamp;
-};
-
-export type BillingLedgerListResponse = {
-    data: Array<BillingLedgerEntry>;
-    pagination: Pagination;
-    request_id: RequestId;
-};
-
-export type AffiliateRelationshipStatus = 'active' | 'disabled';
-
-export type AffiliateLedgerEntryType = 'accrue' | 'transfer_to_balance' | 'withdraw' | 'refund_compensation' | 'manual_adjustment';
-
-export type AffiliateLedgerEntryStatus = 'pending' | 'settled' | 'canceled' | 'compensated';
-
-export type AffiliateInviteCodeStatus = 'active' | 'disabled' | 'expired';
-
-export type AffiliateRuleStatus = 'active' | 'disabled' | 'archived';
-
-export type AffiliateRuleTriggerType = 'payment_paid';
-
-export type AffiliateInviteCode = {
-    id: Id;
-    user_id: Id;
-    code: string;
-    status: AffiliateInviteCodeStatus;
-    created_at: Timestamp;
-    updated_at: Timestamp;
-    expires_at?: string | null;
-};
-
-export type CreateAffiliateInviteCodeRequest = {
-    /**
-     * Optional custom code. When omitted, SRapi generates one.
-     */
-    code?: string;
-    expires_at?: string | null;
-};
-
-export type AffiliateInviteCodeResponse = {
-    data: AffiliateInviteCode;
-    request_id: RequestId;
-};
-
-export type AffiliateInviteCodeListResponse = {
-    data: Array<AffiliateInviteCode>;
-    pagination: Pagination;
-    request_id: RequestId;
-};
-
-export type AffiliateRule = {
-    id: Id;
-    name: string;
-    status: AffiliateRuleStatus;
-    trigger_type: AffiliateRuleTriggerType;
-    rate: string;
-    fixed_amount: string;
-    currency: string;
-    max_rebate_amount: string;
-    valid_from?: string | null;
-    valid_to?: string | null;
-    metadata: JsonObject;
-    created_at: Timestamp;
-    updated_at: Timestamp;
-};
-
-export type CreateAffiliateRuleRequest = {
-    name: string;
-    status?: AffiliateRuleStatus;
-    trigger_type: AffiliateRuleTriggerType;
-    rate?: string;
-    fixed_amount?: string;
-    currency?: string;
-    max_rebate_amount?: string;
-    valid_from?: string | null;
-    valid_to?: string | null;
-    metadata?: JsonObject;
-};
-
-export type UpdateAffiliateRuleRequest = {
-    name?: string;
-    status?: AffiliateRuleStatus;
-    trigger_type?: AffiliateRuleTriggerType;
-    rate?: string;
-    fixed_amount?: string;
-    currency?: string;
-    max_rebate_amount?: string;
-    valid_from?: string | null;
-    valid_to?: string | null;
-    metadata?: JsonObject;
-};
-
-export type AffiliateRuleResponse = {
-    data: AffiliateRule;
-    request_id: RequestId;
-};
-
-export type AffiliateRuleListResponse = {
-    data: Array<AffiliateRule>;
-    pagination: Pagination;
-    request_id: RequestId;
-};
-
-export type AffiliateInviteRecord = {
-    id: Id;
-    inviter_user_id: Id;
-    invitee_user_id: Id;
-    invite_code_id: Id;
-    status: AffiliateRelationshipStatus;
-    created_at: Timestamp;
-    updated_at: Timestamp;
-    first_paid_at?: string | null;
-};
-
-export type AffiliateInviteRecordListResponse = {
-    data: Array<AffiliateInviteRecord>;
-    pagination: Pagination;
-    request_id: RequestId;
-};
-
-export type AffiliateLedgerEntry = {
-    id: Id;
-    user_id: Id;
-    related_user_id: Id;
-    payment_order_id?: Id;
-    subscription_id?: Id;
-    type: AffiliateLedgerEntryType;
-    amount: string;
-    currency: string;
-    status: AffiliateLedgerEntryStatus;
-    reference_id: string;
-    metadata: JsonObject;
-    created_at: Timestamp;
-    updated_at: Timestamp;
-    settled_at?: string | null;
-};
-
-export type AffiliateLedgerEntryListResponse = {
-    data: Array<AffiliateLedgerEntry>;
-    pagination: Pagination;
-    request_id: RequestId;
-};
-
-export type AffiliateLedgerEntryResponse = {
-    data: AffiliateLedgerEntry;
-    request_id: RequestId;
-};
-
-export type AffiliateCurrencySummary = {
-    currency: string;
-    /**
-     * Decimal string affiliate balance available for transfer.
-     */
-    available_balance: string;
-    accrued_amount: string;
-    refund_compensated_amount: string;
-    transferred_to_balance_amount: string;
-    withdrawn_amount: string;
-    manual_adjustment_amount: string;
-};
-
-export type AffiliateSummary = {
-    user_id: Id;
-    balances: Array<AffiliateCurrencySummary>;
-    invite_codes: Array<AffiliateInviteCode>;
-    invited_count: number;
-};
-
-export type AffiliateSummaryResponse = {
-    data: AffiliateSummary;
-    request_id: RequestId;
-};
-
-export type AffiliateTransferToBalanceRequest = {
-    /**
-     * Decimal string amount to move from affiliate balance into gateway balance.
-     */
-    amount: string;
-    currency?: string;
-};
-
-export type AffiliateWithdrawalRequest = {
-    /**
-     * Decimal string amount to withdraw from affiliate balance.
-     */
-    amount: string;
-    currency?: string;
-    /**
-     * Optional withdrawal destination label or account reference.
-     */
-    destination?: string;
-};
-
-export type AdminAffiliateWithdrawalDecisionRequest = {
-    /**
-     * Optional admin note recorded on the withdrawal ledger metadata.
-     */
-    reason?: string;
-};
-
-export type AdminAffiliateManualAdjustmentRequest = {
-    user_id: Id;
-    /**
-     * Decimal string amount to adjust. Positive credits balance; negative debits balance.
-     */
-    amount: string;
-    currency?: string;
-    reason: string;
-    /**
-     * Optional admin-supplied idempotency reference.
-     */
-    reference_id?: string;
-    metadata?: JsonObject;
-};
-
-export type AffiliateTransferToBalanceResult = {
-    applied: boolean;
-    reason?: string;
-    affiliate_ledger: AffiliateLedgerEntry;
-    billing_ledger_id: Id;
-    balance_before: string;
-    balance_after: string;
-};
-
-export type AffiliateTransferToBalanceResponse = {
-    data: AffiliateTransferToBalanceResult;
+export type OpsSettingsResponse = {
+    data: OpsSettings;
     request_id: RequestId;
 };
 
@@ -6289,317 +5495,306 @@ export type OpsNotificationDeliveryListResponse = {
     request_id: RequestId;
 };
 
-export type SchedulerDecision = {
-    id: Id;
-    request_id: RequestId;
-    attempt_no: number;
-    user_id: Id;
-    api_key_id: Id;
-    source_protocol: string;
-    source_endpoint: string;
-    target_protocol: string;
-    model: string;
-    strategy: 'balanced' | 'cost_saver' | 'latency_first' | 'quota_protect' | 'sticky_first' | 'cache_affinity_first' | 'premium_quality';
-    strategy_version: string;
-    strategy_config_hash: string;
-    fallback_from_decision_id?: string | null;
-    selected_provider_id?: string | null;
-    selected_account_id?: string | null;
-    candidate_count: number;
-    rejected_count: number;
-    scores: JsonObject;
-    reject_reasons: JsonObject;
-    strategy_weights: JsonObject;
-    compatibility_warnings: Array<string>;
-    /**
-     * Non-sensitive scheduler explanation for why the selected account won, or why no account was selected.
-     */
-    selection_rationale: string;
-    sticky_hit: boolean;
-    cache_affinity_hit: boolean;
-    estimated_cost: string;
-    currency: string;
-    created_at: Timestamp;
-};
-
-export type SchedulerDecisionListResponse = {
-    data: Array<SchedulerDecision>;
-    pagination: Pagination;
-    request_id: RequestId;
-};
-
-export type SchedulerOverview = {
-    total_decisions: number;
-    selected_decisions: number;
-    failed_decisions: number;
-    success_rate: number;
-    average_latency_ms: number;
-    sticky_hit_count: number;
-    cache_affinity_hit_count: number;
-    strategy_counts: JsonObject;
-};
-
-export type SchedulerOverviewResponse = {
-    data: SchedulerOverview;
-    request_id: RequestId;
-};
-
-export type SchedulerStrategy = {
-    id: Id;
-    name: SchedulerStrategyName;
-    version: string;
-    status: SchedulerStrategyStatus;
-    scope_type: SchedulerStrategyScopeType;
-    scope_id?: Id;
-    description?: string;
-    config_hash: string;
-    config: JsonObject;
-    weights: SchedulerStrategyWeights;
-    source: 'seed' | 'database';
-    created_by?: Id;
-    created_at: Timestamp;
-    activated_at?: string | null;
-    deprecated_at?: string | null;
-};
-
-export type SchedulerStrategyResponse = {
-    data: SchedulerStrategy;
-    request_id: RequestId;
-};
-
-export type SchedulerStrategyListResponse = {
-    data: Array<SchedulerStrategy>;
-    pagination: Pagination;
-    request_id: RequestId;
-};
-
-export type SchedulerStrategyName = 'balanced' | 'cost_saver' | 'latency_first' | 'quota_protect' | 'sticky_first' | 'cache_affinity_first' | 'premium_quality';
-
-export type SchedulerStrategyStatus = 'active' | 'draft' | 'deprecated';
-
-export type SchedulerStrategyScopeType = 'global' | 'api_key' | 'account_group' | 'user';
-
-export type SchedulerStrategyWeights = {
-    [key: string]: number;
-};
-
-export type SchedulerStrategyMutationRequest = {
-    name: SchedulerStrategyName;
-    version: string;
-    status: SchedulerStrategyStatus;
-    scope_type: SchedulerStrategyScopeType;
-    scope_id?: Id;
-    description?: string;
-    config?: JsonObject;
-    weights: SchedulerStrategyWeights;
-};
-
-export type SchedulerSimulationStickyStrength = 'none' | 'soft' | 'hard';
-
-export type SchedulerSimulationRuntimeState = {
-    quota_exhausted?: boolean;
-    health_score?: number | null;
-    quota_remaining_ratio?: number | null;
-    latency_p95_ms?: number | null;
-    circuit_open?: boolean;
-    cooldown_active?: boolean;
-    current_concurrency?: number;
-    rpm_used?: number;
-    tpm_used?: number;
-};
-
-export type SchedulerSimulationLimits = {
-    max_concurrency?: number | null;
-    rpm_limit?: number | null;
-    tpm_limit?: number | null;
-};
-
-export type SchedulerSimulationCandidate = {
-    account_id: Id;
-    account_status?: ProviderAccountStatus;
-    account_runtime_class?: RuntimeClass;
-    account_weight?: number;
-    account_risk_level?: string | null;
-    account_has_credential?: boolean;
-    account_metadata?: JsonObject;
-    provider_id: Id;
-    provider_status?: ResourceStatus;
-    provider_protocol?: ProviderProtocol;
-    provider_capabilities?: JsonObject;
-    provider_config?: JsonObject;
-    mapping_id?: Id;
-    model_id?: Id;
-    mapping_status?: ResourceStatus;
-    upstream_model_name?: string;
-    pricing_override?: JsonObject;
-    effective_capabilities?: Array<CapabilityDescriptor>;
-    runtime_state?: SchedulerSimulationRuntimeState;
-    limits?: SchedulerSimulationLimits;
-};
-
-export type SchedulerSimulationProfile = {
-    request_id: RequestId;
-    attempt_no?: number;
-    user_id: Id;
-    api_key_id: Id;
-    source_protocol?: string;
-    source_endpoint: string;
-    target_protocol?: string;
-    model: string;
-    model_alias?: string;
-    fallback_models?: Array<string>;
-    session_affinity_source?: string;
-    user_tier?: 'free' | 'standard' | 'pro' | 'admin';
-    user_balance_insufficient?: boolean;
-    estimated_input_tokens?: number;
-    estimated_output_tokens?: number;
-    estimated_cost?: string;
-    currency?: string;
-    pricing_rule_id?: Id;
-    pricing_source?: string;
-    pricing_estimated?: boolean;
-    is_stream?: boolean;
-    sticky_account_id?: Id;
-    sticky_strength?: SchedulerSimulationStickyStrength;
-    warnings?: Array<string>;
-    request_capabilities?: Array<CapabilityDescriptor>;
-    excluded_account_ids?: Array<Id>;
-    candidates: Array<SchedulerSimulationCandidate>;
-};
-
-export type SchedulerSimulationRequest = {
-    current_strategy?: SchedulerStrategyName;
-    shadow_strategy: SchedulerStrategyName;
-    /**
-     * Optional deterministic gray-release percentage for previewing whether this request would use the shadow strategy.
-     */
-    shadow_rollout_percent?: number | null;
-    request: SchedulerSimulationProfile;
-};
-
-export type SchedulerSimulationDecision = {
-    /**
-     * Empty when the simulated strategy selected an account.
-     */
-    error: string;
-    request_id: RequestId;
-    attempt_no: number;
-    user_id: Id;
-    api_key_id: Id;
-    source_protocol: string;
-    source_endpoint: string;
-    target_protocol: string;
-    model: string;
-    strategy: SchedulerStrategyName;
-    strategy_version: string;
-    strategy_config_hash: string;
-    selected_provider_id?: string | null;
-    selected_account_id?: string | null;
-    candidate_count: number;
-    rejected_count: number;
-    scores: JsonObject;
-    reject_reasons: JsonObject;
-    strategy_weights: JsonObject;
-    compatibility_warnings: Array<string>;
-    sticky_hit: boolean;
-    cache_affinity_hit: boolean;
-    estimated_cost: string;
-    currency: string;
-    created_at: Timestamp;
-};
-
-export type SchedulerSimulationDiff = {
-    winner_changed: boolean;
-    current_selected_account_id?: string | null;
-    shadow_selected_account_id?: string | null;
-    current_selected_provider_id?: string | null;
-    shadow_selected_provider_id?: string | null;
-    final_score_delta: number;
-    cost_score_delta: number;
-    latency_score_delta: number;
-    quality_score_delta: number;
-    risk_penalty_delta: number;
-};
-
-export type SchedulerSimulationRollout = {
-    /**
-     * True when shadow_rollout_percent was supplied in the request.
-     */
+export type ScheduledTestPlan = {
+    id: number;
+    name: string;
     enabled: boolean;
-    percent: number;
-    /**
-     * Stable deterministic bucket for the rollout key, in the range [0, 100).
-     */
-    bucket: number;
-    /**
-     * True when bucket is inside the supplied shadow rollout percentage.
-     */
-    shadow_selected: boolean;
-    /**
-     * SHA-256 hash of the rollout key; the raw key is never returned.
-     */
-    key_hash: string;
+    scope_type: 'all' | 'account' | 'group';
+    scope_id?: number | null;
+    interval_seconds: number;
+    cron_expression: string;
+    probe_model: string;
+    max_results: number;
+    auto_recover: boolean;
+    last_run_at?: string | null;
+    last_status: string;
+    last_summary: string;
+    created_at: string;
+    updated_at: string;
 };
 
-export type SchedulerSimulationResult = {
-    dry_run: boolean;
-    current: SchedulerSimulationDecision;
-    shadow: SchedulerSimulationDecision;
-    diff: SchedulerSimulationDiff;
-    rollout: SchedulerSimulationRollout;
+export type CreateScheduledTestPlanRequest = {
+    name: string;
+    enabled?: boolean;
+    scope_type: 'all' | 'account' | 'group';
+    scope_id?: number | null;
+    interval_seconds?: number;
+    cron_expression?: string;
+    probe_model?: string;
+    max_results?: number;
+    auto_recover?: boolean;
 };
 
-export type SchedulerSimulationResponse = {
-    data: SchedulerSimulationResult;
-    request_id: RequestId;
+export type UpdateScheduledTestPlanRequest = {
+    name?: string;
+    enabled?: boolean;
+    scope_type?: 'all' | 'account' | 'group';
+    scope_id?: number | null;
+    interval_seconds?: number;
+    cron_expression?: string;
+    probe_model?: string;
+    max_results?: number;
+    auto_recover?: boolean;
 };
 
-export type SchedulerReplayRequest = {
-    current_strategy?: SchedulerStrategyName;
-    shadow_strategy: SchedulerStrategyName;
-    /**
-     * Optional deterministic gray-release percentage preview for each replayed request.
-     */
-    shadow_rollout_percent?: number | null;
-    limit?: number;
-    since?: string | null;
-    until?: string | null;
-    model?: string;
-    request_id?: string;
-};
-
-export type SchedulerReplayItem = {
-    snapshot_id: Id;
-    decision_id: Id;
-    request_id: RequestId;
-    attempt_no: number;
-    created_at: Timestamp;
-    original_strategy: SchedulerStrategyName;
-    original_selected_account_id?: string | null;
-    current: SchedulerSimulationDecision;
-    shadow: SchedulerSimulationDecision;
-    diff: SchedulerSimulationDiff;
-    rollout: SchedulerSimulationRollout;
-};
-
-export type SchedulerReplayResult = {
-    dry_run: boolean;
-    requested: number;
-    replayed: number;
+export type ScheduledTestPlanRun = {
+    id: number;
+    plan_id: number;
+    trigger: 'schedule' | 'manual';
+    status: 'ok' | 'warning' | 'partial' | 'failed';
+    selected: number;
+    probed: number;
     skipped: number;
-    winner_changed: number;
-    current_win_counts: JsonObject;
-    shadow_win_counts: JsonObject;
-    average_final_score_delta: number;
-    average_cost_score_delta: number;
-    average_latency_score_delta: number;
-    average_quality_score_delta: number;
-    average_risk_penalty_delta: number;
-    items: Array<SchedulerReplayItem>;
+    failed: number;
+    unhealthy: number;
+    recovered: number;
+    summary: string;
+    started_at: string;
+    finished_at: string;
 };
 
-export type SchedulerReplayResponse = {
-    data: SchedulerReplayResult;
+export type ScheduledTestPlanResponse = {
+    data: ScheduledTestPlan;
+    request_id: RequestId;
+};
+
+export type ScheduledTestPlanListResponse = {
+    data: Array<ScheduledTestPlan>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type ScheduledTestPlanRunResponse = {
+    data: ScheduledTestPlanRun;
+    request_id: RequestId;
+};
+
+export type ScheduledTestPlanRunListResponse = {
+    data: Array<ScheduledTestPlanRun>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+/**
+ * Importable scheduled-test-plan shape. Account/group scopes are remapped by natural key; snapshots do not export source-environment integer scope IDs.
+ *
+ */
+export type ImportScheduledTestPlan = {
+    name: string;
+    enabled?: boolean;
+    scope_type: 'all' | 'account' | 'group';
+    /**
+     * Provider name used with scope_account_name for account-scoped plans.
+     */
+    scope_account_provider_name?: string;
+    /**
+     * Provider account name used for account-scoped plans.
+     */
+    scope_account_name?: string;
+    /**
+     * Account group name used for group-scoped plans.
+     */
+    scope_group_name?: string;
+    interval_seconds?: number;
+    cron_expression?: string;
+    probe_model?: string;
+    max_results?: number;
+    auto_recover?: boolean;
+};
+
+/**
+ * What the monitor probes — a single account, an account group, all of a provider's accounts, or accounts serving a model.
+ */
+export type ChannelMonitorScope = 'account' | 'group' | 'provider' | 'model';
+
+/**
+ * Custom synthetic-probe request override; empty fields inherit the config-map probe defaults.
+ */
+export type ChannelMonitorRequest = {
+    method?: string;
+    url?: string;
+    headers?: {
+        [key: string]: string;
+    };
+    body?: string;
+    expected_status_codes?: Array<number>;
+    response_json_path?: string;
+    response_contains?: string;
+};
+
+export type ChannelMonitor = {
+    id: number;
+    name: string;
+    enabled: boolean;
+    scope: ChannelMonitorScope;
+    scope_ref: string;
+    interval_seconds: number;
+    model: string;
+    request: ChannelMonitorRequest;
+    created_at: string;
+    updated_at: string;
+    /**
+     * Timestamp of the most recent recorded run for this monitor (absent when no runs exist yet).
+     */
+    last_run_at?: string;
+    /**
+     * Whether the most recent run was a fully-OK result. Absent when no runs exist.
+     */
+    last_run_ok?: boolean;
+    /**
+     * Latency in ms of the most recent run. Absent when no runs exist.
+     */
+    last_run_latency_ms?: number;
+    /**
+     * Window in days over which recent_uptime_success_rate is computed (absent when no recent runs).
+     */
+    recent_uptime_window_days?: number;
+    /**
+     * How many runs in the window contributed to recent_uptime_success_rate (capped per server policy).
+     */
+    recent_uptime_sample_count?: number;
+    /**
+     * Ratio of OK runs over recent_uptime_sample_count (absent when no recent runs).
+     */
+    recent_uptime_success_rate?: number;
+};
+
+export type CreateChannelMonitorRequest = {
+    name: string;
+    enabled?: boolean;
+    scope: ChannelMonitorScope;
+    scope_ref?: string;
+    interval_seconds?: number;
+    model?: string;
+    request?: ChannelMonitorRequest;
+};
+
+export type UpdateChannelMonitorRequest = {
+    name?: string;
+    enabled?: boolean;
+    scope?: ChannelMonitorScope;
+    scope_ref?: string;
+    interval_seconds?: number;
+    model?: string;
+    request?: ChannelMonitorRequest;
+};
+
+export type ChannelMonitorResponse = {
+    data: ChannelMonitor;
+    request_id: RequestId;
+};
+
+export type ChannelMonitorListResponse = {
+    data: Array<ChannelMonitor>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type ChannelMonitorCheckResult = {
+    account_id: number;
+    account_name: string;
+    provider_id: number;
+    model: string;
+    ok: boolean;
+    status_code: number;
+    latency_ms: number;
+    error_class?: string;
+    metadata?: JsonObject;
+};
+
+export type ChannelMonitorRun = {
+    id: number;
+    monitor_id: number;
+    run_id: string;
+    ok: boolean;
+    checked_count: number;
+    ok_count: number;
+    latency_ms: number;
+    trigger: string;
+    results: Array<ChannelMonitorCheckResult>;
+    created_at: string;
+};
+
+export type ChannelMonitorRunResponse = {
+    data: ChannelMonitorRun;
+    request_id: RequestId;
+};
+
+export type ChannelMonitorRunListResponse = {
+    data: Array<ChannelMonitorRun>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type ChannelMonitorTemplate = {
+    id: number;
+    name: string;
+    description: string;
+    request: ChannelMonitorRequest;
+    created_at: string;
+    updated_at: string;
+};
+
+export type CreateChannelMonitorTemplateRequest = {
+    name: string;
+    description?: string;
+    request?: ChannelMonitorRequest;
+};
+
+export type UpdateChannelMonitorTemplateRequest = {
+    name?: string;
+    description?: string;
+    request?: ChannelMonitorRequest;
+};
+
+export type ApplyChannelMonitorTemplateRequest = {
+    monitor_ids: Array<number>;
+};
+
+export type ChannelMonitorTemplateResponse = {
+    data: ChannelMonitorTemplate;
+    request_id: RequestId;
+};
+
+export type ChannelMonitorTemplateListResponse = {
+    data: Array<ChannelMonitorTemplate>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type PlaygroundImage = {
+    mime_type: string;
+    /**
+     * Base64-encoded image bytes (no data URL prefix).
+     */
+    data: string;
+};
+
+export type PlaygroundMessage = {
+    role: 'user' | 'assistant';
+    content?: string;
+    images?: Array<PlaygroundImage>;
+};
+
+export type PlaygroundChatRequest = {
+    messages: Array<PlaygroundMessage>;
+    model: string;
+    reasoning_effort?: 'off' | 'low' | 'medium' | 'high';
+    /**
+     * Optional system prompt prepended to the conversation.
+     */
+    system?: string;
+    temperature?: number;
+    max_tokens?: number;
+};
+
+export type PlaygroundModel = {
+    id: string;
+    name: string;
+};
+
+export type PlaygroundModelsResponse = {
+    data: Array<PlaygroundModel>;
     request_id: RequestId;
 };
 
@@ -7409,6 +6604,1239 @@ export type GeminiModelList = {
     nextPageToken?: string;
 };
 
+export type RedeemCodeStatus = 'active' | 'redeemed' | 'disabled' | 'expired';
+
+export type RedeemCodeType = 'balance' | 'subscription';
+
+export type RedeemCode = {
+    id: Id;
+    code: string;
+    type: RedeemCodeType;
+    status: RedeemCodeStatus;
+    /**
+     * Balance amount for balance codes, or subscription plan id for subscription codes.
+     */
+    value: string;
+    currency: string;
+    max_redemptions: number;
+    redeemed_count: number;
+    expires_at?: Timestamp;
+    /**
+     * Free-text audit comment last applied to this code (set by bulk-disable).
+     */
+    note?: string;
+    /**
+     * Why this code is in disabled status, if applicable. Empty for active/used codes.
+     */
+    disabled_reason?: string;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+};
+
+export type CreateRedeemCodeRequest = {
+    code: string;
+    type: RedeemCodeType;
+    /**
+     * Balance amount for balance codes, or subscription plan id for subscription codes.
+     */
+    value: string;
+    currency?: string;
+    max_redemptions?: number;
+    expires_at?: Timestamp;
+};
+
+export type RedeemCodeRedemptionRequest = {
+    code: string;
+};
+
+export type RedeemCodeRedemption = {
+    id: Id;
+    user_id: Id;
+    redeem_code_id: Id;
+    type: RedeemCodeType;
+    amount: string;
+    currency: string;
+    balance_before: string;
+    balance_after: string;
+    billing_ledger_id?: Id;
+    user_subscription_id?: Id;
+    redeemed_at: Timestamp;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+};
+
+export type RedeemCodeRedemptionResult = {
+    redemption: RedeemCodeRedemption;
+    redeem_code: RedeemCode;
+    already_redeemed: boolean;
+};
+
+export type RedeemCodeRedemptionResponse = {
+    data: RedeemCodeRedemptionResult;
+    request_id: RequestId;
+};
+
+export type BatchGenerateRedeemCodesRequest = {
+    prefix?: string;
+    count: number;
+    type: RedeemCodeType;
+    /**
+     * Balance amount for balance codes, or subscription plan id for subscription codes.
+     */
+    value: string;
+    currency?: string;
+    max_redemptions?: number;
+    expires_at?: Timestamp;
+};
+
+export type BatchDisableRedeemCodesRequest = {
+    ids: Array<Id>;
+    /**
+     * Free-text audit comment recorded against every code disabled by this call.
+     */
+    note?: string | null;
+};
+
+export type BatchUpdateRedeemCodeItem = {
+    id: Id;
+    /**
+     * New redemption amount (decimal string > 0; balance codes only). Null leaves unchanged.
+     */
+    amount?: string | null;
+    /**
+     * New max-redemption cap. Null leaves unchanged.
+     */
+    max_redemptions?: number | null;
+    /**
+     * New expiry (RFC3339). Null in the JSON body clears the expiry (NullableTimeUpdate semantics from sub2api).
+     */
+    expires_at?: string | null;
+    /**
+     * New operator note (free text). Null leaves unchanged.
+     */
+    note?: string | null;
+};
+
+export type BatchUpdateRedeemCodesRequest = {
+    items: Array<BatchUpdateRedeemCodeItem>;
+};
+
+export type BatchUpdateRedeemCodeErrorRow = {
+    id: Id;
+    message: string;
+};
+
+export type BatchUpdateRedeemCodesResult = {
+    updated_count: number;
+    /**
+     * Per-id failures (invalid id, invalid value, already-redeemed gate, store error). NotFound is idempotent.
+     */
+    errors: Array<BatchUpdateRedeemCodeErrorRow>;
+};
+
+export type BatchUpdateRedeemCodesResponse = {
+    data: BatchUpdateRedeemCodesResult;
+    request_id: RequestId;
+};
+
+export type BatchExtendRedeemCodesRequest = {
+    ids: Array<Id>;
+    expires_at: Timestamp;
+};
+
+export type RedeemCodeResponse = {
+    data: RedeemCode;
+    request_id: RequestId;
+};
+
+export type RedeemCodeListResponse = {
+    data: Array<RedeemCode>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type RedeemCodeStats = {
+    total: number;
+    active: number;
+    redeemed: number;
+    disabled: number;
+    expired: number;
+};
+
+export type RedeemCodeStatsResponse = {
+    data: RedeemCodeStats;
+    request_id: RequestId;
+};
+
+export type PromoCodeStatus = 'active' | 'disabled' | 'expired';
+
+export type PromoDiscountType = 'amount' | 'percent';
+
+export type PromoCode = {
+    id: Id;
+    code: string;
+    status: PromoCodeStatus;
+    discount_type: PromoDiscountType;
+    discount_value: string;
+    currency: string;
+    max_uses: number;
+    /**
+     * Maximum active uses per user. Zero means no per-user limit.
+     */
+    per_user_limit: number;
+    /**
+     * Minimum original order amount required before the discount applies. Blank means no minimum.
+     */
+    min_order_amount: string;
+    used_count: number;
+    starts_at?: Timestamp;
+    expires_at?: Timestamp;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+};
+
+export type CreatePromoCodeRequest = {
+    code: string;
+    discount_type: PromoDiscountType;
+    discount_value: string;
+    currency?: string;
+    max_uses?: number;
+    /**
+     * Maximum active uses per user. Zero means no per-user limit.
+     */
+    per_user_limit?: number;
+    /**
+     * Minimum original order amount required before the discount applies. Omit for no minimum.
+     */
+    min_order_amount?: string;
+    status?: PromoCodeStatus;
+    starts_at?: Timestamp;
+    expires_at?: Timestamp;
+};
+
+export type UpdatePromoCodeRequest = CreatePromoCodeRequest;
+
+export type PromoCodeResponse = {
+    data: PromoCode;
+    request_id: RequestId;
+};
+
+export type PromoCodeListResponse = {
+    data: Array<PromoCode>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type PromoCodeUsage = {
+    id: Id;
+    user_id: Id;
+    promo_code_id: Id;
+    payment_order_id: Id;
+    order_no: string;
+    original_amount: string;
+    discount_amount: string;
+    final_amount: string;
+    currency: string;
+    discount_type: PromoDiscountType;
+    applied_at: Timestamp;
+};
+
+export type PromoCodeUsageListResponse = {
+    data: Array<PromoCodeUsage>;
+    request_id: RequestId;
+};
+
+export type RiskControlMode = 'monitor' | 'enforce';
+
+export type RiskControlConfig = {
+    enabled: boolean;
+    mode: RiskControlMode;
+    max_failed_requests_per_minute: number;
+    max_cost_per_day: string;
+    cooldown_seconds: number;
+    blocked_countries: Array<string>;
+    blocked_ips: Array<string>;
+};
+
+export type RiskControlConfigResponse = {
+    data: RiskControlConfig;
+    request_id: RequestId;
+};
+
+export type RiskControlStatus = {
+    enabled: boolean;
+    mode: RiskControlMode;
+    active_blocks: number;
+    recent_events: number;
+    evaluated_at: Timestamp;
+};
+
+export type RiskControlStatusResponse = {
+    data: RiskControlStatus;
+    request_id: RequestId;
+};
+
+export type RiskControlLog = {
+    id: Id;
+    level: 'info' | 'warn' | 'block';
+    action: string;
+    reason: string;
+    subject?: string | null;
+    metadata?: JsonObject;
+    created_at: Timestamp;
+};
+
+export type RiskControlLogListResponse = {
+    data: Array<RiskControlLog>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type ContentSafetyMode = 'monitor' | 'enforce';
+
+export type ContentSafetyConfig = {
+    enabled: boolean;
+    mode: ContentSafetyMode;
+    redact_pii: boolean;
+    block_pii: boolean;
+    block_prompt_injection: boolean;
+    block_custom_keywords: boolean;
+    custom_keywords: Array<string>;
+    /**
+     * Canonical model names or prefix scopes ending in '*'. Empty means all models.
+     */
+    model_scopes: Array<string>;
+    moderation: ContentSafetyModerationConfig;
+};
+
+/**
+ * Upstream classification pass that runs after the local regex/keyword scan. Only the OpenAI Moderation contract is wired today; future providers register under the `provider` key once their client lands. The API key is encrypted at rest; the wire schema exposes only a write-only `api_key` and a read-only `api_key_configured` indicator.
+ */
+export type ContentSafetyModerationConfig = {
+    /**
+     * Master switch for the upstream moderation pass.
+     */
+    enabled: boolean;
+    /**
+     * Upstream classifier vendor. Only `openai` is supported today.
+     */
+    provider: 'openai';
+    /**
+     * Upstream model id (e.g. `omni-moderation-latest`).
+     */
+    model: string;
+    /**
+     * HTTPS base URL for OpenAI-compatible deployments.
+     */
+    base_url: string;
+    /**
+     * When mode is `enforce`, refuse the request once the upstream returns flagged or a category exceeds its threshold.
+     */
+    block_on_flag: boolean;
+    /**
+     * Per-category minimum score in [0, 1] to flag. Empty falls back to the upstream `flagged` boolean.
+     */
+    categories: {
+        [key: string]: number;
+    };
+    /**
+     * HTTP call timeout for the upstream moderation request.
+     */
+    timeout_ms: number;
+    /**
+     * In-process LRU TTL; 0 disables the cache.
+     */
+    cache_ttl_seconds: number;
+    /**
+     * True when a moderation API key is stored.
+     */
+    api_key_configured: boolean;
+};
+
+export type ContentSafetyConfigResponse = {
+    data: ContentSafetyConfig;
+    request_id: RequestId;
+};
+
+export type ErrorLog = {
+    id: Id;
+    request_id: RequestId;
+    created_at: Timestamp;
+    user_id: Id;
+    api_key_id: Id;
+    account_id?: string | null;
+    provider_id?: string | null;
+    model: string;
+    source_endpoint: string;
+    source_protocol: string;
+    target_protocol: string;
+    error_class?: string | null;
+    /**
+     * Verbatim upstream error message (sub2api parity).
+     */
+    error_message?: string | null;
+    /**
+     * Compacted upstream error envelope.
+     */
+    error_body_excerpt?: string | null;
+    /**
+     * Upstream HTTP status code (omitted when no HTTP response).
+     */
+    status_code?: number | null;
+    /**
+     * Upstream provider request id (x-request-id / openai-request-id).
+     */
+    upstream_request_id?: string | null;
+    /**
+     * request | auth | routing | upstream | network | internal
+     */
+    error_phase?: string | null;
+    /**
+     * client | provider | platform
+     */
+    error_owner?: string | null;
+    /**
+     * client_request | upstream_http | gateway
+     */
+    error_source?: string | null;
+    /**
+     * Operator acknowledgement flag.
+     */
+    resolved: boolean;
+    resolved_by?: string | null;
+    resolved_at?: Timestamp;
+    upstream_errors?: Array<UpstreamErrorEvent> | null;
+    latency_ms: number;
+    input_tokens: number;
+    output_tokens: number;
+    attempt_no: number;
+    usage_estimated: boolean;
+};
+
+/**
+ * One failed candidate attempt within a gateway request's failover history
+ * (sub2api ops_upstream_error_events parity).
+ *
+ */
+export type UpstreamErrorEvent = {
+    at_unix_ms: number;
+    attempt_no: number;
+    account_id?: string | null;
+    account_name: string;
+    upstream_status_code: number;
+    upstream_request_id: string;
+    upstream_url: string;
+    /**
+     * http_error | request_error | retry_exhausted | failover
+     */
+    kind: string;
+    message: string;
+    body_excerpt: string;
+};
+
+export type ErrorLogListResponse = {
+    data: Array<ErrorLog>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type RequestLogFileDescriptor = {
+    /**
+     * On-disk filename such as request-<unix_ms>-<request_id>.log.
+     */
+    name: string;
+    size: number;
+    created_at: Timestamp;
+    request_id: string;
+    is_error_only: boolean;
+    /**
+     * User identifier captured in REQUEST INFO, when present.
+     */
+    user_id?: string;
+    /**
+     * API key identifier captured in REQUEST INFO, when present.
+     */
+    api_key_id?: string;
+    /**
+     * Provider account identifier captured in REQUEST INFO, when present.
+     */
+    account_id?: string;
+    /**
+     * Gateway protocol captured in REQUEST INFO, such as openai-compatible.
+     */
+    source_protocol?: string;
+    /**
+     * Source endpoint captured in REQUEST INFO.
+     */
+    source_endpoint?: string;
+    started_at?: Timestamp;
+    /**
+     * Final outcome parsed from the SUMMARY section, when present.
+     */
+    success?: boolean;
+    /**
+     * Final upstream or gateway status parsed from SUMMARY.
+     */
+    status_code?: number;
+    /**
+     * Error class parsed from SUMMARY for failed requests.
+     */
+    error_class?: string;
+    /**
+     * Request latency parsed from SUMMARY.
+     */
+    latency_ms?: number;
+    /**
+     * Highest numbered outbound REQUEST section observed in the captured dump.
+     */
+    attempt_count?: number;
+    /**
+     * Count of upstream RESPONSE sections observed in the captured dump.
+     */
+    response_count?: number;
+    /**
+     * Whether the descriptor parser found a SUMMARY section.
+     */
+    has_summary?: boolean;
+};
+
+export type RequestLogFileListResponse = {
+    data: Array<RequestLogFileDescriptor>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type RequestLogFileResponse = {
+    data: RequestLogFileDescriptor;
+    request_id: RequestId;
+};
+
+export type RequestEvidenceKind = 'success' | 'error' | 'unknown';
+
+export type RequestEvidenceSource = 'usage' | 'ops_error' | 'request_dump' | 'system_log' | 'scheduler_decision';
+
+export type RequestEvidenceRow = {
+    kind: RequestEvidenceKind;
+    evidence_source: RequestEvidenceSource;
+    created_at: Timestamp;
+    request_id: string;
+    usage_log_id?: Id;
+    ops_error_log_id?: Id;
+    user_id?: Id;
+    api_key_id?: Id;
+    account_id?: string;
+    provider_id?: string;
+    source_protocol?: string;
+    source_endpoint?: string;
+    target_protocol?: string;
+    model?: string;
+    status_code?: number;
+    success?: boolean;
+    error_class?: string;
+    /**
+     * Bounded, redacted upstream error message when available.
+     */
+    error_message?: string;
+    error_phase?: string;
+    error_owner?: string;
+    error_source?: string;
+    upstream_request_id?: string;
+    /**
+     * Low-cardinality terminal state for gateway streaming requests when
+     * available from ops_error_logs. Empty when the request was not
+     * streamed or the state was not observed.
+     *
+     */
+    stream_completion_state?: 'completed' | 'interrupted' | 'idle_timeout' | 'client_disconnect' | 'failed' | 'unknown';
+    attempt_no?: number;
+    latency_ms?: number;
+    input_tokens?: number;
+    output_tokens?: number;
+    total_tokens?: number;
+    usage_estimated?: boolean;
+    resolution?: 'open' | 'investigating' | 'resolved' | 'muted';
+    has_usage_log: boolean;
+    has_ops_error_log: boolean;
+    has_request_dump: boolean;
+    has_system_log: boolean;
+    has_scheduler_decision: boolean;
+    request_dump_count: number;
+    request_dump_error_count: number;
+    system_log_count: number;
+    scheduler_decision_count: number;
+    scheduler_decision_id?: Id;
+    scheduler_candidate_count?: number;
+    scheduler_rejected_count?: number;
+    scheduler_strategy?: string;
+    /**
+     * Non-sensitive scheduler explanation from the latest linked decision.
+     */
+    scheduler_selection_rationale?: string;
+    latest_request_dump_name?: string;
+    latest_request_dump_created_at?: Timestamp;
+};
+
+export type RequestEvidenceListResponse = {
+    data: Array<RequestEvidenceRow>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type RequestEvidenceSummary = {
+    kind: RequestEvidenceKind;
+    primary_source: RequestEvidenceSource;
+    attempt_count: number;
+    usage_log_count: number;
+    ops_error_log_count: number;
+    request_dump_count: number;
+    request_dump_error_count: number;
+    scheduler_decision_count: number;
+    has_usage_log: boolean;
+    has_ops_error_log: boolean;
+    has_request_dump: boolean;
+    has_scheduler_decision: boolean;
+    scheduler_decision_id?: Id;
+    scheduler_candidate_count?: number;
+    scheduler_rejected_count?: number;
+    scheduler_strategy?: string;
+    /**
+     * Non-sensitive scheduler explanation from the latest linked decision.
+     */
+    scheduler_selection_rationale?: string;
+    /**
+     * Sum of known attempt latencies for the request.
+     */
+    latency_ms?: number;
+    input_tokens?: number;
+    output_tokens?: number;
+    total_tokens?: number;
+    status_code?: number;
+    error_class?: string;
+    error_message?: string;
+    error_phase?: string;
+    error_owner?: string;
+    error_source?: string;
+    upstream_request_id?: string;
+    /**
+     * Latest low-cardinality terminal state among linked gateway
+     * streaming attempts when available.
+     *
+     */
+    stream_completion_state?: 'completed' | 'interrupted' | 'idle_timeout' | 'client_disconnect' | 'failed' | 'unknown';
+};
+
+export type RequestEvidenceDumpDescriptor = {
+    name: string;
+    created_at: Timestamp;
+    size_bytes: number;
+    request_id: string;
+    is_error_only: boolean;
+    user_id?: string;
+    api_key_id?: string;
+    account_id?: string;
+    source_protocol?: string;
+    source_endpoint?: string;
+    started_at?: Timestamp;
+    success?: boolean;
+    status_code?: number;
+    error_class?: string;
+    latency_ms?: number;
+    attempt_count: number;
+    response_count: number;
+    has_summary: boolean;
+};
+
+export type RequestEvidenceSystemLogSummary = {
+    /**
+     * Total sanitized system logs linked to this exact request id.
+     */
+    total_count: number;
+    level_counts: {
+        [key: string]: number;
+    };
+    latest_level?: OpsSystemLogLevel;
+    latest_message?: string;
+    latest_source?: string;
+    latest_at?: Timestamp;
+};
+
+export type RequestEvidenceDetailResponse = {
+    /**
+     * Exact gateway request id being investigated.
+     */
+    evidence_request_id: string;
+    summary: RequestEvidenceSummary;
+    attempts: Array<RequestEvidenceRow>;
+    request_dumps: Array<RequestEvidenceDumpDescriptor>;
+    system_log_summary: RequestEvidenceSystemLogSummary;
+    /**
+     * Latest sanitized system logs linked to this exact request id.
+     */
+    system_logs: Array<OpsSystemLog>;
+    first_seen_at?: Timestamp;
+    last_seen_at?: Timestamp;
+    request_id: RequestId;
+};
+
+export type DeleteRequestLogFileResponse = {
+    success: boolean;
+    request_id: RequestId;
+};
+
+export type AuditLog = {
+    id: Id;
+    actor_user_id?: string | null;
+    action: string;
+    resource_type: string;
+    resource_id: string;
+    before: JsonObject;
+    after: JsonObject;
+    ip: string;
+    user_agent: string;
+    trace_id: string;
+    created_at: Timestamp;
+};
+
+export type AuditLogListResponse = {
+    data: Array<AuditLog>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type AffiliateRelationshipStatus = 'active' | 'disabled';
+
+export type AffiliateLedgerEntryType = 'accrue' | 'transfer_to_balance' | 'withdraw' | 'refund_compensation' | 'manual_adjustment';
+
+export type AffiliateLedgerEntryStatus = 'pending' | 'settled' | 'canceled' | 'compensated';
+
+export type AffiliateInviteCodeStatus = 'active' | 'disabled' | 'expired';
+
+export type AffiliateRuleStatus = 'active' | 'disabled' | 'archived';
+
+export type AffiliateRuleTriggerType = 'payment_paid';
+
+export type AffiliateInviteCode = {
+    id: Id;
+    user_id: Id;
+    code: string;
+    status: AffiliateInviteCodeStatus;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+    expires_at?: string | null;
+};
+
+export type CreateAffiliateInviteCodeRequest = {
+    /**
+     * Optional custom code. When omitted, SRapi generates one.
+     */
+    code?: string;
+    expires_at?: string | null;
+};
+
+export type AffiliateInviteCodeResponse = {
+    data: AffiliateInviteCode;
+    request_id: RequestId;
+};
+
+export type AffiliateInviteCodeListResponse = {
+    data: Array<AffiliateInviteCode>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type AffiliateRule = {
+    id: Id;
+    name: string;
+    status: AffiliateRuleStatus;
+    trigger_type: AffiliateRuleTriggerType;
+    rate: string;
+    fixed_amount: string;
+    currency: string;
+    max_rebate_amount: string;
+    valid_from?: string | null;
+    valid_to?: string | null;
+    metadata: JsonObject;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+};
+
+export type CreateAffiliateRuleRequest = {
+    name: string;
+    status?: AffiliateRuleStatus;
+    trigger_type: AffiliateRuleTriggerType;
+    rate?: string;
+    fixed_amount?: string;
+    currency?: string;
+    max_rebate_amount?: string;
+    valid_from?: string | null;
+    valid_to?: string | null;
+    metadata?: JsonObject;
+};
+
+export type UpdateAffiliateRuleRequest = {
+    name?: string;
+    status?: AffiliateRuleStatus;
+    trigger_type?: AffiliateRuleTriggerType;
+    rate?: string;
+    fixed_amount?: string;
+    currency?: string;
+    max_rebate_amount?: string;
+    valid_from?: string | null;
+    valid_to?: string | null;
+    metadata?: JsonObject;
+};
+
+export type AffiliateRuleResponse = {
+    data: AffiliateRule;
+    request_id: RequestId;
+};
+
+export type AffiliateRuleListResponse = {
+    data: Array<AffiliateRule>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type AffiliateInviteRecord = {
+    id: Id;
+    inviter_user_id: Id;
+    invitee_user_id: Id;
+    invite_code_id: Id;
+    status: AffiliateRelationshipStatus;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+    first_paid_at?: string | null;
+};
+
+export type AffiliateInviteRecordListResponse = {
+    data: Array<AffiliateInviteRecord>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type AffiliateLedgerEntry = {
+    id: Id;
+    user_id: Id;
+    related_user_id: Id;
+    payment_order_id?: Id;
+    subscription_id?: Id;
+    type: AffiliateLedgerEntryType;
+    amount: string;
+    currency: string;
+    status: AffiliateLedgerEntryStatus;
+    reference_id: string;
+    metadata: JsonObject;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+    settled_at?: string | null;
+};
+
+export type AffiliateLedgerEntryListResponse = {
+    data: Array<AffiliateLedgerEntry>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type AffiliateLedgerEntryResponse = {
+    data: AffiliateLedgerEntry;
+    request_id: RequestId;
+};
+
+export type AffiliateCurrencySummary = {
+    currency: string;
+    /**
+     * Decimal string affiliate balance available for transfer.
+     */
+    available_balance: string;
+    accrued_amount: string;
+    refund_compensated_amount: string;
+    transferred_to_balance_amount: string;
+    withdrawn_amount: string;
+    manual_adjustment_amount: string;
+};
+
+export type AffiliateSummary = {
+    user_id: Id;
+    balances: Array<AffiliateCurrencySummary>;
+    invite_codes: Array<AffiliateInviteCode>;
+    invited_count: number;
+};
+
+export type AffiliateSummaryResponse = {
+    data: AffiliateSummary;
+    request_id: RequestId;
+};
+
+export type AffiliateTransferToBalanceRequest = {
+    /**
+     * Decimal string amount to move from affiliate balance into gateway balance.
+     */
+    amount: string;
+    currency?: string;
+};
+
+export type AffiliateWithdrawalRequest = {
+    /**
+     * Decimal string amount to withdraw from affiliate balance.
+     */
+    amount: string;
+    currency?: string;
+    /**
+     * Optional withdrawal destination label or account reference.
+     */
+    destination?: string;
+};
+
+export type AdminAffiliateWithdrawalDecisionRequest = {
+    /**
+     * Optional admin note recorded on the withdrawal ledger metadata.
+     */
+    reason?: string;
+};
+
+export type AdminAffiliateManualAdjustmentRequest = {
+    user_id: Id;
+    /**
+     * Decimal string amount to adjust. Positive credits balance; negative debits balance.
+     */
+    amount: string;
+    currency?: string;
+    reason: string;
+    /**
+     * Optional admin-supplied idempotency reference.
+     */
+    reference_id?: string;
+    metadata?: JsonObject;
+};
+
+export type AffiliateTransferToBalanceResult = {
+    applied: boolean;
+    reason?: string;
+    affiliate_ledger: AffiliateLedgerEntry;
+    billing_ledger_id: Id;
+    balance_before: string;
+    balance_after: string;
+};
+
+export type AffiliateTransferToBalanceResponse = {
+    data: AffiliateTransferToBalanceResult;
+    request_id: RequestId;
+};
+
+export type SchedulerDecision = {
+    id: Id;
+    request_id: RequestId;
+    attempt_no: number;
+    user_id: Id;
+    api_key_id: Id;
+    source_protocol: string;
+    source_endpoint: string;
+    target_protocol: string;
+    model: string;
+    strategy: 'balanced' | 'cost_saver' | 'latency_first' | 'quota_protect' | 'sticky_first' | 'cache_affinity_first' | 'premium_quality';
+    strategy_version: string;
+    strategy_config_hash: string;
+    fallback_from_decision_id?: string | null;
+    selected_provider_id?: string | null;
+    selected_account_id?: string | null;
+    candidate_count: number;
+    rejected_count: number;
+    scores: JsonObject;
+    reject_reasons: JsonObject;
+    strategy_weights: JsonObject;
+    compatibility_warnings: Array<string>;
+    /**
+     * Non-sensitive scheduler explanation for why the selected account won, or why no account was selected.
+     */
+    selection_rationale: string;
+    sticky_hit: boolean;
+    cache_affinity_hit: boolean;
+    estimated_cost: string;
+    currency: string;
+    created_at: Timestamp;
+};
+
+export type SchedulerDecisionListResponse = {
+    data: Array<SchedulerDecision>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type SchedulerOverview = {
+    total_decisions: number;
+    selected_decisions: number;
+    failed_decisions: number;
+    success_rate: number;
+    average_latency_ms: number;
+    sticky_hit_count: number;
+    cache_affinity_hit_count: number;
+    strategy_counts: JsonObject;
+};
+
+export type SchedulerOverviewResponse = {
+    data: SchedulerOverview;
+    request_id: RequestId;
+};
+
+export type SchedulerStrategy = {
+    id: Id;
+    name: SchedulerStrategyName;
+    version: string;
+    status: SchedulerStrategyStatus;
+    scope_type: SchedulerStrategyScopeType;
+    scope_id?: Id;
+    description?: string;
+    config_hash: string;
+    config: JsonObject;
+    weights: SchedulerStrategyWeights;
+    source: 'seed' | 'database';
+    created_by?: Id;
+    created_at: Timestamp;
+    activated_at?: string | null;
+    deprecated_at?: string | null;
+};
+
+export type SchedulerStrategyResponse = {
+    data: SchedulerStrategy;
+    request_id: RequestId;
+};
+
+export type SchedulerStrategyListResponse = {
+    data: Array<SchedulerStrategy>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type SchedulerStrategyName = 'balanced' | 'cost_saver' | 'latency_first' | 'quota_protect' | 'sticky_first' | 'cache_affinity_first' | 'premium_quality';
+
+export type SchedulerStrategyStatus = 'active' | 'draft' | 'deprecated';
+
+export type SchedulerStrategyScopeType = 'global' | 'api_key' | 'account_group' | 'user';
+
+export type SchedulerStrategyWeights = {
+    [key: string]: number;
+};
+
+export type SchedulerStrategyMutationRequest = {
+    name: SchedulerStrategyName;
+    version: string;
+    status: SchedulerStrategyStatus;
+    scope_type: SchedulerStrategyScopeType;
+    scope_id?: Id;
+    description?: string;
+    config?: JsonObject;
+    weights: SchedulerStrategyWeights;
+};
+
+export type SchedulerSimulationStickyStrength = 'none' | 'soft' | 'hard';
+
+export type SchedulerSimulationRuntimeState = {
+    quota_exhausted?: boolean;
+    health_score?: number | null;
+    quota_remaining_ratio?: number | null;
+    latency_p95_ms?: number | null;
+    circuit_open?: boolean;
+    cooldown_active?: boolean;
+    current_concurrency?: number;
+    rpm_used?: number;
+    tpm_used?: number;
+};
+
+export type SchedulerSimulationLimits = {
+    max_concurrency?: number | null;
+    rpm_limit?: number | null;
+    tpm_limit?: number | null;
+};
+
+export type SchedulerSimulationCandidate = {
+    account_id: Id;
+    account_status?: ProviderAccountStatus;
+    account_runtime_class?: RuntimeClass;
+    account_weight?: number;
+    account_risk_level?: string | null;
+    account_has_credential?: boolean;
+    account_metadata?: JsonObject;
+    provider_id: Id;
+    provider_status?: ResourceStatus;
+    provider_protocol?: ProviderProtocol;
+    provider_capabilities?: JsonObject;
+    provider_config?: JsonObject;
+    mapping_id?: Id;
+    model_id?: Id;
+    mapping_status?: ResourceStatus;
+    upstream_model_name?: string;
+    pricing_override?: JsonObject;
+    effective_capabilities?: Array<CapabilityDescriptor>;
+    runtime_state?: SchedulerSimulationRuntimeState;
+    limits?: SchedulerSimulationLimits;
+};
+
+export type SchedulerSimulationProfile = {
+    request_id: RequestId;
+    attempt_no?: number;
+    user_id: Id;
+    api_key_id: Id;
+    source_protocol?: string;
+    source_endpoint: string;
+    target_protocol?: string;
+    model: string;
+    model_alias?: string;
+    fallback_models?: Array<string>;
+    session_affinity_source?: string;
+    user_tier?: 'free' | 'standard' | 'pro' | 'admin';
+    user_balance_insufficient?: boolean;
+    estimated_input_tokens?: number;
+    estimated_output_tokens?: number;
+    estimated_cost?: string;
+    currency?: string;
+    pricing_rule_id?: Id;
+    pricing_source?: string;
+    pricing_estimated?: boolean;
+    is_stream?: boolean;
+    sticky_account_id?: Id;
+    sticky_strength?: SchedulerSimulationStickyStrength;
+    warnings?: Array<string>;
+    request_capabilities?: Array<CapabilityDescriptor>;
+    excluded_account_ids?: Array<Id>;
+    candidates: Array<SchedulerSimulationCandidate>;
+};
+
+export type SchedulerSimulationRequest = {
+    current_strategy?: SchedulerStrategyName;
+    shadow_strategy: SchedulerStrategyName;
+    /**
+     * Optional deterministic gray-release percentage for previewing whether this request would use the shadow strategy.
+     */
+    shadow_rollout_percent?: number | null;
+    request: SchedulerSimulationProfile;
+};
+
+export type SchedulerSimulationDecision = {
+    /**
+     * Empty when the simulated strategy selected an account.
+     */
+    error: string;
+    request_id: RequestId;
+    attempt_no: number;
+    user_id: Id;
+    api_key_id: Id;
+    source_protocol: string;
+    source_endpoint: string;
+    target_protocol: string;
+    model: string;
+    strategy: SchedulerStrategyName;
+    strategy_version: string;
+    strategy_config_hash: string;
+    selected_provider_id?: string | null;
+    selected_account_id?: string | null;
+    candidate_count: number;
+    rejected_count: number;
+    scores: JsonObject;
+    reject_reasons: JsonObject;
+    strategy_weights: JsonObject;
+    compatibility_warnings: Array<string>;
+    sticky_hit: boolean;
+    cache_affinity_hit: boolean;
+    estimated_cost: string;
+    currency: string;
+    created_at: Timestamp;
+};
+
+export type SchedulerSimulationDiff = {
+    winner_changed: boolean;
+    current_selected_account_id?: string | null;
+    shadow_selected_account_id?: string | null;
+    current_selected_provider_id?: string | null;
+    shadow_selected_provider_id?: string | null;
+    final_score_delta: number;
+    cost_score_delta: number;
+    latency_score_delta: number;
+    quality_score_delta: number;
+    risk_penalty_delta: number;
+};
+
+export type SchedulerSimulationRollout = {
+    /**
+     * True when shadow_rollout_percent was supplied in the request.
+     */
+    enabled: boolean;
+    percent: number;
+    /**
+     * Stable deterministic bucket for the rollout key, in the range [0, 100).
+     */
+    bucket: number;
+    /**
+     * True when bucket is inside the supplied shadow rollout percentage.
+     */
+    shadow_selected: boolean;
+    /**
+     * SHA-256 hash of the rollout key; the raw key is never returned.
+     */
+    key_hash: string;
+};
+
+export type SchedulerSimulationResult = {
+    dry_run: boolean;
+    current: SchedulerSimulationDecision;
+    shadow: SchedulerSimulationDecision;
+    diff: SchedulerSimulationDiff;
+    rollout: SchedulerSimulationRollout;
+};
+
+export type SchedulerSimulationResponse = {
+    data: SchedulerSimulationResult;
+    request_id: RequestId;
+};
+
+export type SchedulerReplayRequest = {
+    current_strategy?: SchedulerStrategyName;
+    shadow_strategy: SchedulerStrategyName;
+    /**
+     * Optional deterministic gray-release percentage preview for each replayed request.
+     */
+    shadow_rollout_percent?: number | null;
+    limit?: number;
+    since?: string | null;
+    until?: string | null;
+    model?: string;
+    request_id?: string;
+};
+
+export type SchedulerReplayItem = {
+    snapshot_id: Id;
+    decision_id: Id;
+    request_id: RequestId;
+    attempt_no: number;
+    created_at: Timestamp;
+    original_strategy: SchedulerStrategyName;
+    original_selected_account_id?: string | null;
+    current: SchedulerSimulationDecision;
+    shadow: SchedulerSimulationDecision;
+    diff: SchedulerSimulationDiff;
+    rollout: SchedulerSimulationRollout;
+};
+
+export type SchedulerReplayResult = {
+    dry_run: boolean;
+    requested: number;
+    replayed: number;
+    skipped: number;
+    winner_changed: number;
+    current_win_counts: JsonObject;
+    shadow_win_counts: JsonObject;
+    average_final_score_delta: number;
+    average_cost_score_delta: number;
+    average_latency_score_delta: number;
+    average_quality_score_delta: number;
+    average_risk_penalty_delta: number;
+    items: Array<SchedulerReplayItem>;
+};
+
+export type SchedulerReplayResponse = {
+    data: SchedulerReplayResult;
+    request_id: RequestId;
+};
+
 export type UserPlatformQuota = {
     user_id: number;
     platform: string;
@@ -7468,16 +7896,6 @@ export type ModelRateLimitListResponse = {
     data: Array<ModelRateLimit>;
     pagination: Pagination;
     request_id: RequestId;
-};
-
-export type AccountGroupRateLimit = {
-    account_group_id: number;
-    rpm_limit: number;
-    tpm_limit: number;
-    max_concurrency: number;
-    enabled: boolean;
-    created_at: string;
-    updated_at: string;
 };
 
 export type UpsertGroupRateLimitRequest = {
@@ -7670,428 +8088,6 @@ export type ErrorPassthroughRuleListResponse = {
     request_id: RequestId;
 };
 
-export type ScheduledTestPlan = {
-    id: number;
-    name: string;
-    enabled: boolean;
-    scope_type: 'all' | 'account' | 'group';
-    scope_id?: number | null;
-    interval_seconds: number;
-    cron_expression: string;
-    probe_model: string;
-    max_results: number;
-    auto_recover: boolean;
-    last_run_at?: string | null;
-    last_status: string;
-    last_summary: string;
-    created_at: string;
-    updated_at: string;
-};
-
-export type CreateScheduledTestPlanRequest = {
-    name: string;
-    enabled?: boolean;
-    scope_type: 'all' | 'account' | 'group';
-    scope_id?: number | null;
-    interval_seconds?: number;
-    cron_expression?: string;
-    probe_model?: string;
-    max_results?: number;
-    auto_recover?: boolean;
-};
-
-export type UpdateScheduledTestPlanRequest = {
-    name?: string;
-    enabled?: boolean;
-    scope_type?: 'all' | 'account' | 'group';
-    scope_id?: number | null;
-    interval_seconds?: number;
-    cron_expression?: string;
-    probe_model?: string;
-    max_results?: number;
-    auto_recover?: boolean;
-};
-
-export type ScheduledTestPlanRun = {
-    id: number;
-    plan_id: number;
-    trigger: 'schedule' | 'manual';
-    status: 'ok' | 'warning' | 'partial' | 'failed';
-    selected: number;
-    probed: number;
-    skipped: number;
-    failed: number;
-    unhealthy: number;
-    recovered: number;
-    summary: string;
-    started_at: string;
-    finished_at: string;
-};
-
-export type ScheduledTestPlanResponse = {
-    data: ScheduledTestPlan;
-    request_id: RequestId;
-};
-
-export type ScheduledTestPlanListResponse = {
-    data: Array<ScheduledTestPlan>;
-    pagination: Pagination;
-    request_id: RequestId;
-};
-
-export type ScheduledTestPlanRunResponse = {
-    data: ScheduledTestPlanRun;
-    request_id: RequestId;
-};
-
-export type ScheduledTestPlanRunListResponse = {
-    data: Array<ScheduledTestPlanRun>;
-    pagination: Pagination;
-    request_id: RequestId;
-};
-
-/**
- * Importable scheduled-test-plan shape. Account/group scopes are remapped by natural key; snapshots do not export source-environment integer scope IDs.
- *
- */
-export type ImportScheduledTestPlan = {
-    name: string;
-    enabled?: boolean;
-    scope_type: 'all' | 'account' | 'group';
-    /**
-     * Provider name used with scope_account_name for account-scoped plans.
-     */
-    scope_account_provider_name?: string;
-    /**
-     * Provider account name used for account-scoped plans.
-     */
-    scope_account_name?: string;
-    /**
-     * Account group name used for group-scoped plans.
-     */
-    scope_group_name?: string;
-    interval_seconds?: number;
-    cron_expression?: string;
-    probe_model?: string;
-    max_results?: number;
-    auto_recover?: boolean;
-};
-
-/**
- * What the monitor probes — a single account, an account group, all of a provider's accounts, or accounts serving a model.
- */
-export type ChannelMonitorScope = 'account' | 'group' | 'provider' | 'model';
-
-/**
- * Custom synthetic-probe request override; empty fields inherit the config-map probe defaults.
- */
-export type ChannelMonitorRequest = {
-    method?: string;
-    url?: string;
-    headers?: {
-        [key: string]: string;
-    };
-    body?: string;
-    expected_status_codes?: Array<number>;
-    response_json_path?: string;
-    response_contains?: string;
-};
-
-export type ChannelMonitor = {
-    id: number;
-    name: string;
-    enabled: boolean;
-    scope: ChannelMonitorScope;
-    scope_ref: string;
-    interval_seconds: number;
-    model: string;
-    request: ChannelMonitorRequest;
-    created_at: string;
-    updated_at: string;
-    /**
-     * Timestamp of the most recent recorded run for this monitor (absent when no runs exist yet).
-     */
-    last_run_at?: string;
-    /**
-     * Whether the most recent run was a fully-OK result. Absent when no runs exist.
-     */
-    last_run_ok?: boolean;
-    /**
-     * Latency in ms of the most recent run. Absent when no runs exist.
-     */
-    last_run_latency_ms?: number;
-    /**
-     * Window in days over which recent_uptime_success_rate is computed (absent when no recent runs).
-     */
-    recent_uptime_window_days?: number;
-    /**
-     * How many runs in the window contributed to recent_uptime_success_rate (capped per server policy).
-     */
-    recent_uptime_sample_count?: number;
-    /**
-     * Ratio of OK runs over recent_uptime_sample_count (absent when no recent runs).
-     */
-    recent_uptime_success_rate?: number;
-};
-
-export type CreateChannelMonitorRequest = {
-    name: string;
-    enabled?: boolean;
-    scope: ChannelMonitorScope;
-    scope_ref?: string;
-    interval_seconds?: number;
-    model?: string;
-    request?: ChannelMonitorRequest;
-};
-
-export type UpdateChannelMonitorRequest = {
-    name?: string;
-    enabled?: boolean;
-    scope?: ChannelMonitorScope;
-    scope_ref?: string;
-    interval_seconds?: number;
-    model?: string;
-    request?: ChannelMonitorRequest;
-};
-
-export type ChannelMonitorResponse = {
-    data: ChannelMonitor;
-    request_id: RequestId;
-};
-
-export type ChannelMonitorListResponse = {
-    data: Array<ChannelMonitor>;
-    pagination: Pagination;
-    request_id: RequestId;
-};
-
-export type ChannelMonitorCheckResult = {
-    account_id: number;
-    account_name: string;
-    provider_id: number;
-    model: string;
-    ok: boolean;
-    status_code: number;
-    latency_ms: number;
-    error_class?: string;
-    metadata?: JsonObject;
-};
-
-export type ChannelMonitorRun = {
-    id: number;
-    monitor_id: number;
-    run_id: string;
-    ok: boolean;
-    checked_count: number;
-    ok_count: number;
-    latency_ms: number;
-    trigger: string;
-    results: Array<ChannelMonitorCheckResult>;
-    created_at: string;
-};
-
-export type ChannelMonitorRunResponse = {
-    data: ChannelMonitorRun;
-    request_id: RequestId;
-};
-
-export type ChannelMonitorRunListResponse = {
-    data: Array<ChannelMonitorRun>;
-    pagination: Pagination;
-    request_id: RequestId;
-};
-
-export type ChannelMonitorTemplate = {
-    id: number;
-    name: string;
-    description: string;
-    request: ChannelMonitorRequest;
-    created_at: string;
-    updated_at: string;
-};
-
-export type CreateChannelMonitorTemplateRequest = {
-    name: string;
-    description?: string;
-    request?: ChannelMonitorRequest;
-};
-
-export type UpdateChannelMonitorTemplateRequest = {
-    name?: string;
-    description?: string;
-    request?: ChannelMonitorRequest;
-};
-
-export type ApplyChannelMonitorTemplateRequest = {
-    monitor_ids: Array<number>;
-};
-
-export type ChannelMonitorTemplateResponse = {
-    data: ChannelMonitorTemplate;
-    request_id: RequestId;
-};
-
-export type ChannelMonitorTemplateListResponse = {
-    data: Array<ChannelMonitorTemplate>;
-    pagination: Pagination;
-    request_id: RequestId;
-};
-
-export type UserAttributeDefinition = {
-    id: number;
-    key: string;
-    name: string;
-    data_type: 'string' | 'number' | 'boolean' | 'select';
-    options: Array<string>;
-    required: boolean;
-    display_order: number;
-    enabled: boolean;
-    created_at: string;
-    updated_at: string;
-};
-
-export type CreateUserAttributeDefinitionRequest = {
-    key: string;
-    name: string;
-    data_type: 'string' | 'number' | 'boolean' | 'select';
-    options?: Array<string>;
-    required?: boolean;
-    display_order?: number;
-    enabled?: boolean;
-};
-
-export type UpdateUserAttributeDefinitionRequest = {
-    name?: string;
-    data_type?: 'string' | 'number' | 'boolean' | 'select';
-    options?: Array<string>;
-    required?: boolean;
-    display_order?: number;
-    enabled?: boolean;
-};
-
-export type UserAttributeValue = {
-    definition_id: number;
-    key: string;
-    name: string;
-    data_type: string;
-    options: Array<string>;
-    required: boolean;
-    value: string;
-    updated_at?: string;
-};
-
-export type UserAttributeValueWithUserId = UserAttributeValue & {
-    user_id: Id;
-};
-
-export type BatchUserAttributeValuesResponse = {
-    data: Array<UserAttributeValueWithUserId>;
-    request_id: RequestId;
-};
-
-export type SetUserAttributeValueRequest = {
-    value?: string;
-};
-
-export type UserAttributeValueInput = {
-    definition_id: number;
-    value: string;
-};
-
-export type UpdateCurrentUserAttributesRequest = {
-    values: Array<UserAttributeValueInput>;
-};
-
-export type UserAttributeDefinitionResponse = {
-    data: UserAttributeDefinition;
-    request_id: RequestId;
-};
-
-export type UserAttributeDefinitionListResponse = {
-    data: Array<UserAttributeDefinition>;
-    pagination: Pagination;
-    request_id: RequestId;
-};
-
-export type UserAttributeValueListResponse = {
-    data: Array<UserAttributeValue>;
-    pagination: Pagination;
-    request_id: RequestId;
-};
-
-export type SetUserAttributeValueResponse = {
-    data: {
-        definition_id: number;
-        value: string;
-        updated_at?: string;
-    };
-    request_id: RequestId;
-};
-
-export type AccountAvailabilityRollup = {
-    date: string;
-    provider_id: number;
-    total_samples: number;
-    healthy_samples: number;
-    availability_ratio: number;
-    avg_success_rate: number;
-    computed_at: string;
-};
-
-export type AccountAvailabilitySummary = {
-    account_id: number;
-    account_name: string;
-    provider_id: number;
-    status: string;
-    overall_uptime: number;
-    window_days: number;
-    last_checked_at?: string | null;
-};
-
-export type AccountsAvailabilitySummaryResponse = {
-    data: Array<AccountAvailabilitySummary>;
-    pagination: Pagination;
-    request_id: RequestId;
-};
-
-export type AccountAvailabilityResponse = {
-    data: {
-        account_id: number;
-        window_days: number;
-        overall_uptime: number;
-        daily_availability: Array<AccountAvailabilityRollup>;
-    };
-    request_id: RequestId;
-};
-
-export type AccountQuotaSignal = {
-    quota_type: string;
-    remaining: string;
-    used: string;
-    quota_limit: string;
-    remaining_ratio: number;
-    reset_at?: string;
-};
-
-export type AccountQuotaReport = {
-    provider: string;
-    supported: boolean;
-    source: string;
-    plan: string;
-    credits_remaining: string;
-    credits_used: string;
-    credits_limit: string;
-    currency: string;
-    status_code: number;
-    fetched_at: string;
-    quota_signals: Array<AccountQuotaSignal>;
-};
-
-export type AccountQuotaReportResponse = {
-    data: AccountQuotaReport;
-    request_id: RequestId;
-};
-
 export type SnapshotModelRateLimit = {
     model_id: number;
     model_name: string;
@@ -8182,6 +8178,23 @@ export type ConfigImportResponse = {
         model_rate_limits: ImportRemapResult;
         group_rate_limits: ImportRemapResult;
     };
+    request_id: RequestId;
+};
+
+export type CaptchaSettingsWritable = {
+    /**
+     * When true, admin settings override environment captcha config.
+     */
+    managed: boolean;
+    enabled: boolean;
+    provider: 'turnstile' | 'hcaptcha' | 'recaptcha';
+    site_key: string;
+    secret_key?: string;
+    verify_url: string;
+};
+
+export type CaptchaSettingsResponseWritable = {
+    data: CaptchaSettingsWritable;
     request_id: RequestId;
 };
 
@@ -8301,6 +8314,122 @@ export type UpdateProviderAccountRequestWritable = {
     metadata?: JsonObject;
 };
 
+export type ProviderAccountImportItemWritable = {
+    provider_id: Id;
+    name: string;
+    runtime_class: RuntimeClass;
+    upstream_client?: string | null;
+    /**
+     * Write-only credential payload. Exports intentionally omit this field.
+     */
+    credential?: {
+        [key: string]: unknown;
+    };
+    /**
+     * Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first.
+     */
+    proxy_id?: string | null;
+    status?: ProviderAccountStatus;
+    risk_level?: 'normal' | 'medium' | 'high';
+    priority?: number;
+    weight?: number;
+    metadata?: JsonObject;
+    group_ids?: Array<Id>;
+};
+
+export type ProviderAccountImportRequestWritable = {
+    accounts: Array<ProviderAccountImportItemWritable>;
+};
+
+export type AdminSettingsWritable = {
+    general: AdminSettingsGeneral;
+    agreement: AdminSettingsAgreement;
+    features: AdminSettingsFeatures;
+    security: AdminSettingsSecurity;
+    users: AdminSettingsUsers;
+    gateway: AdminSettingsGateway;
+    payment: AdminSettingsPayment;
+    email: AdminSettingsEmail;
+    backup: AdminSettingsBackup;
+    copilot: AdminSettingsCopilotWritable;
+    maintenance: AdminSettingsMaintenance;
+};
+
+/**
+ * Admin AI Copilot configuration. The copilot drives an agentic tool-calling loop over the admin API; configure which LLM powers it and how autonomously it may act.
+ */
+export type AdminSettingsCopilotWritable = {
+    /**
+     * Master switch for the copilot chat endpoint.
+     */
+    enabled: boolean;
+    /**
+     * Where the copilot's LLM credentials come from. "account" reuses an existing provider account; "dedicated" uses a standalone key.
+     */
+    source: 'account' | 'dedicated';
+    /**
+     * Provider account id used when source is "account" (0 = unset).
+     */
+    provider_account_id: number;
+    /**
+     * Default upstream model the copilot calls (e.g. claude-3-5-sonnet, gpt-4o).
+     */
+    model: string;
+    /**
+     * Selectable models offered in the chat composer's picker. Optional; when empty the picker is auto-derived from the account's discovered models plus the default.
+     */
+    models?: Array<string>;
+    /**
+     * Wire protocol for dedicated mode (openai-compatible, anthropic-compatible, gemini-compatible).
+     */
+    dedicated_protocol: string;
+    /**
+     * Upstream base URL for dedicated mode.
+     */
+    dedicated_base_url: string;
+    /**
+     * API key for dedicated mode. Write-only; supplied to set or rotate the key and never returned. Omit to keep the stored key.
+     */
+    dedicated_api_key?: string;
+    /**
+     * True when a dedicated API key is stored.
+     */
+    dedicated_api_key_configured: boolean;
+    /**
+     * Restrict the copilot to owner-role admins.
+     */
+    owner_only: boolean;
+    /**
+     * Auto-execute read-only (GET) tool calls without confirmation.
+     */
+    auto_run_reads: boolean;
+    /**
+     * Enable the copilot's public-web search tool (works with any model).
+     */
+    web_search_enabled: boolean;
+    /**
+     * Search backend for the web_search tool (tavily or brave).
+     */
+    web_search_provider: string;
+    /**
+     * Optional override base URL for the search provider.
+     */
+    web_search_base_url: string;
+    /**
+     * API key for the search provider. Write-only; supplied to set or rotate the key and never returned. Omit to keep the stored key.
+     */
+    web_search_api_key?: string;
+    /**
+     * True when a search-provider API key is stored.
+     */
+    web_search_api_key_configured: boolean;
+};
+
+export type AdminSettingsResponseWritable = {
+    data: AdminSettingsWritable;
+    request_id: RequestId;
+};
+
 export type CreateProxyDefinitionRequestWritable = {
     name: string;
     type: ProxyDefinitionType;
@@ -8391,142 +8520,7 @@ export type BatchCreateProxiesRequestWritable = {
     proxies: Array<CreateProxyDefinitionRequestWritable>;
 };
 
-export type ProviderAccountImportItemWritable = {
-    provider_id: Id;
-    name: string;
-    runtime_class: RuntimeClass;
-    upstream_client?: string | null;
-    /**
-     * Write-only credential payload. Exports intentionally omit this field.
-     */
-    credential?: {
-        [key: string]: unknown;
-    };
-    /**
-     * Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first.
-     */
-    proxy_id?: string | null;
-    status?: ProviderAccountStatus;
-    risk_level?: 'normal' | 'medium' | 'high';
-    priority?: number;
-    weight?: number;
-    metadata?: JsonObject;
-    group_ids?: Array<Id>;
-};
-
-export type ProviderAccountImportRequestWritable = {
-    accounts: Array<ProviderAccountImportItemWritable>;
-};
-
-export type AdminSettingsWritable = {
-    general: AdminSettingsGeneral;
-    agreement: AdminSettingsAgreement;
-    features: AdminSettingsFeatures;
-    security: AdminSettingsSecurity;
-    users: AdminSettingsUsers;
-    gateway: AdminSettingsGateway;
-    payment: AdminSettingsPayment;
-    email: AdminSettingsEmail;
-    backup: AdminSettingsBackup;
-    copilot: AdminSettingsCopilotWritable;
-    maintenance: AdminSettingsMaintenance;
-};
-
-/**
- * Admin AI Copilot configuration. The copilot drives an agentic tool-calling loop over the admin API; configure which LLM powers it and how autonomously it may act.
- */
-export type AdminSettingsCopilotWritable = {
-    /**
-     * Master switch for the copilot chat endpoint.
-     */
-    enabled: boolean;
-    /**
-     * Where the copilot's LLM credentials come from. "account" reuses an existing provider account; "dedicated" uses a standalone key.
-     */
-    source: 'account' | 'dedicated';
-    /**
-     * Provider account id used when source is "account" (0 = unset).
-     */
-    provider_account_id: number;
-    /**
-     * Account group id used when source is "account" (0 = unset). When set, the copilot randomly picks a member account each turn for load distribution.
-     */
-    provider_account_group_id: number;
-    /**
-     * Default upstream model the copilot calls (e.g. claude-3-5-sonnet, gpt-4o).
-     */
-    model: string;
-    /**
-     * Selectable models offered in the chat composer's picker. Optional; when empty the picker is auto-derived from the account's discovered models plus the default.
-     */
-    models?: Array<string>;
-    /**
-     * Wire protocol for dedicated mode (openai-compatible, anthropic-compatible, gemini-compatible).
-     */
-    dedicated_protocol: string;
-    /**
-     * Upstream base URL for dedicated mode.
-     */
-    dedicated_base_url: string;
-    /**
-     * API key for dedicated mode. Write-only; supplied to set or rotate the key and never returned. Omit to keep the stored key.
-     */
-    dedicated_api_key?: string;
-    /**
-     * True when a dedicated API key is stored.
-     */
-    dedicated_api_key_configured: boolean;
-    /**
-     * Restrict the copilot to owner-role admins.
-     */
-    owner_only: boolean;
-    /**
-     * Auto-execute read-only (GET) tool calls without confirmation.
-     */
-    auto_run_reads: boolean;
-    /**
-     * Enable the copilot's public-web search tool (works with any model).
-     */
-    web_search_enabled: boolean;
-    /**
-     * Search backend for the web_search tool (tavily or brave).
-     */
-    web_search_provider: string;
-    /**
-     * Optional override base URL for the search provider.
-     */
-    web_search_base_url: string;
-    /**
-     * API key for the search provider. Write-only; supplied to set or rotate the key and never returned. Omit to keep the stored key.
-     */
-    web_search_api_key?: string;
-    /**
-     * True when a search-provider API key is stored.
-     */
-    web_search_api_key_configured: boolean;
-};
-
-export type AdminSettingsResponseWritable = {
-    data: AdminSettingsWritable;
-    request_id: RequestId;
-};
-
-export type CaptchaSettingsWritable = {
-    /**
-     * When true, admin settings override environment captcha config.
-     */
-    managed: boolean;
-    enabled: boolean;
-    provider: 'turnstile' | 'hcaptcha' | 'recaptcha';
-    site_key: string;
-    secret_key?: string;
-    verify_url: string;
-};
-
-export type CaptchaSettingsResponseWritable = {
-    data: CaptchaSettingsWritable;
-    request_id: RequestId;
-};
+export type RerankDocumentWritable = string | JsonObject;
 
 export type ContentSafetyConfigWritable = {
     enabled: boolean;
@@ -8640,8 +8634,6 @@ export type SchedulerSimulationRequestWritable = {
     rollout_key?: string;
     request: SchedulerSimulationProfileWritable;
 };
-
-export type RerankDocumentWritable = string | JsonObject;
 
 export type ConfigSnapshotResponseWritable = {
     data: {

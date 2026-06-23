@@ -74,8 +74,6 @@ export function CopilotTab({
                   onField("dedicated_api_key", "");
                   onField("dedicated_base_url", "");
                   onField("dedicated_protocol", "");
-                } else {
-                  onField("provider_account_group_id", 0);
                 }
               }}
             >
@@ -117,12 +115,12 @@ export function CopilotTab({
           <p className="mt-1 text-xs text-srapi-text-tertiary">{t("copilot.fieldModelsHint")}</p>
         </div>
 
-        {value.source === "account" ? (
+        {value.source === "account" && groupOptions.length > 0 ? (
           <div>
             <Label>{t("copilot.fieldAccountGroup")}</Label>
             <Select
-              value={value.provider_account_group_id ? String(value.provider_account_group_id) : ""}
-              onValueChange={(v) => v && onField("provider_account_group_id", Number(v))}
+              value={value.provider_account_id ? String(value.provider_account_id) : ""}
+              onValueChange={(v) => v && onField("provider_account_id", Number(v))}
             >
               <SelectTrigger>
                 <SelectValue placeholder={t("copilot.selectAccountGroup")} />

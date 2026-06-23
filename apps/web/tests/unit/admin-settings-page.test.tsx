@@ -376,7 +376,6 @@ function settings(): AdminSettings {
       enabled: false,
       source: "account",
       provider_account_id: 0,
-      provider_account_group_id: 0,
       model: "",
       models: [],
       dedicated_protocol: "openai-compatible",
