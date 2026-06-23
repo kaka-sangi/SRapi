@@ -36,11 +36,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { LanguageToggle } from "@/components/layout/language-toggle";
 import { formatMoney } from "@/lib/admin-format";
+import { AppShell } from "@/components/layout/app-shell";
 import type { PaymentOrder, SubscriptionPlan } from "@/lib/sdk-types";
 
-// Public storefront. No AppShell — that gates by auth. The page is intentionally
-// renderable without a session so visitors can browse pricing first.
 export default function PricingPage() {
+  return (
+    <AppShell>
+      <PricingContent />
+    </AppShell>
+  );
+}
+
+function PricingContent() {
   const { t } = useLanguage();
   const plans = usePublicSubscriptionPlans();
   const [selected, setSelected] = useState<SubscriptionPlan | null>(null);
