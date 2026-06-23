@@ -58,9 +58,10 @@ func (s *Server) handleSiteConfig(w http.ResponseWriter, r *http.Request) {
 			"contact_info":   settings.General.ContactInfo,
 			"doc_url":        settings.General.DocURL,
 			"custom_menus":   publicCustomMenus(settings.General.CustomMenus),
-			"user_agreement": settings.Agreement.UserAgreement,
-			"privacy_policy": settings.Agreement.PrivacyPolicy,
-			"maintenance":    publicMaintenanceSummary(settings.Maintenance),
+			"user_agreement":       settings.Agreement.UserAgreement,
+			"privacy_policy":       settings.Agreement.PrivacyPolicy,
+			"maintenance":          publicMaintenanceSummary(settings.Maintenance),
+			"email_login_available": settings.Email.SMTPConfigured,
 		},
 		"request_id": requestID,
 	})

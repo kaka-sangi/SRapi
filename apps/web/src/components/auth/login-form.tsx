@@ -41,6 +41,7 @@ export function LoginForm() {
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
   const [submitting, setSubmitting] = useState(false);
   const [providers, setProviders] = useState<EnabledOAuthProvider[]>([]);
+  const [emailLoginAvailable, setEmailLoginAvailable] = useState(false);
   const [passwordlessSent, setPasswordlessSent] = useState(false);
   // When set, the password step succeeded but TOTP is required to finish.
   const [challengeId, setChallengeId] = useState<string | null>(null);
@@ -54,6 +55,11 @@ export function LoginForm() {
     apiService.listOAuthProviders().then((list) => {
       if (active) setProviders(list.filter((item) => !["wechat", "dingtalk"].includes(item.provider)));
     });
+    apiService.getSiteConfig().then((config) => {
+      if (active && (config as Record<string, unknown>).email_login_available) {
+        setEmailLoginAvailable(true);
+      }
+    }).catch(() => {});
     return () => {
       active = false;
     };
@@ -283,21 +289,25 @@ export function LoginForm() {
             ) : null}
           </span>
         </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="lg"
-          className="h-11 w-full rounded-xl"
-          disabled={submitting || !email || (captcha.required && !captcha.token)}
-          onClick={requestPasswordless}
-        >
-          {t("login.passwordlessButton")}
-        </Button>
-        {passwordlessSent ? (
-          <p className="text-center text-xs text-srapi-text-secondary">
-            Check your email for a one-time sign-in link.
-          </p>
-        ) : null}
+        {emailLoginAvailable && (
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              className="h-11 w-full rounded-xl"
+              disabled={submitting || !email || (captcha.required && !captcha.token)}
+              onClick={requestPasswordless}
+            >
+              {t("login.passwordlessButton")}
+            </Button>
+            {passwordlessSent ? (
+              <p className="text-center text-xs text-srapi-text-secondary">
+                Check your email for a one-time sign-in link.
+              </p>
+            ) : null}
+          </>
+        )}
       </form>
 
       {providers.length > 0 && (
