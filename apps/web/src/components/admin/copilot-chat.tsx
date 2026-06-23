@@ -718,7 +718,7 @@ function SearchResults({ content }: { content: string }) {
           <a
             href={it.url}
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
             className="text-sm font-medium text-srapi-primary underline underline-offset-2"
           >
             {it.title || it.url}

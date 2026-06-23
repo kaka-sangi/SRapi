@@ -436,7 +436,7 @@ export function AccountOAuthAuthorizeDialog({
                       <a
                         href={authUrl}
                         target="_blank"
-                        rel="noreferrer"
+                        rel="noopener noreferrer"
                         className="mt-2 inline-flex items-center gap-1.5 text-sm text-srapi-primary hover:underline"
                       >
                         <ExternalLink className="size-3.5" />
@@ -486,7 +486,7 @@ export function AccountOAuthAuthorizeDialog({
                 <a
                   href={device.verification_uri_complete ?? device.verification_uri}
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 text-sm text-srapi-primary hover:underline"
                 >
                   <ExternalLink className="size-3.5" />

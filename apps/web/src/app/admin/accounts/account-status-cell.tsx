@@ -91,7 +91,7 @@ export function AccountStatusCell({
         <a
           href={validationURL}
           target="_blank"
-          rel="noreferrer"
+          rel="noopener noreferrer"
           className="text-[11px] font-medium text-srapi-primary hover:underline"
         >
           {t("adminAccounts.validationLink")}
