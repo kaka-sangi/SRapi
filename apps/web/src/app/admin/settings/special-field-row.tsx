@@ -387,6 +387,30 @@ function OAuthProviderConfigsEditor({
     onChange(value.filter((_, i) => i !== index));
   }
 
+  const OAUTH_DEFAULTS: Record<string, Partial<OAuthProviderConfig>> = {
+    github: {
+      display_name: "GitHub",
+      authorize_url: "https://github.com/login/oauth/authorize",
+      token_url: "https://github.com/login/oauth/access_token",
+      userinfo_url: "https://api.github.com/user",
+      scopes: ["read:user", "user:email"],
+    },
+    google: {
+      display_name: "Google",
+      authorize_url: "https://accounts.google.com/o/oauth2/v2/auth",
+      token_url: "https://oauth2.googleapis.com/token",
+      userinfo_url: "https://www.googleapis.com/oauth2/v2/userinfo",
+      scopes: ["openid", "email", "profile"],
+    },
+    linuxdo: {
+      display_name: "LINUX DO",
+      authorize_url: "https://connect.linux.do/oauth2/authorize",
+      token_url: "https://connect.linux.do/oauth2/token",
+      userinfo_url: "https://connect.linux.do/api/user",
+      scopes: ["openid", "profile", "email"],
+    },
+  };
+
   function add() {
     onChange([
       ...value,
@@ -401,6 +425,15 @@ function OAuthProviderConfigsEditor({
         scopes: [],
       },
     ]);
+  }
+
+  function applyProviderDefaults(index: number, provider: string) {
+    const defaults = OAUTH_DEFAULTS[provider];
+    if (defaults) {
+      update(index, { provider: provider as AuthIdentityProvider, ...defaults });
+    } else {
+      update(index, { provider: provider as AuthIdentityProvider });
+    }
   }
 
   return (
@@ -427,7 +460,7 @@ function OAuthProviderConfigsEditor({
                   <Select
                     value={config.provider}
                     onValueChange={(provider) =>
-                      update(index, { provider: provider as AuthIdentityProvider })
+                      applyProviderDefaults(index, provider)
                     }
                   >
                     <SelectTrigger className="h-9 rounded-lg">
