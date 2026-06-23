@@ -4,6 +4,7 @@ import type { UseQueryResult } from "@tanstack/react-query";
 import { useState } from "react";
 import Link from "next/link";
 import { Bug, FileText, Fingerprint, Link2, ScrollText } from "lucide-react";
+import { cn } from "@/lib/cn";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
@@ -257,9 +258,28 @@ export function ErrorLogsPanel() {
     {
       key: "error_class",
       header: t("adminErrorLogs.errorClass"),
-      render: (e) => (
-        <span className="text-srapi-error font-mono text-xs">{e.error_class || "—"}</span>
-      ),
+      render: (e) => {
+        const cls = e.error_class || "";
+        const tone = errorClassTone(cls);
+        return (
+          <span className={cn(
+            "inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 font-mono text-[11px] font-medium",
+            tone === "error" && "bg-red-500/10 text-red-700 dark:text-red-400",
+            tone === "warning" && "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+            tone === "info" && "bg-blue-500/10 text-blue-700 dark:text-blue-400",
+            tone === "muted" && "bg-srapi-card-muted text-srapi-text-secondary",
+          )}>
+            <span className={cn(
+              "inline-block size-1.5 rounded-full",
+              tone === "error" && "bg-red-500",
+              tone === "warning" && "bg-amber-400",
+              tone === "info" && "bg-blue-500",
+              tone === "muted" && "bg-srapi-text-tertiary",
+            )} />
+            {cls || "—"}
+          </span>
+        );
+      },
     },
     {
       key: "phase",
@@ -268,17 +288,31 @@ export function ErrorLogsPanel() {
       render: (e) => (
         <div className="flex flex-wrap gap-1">
           {e.error_phase ? (
-            <span className="rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-secondary">
+            <span className={cn(
+              "rounded-full px-2 py-0.5 text-[11px] font-medium",
+              e.error_phase === "stream" ? "bg-purple-500/10 text-purple-700 dark:text-purple-400" :
+              e.error_phase === "auth" || e.error_phase === "auth_phase" ? "bg-orange-500/10 text-orange-700 dark:text-orange-400" :
+              "bg-srapi-card-muted text-srapi-text-secondary",
+            )}>
               {e.error_phase}
             </span>
           ) : null}
           {e.error_owner ? (
-            <span className="rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-tertiary">
+            <span className={cn(
+              "rounded-full px-2 py-0.5 text-[11px] font-medium",
+              e.error_owner === "provider" ? "bg-sky-500/10 text-sky-700 dark:text-sky-400" :
+              e.error_owner === "client" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" :
+              e.error_owner === "gateway" ? "bg-violet-500/10 text-violet-700 dark:text-violet-400" :
+              "bg-srapi-card-muted text-srapi-text-tertiary",
+            )}>
               {e.error_owner}
             </span>
           ) : null}
           {e.stream_completion_state ? (
-            <span className="rounded-full bg-srapi-card-muted px-2 py-0.5 text-[11px] font-medium text-srapi-text-tertiary">
+            <span className={cn(
+              "rounded-full px-2 py-0.5 text-[11px] font-medium",
+              streamStateTone(String(e.stream_completion_state)),
+            )}>
               {e.stream_completion_state}
             </span>
           ) : null}
@@ -906,4 +940,24 @@ function formatCompactCount(value: number): string {
     return `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k`;
   }
   return String(value);
+}
+
+function streamStateTone(state: string): string {
+  switch (state) {
+    case "completed": return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400";
+    case "client_disconnect": return "bg-sky-500/10 text-sky-700 dark:text-sky-400";
+    case "idle_timeout": return "bg-amber-500/10 text-amber-700 dark:text-amber-400";
+    case "interrupted": return "bg-red-500/10 text-red-700 dark:text-red-400";
+    default: return "bg-srapi-card-muted text-srapi-text-tertiary";
+  }
+}
+
+function errorClassTone(cls: string): "error" | "warning" | "info" | "muted" {
+  if (!cls) return "muted";
+  if (/rate_limit|quota_exhausted|overloaded|too_many/.test(cls)) return "warning";
+  if (/auth|permission|forbidden|credential|banned|abuse/.test(cls)) return "error";
+  if (/timeout|network|stream_interrupted|idle_timeout/.test(cls)) return "info";
+  if (/invalid_request|client_disconnect|content_safety/.test(cls)) return "warning";
+  if (/provider_5xx|server_error|empty_completion|invalid_response/.test(cls)) return "error";
+  return "error";
 }

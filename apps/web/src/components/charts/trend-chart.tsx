@@ -17,7 +17,7 @@ import { useHoverSync } from "./hover-sync-provider";
  * locally, and a floating mini-popover near the cursor shows date + each
  * series's value at that index (rich-tooltip style, inline render).
  */
-type TrendTone = "primary" | "secondary" | "success";
+type TrendTone = "primary" | "secondary" | "success" | "warning" | "error" | "info";
 export type TrendSeries = {
   key: string;
   label: string;
@@ -29,21 +29,33 @@ const STROKE: Record<TrendTone, string> = {
   primary: "stroke-srapi-primary",
   secondary: "stroke-srapi-text-secondary",
   success: "stroke-srapi-success",
+  warning: "stroke-amber-500",
+  error: "stroke-red-500",
+  info: "stroke-sky-500",
 };
 const AREA: Record<TrendTone, string> = {
   primary: "text-srapi-primary",
   secondary: "text-srapi-text-secondary",
   success: "text-srapi-success",
+  warning: "text-amber-500",
+  error: "text-red-500",
+  info: "text-sky-500",
 };
 const DOT: Record<TrendTone, string> = {
   primary: "bg-srapi-primary",
   secondary: "bg-srapi-text-secondary",
   success: "bg-srapi-success",
+  warning: "bg-amber-500",
+  error: "bg-red-500",
+  info: "bg-sky-500",
 };
 const DOT_FILL: Record<TrendTone, string> = {
   primary: "fill-srapi-primary",
   secondary: "fill-srapi-text-secondary",
   success: "fill-srapi-success",
+  warning: "fill-amber-500",
+  error: "fill-red-500",
+  info: "fill-sky-500",
 };
 
 export function TrendChart({
