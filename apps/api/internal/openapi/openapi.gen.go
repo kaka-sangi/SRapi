@@ -5275,6 +5275,12 @@ type AdminSettingsCopilot struct {
 	// Source Where the copilot's LLM credentials come from. "account" reuses an existing provider account; "dedicated" uses a standalone key.
 	Source AdminSettingsCopilotSource `json:"source"`
 
+	// Temperature Sampling temperature (0.0–2.0). Lower = more deterministic. Null uses the model default.
+	Temperature *float32 `json:"temperature,omitempty"`
+
+	// TopP Nucleus sampling cutoff (0.0–1.0). Null uses the model default.
+	TopP *float32 `json:"top_p,omitempty"`
+
 	// WebSearchApiKey API key for the search provider. Write-only; supplied to set or rotate the key and never returned. Omit to keep the stored key.
 	WebSearchApiKey *string `json:"web_search_api_key,omitempty"`
 

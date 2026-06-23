@@ -267,8 +267,8 @@ export function CopilotTab({
           </div>
         </div>
 
-        <div className="border-t border-srapi-border/70 pt-4">
-          <div className="mb-4">
+        <div className="space-y-4 border-t border-srapi-border/70 pt-4">
+          <div>
             <Label htmlFor="copilot-maxtokens">{t("copilot.fieldMaxTokens")}</Label>
             <p className="mt-0.5 mb-1.5 text-xs text-srapi-text-tertiary">{t("copilot.fieldMaxTokensHint")}</p>
             <Input
@@ -279,6 +279,36 @@ export function CopilotTab({
               value={value.max_output_tokens || ""}
               onChange={(e) => onField("max_output_tokens", e.target.value === "" ? 0 : Number(e.target.value))}
             />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="copilot-temp">{t("copilot.fieldTemperature")}</Label>
+              <p className="mt-0.5 mb-1.5 text-xs text-srapi-text-tertiary">{t("copilot.fieldTemperatureHint")}</p>
+              <Input
+                id="copilot-temp"
+                type="number"
+                min={0}
+                max={2}
+                step={0.1}
+                placeholder={t("copilot.modelDefault")}
+                value={String((value as Record<string, unknown>).temperature ?? "")}
+                onChange={(e) => onField("temperature" as keyof typeof value, e.target.value === "" ? null : Number(e.target.value))}
+              />
+            </div>
+            <div>
+              <Label htmlFor="copilot-topp">{t("copilot.fieldTopP")}</Label>
+              <p className="mt-0.5 mb-1.5 text-xs text-srapi-text-tertiary">{t("copilot.fieldTopPHint")}</p>
+              <Input
+                id="copilot-topp"
+                type="number"
+                min={0}
+                max={1}
+                step={0.05}
+                placeholder={t("copilot.modelDefault")}
+                value={String((value as Record<string, unknown>).top_p ?? "")}
+                onChange={(e) => onField("top_p" as keyof typeof value, e.target.value === "" ? null : Number(e.target.value))}
+              />
+            </div>
           </div>
           <div className="flex justify-end">
             <Button variant="primary" loading={pending} onClick={onSave}>

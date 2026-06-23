@@ -3600,6 +3600,14 @@ export type AdminSettingsCopilot = {
      */
     max_output_tokens?: number;
     /**
+     * Sampling temperature (0.0–2.0). Lower = more deterministic. Null uses the model default.
+     */
+    temperature?: number | null;
+    /**
+     * Nucleus sampling cutoff (0.0–1.0). Null uses the model default.
+     */
+    top_p?: number | null;
+    /**
      * Enable the copilot's public-web search tool (works with any model).
      */
     web_search_enabled: boolean;
@@ -8474,6 +8482,14 @@ export type AdminSettingsCopilotWritable = {
      * Maximum output tokens for the copilot's LLM calls. 0 uses the default (8192). Increase if the copilot truncates large tool call arguments.
      */
     max_output_tokens?: number;
+    /**
+     * Sampling temperature (0.0–2.0). Lower = more deterministic. Null uses the model default.
+     */
+    temperature?: number | null;
+    /**
+     * Nucleus sampling cutoff (0.0–1.0). Null uses the model default.
+     */
+    top_p?: number | null;
     /**
      * Enable the copilot's public-web search tool (works with any model).
      */

@@ -180,6 +180,8 @@ func (s *Server) buildCopilotLLM(settings copilot.Settings, ciphertext, override
 			Tools:           tools,
 			ToolChoice:      "auto",
 			MaxOutputTokens: &maxTokens,
+			Temperature:     settings.Temperature,
+			TopP:            settings.TopP,
 		}
 		if settings.Source == "dedicated" {
 			key, err := s.decryptCopilotSecret(ciphertext)
@@ -516,6 +518,8 @@ func (s *Server) copilotSettings(ctx context.Context) (copilot.Settings, string,
 		OwnerOnly:         c.OwnerOnly,
 		AutoRunReads:      c.AutoRunReads,
 		MaxOutputTokens:   c.MaxOutputTokens,
+		Temperature:       c.Temperature,
+		TopP:              c.TopP,
 
 		WebSearchEnabled:          c.WebSearchEnabled,
 		WebSearchProvider:         c.WebSearchProvider,

@@ -19,6 +19,8 @@ type Settings struct {
 	OwnerOnly         bool
 	AutoRunReads      bool
 	MaxOutputTokens   int
+	Temperature       *float32
+	TopP              *float32
 
 	// SystemSummary is an optional runtime snapshot (account counts, health, etc.)
 	// injected into the system prompt so the model starts with situational awareness.
