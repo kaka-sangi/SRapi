@@ -167,6 +167,7 @@ export const en = {
     usage: "Usage",
     account: "Profile",
     billing: "Billing",
+    pricing: "Plans & Pricing",
     redeem: "Redeem",
     affiliate: "Affiliate",
     providerAccounts: "Provider accounts",

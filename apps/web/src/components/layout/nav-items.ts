@@ -66,6 +66,7 @@ const ACCOUNT_SECTION: NavSection = {
   items: [
     { href: USER_ROUTES.account, labelKey: "nav.account", icon: CircleUser },
     { href: USER_ROUTES.billing, labelKey: "nav.billing", icon: Wallet, requiresPayment: true },
+    { href: "/pricing", labelKey: "nav.pricing", icon: Ticket, requiresPayment: true },
     { href: USER_ROUTES.redeem, labelKey: "nav.redeem", icon: Gem, requiresPayment: true },
     { href: USER_ROUTES.affiliate, labelKey: "nav.affiliate", icon: Handshake },
   ],

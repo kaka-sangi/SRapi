@@ -168,6 +168,7 @@ export const zh: Messages = {
     usage: "用量",
     account: "个人资料",
     billing: "账单",
+    pricing: "套餐订阅",
     redeem: "兑换",
     affiliate: "推广",
     providerAccounts: "上游账号",
