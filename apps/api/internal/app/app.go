@@ -12,6 +12,7 @@ import (
 
 	"github.com/srapi/srapi/apps/api/internal/config"
 	"github.com/srapi/srapi/apps/api/internal/httpserver"
+	errorpassthroughservice "github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/service"
 	"github.com/srapi/srapi/apps/api/internal/persistence/entstore"
 	entschedulerstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/scheduler"
 	redisbalancereservation "github.com/srapi/srapi/apps/api/internal/persistence/redisstore/balancereservation"
@@ -494,6 +495,13 @@ func persistentStores(ctx context.Context, cfg config.Config, logger *slog.Logge
 	stores, err := entstore.New(dbClient.Ent())
 	if err != nil {
 		return nil, err
+	}
+	if stores.ErrorPassthrough != nil {
+		if n, seedErr := errorpassthroughservice.SeedDefaultRules(ctx, stores.ErrorPassthrough); seedErr != nil {
+			logger.Warn("failed to seed error passthrough defaults", "error", seedErr)
+		} else if n > 0 {
+			logger.Info("seeded default error passthrough rules", "count", n)
+		}
 	}
 	leaseStore, err := schedulerLeaseStore(ctx, cfg, logger, redisClient)
 	if err != nil {
