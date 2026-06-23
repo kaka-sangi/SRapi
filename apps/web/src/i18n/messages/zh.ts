@@ -738,7 +738,10 @@ export const zh: Messages = {
   adminUserAttributeValues: {
     title: "自定义属性",
     subtitle: "为 {user} 设置自定义属性值。",
-    empty: "尚未定义自定义属性,请先到 /admin/identity 定义。",
+    empty: "尚未定义自定义属性。",
+    emptyTitle: "暂无自定义属性",
+    emptyHint: "自定义属性可以为用户附加额外字段（部门、团队、级别等）。请先创建属性定义，再在此处为用户赋值。",
+    emptyAction: "前往属性定义",
     required: "{name} 是必填项。",
   },
   adminAccounts: {

@@ -750,7 +750,10 @@ export const en = {
   adminUserAttributeValues: {
     title: "Custom attributes",
     subtitle: "Set custom attribute values for {user}.",
-    empty: "No custom attribute definitions exist yet. Define them at /admin/identity first.",
+    empty: "No custom attribute definitions exist yet.",
+    emptyTitle: "No custom attributes defined",
+    emptyHint: "Custom attributes let you attach extra fields (department, team, tier, etc.) to user profiles. Create attribute definitions first, then assign values here.",
+    emptyAction: "Go to attribute definitions",
     required: "{name} is required.",
   },
   adminAccounts: {

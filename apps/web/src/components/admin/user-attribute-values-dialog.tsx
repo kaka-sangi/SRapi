@@ -107,9 +107,17 @@ export function UserAttributeValuesDialog({
           <PageQueryState query={query} skeleton={<DialogListSkeleton rows={3} />}>
             {(list) =>
               list.data.length === 0 ? (
-                <p className="text-sm text-srapi-text-tertiary">
-                  {t("adminUserAttributeValues.empty")}
-                </p>
+                <div className="space-y-3 py-6 text-center">
+                  <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-srapi-card-muted">
+                    <svg className="size-6 text-srapi-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" /><path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" /></svg>
+                  </div>
+                  <p className="text-sm font-medium text-srapi-text-primary">{t("adminUserAttributeValues.emptyTitle")}</p>
+                  <p className="mx-auto max-w-xs text-xs text-srapi-text-tertiary">{t("adminUserAttributeValues.emptyHint")}</p>
+                  <a href="/admin/identity?tab=user-attributes" className="inline-flex items-center gap-1 text-xs font-medium text-srapi-primary hover:underline">
+                    {t("adminUserAttributeValues.emptyAction")}
+                    <svg className="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" /></svg>
+                  </a>
+                </div>
               ) : (
                 <div className="space-y-2.5">
                   {list.data.map((row) => {
