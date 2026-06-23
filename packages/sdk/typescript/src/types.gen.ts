@@ -516,9 +516,13 @@ export type OAuthProviderConfig = {
      */
     display_name: string;
     /**
-     * Public OAuth client id. Client secrets are not exposed in admin settings.
+     * Public OAuth client id.
      */
     client_id: string;
+    /**
+     * True when a client secret is stored for this provider config.
+     */
+    readonly client_secret_configured?: boolean;
     /**
      * HTTPS provider authorization endpoint without query or fragment.
      */
@@ -532,9 +536,9 @@ export type OAuthProviderConfig = {
      */
     userinfo_url?: string;
     /**
-     * Token endpoint client authentication method. v1 accepts none so client secrets stay outside Admin Settings.
+     * Token endpoint client authentication method.
      */
-    token_auth_method?: 'none';
+    token_auth_method?: 'none' | 'client_secret_post' | 'client_secret_basic';
     /**
      * Registered callback URI. HTTP is accepted only for localhost development.
      */
@@ -8185,6 +8189,50 @@ export type ConfigImportResponse = {
     request_id: RequestId;
 };
 
+export type OAuthProviderConfigWritable = {
+    provider: AuthIdentityProvider;
+    /**
+     * Stable provider instance key. Defaults to provider name for single-instance providers.
+     */
+    provider_key: string;
+    /**
+     * Non-secret label shown in console settings.
+     */
+    display_name: string;
+    /**
+     * Public OAuth client id.
+     */
+    client_id: string;
+    /**
+     * OAuth client secret. Write-only; supplied to set or rotate and never returned. Omit to keep the stored secret.
+     */
+    client_secret?: string;
+    /**
+     * HTTPS provider authorization endpoint without query or fragment.
+     */
+    authorize_url: string;
+    /**
+     * Optional provider token endpoint for callback completion. HTTPS is required except localhost development. v1 supports public clients with token_auth_method=none.
+     */
+    token_url?: string;
+    /**
+     * Optional provider UserInfo/profile endpoint for callback completion. HTTPS is required except localhost development.
+     */
+    userinfo_url?: string;
+    /**
+     * Token endpoint client authentication method.
+     */
+    token_auth_method?: 'none' | 'client_secret_post' | 'client_secret_basic';
+    /**
+     * Registered callback URI. HTTP is accepted only for localhost development.
+     */
+    redirect_uri: string;
+    /**
+     * Provider scopes sent as a space-delimited authorization request parameter.
+     */
+    scopes: Array<string>;
+};
+
 export type CaptchaSettingsWritable = {
     /**
      * When true, admin settings override environment captcha config.
@@ -8345,11 +8393,26 @@ export type ProviderAccountImportRequestWritable = {
     accounts: Array<ProviderAccountImportItemWritable>;
 };
 
+export type AdminSettingsSecurityWritable = {
+    admin_api_key: SecretConfigured;
+    registration_enabled: boolean;
+    /**
+     * Normalized allowed email suffixes for public registration. Empty means all valid email domains are allowed.
+     */
+    registration_email_suffix_allowlist: Array<string>;
+    oauth_enabled: boolean;
+    oauth_providers: Array<string>;
+    /**
+     * Non-secret OAuth/OIDC provider authorization settings. Secrets for token exchange are configured outside this response.
+     */
+    oauth_provider_configs: Array<OAuthProviderConfigWritable>;
+};
+
 export type AdminSettingsWritable = {
     general: AdminSettingsGeneral;
     agreement: AdminSettingsAgreement;
     features: AdminSettingsFeatures;
-    security: AdminSettingsSecurity;
+    security: AdminSettingsSecurityWritable;
     users: AdminSettingsUsers;
     gateway: AdminSettingsGateway;
     payment: AdminSettingsPayment;

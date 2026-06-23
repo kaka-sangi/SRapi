@@ -190,16 +190,17 @@ type AdminSettingsSecurity struct {
 }
 
 type OAuthProviderConfig struct {
-	Provider        string   `json:"provider"`
-	ProviderKey     string   `json:"provider_key"`
-	DisplayName     string   `json:"display_name"`
-	ClientID        string   `json:"client_id"`
-	AuthorizeURL    string   `json:"authorize_url"`
-	TokenURL        string   `json:"token_url"`
-	UserInfoURL     string   `json:"userinfo_url"`
-	TokenAuthMethod string   `json:"token_auth_method"`
-	RedirectURI     string   `json:"redirect_uri"`
-	Scopes          []string `json:"scopes"`
+	Provider              string   `json:"provider"`
+	ProviderKey           string   `json:"provider_key"`
+	DisplayName           string   `json:"display_name"`
+	ClientID              string   `json:"client_id"`
+	ClientSecretCiphertext string  `json:"client_secret_ciphertext,omitempty"`
+	AuthorizeURL          string   `json:"authorize_url"`
+	TokenURL              string   `json:"token_url"`
+	UserInfoURL           string   `json:"userinfo_url"`
+	TokenAuthMethod       string   `json:"token_auth_method"`
+	RedirectURI           string   `json:"redirect_uri"`
+	Scopes                []string `json:"scopes"`
 }
 type AdminSettingsUsers struct {
 	DefaultBalance        string `json:"default_balance"`

@@ -237,7 +237,7 @@ func (s *Server) handleCompleteOAuthAuthorization(w http.ResponseWriter, r *http
 
 	ctx, cancel := context.WithTimeout(r.Context(), oauthProviderHTTPTimeout)
 	defer cancel()
-	accessToken, idToken, err := exchangeOAuthAuthorizationCode(ctx, http.DefaultClient, config, flow, code, s.runtime.oauthClientSecret(flow.ProviderKey))
+	accessToken, idToken, err := exchangeOAuthAuthorizationCode(ctx, http.DefaultClient, config, flow, code, s.oauthClientSecretWithStored(flow.ProviderKey))
 	if err != nil {
 		s.clearOAuthFlowCookie(w)
 		s.logger.Warn("oauth token exchange failed", "provider", provider, "provider_key", flow.ProviderKey, "error", err)
@@ -965,10 +965,29 @@ func callbackOAuthProviderConfigReady(config admincontrolcontract.OAuthProviderC
 // provider key, sourced from deployment env (never AdminSettings). Empty means a
 // public client.
 func (rt *runtimeState) oauthClientSecret(providerKey string) string {
+	// Legacy environment variable path.
 	if rt == nil || rt.cfg.OAuth.ClientSecrets == nil {
 		return ""
 	}
 	return rt.cfg.OAuth.ClientSecrets[strings.TrimSpace(providerKey)]
+}
+
+// oauthClientSecretWithStored resolves the client secret for a provider key,
+// preferring the encrypted secret stored in admin settings, falling back to
+// the legacy OAUTH_CLIENT_SECRETS_JSON environment variable.
+func (s *Server) oauthClientSecretWithStored(providerKey string) string {
+	providerKey = strings.TrimSpace(providerKey)
+	settings, err := s.runtime.adminControl.GetAdminSettings(context.Background())
+	if err == nil {
+		for _, cfg := range settings.Security.OAuthProviderConfigs {
+			if cfg.ProviderKey == providerKey && cfg.ClientSecretCiphertext != "" {
+				if secret, derr := s.decryptOAuthClientSecret(cfg.ClientSecretCiphertext); derr == nil && secret != "" {
+					return secret
+				}
+			}
+		}
+	}
+	return s.runtime.oauthClientSecret(providerKey)
 }
 
 // oauthIssuer returns the configured OIDC issuer for a console OAuth provider

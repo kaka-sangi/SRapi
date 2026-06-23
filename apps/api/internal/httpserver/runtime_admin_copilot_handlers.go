@@ -726,3 +726,13 @@ func (s *Server) encryptCopilotSecret(plaintext string) (string, error) {
 func (s *Server) decryptCopilotSecret(ciphertext string) (string, error) {
 	return s.decryptMasterSecret(ciphertext, copilotSecretVersion)
 }
+
+const oauthSecretVersion = "oauth_v1"
+
+func (s *Server) encryptOAuthClientSecret(plaintext string) (string, error) {
+	return s.encryptMasterSecret(plaintext, oauthSecretVersion)
+}
+
+func (s *Server) decryptOAuthClientSecret(ciphertext string) (string, error) {
+	return s.decryptMasterSecret(ciphertext, oauthSecretVersion)
+}

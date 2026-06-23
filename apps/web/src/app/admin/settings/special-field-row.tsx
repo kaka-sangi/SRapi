@@ -511,6 +511,20 @@ function OAuthProviderConfigsEditor({
                     onChange={(event) => update(index, { client_id: event.target.value })}
                   />
                 </Field>
+                <Field
+                  className="lg:col-span-3"
+                  htmlFor={`oauth-${index}-client-secret`}
+                  label={t("adminSettings.oauthFields.clientSecret")}
+                >
+                  <Input
+                    id={`oauth-${index}-client-secret`}
+                    className="h-9 font-mono text-xs"
+                    type="password"
+                    placeholder={(config as Record<string, unknown>).client_secret_configured ? t("adminSettings.oauthFields.secretConfigured") : t("adminSettings.oauthFields.secretPlaceholder")}
+                    value={(config as Record<string, unknown>).client_secret as string ?? ""}
+                    onChange={(event) => update(index, { client_secret: event.target.value } as Partial<OAuthProviderConfig>)}
+                  />
+                </Field>
                 <div className="flex items-end justify-end lg:col-span-3">
                   <Button
                     type="button"

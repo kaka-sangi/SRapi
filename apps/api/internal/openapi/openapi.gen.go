@@ -2164,12 +2164,18 @@ func (e OAuthPendingNextStep) Valid() bool {
 
 // Defines values for OAuthProviderConfigTokenAuthMethod.
 const (
-	OAuthProviderConfigTokenAuthMethodNone OAuthProviderConfigTokenAuthMethod = "none"
+	OAuthProviderConfigTokenAuthMethodClientSecretBasic OAuthProviderConfigTokenAuthMethod = "client_secret_basic"
+	OAuthProviderConfigTokenAuthMethodClientSecretPost  OAuthProviderConfigTokenAuthMethod = "client_secret_post"
+	OAuthProviderConfigTokenAuthMethodNone              OAuthProviderConfigTokenAuthMethod = "none"
 )
 
 // Valid indicates whether the value is a known member of the OAuthProviderConfigTokenAuthMethod enum.
 func (e OAuthProviderConfigTokenAuthMethod) Valid() bool {
 	switch e {
+	case OAuthProviderConfigTokenAuthMethodClientSecretBasic:
+		return true
+	case OAuthProviderConfigTokenAuthMethodClientSecretPost:
+		return true
 	case OAuthProviderConfigTokenAuthMethodNone:
 		return true
 	default:
@@ -9485,8 +9491,14 @@ type OAuthProviderConfig struct {
 	// AuthorizeUrl HTTPS provider authorization endpoint without query or fragment.
 	AuthorizeUrl string `json:"authorize_url"`
 
-	// ClientId Public OAuth client id. Client secrets are not exposed in admin settings.
+	// ClientId Public OAuth client id.
 	ClientId string `json:"client_id"`
+
+	// ClientSecret OAuth client secret. Write-only; supplied to set or rotate and never returned. Omit to keep the stored secret.
+	ClientSecret *string `json:"client_secret,omitempty"`
+
+	// ClientSecretConfigured True when a client secret is stored for this provider config.
+	ClientSecretConfigured *bool `json:"client_secret_configured,omitempty"`
 
 	// DisplayName Non-secret label shown in console settings.
 	DisplayName string               `json:"display_name"`
@@ -9501,7 +9513,7 @@ type OAuthProviderConfig struct {
 	// Scopes Provider scopes sent as a space-delimited authorization request parameter.
 	Scopes []string `json:"scopes"`
 
-	// TokenAuthMethod Token endpoint client authentication method. v1 accepts none so client secrets stay outside Admin Settings.
+	// TokenAuthMethod Token endpoint client authentication method.
 	TokenAuthMethod *OAuthProviderConfigTokenAuthMethod `json:"token_auth_method,omitempty"`
 
 	// TokenUrl Optional provider token endpoint for callback completion. HTTPS is required except localhost development. v1 supports public clients with token_auth_method=none.
@@ -9511,7 +9523,7 @@ type OAuthProviderConfig struct {
 	UserinfoUrl *string `json:"userinfo_url,omitempty"`
 }
 
-// OAuthProviderConfigTokenAuthMethod Token endpoint client authentication method. v1 accepts none so client secrets stay outside Admin Settings.
+// OAuthProviderConfigTokenAuthMethod Token endpoint client authentication method.
 type OAuthProviderConfigTokenAuthMethod string
 
 // OpenAIModel defines model for OpenAIModel.

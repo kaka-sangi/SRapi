@@ -18661,7 +18661,15 @@ components:
           description: Non-secret label shown in console settings.
         client_id:
           type: string
-          description: Public OAuth client id. Client secrets are not exposed in admin settings.
+          description: Public OAuth client id.
+        client_secret:
+          type: string
+          writeOnly: true
+          description: OAuth client secret. Write-only; supplied to set or rotate and never returned. Omit to keep the stored secret.
+        client_secret_configured:
+          type: boolean
+          readOnly: true
+          description: True when a client secret is stored for this provider config.
         authorize_url:
           type: string
           format: uri
@@ -18676,10 +18684,12 @@ components:
           description: Optional provider UserInfo/profile endpoint for callback completion. HTTPS is required except localhost development.
         token_auth_method:
           type: string
-          description: Token endpoint client authentication method. v1 accepts none so client secrets stay outside Admin Settings.
+          description: Token endpoint client authentication method.
           enum:
             - none
-          default: none
+            - client_secret_post
+            - client_secret_basic
+          default: client_secret_post
         redirect_uri:
           type: string
           format: uri

@@ -71,6 +71,26 @@ func (s *Server) handleUpdateAdminSettings(w http.ResponseWriter, r *http.Reques
 	} else {
 		mapped.Copilot.WebSearchAPIKeyCiphertext = before.Copilot.WebSearchAPIKeyCiphertext
 	}
+	// OAuth client secrets: encrypt freshly supplied ones, carry over stored
+	// ciphertexts for configs that omit the write-only field.
+	existingByKey := map[string]string{}
+	for _, cfg := range before.Security.OAuthProviderConfigs {
+		if cfg.ClientSecretCiphertext != "" {
+			existingByKey[cfg.ProviderKey] = cfg.ClientSecretCiphertext
+		}
+	}
+	for i, apiCfg := range body.Security.OauthProviderConfigs {
+		if apiCfg.ClientSecret != nil && strings.TrimSpace(*apiCfg.ClientSecret) != "" {
+			ciphertext, encErr := s.encryptOAuthClientSecret(strings.TrimSpace(*apiCfg.ClientSecret))
+			if encErr != nil {
+				writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to secure oauth secret", requestID)
+				return
+			}
+			mapped.Security.OAuthProviderConfigs[i].ClientSecretCiphertext = ciphertext
+		} else if existing, ok := existingByKey[apiCfg.ProviderKey]; ok {
+			mapped.Security.OAuthProviderConfigs[i].ClientSecretCiphertext = existing
+		}
+	}
 	updated, err := s.runtime.adminControl.UpdateAdminSettings(r.Context(), mapped, session.User.ID)
 	if err != nil {
 		writeAdminControlError(w, err, requestID)
@@ -965,17 +985,19 @@ func adminSettingsFromAPI(in apiopenapi.AdminSettings) admincontrol.AdminSetting
 func toAPIOAuthProviderConfigs(values []admincontrol.OAuthProviderConfig) []apiopenapi.OAuthProviderConfig {
 	out := make([]apiopenapi.OAuthProviderConfig, 0, len(values))
 	for _, value := range values {
+		configured := strings.TrimSpace(value.ClientSecretCiphertext) != ""
 		out = append(out, apiopenapi.OAuthProviderConfig{
-			AuthorizeUrl:    value.AuthorizeURL,
-			ClientId:        value.ClientID,
-			DisplayName:     value.DisplayName,
-			Provider:        apiopenapi.AuthIdentityProvider(value.Provider),
-			ProviderKey:     value.ProviderKey,
-			RedirectUri:     value.RedirectURI,
-			Scopes:          append([]string(nil), value.Scopes...),
-			TokenAuthMethod: oauthTokenAuthMethodPtrValueForAPI(value.TokenAuthMethod),
-			TokenUrl:        stringPtrValueForAPI(value.TokenURL),
-			UserinfoUrl:     stringPtrValueForAPI(value.UserInfoURL),
+			AuthorizeUrl:          value.AuthorizeURL,
+			ClientId:              value.ClientID,
+			ClientSecretConfigured: &configured,
+			DisplayName:           value.DisplayName,
+			Provider:              apiopenapi.AuthIdentityProvider(value.Provider),
+			ProviderKey:           value.ProviderKey,
+			RedirectUri:           value.RedirectURI,
+			Scopes:                append([]string(nil), value.Scopes...),
+			TokenAuthMethod:       oauthTokenAuthMethodPtrValueForAPI(value.TokenAuthMethod),
+			TokenUrl:              stringPtrValueForAPI(value.TokenURL),
+			UserinfoUrl:           stringPtrValueForAPI(value.UserInfoURL),
 		})
 	}
 	return out
