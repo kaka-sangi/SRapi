@@ -38,6 +38,20 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 	if rec.AttemptNo == 0 {
 		rec.AttemptNo = 1
 	}
+	// Streaming anti-double-billing: for successful streaming requests, check
+	// whether a prior attempt already recorded billing for this RequestID. The
+	// balance reservation is already idempotent; this guard prevents a second
+	// usage_log row (and thus a second billing aggregation) when a client
+	// retries a streaming request that completed on a previous attempt.
+	if rec.Success && rec.StreamCompletionState != "" {
+		if rt.isStreamingBillingRecorded(ctx, rec.RequestID) {
+			rt.logger.Info("streaming billing already recorded — skipping duplicate",
+				"request_id", rec.RequestID)
+			rt.releaseGatewayReservation(ctx, rec.Authed.UserID, rec.RequestID)
+			return
+		}
+		rt.markStreamingBillingRecorded(ctx, rec.RequestID)
+	}
 	rec.SourceEndpoint = gatewayEvidenceEndpoint(ctx, rec.SourceEndpoint)
 	model := fallbackModelName(rec.Model)
 	pricing := rec.Pricing.withDefaults()
@@ -116,6 +130,21 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 	rt.dispatchUsageWrite(detached, func(c context.Context) {
 		rt.recordGatewayUsageEffects(c, rec, model, pricing, usageLogID)
 	})
+}
+
+func (rt *runtimeState) isStreamingBillingRecorded(_ context.Context, requestID string) bool {
+	if rt.streamBillingDedup == nil || requestID == "" {
+		return false
+	}
+	_, ok := rt.streamBillingDedup.Get(requestID)
+	return ok
+}
+
+func (rt *runtimeState) markStreamingBillingRecorded(_ context.Context, requestID string) {
+	if rt.streamBillingDedup == nil || requestID == "" {
+		return
+	}
+	rt.streamBillingDedup.Set(requestID, true)
 }
 
 func (rt *runtimeState) releaseGatewaySchedulerLease(ctx context.Context, result schedulercontract.ScheduleResult, reason string) {

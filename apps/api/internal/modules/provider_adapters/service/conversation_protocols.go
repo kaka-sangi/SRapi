@@ -84,6 +84,7 @@ func anthropicCompatibleRequestBody(req contract.ConversationRequest) ([]byte, e
 		return nil, err
 	}
 	raw = claudeThinkingSanitizeRawPayload(req.Mapping.UpstreamModelName, raw)
+	raw = oauthToolNameSanitizeRawPayload(req, raw)
 	raw = translator.Default().TranslateRequest(
 		translator.FormatClaudeMessages,
 		translator.FormatOpenAIResponses,

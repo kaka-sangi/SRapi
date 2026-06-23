@@ -22,6 +22,7 @@ package service
 
 import (
 	"container/list"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -60,6 +61,17 @@ type Key struct {
 	Model     string
 }
 
+// HitCounter is an optional distributed hit counter for cross-node
+// escalation. When set, RecordRateLimitHit increments the distributed
+// counter and uses its value for the escalation threshold instead of the
+// local hits slice. This ensures that N hits spread across M nodes still
+// trigger escalation when the cluster-wide total reaches the threshold.
+type HitCounter interface {
+	// IncrHit atomically increments the hit count for the key and returns
+	// the new total. The counter auto-expires after the consecutive window.
+	IncrHit(key string, window time.Duration) (int64, error)
+}
+
 // Service is the in-process per-(account, model) cooldown registry.
 // Safe for concurrent use; all state is held under a single mutex.
 type Service struct {
@@ -68,6 +80,7 @@ type Service struct {
 	order       *list.List
 	maxAccounts int
 	now         func() time.Time
+	hitCounter  HitCounter
 }
 
 type cooldownEntry struct {
@@ -97,6 +110,14 @@ func NewWithMax(maxAccounts int) *Service {
 		maxAccounts: maxAccounts,
 		now:         time.Now,
 	}
+}
+
+// SetHitCounter wires an optional distributed hit counter. When set,
+// escalation checks use the cluster-wide count instead of local hits.
+func (s *Service) SetHitCounter(hc HitCounter) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.hitCounter = hc
 }
 
 // RecordRateLimitHit records a 429 for (accountID, model). Model is
@@ -133,8 +154,18 @@ func (s *Service) RecordRateLimitHit(accountID int64, model string, retryAfter t
 	filtered = append(filtered, now)
 	entry.hits = filtered
 
-	if len(entry.hits) >= consecutiveDisableThreshold {
-		disableUntil := now.Add(escalatedCooldown(len(entry.hits)))
+	// Determine the hit count for escalation: prefer the distributed counter
+	// (cluster-wide) when available, fall back to the local hits slice.
+	hitCount := len(entry.hits)
+	if s.hitCounter != nil {
+		counterKey := "rlc:" + key.hitCounterKey()
+		if n, err := s.hitCounter.IncrHit(counterKey, consecutiveWindow); err == nil && int(n) > hitCount {
+			hitCount = int(n)
+		}
+	}
+
+	if hitCount >= consecutiveDisableThreshold {
+		disableUntil := now.Add(escalatedCooldown(hitCount))
 		if disableUntil.After(entry.tempDisabledUntil) {
 			entry.tempDisabledUntil = disableUntil
 		}
@@ -317,6 +348,13 @@ func escalatedCooldown(hits int) time.Duration {
 		return maxDisableCooldown
 	}
 	return d
+}
+
+func (k Key) hitCounterKey() string {
+	if k.Model == "" {
+		return fmt.Sprintf("%d", k.AccountID)
+	}
+	return fmt.Sprintf("%d:%s", k.AccountID, k.Model)
 }
 
 func normalizeKey(accountID int64, model string) Key {

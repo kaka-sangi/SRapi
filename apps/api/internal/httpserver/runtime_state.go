@@ -312,6 +312,10 @@ type runtimeState struct {
 	// durable usage_log. Inspired by sub2api's BillingCircuitBreaker.
 	billingBreaker *circuitbreaker.Breaker
 
+	// streamBillingDedup prevents double-billing when a client retries a
+	// streaming request. Keyed by RequestID; entries expire after 5 minutes.
+	streamBillingDedup *localcache.Cache[bool]
+
 	// requestLogFiles holds the optional file-based per-request capture
 	// (gateway HTTP envelope dumps). Lazily populated by
 	// ensureRequestLogFilesState; nil until the first call. Disabling
@@ -1109,13 +1113,23 @@ func assembleRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOp
 		redisProbe:           opts.redis,
 		accountBreakers:      make(map[int]*circuitbreaker.Breaker),
 		concurrencySlots:     concurrencyslotsservice.New(),
-		rateLimitCooldown:    ratelimitcooldownservice.New(),
+		rateLimitCooldown: func() *ratelimitcooldownservice.Service {
+			svc := ratelimitcooldownservice.New()
+			if opts.redisCmd != nil {
+				svc.SetHitCounter(ratelimitcooldownservice.NewRedisHitCounter(opts.redisCmd))
+			}
+			return svc
+		}(),
 		modelResolutionCache: localcache.New[modelcontract.ModelResolution](localcache.Config{
 			MaxEntries: 512,
 			DefaultTTL: 30 * time.Second,
 		}),
 		eventHub:            eventsub.NewHub(),
 		usageAggregator: opts.usageAggregator,
+		streamBillingDedup: localcache.New[bool](localcache.Config{
+			MaxEntries: 4096,
+			DefaultTTL: 5 * time.Minute,
+		}),
 		billingBreaker: circuitbreaker.New(circuitbreaker.Config{
 			FailureThreshold: 5,
 			SuccessThreshold: 2,

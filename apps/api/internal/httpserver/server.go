@@ -165,6 +165,7 @@ type runtimeOptions struct {
 	usageAggregator        usageAggregator
 	proxyProbeMetrics      ProxyProbeMetricsProvider
 	tokenRefreshMetrics    TokenRefreshMetricsProvider
+	redisCmd               redis.Cmdable
 }
 
 func WithAdminControlStore(store admincontrolcontract.Store) Option {
@@ -405,7 +406,10 @@ func WithRateLimitRedis(client *redis.Client) Option {
 	if err != nil {
 		return func(*runtimeOptions) {}
 	}
-	return WithRateLimiter(limiter)
+	return func(opts *runtimeOptions) {
+		opts.rateLimiter = limiter
+		opts.redisCmd = client
+	}
 }
 
 func WithSchedulerStore(store schedulercontract.Store) Option {

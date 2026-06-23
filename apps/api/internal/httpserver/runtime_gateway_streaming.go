@@ -143,6 +143,155 @@ func (a *anthropicStreamUsageAccumulator) processLine(line []byte) {
 	}
 }
 
+// openAIStreamUsageAccumulator captures usage from OpenAI-compatible SSE
+// streams. OpenAI sends a single usage block in the final data chunk (the one
+// just before "data: [DONE]"). Like the Anthropic accumulator it runs over the
+// full unbounded stream, so usage is recovered even when the 16MB meter cap is
+// exceeded on very long responses.
+type openAIStreamUsageAccumulator struct {
+	pending []byte
+	usage   openAIAccumulatedUsage
+	seen    bool
+}
+
+type openAIAccumulatedUsage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+	CachedTokens     int `json:"cached_tokens"`
+}
+
+func (a *openAIStreamUsageAccumulator) write(chunk []byte) {
+	if len(chunk) == 0 {
+		return
+	}
+	data := chunk
+	if len(a.pending) > 0 {
+		data = append(a.pending, chunk...)
+		a.pending = nil
+	}
+	for {
+		nl := bytes.IndexByte(data, '\n')
+		if nl < 0 {
+			if len(data) > 0 {
+				a.pending = append(a.pending[:0:0], data...)
+			}
+			return
+		}
+		a.processLine(data[:nl])
+		data = data[nl+1:]
+	}
+}
+
+func (a *openAIStreamUsageAccumulator) processLine(line []byte) {
+	line = bytes.TrimRight(line, "\r")
+	const prefix = "data: "
+	if !bytes.HasPrefix(line, []byte(prefix)) {
+		return
+	}
+	payload := line[len(prefix):]
+	if len(payload) == 0 || bytes.Equal(bytes.TrimSpace(payload), []byte("[DONE]")) {
+		return
+	}
+	var chunk struct {
+		Usage *struct {
+			PromptTokens     *int `json:"prompt_tokens"`
+			CompletionTokens *int `json:"completion_tokens"`
+			InputTokens      *int `json:"input_tokens"`
+			OutputTokens     *int `json:"output_tokens"`
+			PromptTokensDetails *struct {
+				CachedTokens *int `json:"cached_tokens"`
+			} `json:"prompt_tokens_details"`
+		} `json:"usage"`
+	}
+	if err := json.Unmarshal(payload, &chunk); err != nil || chunk.Usage == nil {
+		return
+	}
+	u := chunk.Usage
+	if u.InputTokens != nil && *u.InputTokens > 0 {
+		a.usage.PromptTokens = *u.InputTokens
+	} else if u.PromptTokens != nil && *u.PromptTokens > 0 {
+		a.usage.PromptTokens = *u.PromptTokens
+	}
+	if u.OutputTokens != nil && *u.OutputTokens > 0 {
+		a.usage.CompletionTokens = *u.OutputTokens
+	} else if u.CompletionTokens != nil && *u.CompletionTokens > 0 {
+		a.usage.CompletionTokens = *u.CompletionTokens
+	}
+	if u.PromptTokensDetails != nil && u.PromptTokensDetails.CachedTokens != nil {
+		a.usage.CachedTokens = *u.PromptTokensDetails.CachedTokens
+	}
+	a.seen = true
+}
+
+// geminiStreamUsageAccumulator captures usage from Gemini SSE streams. Gemini
+// sends usageMetadata in every chunk; we keep the latest non-zero values.
+type geminiStreamUsageAccumulator struct {
+	pending []byte
+	usage   geminiAccumulatedUsage
+	seen    bool
+}
+
+type geminiAccumulatedUsage struct {
+	PromptTokenCount        int
+	CandidatesTokenCount    int
+	CachedContentTokenCount int
+}
+
+func (a *geminiStreamUsageAccumulator) write(chunk []byte) {
+	if len(chunk) == 0 {
+		return
+	}
+	data := chunk
+	if len(a.pending) > 0 {
+		data = append(a.pending, chunk...)
+		a.pending = nil
+	}
+	for {
+		nl := bytes.IndexByte(data, '\n')
+		if nl < 0 {
+			if len(data) > 0 {
+				a.pending = append(a.pending[:0:0], data...)
+			}
+			return
+		}
+		a.processLine(data[:nl])
+		data = data[nl+1:]
+	}
+}
+
+func (a *geminiStreamUsageAccumulator) processLine(line []byte) {
+	line = bytes.TrimRight(line, "\r")
+	const prefix = "data: "
+	if !bytes.HasPrefix(line, []byte(prefix)) {
+		return
+	}
+	payload := line[len(prefix):]
+	if len(payload) == 0 || bytes.Equal(bytes.TrimSpace(payload), []byte("[DONE]")) {
+		return
+	}
+	var chunk struct {
+		UsageMetadata *struct {
+			PromptTokenCount        *int `json:"promptTokenCount"`
+			CandidatesTokenCount    *int `json:"candidatesTokenCount"`
+			CachedContentTokenCount *int `json:"cachedContentTokenCount"`
+		} `json:"usageMetadata"`
+	}
+	if err := json.Unmarshal(payload, &chunk); err != nil || chunk.UsageMetadata == nil {
+		return
+	}
+	u := chunk.UsageMetadata
+	if u.PromptTokenCount != nil && *u.PromptTokenCount > 0 {
+		a.usage.PromptTokenCount = *u.PromptTokenCount
+	}
+	if u.CandidatesTokenCount != nil && *u.CandidatesTokenCount > 0 {
+		a.usage.CandidatesTokenCount = *u.CandidatesTokenCount
+	}
+	if u.CachedContentTokenCount != nil && *u.CachedContentTokenCount > 0 {
+		a.usage.CachedContentTokenCount = *u.CachedContentTokenCount
+	}
+	a.seen = true
+}
+
 // streamLeaseCloser wraps a streamed upstream body so that closing it also
 // releases the request's concurrency lease, exactly once, after the caller has
 // finished streaming to the client.
@@ -281,10 +430,12 @@ func (s *Server) writeConversationStreamPassthrough(
 	}()
 
 	var meter bytes.Buffer
-	// usageAcc is a fallback Anthropic-SSE usage accumulator that runs over the
-	// full stream (not just the bounded meter), so usage is still recovered when
-	// the terminal message_delta usage event falls beyond the 16MB meter cap.
-	var usageAcc anthropicStreamUsageAccumulator
+	// Protocol-specific SSE usage accumulators run over the full unbounded stream
+	// so usage is recovered even when the 16MB meter cap is exceeded. All three
+	// are fed in parallel; only the matching protocol's accumulator captures data.
+	var anthropicAcc anthropicStreamUsageAccumulator
+	var openaiAcc openAIStreamUsageAccumulator
+	var geminiAcc geminiStreamUsageAccumulator
 	interrupted := false
 	clientDisconnect := false
 readLoop:
@@ -300,7 +451,9 @@ readLoop:
 						meter.Write(sc.data[:remaining])
 					}
 				}
-				usageAcc.write(sc.data)
+				anthropicAcc.write(sc.data)
+				openaiAcc.write(sc.data)
+				geminiAcc.write(sc.data)
 				if _, writeErr := w.Write(sc.data); writeErr != nil {
 					interrupted = true
 					clientDisconnect = true
@@ -359,21 +512,13 @@ readLoop:
 
 	// Fallback: if the primary meter parse produced no concrete usage (e.g. the
 	// terminal usage event fell beyond the 16MB meter cap, leaving only the
-	// admission estimate), but the incremental Anthropic accumulator captured
-	// real token counts, adopt them. The primary StreamParse-on-meter path stays
-	// authoritative whenever it yielded usage.
-	if usageEstimated && usageAcc.seen && (usageAcc.usage.InputTokens > 0 || usageAcc.usage.OutputTokens > 0) {
-		usage = gatewaycontract.Usage{
-			InputTokens:           usageAcc.usage.InputTokens,
-			OutputTokens:          usageAcc.usage.OutputTokens,
-			CachedTokens:          usageAcc.usage.CacheReadInputTokens,
-			CacheCreationTokens:   usageAcc.usage.CacheCreationInputTokens,
-			CacheCreation5mTokens: usageAcc.usage.CacheCreation5mInputTokens,
-			CacheCreation1hTokens: usageAcc.usage.CacheCreation1hInputTokens,
-			Observed:              true,
-			Estimated:             false,
+	// admission estimate), try each protocol-specific accumulator. The primary
+	// StreamParse-on-meter path stays authoritative whenever it yielded usage.
+	if usageEstimated {
+		if recovered, ok := recoverStreamUsageFromAccumulators(anthropicAcc, openaiAcc, geminiAcc); ok {
+			usage = recovered
+			usageEstimated = false
 		}
-		usageEstimated = false
 	}
 
 	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequestForCanonical(modelID, result.Candidate, canonical, usage), ptrInt(result.Candidate.Account.ID), usage.Estimated)
@@ -687,6 +832,52 @@ func statusOrOK(status int) int {
 		return http.StatusOK
 	}
 	return status
+}
+
+// recoverStreamUsageFromAccumulators checks each protocol-specific accumulator
+// and returns the first one that captured real token counts. This ensures usage
+// is recovered from any provider's stream even when the 16MB meter overflows.
+func recoverStreamUsageFromAccumulators(
+	anthropic anthropicStreamUsageAccumulator,
+	openai openAIStreamUsageAccumulator,
+	gemini geminiStreamUsageAccumulator,
+) (gatewaycontract.Usage, bool) {
+	if anthropic.seen && (anthropic.usage.InputTokens > 0 || anthropic.usage.OutputTokens > 0) {
+		return gatewaycontract.Usage{
+			InputTokens:           anthropic.usage.InputTokens,
+			OutputTokens:          anthropic.usage.OutputTokens,
+			CachedTokens:          anthropic.usage.CacheReadInputTokens,
+			CacheCreationTokens:   anthropic.usage.CacheCreationInputTokens,
+			CacheCreation5mTokens: anthropic.usage.CacheCreation5mInputTokens,
+			CacheCreation1hTokens: anthropic.usage.CacheCreation1hInputTokens,
+			Observed:              true,
+			Estimated:             false,
+		}, true
+	}
+	if openai.seen && (openai.usage.PromptTokens > 0 || openai.usage.CompletionTokens > 0) {
+		return gatewaycontract.Usage{
+			InputTokens:  openai.usage.PromptTokens,
+			OutputTokens: openai.usage.CompletionTokens,
+			CachedTokens: openai.usage.CachedTokens,
+			Observed:     true,
+			Estimated:    false,
+		}, true
+	}
+	if gemini.seen && (gemini.usage.PromptTokenCount > 0 || gemini.usage.CandidatesTokenCount > 0) {
+		cached := gemini.usage.CachedContentTokenCount
+		input := gemini.usage.PromptTokenCount - cached
+		if input < 0 {
+			input = 0
+		}
+		return gatewaycontract.Usage{
+			InputTokens:  input,
+			OutputTokens: gemini.usage.CandidatesTokenCount,
+			CachedTokens: cached,
+			Observed:     true,
+			Estimated:    false,
+		}, true
+	}
+	return gatewaycontract.Usage{}, false
 }
 
 // classifyStreamInterruption fills the error-class and owner/source fields on a
