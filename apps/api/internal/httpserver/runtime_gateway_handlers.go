@@ -90,7 +90,7 @@ func (s *Server) handleCreateChatCompletion(w http.ResponseWriter, r *http.Reque
 			Success:        false,
 			ErrorClass:     ptrStringValue("invalid_request"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, jsonDecodeStatus(err), apiopenapi.InvalidRequestError, "invalid chat completion request", "invalid_request")
 		return
@@ -117,7 +117,7 @@ func (s *Server) serveChatCompletion(w http.ResponseWriter, r *http.Request, aut
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_found"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusNotFound, apiopenapi.InvalidRequestError, "model not found", "model_not_found")
 		return
@@ -133,7 +133,7 @@ func (s *Server) serveChatCompletion(w http.ResponseWriter, r *http.Request, aut
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_allowed"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusForbidden, apiopenapi.PermissionError, "model not allowed for this api key", "model_not_allowed")
 		return
@@ -158,7 +158,7 @@ func (s *Server) serveChatCompletion(w http.ResponseWriter, r *http.Request, aut
 			Success:               false,
 			ErrorClass:            ptrStringValue("entitlement_check_failed"),
 			LatencyMS:             elapsedMillis(startedAt),
-			UsageEstimated:        true,
+			UsageEstimated:        false,
 			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
@@ -176,10 +176,10 @@ func (s *Server) serveChatCompletion(w http.ResponseWriter, r *http.Request, aut
 			Success:               false,
 			ErrorClass:            ptrStringValue(errorClass),
 			LatencyMS:             elapsedMillis(startedAt),
-			InputTokens:           admission.EstimatedUsage.InputTokens,
-			OutputTokens:          admission.EstimatedUsage.OutputTokens,
-			CachedTokens:          admission.EstimatedUsage.CachedTokens,
-			UsageEstimated:        true,
+			InputTokens:           0,
+			OutputTokens:          0,
+			CachedTokens:          0,
+			UsageEstimated:        false,
 			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
@@ -272,7 +272,7 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 			Success:        false,
 			ErrorClass:     ptrStringValue("invalid_request"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, jsonDecodeStatus(err), apiopenapi.InvalidRequestError, "invalid responses request", "invalid_request")
 		return
@@ -287,7 +287,7 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 			Success:        false,
 			ErrorClass:     ptrStringValue("invalid_request"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusBadRequest, apiopenapi.InvalidRequestError, err.Error(), "invalid_request")
 		return
@@ -304,7 +304,7 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_found"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusNotFound, apiopenapi.InvalidRequestError, "model not found", "model_not_found")
 		return
@@ -320,7 +320,7 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_allowed"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusForbidden, apiopenapi.PermissionError, "model not allowed for this api key", "model_not_allowed")
 		return
@@ -362,7 +362,7 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 			Success:               false,
 			ErrorClass:            ptrStringValue("entitlement_check_failed"),
 			LatencyMS:             elapsedMillis(startedAt),
-			UsageEstimated:        true,
+			UsageEstimated:        false,
 			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
@@ -380,10 +380,10 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 			Success:               false,
 			ErrorClass:            ptrStringValue(errorClass),
 			LatencyMS:             elapsedMillis(startedAt),
-			InputTokens:           admission.EstimatedUsage.InputTokens,
-			OutputTokens:          admission.EstimatedUsage.OutputTokens,
-			CachedTokens:          admission.EstimatedUsage.CachedTokens,
-			UsageEstimated:        true,
+			InputTokens:           0,
+			OutputTokens:          0,
+			CachedTokens:          0,
+			UsageEstimated:        false,
 			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
@@ -477,7 +477,7 @@ func (s *Server) handleListResponseInputItems(w http.ResponseWriter, r *http.Req
 			Success:        false,
 			ErrorClass:     ptrStringValue("invalid_request"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusBadRequest, apiopenapi.InvalidRequestError, "response input_items requests require response_id and model", "invalid_request")
 		return
@@ -493,7 +493,7 @@ func (s *Server) handleListResponseInputItems(w http.ResponseWriter, r *http.Req
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_found"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusNotFound, apiopenapi.InvalidRequestError, "model not found", "model_not_found")
 		return
@@ -509,7 +509,7 @@ func (s *Server) handleListResponseInputItems(w http.ResponseWriter, r *http.Req
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_allowed"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusForbidden, apiopenapi.PermissionError, "model not allowed for this api key", "model_not_allowed")
 		return
@@ -532,7 +532,7 @@ func (s *Server) handleListResponseInputItems(w http.ResponseWriter, r *http.Req
 			Success:               false,
 			ErrorClass:            ptrStringValue("entitlement_check_failed"),
 			LatencyMS:             elapsedMillis(startedAt),
-			UsageEstimated:        true,
+			UsageEstimated:        false,
 			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
@@ -550,7 +550,7 @@ func (s *Server) handleListResponseInputItems(w http.ResponseWriter, r *http.Req
 			Success:               false,
 			ErrorClass:            ptrStringValue(errorClass),
 			LatencyMS:             elapsedMillis(startedAt),
-			UsageEstimated:        true,
+			UsageEstimated:        false,
 			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
@@ -615,7 +615,7 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 			Success:        false,
 			ErrorClass:     ptrStringValue("invalid_request"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, jsonDecodeStatus(err), apiopenapi.InvalidRequestError, "invalid messages request", "invalid_request")
 		return
@@ -632,7 +632,7 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_found"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusNotFound, apiopenapi.InvalidRequestError, "model not found", "model_not_found")
 		return
@@ -648,7 +648,7 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_allowed"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusForbidden, apiopenapi.PermissionError, "model not allowed for this api key", "model_not_allowed")
 		return
@@ -673,7 +673,7 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 			Success:               false,
 			ErrorClass:            ptrStringValue("entitlement_check_failed"),
 			LatencyMS:             elapsedMillis(startedAt),
-			UsageEstimated:        true,
+			UsageEstimated:        false,
 			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
@@ -691,10 +691,10 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 			Success:               false,
 			ErrorClass:            ptrStringValue(errorClass),
 			LatencyMS:             elapsedMillis(startedAt),
-			InputTokens:           admission.EstimatedUsage.InputTokens,
-			OutputTokens:          admission.EstimatedUsage.OutputTokens,
-			CachedTokens:          admission.EstimatedUsage.CachedTokens,
-			UsageEstimated:        true,
+			InputTokens:           0,
+			OutputTokens:          0,
+			CachedTokens:          0,
+			UsageEstimated:        false,
 			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
@@ -787,7 +787,7 @@ func (s *Server) handleCreateEmbedding(w http.ResponseWriter, r *http.Request) {
 			Success:        false,
 			ErrorClass:     ptrStringValue("invalid_request"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, jsonDecodeStatus(err), apiopenapi.InvalidRequestError, "invalid embeddings request", "invalid_request")
 		return
@@ -803,7 +803,7 @@ func (s *Server) handleCreateEmbedding(w http.ResponseWriter, r *http.Request) {
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_found"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusNotFound, apiopenapi.InvalidRequestError, "model not found", "model_not_found")
 		return
@@ -819,7 +819,7 @@ func (s *Server) handleCreateEmbedding(w http.ResponseWriter, r *http.Request) {
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_allowed"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusForbidden, apiopenapi.PermissionError, "model not allowed for this api key", "model_not_allowed")
 		return
@@ -841,7 +841,7 @@ func (s *Server) handleCreateEmbedding(w http.ResponseWriter, r *http.Request) {
 			Success:        false,
 			ErrorClass:     ptrStringValue("invalid_request"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusBadRequest, apiopenapi.InvalidRequestError, err.Error(), "invalid_request")
 		return
@@ -857,7 +857,7 @@ func (s *Server) handleCreateEmbedding(w http.ResponseWriter, r *http.Request) {
 			Success:               false,
 			ErrorClass:            ptrStringValue("entitlement_check_failed"),
 			LatencyMS:             elapsedMillis(startedAt),
-			UsageEstimated:        true,
+			UsageEstimated:        false,
 			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
@@ -875,10 +875,10 @@ func (s *Server) handleCreateEmbedding(w http.ResponseWriter, r *http.Request) {
 			Success:               false,
 			ErrorClass:            ptrStringValue(errorClass),
 			LatencyMS:             elapsedMillis(startedAt),
-			InputTokens:           admission.EstimatedUsage.InputTokens,
-			OutputTokens:          admission.EstimatedUsage.OutputTokens,
-			CachedTokens:          admission.EstimatedUsage.CachedTokens,
-			UsageEstimated:        true,
+			InputTokens:           0,
+			OutputTokens:          0,
+			CachedTokens:          0,
+			UsageEstimated:        false,
 			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
@@ -957,7 +957,7 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 			Success:        false,
 			ErrorClass:     ptrStringValue("invalid_request"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGeminiGatewayError(w, jsonDecodeStatus(err), "INVALID_ARGUMENT", "invalid generateContent request")
 		return
@@ -974,7 +974,7 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_found"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGeminiGatewayError(w, http.StatusNotFound, "NOT_FOUND", "model not found")
 		return
@@ -990,7 +990,7 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_allowed"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGeminiGatewayError(w, http.StatusForbidden, "PERMISSION_DENIED", "model not allowed for this api key")
 		return
@@ -1015,7 +1015,7 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 			Success:               false,
 			ErrorClass:            ptrStringValue("entitlement_check_failed"),
 			LatencyMS:             elapsedMillis(startedAt),
-			UsageEstimated:        true,
+			UsageEstimated:        false,
 			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
@@ -1033,10 +1033,10 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 			Success:               false,
 			ErrorClass:            ptrStringValue(errorClass),
 			LatencyMS:             elapsedMillis(startedAt),
-			InputTokens:           admission.EstimatedUsage.InputTokens,
-			OutputTokens:          admission.EstimatedUsage.OutputTokens,
-			CachedTokens:          admission.EstimatedUsage.CachedTokens,
-			UsageEstimated:        true,
+			InputTokens:           0,
+			OutputTokens:          0,
+			CachedTokens:          0,
+			UsageEstimated:        false,
 			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})

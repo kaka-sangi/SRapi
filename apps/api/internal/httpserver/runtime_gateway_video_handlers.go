@@ -217,7 +217,7 @@ func (s *Server) recordVideoGatewayFailure(r *http.Request, authed apikeycontrac
 		ErrorClass:     ptrStringValue(errorClass),
 		StatusCode:     ptrInt(statusCode),
 		LatencyMS:      elapsedMillis(startedAt),
-		UsageEstimated: true,
+		UsageEstimated: false,
 	})
 }
 

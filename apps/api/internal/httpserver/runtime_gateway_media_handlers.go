@@ -40,7 +40,7 @@ func (s *Server) handleCreateImageGeneration(w http.ResponseWriter, r *http.Requ
 			Success:        false,
 			ErrorClass:     ptrStringValue("invalid_request"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, jsonDecodeStatus(err), apiopenapi.InvalidRequestError, "invalid image generation request", "invalid_request")
 		return
@@ -56,7 +56,7 @@ func (s *Server) handleCreateImageGeneration(w http.ResponseWriter, r *http.Requ
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_found"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusNotFound, apiopenapi.InvalidRequestError, "model not found", "model_not_found")
 		return
@@ -72,7 +72,7 @@ func (s *Server) handleCreateImageGeneration(w http.ResponseWriter, r *http.Requ
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_allowed"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusForbidden, apiopenapi.PermissionError, "model not allowed for this api key", "model_not_allowed")
 		return
@@ -94,7 +94,7 @@ func (s *Server) handleCreateImageGeneration(w http.ResponseWriter, r *http.Requ
 			Success:        false,
 			ErrorClass:     ptrStringValue("invalid_request"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusBadRequest, apiopenapi.InvalidRequestError, err.Error(), "invalid_request")
 		return
@@ -110,7 +110,7 @@ func (s *Server) handleCreateImageGeneration(w http.ResponseWriter, r *http.Requ
 			Success:               false,
 			ErrorClass:            ptrStringValue("entitlement_check_failed"),
 			LatencyMS:             elapsedMillis(startedAt),
-			UsageEstimated:        true,
+			UsageEstimated:        false,
 			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
@@ -128,10 +128,10 @@ func (s *Server) handleCreateImageGeneration(w http.ResponseWriter, r *http.Requ
 			Success:               false,
 			ErrorClass:            ptrStringValue(errorClass),
 			LatencyMS:             elapsedMillis(startedAt),
-			InputTokens:           admission.EstimatedUsage.InputTokens,
-			OutputTokens:          admission.EstimatedUsage.OutputTokens,
-			CachedTokens:          admission.EstimatedUsage.CachedTokens,
-			UsageEstimated:        true,
+			InputTokens:           0,
+			OutputTokens:          0,
+			CachedTokens:          0,
+			UsageEstimated:        false,
 			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
@@ -208,7 +208,7 @@ func (s *Server) handleCreateImageEdit(w http.ResponseWriter, r *http.Request) {
 			Success:        false,
 			ErrorClass:     ptrStringValue("invalid_request"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, imageRequestDecodeStatus(err), apiopenapi.InvalidRequestError, imageEditDecodeMessage(err), "invalid_request")
 		return
@@ -224,7 +224,7 @@ func (s *Server) handleCreateImageEdit(w http.ResponseWriter, r *http.Request) {
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_found"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusNotFound, apiopenapi.InvalidRequestError, "model not found", "model_not_found")
 		return
@@ -240,7 +240,7 @@ func (s *Server) handleCreateImageEdit(w http.ResponseWriter, r *http.Request) {
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_allowed"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusForbidden, apiopenapi.PermissionError, "model not allowed for this api key", "model_not_allowed")
 		return
@@ -262,7 +262,7 @@ func (s *Server) handleCreateImageEdit(w http.ResponseWriter, r *http.Request) {
 			Success:        false,
 			ErrorClass:     ptrStringValue("invalid_request"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusBadRequest, apiopenapi.InvalidRequestError, err.Error(), "invalid_request")
 		return
@@ -279,7 +279,7 @@ func (s *Server) handleCreateImageEdit(w http.ResponseWriter, r *http.Request) {
 			Success:               false,
 			ErrorClass:            ptrStringValue("entitlement_check_failed"),
 			LatencyMS:             elapsedMillis(startedAt),
-			UsageEstimated:        true,
+			UsageEstimated:        false,
 			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
@@ -297,10 +297,10 @@ func (s *Server) handleCreateImageEdit(w http.ResponseWriter, r *http.Request) {
 			Success:               false,
 			ErrorClass:            ptrStringValue(errorClass),
 			LatencyMS:             elapsedMillis(startedAt),
-			InputTokens:           admission.EstimatedUsage.InputTokens,
-			OutputTokens:          admission.EstimatedUsage.OutputTokens,
-			CachedTokens:          admission.EstimatedUsage.CachedTokens,
-			UsageEstimated:        true,
+			InputTokens:           0,
+			OutputTokens:          0,
+			CachedTokens:          0,
+			UsageEstimated:        false,
 			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
@@ -378,7 +378,7 @@ func (s *Server) handleCreateImageVariation(w http.ResponseWriter, r *http.Reque
 			Success:        false,
 			ErrorClass:     ptrStringValue("invalid_request"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, imageRequestDecodeStatus(err), apiopenapi.InvalidRequestError, imageVariationDecodeMessage(err), "invalid_request")
 		return
@@ -394,7 +394,7 @@ func (s *Server) handleCreateImageVariation(w http.ResponseWriter, r *http.Reque
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_found"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusNotFound, apiopenapi.InvalidRequestError, "model not found", "model_not_found")
 		return
@@ -410,7 +410,7 @@ func (s *Server) handleCreateImageVariation(w http.ResponseWriter, r *http.Reque
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_allowed"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusForbidden, apiopenapi.PermissionError, "model not allowed for this api key", "model_not_allowed")
 		return
@@ -432,7 +432,7 @@ func (s *Server) handleCreateImageVariation(w http.ResponseWriter, r *http.Reque
 			Success:        false,
 			ErrorClass:     ptrStringValue("invalid_request"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusBadRequest, apiopenapi.InvalidRequestError, err.Error(), "invalid_request")
 		return
@@ -451,7 +451,7 @@ func (s *Server) handleCreateImageVariation(w http.ResponseWriter, r *http.Reque
 			Success:               false,
 			ErrorClass:            ptrStringValue("entitlement_check_failed"),
 			LatencyMS:             elapsedMillis(startedAt),
-			UsageEstimated:        true,
+			UsageEstimated:        false,
 			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
@@ -469,10 +469,10 @@ func (s *Server) handleCreateImageVariation(w http.ResponseWriter, r *http.Reque
 			Success:               false,
 			ErrorClass:            ptrStringValue(errorClass),
 			LatencyMS:             elapsedMillis(startedAt),
-			InputTokens:           admission.EstimatedUsage.InputTokens,
-			OutputTokens:          admission.EstimatedUsage.OutputTokens,
-			CachedTokens:          admission.EstimatedUsage.CachedTokens,
-			UsageEstimated:        true,
+			InputTokens:           0,
+			OutputTokens:          0,
+			CachedTokens:          0,
+			UsageEstimated:        false,
 			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
@@ -1112,7 +1112,7 @@ func (s *Server) handleCreateModeration(w http.ResponseWriter, r *http.Request) 
 			Success:        false,
 			ErrorClass:     ptrStringValue("invalid_request"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, jsonDecodeStatus(err), apiopenapi.InvalidRequestError, "invalid moderation request", "invalid_request")
 		return
@@ -1128,7 +1128,7 @@ func (s *Server) handleCreateModeration(w http.ResponseWriter, r *http.Request) 
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_found"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusNotFound, apiopenapi.InvalidRequestError, "model not found", "model_not_found")
 		return
@@ -1144,7 +1144,7 @@ func (s *Server) handleCreateModeration(w http.ResponseWriter, r *http.Request) 
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_allowed"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusForbidden, apiopenapi.PermissionError, "model not allowed for this api key", "model_not_allowed")
 		return
@@ -1166,7 +1166,7 @@ func (s *Server) handleCreateModeration(w http.ResponseWriter, r *http.Request) 
 			Success:        false,
 			ErrorClass:     ptrStringValue("invalid_request"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusBadRequest, apiopenapi.InvalidRequestError, err.Error(), "invalid_request")
 		return
@@ -1182,7 +1182,7 @@ func (s *Server) handleCreateModeration(w http.ResponseWriter, r *http.Request) 
 			Success:               false,
 			ErrorClass:            ptrStringValue("entitlement_check_failed"),
 			LatencyMS:             elapsedMillis(startedAt),
-			UsageEstimated:        true,
+			UsageEstimated:        false,
 			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
@@ -1200,10 +1200,10 @@ func (s *Server) handleCreateModeration(w http.ResponseWriter, r *http.Request) 
 			Success:               false,
 			ErrorClass:            ptrStringValue(errorClass),
 			LatencyMS:             elapsedMillis(startedAt),
-			InputTokens:           admission.EstimatedUsage.InputTokens,
-			OutputTokens:          admission.EstimatedUsage.OutputTokens,
-			CachedTokens:          admission.EstimatedUsage.CachedTokens,
-			UsageEstimated:        true,
+			InputTokens:           0,
+			OutputTokens:          0,
+			CachedTokens:          0,
+			UsageEstimated:        false,
 			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
@@ -1271,7 +1271,7 @@ func (s *Server) handleCreateRerank(w http.ResponseWriter, r *http.Request) {
 			Success:        false,
 			ErrorClass:     ptrStringValue("invalid_request"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, jsonDecodeStatus(err), apiopenapi.InvalidRequestError, "invalid rerank request", "invalid_request")
 		return
@@ -1287,7 +1287,7 @@ func (s *Server) handleCreateRerank(w http.ResponseWriter, r *http.Request) {
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_found"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusNotFound, apiopenapi.InvalidRequestError, "model not found", "model_not_found")
 		return
@@ -1303,7 +1303,7 @@ func (s *Server) handleCreateRerank(w http.ResponseWriter, r *http.Request) {
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_allowed"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusForbidden, apiopenapi.PermissionError, "model not allowed for this api key", "model_not_allowed")
 		return
@@ -1325,7 +1325,7 @@ func (s *Server) handleCreateRerank(w http.ResponseWriter, r *http.Request) {
 			Success:        false,
 			ErrorClass:     ptrStringValue("invalid_request"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusBadRequest, apiopenapi.InvalidRequestError, err.Error(), "invalid_request")
 		return
@@ -1341,7 +1341,7 @@ func (s *Server) handleCreateRerank(w http.ResponseWriter, r *http.Request) {
 			Success:               false,
 			ErrorClass:            ptrStringValue("entitlement_check_failed"),
 			LatencyMS:             elapsedMillis(startedAt),
-			UsageEstimated:        true,
+			UsageEstimated:        false,
 			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
@@ -1359,10 +1359,10 @@ func (s *Server) handleCreateRerank(w http.ResponseWriter, r *http.Request) {
 			Success:               false,
 			ErrorClass:            ptrStringValue(errorClass),
 			LatencyMS:             elapsedMillis(startedAt),
-			InputTokens:           admission.EstimatedUsage.InputTokens,
-			OutputTokens:          admission.EstimatedUsage.OutputTokens,
-			CachedTokens:          admission.EstimatedUsage.CachedTokens,
-			UsageEstimated:        true,
+			InputTokens:           0,
+			OutputTokens:          0,
+			CachedTokens:          0,
+			UsageEstimated:        false,
 			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})

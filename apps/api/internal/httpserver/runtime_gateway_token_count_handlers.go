@@ -136,16 +136,13 @@ func (s *Server) recordTokenCountFailure(r *http.Request, authed apikeycontract.
 		Success:        false,
 		ErrorClass:     ptrStringValue(errorClass),
 		LatencyMS:      latencyMS,
-		UsageEstimated: true,
+		UsageEstimated: false,
 		Pricing:        admission.Pricing,
 	}
 	if canonical != nil {
 		rec.SourceProtocol = string(canonical.SourceProtocol)
 		rec.SourceEndpoint = canonical.SourceEndpoint
 		rec.Model = canonical.CanonicalModel
-		rec.InputTokens = admission.EstimatedUsage.InputTokens
-		rec.OutputTokens = admission.EstimatedUsage.OutputTokens
-		rec.CachedTokens = admission.EstimatedUsage.CachedTokens
 		rec.CompatibilityWarnings = canonical.CompatibilityWarnings
 	}
 	s.runtime.recordGatewayUsage(r.Context(), rec)

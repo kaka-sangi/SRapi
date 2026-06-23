@@ -34,7 +34,7 @@ func (s *Server) handleCreateAudioTranscription(w http.ResponseWriter, r *http.R
 			Success:        false,
 			ErrorClass:     ptrStringValue("invalid_request"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, audioTranscriptionDecodeStatus(err), apiopenapi.InvalidRequestError, "invalid audio transcription request", "invalid_request")
 		return
@@ -50,7 +50,7 @@ func (s *Server) handleCreateAudioTranscription(w http.ResponseWriter, r *http.R
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_found"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusNotFound, apiopenapi.InvalidRequestError, "model not found", "model_not_found")
 		return
@@ -66,7 +66,7 @@ func (s *Server) handleCreateAudioTranscription(w http.ResponseWriter, r *http.R
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_allowed"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusForbidden, apiopenapi.PermissionError, "model not allowed for this api key", "model_not_allowed")
 		return
@@ -88,7 +88,7 @@ func (s *Server) handleCreateAudioTranscription(w http.ResponseWriter, r *http.R
 			Success:        false,
 			ErrorClass:     ptrStringValue("invalid_request"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusBadRequest, apiopenapi.InvalidRequestError, err.Error(), "invalid_request")
 		return
@@ -105,7 +105,7 @@ func (s *Server) handleCreateAudioTranscription(w http.ResponseWriter, r *http.R
 			Success:               false,
 			ErrorClass:            ptrStringValue("entitlement_check_failed"),
 			LatencyMS:             elapsedMillis(startedAt),
-			UsageEstimated:        true,
+			UsageEstimated:        false,
 			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
@@ -123,10 +123,10 @@ func (s *Server) handleCreateAudioTranscription(w http.ResponseWriter, r *http.R
 			Success:               false,
 			ErrorClass:            ptrStringValue(errorClass),
 			LatencyMS:             elapsedMillis(startedAt),
-			InputTokens:           admission.EstimatedUsage.InputTokens,
-			OutputTokens:          admission.EstimatedUsage.OutputTokens,
-			CachedTokens:          admission.EstimatedUsage.CachedTokens,
-			UsageEstimated:        true,
+			InputTokens:           0,
+			OutputTokens:          0,
+			CachedTokens:          0,
+			UsageEstimated:        false,
 			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
@@ -307,7 +307,7 @@ func (s *Server) handleCreateAudioSpeech(w http.ResponseWriter, r *http.Request)
 			Success:        false,
 			ErrorClass:     ptrStringValue("invalid_request"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, jsonDecodeStatus(err), apiopenapi.InvalidRequestError, "invalid audio speech request", "invalid_request")
 		return
@@ -323,7 +323,7 @@ func (s *Server) handleCreateAudioSpeech(w http.ResponseWriter, r *http.Request)
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_found"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusNotFound, apiopenapi.InvalidRequestError, "model not found", "model_not_found")
 		return
@@ -339,7 +339,7 @@ func (s *Server) handleCreateAudioSpeech(w http.ResponseWriter, r *http.Request)
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_allowed"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusForbidden, apiopenapi.PermissionError, "model not allowed for this api key", "model_not_allowed")
 		return
@@ -361,7 +361,7 @@ func (s *Server) handleCreateAudioSpeech(w http.ResponseWriter, r *http.Request)
 			Success:        false,
 			ErrorClass:     ptrStringValue("invalid_request"),
 			LatencyMS:      elapsedMillis(startedAt),
-			UsageEstimated: true,
+			UsageEstimated: false,
 		})
 		writeGatewayError(w, http.StatusBadRequest, apiopenapi.InvalidRequestError, err.Error(), "invalid_request")
 		return
@@ -377,7 +377,7 @@ func (s *Server) handleCreateAudioSpeech(w http.ResponseWriter, r *http.Request)
 			Success:               false,
 			ErrorClass:            ptrStringValue("entitlement_check_failed"),
 			LatencyMS:             elapsedMillis(startedAt),
-			UsageEstimated:        true,
+			UsageEstimated:        false,
 			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
@@ -395,10 +395,10 @@ func (s *Server) handleCreateAudioSpeech(w http.ResponseWriter, r *http.Request)
 			Success:               false,
 			ErrorClass:            ptrStringValue(errorClass),
 			LatencyMS:             elapsedMillis(startedAt),
-			InputTokens:           admission.EstimatedUsage.InputTokens,
-			OutputTokens:          admission.EstimatedUsage.OutputTokens,
-			CachedTokens:          admission.EstimatedUsage.CachedTokens,
-			UsageEstimated:        true,
+			InputTokens:           0,
+			OutputTokens:          0,
+			CachedTokens:          0,
+			UsageEstimated:        false,
 			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
