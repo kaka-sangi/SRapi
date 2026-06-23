@@ -24,10 +24,15 @@ export function CopilotPet() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
-  const { data: cfg } = useAdminCopilotConfig();
+  const copilotQuery = useAdminCopilotConfig();
+  const cfg = copilotQuery.data;
   const { running, newConversation } = useCopilotSession();
 
-  const hidden = pathname === ADMIN_ROUTES.copilot || !cfg?.enabled || !cfg?.configured;
+  // Only hide when we have a definitive answer that copilot is disabled.
+  // During loading or on transient query errors, keep the pet visible to
+  // prevent it from vanishing on route changes and refetches.
+  const hidden = pathname === ADMIN_ROUTES.copilot ||
+    (copilotQuery.isFetched && (!cfg?.enabled || !cfg?.configured));
 
   /* ── Ctrl/Cmd+K → new chat & open panel ── */
   useEffect(() => {
@@ -127,7 +132,7 @@ export function CopilotPet() {
           {showShortcuts ? <ShortcutsList /> : null}
           <div className="min-h-0 flex-1 px-4 pb-3">
             <ErrorBoundary>
-              <CopilotChat models={cfg.models ?? []} defaultModel={cfg.model ?? ""} />
+              <CopilotChat models={cfg?.models ?? []} defaultModel={cfg?.model ?? ""} />
             </ErrorBoundary>
           </div>
         </DialogPrimitive.Content>
