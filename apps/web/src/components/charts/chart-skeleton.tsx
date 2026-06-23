@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/cn";
+import { useLanguage } from "@/context/LanguageContext";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /**
@@ -16,6 +17,7 @@ export function TrendChartSkeleton({
   height?: number;
   className?: string;
 }) {
+  const { t } = useLanguage();
   // A SVG sine-ish line + dashed grid evoke the real trend chart's shape so the
   // loading state reads as "trend chart, pending data" not "generic block".
   return (
@@ -54,7 +56,7 @@ export function TrendChartSkeleton({
         }}
         aria-hidden
       />
-      <span className="sr-only">Loading chart</span>
+      <span className="sr-only">{t("common.loadingChart")}</span>
     </div>
   );
 }
@@ -66,6 +68,7 @@ export function BarChartSkeleton({
   rows?: number;
   className?: string;
 }) {
+  const { t } = useLanguage();
   // Each ghost row is label + bar + value — same proportions as BarSeries so
   // the layout doesn't shift when data resolves.
   const widths = ["75%", "60%", "45%", "85%", "35%", "55%", "70%", "40%"];
@@ -83,7 +86,7 @@ export function BarChartSkeleton({
           <Skeleton className="h-3 w-10 shrink-0" />
         </div>
       ))}
-      <span className="sr-only">Loading chart</span>
+      <span className="sr-only">{t("common.loadingChart")}</span>
     </div>
   );
 }
@@ -101,6 +104,7 @@ function HistogramChartSkeleton({
   bars?: number;
   className?: string;
 }) {
+  const { t } = useLanguage();
   const heights = [40, 65, 80, 95, 78, 60, 48, 36, 28, 22, 18, 14, 12];
   return (
     <div
@@ -127,7 +131,7 @@ function HistogramChartSkeleton({
           </div>
         ))}
       </div>
-      <span className="sr-only">Loading histogram</span>
+      <span className="sr-only">{t("common.loadingHistogram")}</span>
     </div>
   );
 }
@@ -141,6 +145,7 @@ function DonutChartSkeleton({
 }: {
   className?: string;
 }) {
+  const { t } = useLanguage();
   return (
     <div className={cn("flex flex-col items-center gap-5 sm:flex-row sm:items-start", className)} aria-busy>
       <div className="relative shrink-0">
@@ -160,7 +165,7 @@ function DonutChartSkeleton({
           </div>
         ))}
       </div>
-      <span className="sr-only">Loading distribution</span>
+      <span className="sr-only">{t("common.loadingDistribution")}</span>
     </div>
   );
 }

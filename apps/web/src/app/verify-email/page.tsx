@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { apiService } from "@/lib/api";
 import { meErrorMessage } from "@/lib/me-api";
+import { useLanguage } from "@/context/LanguageContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { IconBubble } from "@/components/ui/icon-bubble";
@@ -18,6 +19,7 @@ import { IconBubble } from "@/components/ui/icon-bubble";
 type State = { kind: "verifying" } | { kind: "ok" } | { kind: "error"; message: string };
 
 export default function VerifyEmailPage() {
+  const { t } = useLanguage();
   const [state, setState] = useState<State>({ kind: "verifying" });
 
   useEffect(() => {
@@ -44,7 +46,7 @@ export default function VerifyEmailPage() {
               <IconBubble tone="neutral" size="lg" className="mx-auto">
                 <Loader2 className="animate-spin" />
               </IconBubble>
-              <h1 className="mt-4 text-xl font-semibold tracking-tight text-srapi-text-primary">Verifying your email…</h1>
+              <h1 className="mt-4 text-xl font-semibold tracking-tight text-srapi-text-primary">{t("verifyEmail.verifying")}</h1>
             </>
           )}
           {state.kind === "ok" && (
@@ -52,13 +54,13 @@ export default function VerifyEmailPage() {
               <IconBubble tone="success" size="lg" className="mx-auto">
                 <CheckCircle2 />
               </IconBubble>
-              <h1 className="mt-4 text-xl font-semibold tracking-tight text-srapi-text-primary">Email verified</h1>
+              <h1 className="mt-4 text-xl font-semibold tracking-tight text-srapi-text-primary">{t("verifyEmail.successTitle")}</h1>
               <p className="mt-2 text-sm text-srapi-text-secondary">
-                Your email address has been verified. You can now sign in.
+                {t("verifyEmail.successBody")}
               </p>
               <Link href="/" className="mt-6 block">
                 <Button variant="primary" size="lg" className="h-11 w-full rounded-xl">
-                  Continue to sign in
+                  {t("verifyEmail.successCta")}
                 </Button>
               </Link>
             </>
@@ -68,11 +70,11 @@ export default function VerifyEmailPage() {
               <IconBubble tone="error" size="lg" className="mx-auto">
                 <XCircle />
               </IconBubble>
-              <h1 className="mt-4 text-xl font-semibold tracking-tight text-srapi-text-primary">Verification failed</h1>
+              <h1 className="mt-4 text-xl font-semibold tracking-tight text-srapi-text-primary">{t("verifyEmail.failTitle")}</h1>
               <p className="mt-2 rounded-xl bg-srapi-error/10 px-3 py-2 text-sm text-srapi-error">{state.message}</p>
               <Link href="/" className="mt-6 block">
                 <Button variant="outline" size="lg" className="h-11 w-full rounded-xl">
-                  Back to sign in
+                  {t("verifyEmail.failCta")}
                 </Button>
               </Link>
             </>

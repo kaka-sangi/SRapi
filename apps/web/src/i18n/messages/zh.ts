@@ -52,6 +52,9 @@ export const zh: Messages = {
     apply: "应用",
     theme: "主题",
     language: "中 / EN",
+    loadingChart: "加载图表中",
+    loadingHistogram: "加载直方图中",
+    loadingDistribution: "加载分布图中",
   },
   commandPalette: {
     placeholder: "跳转到页面或执行操作…",
@@ -327,6 +330,14 @@ export const zh: Messages = {
     expired: "登录链接已过期或已被使用。",
     backToSignIn: "返回登录",
   },
+  verifyEmail: {
+    verifying: "正在验证邮箱…",
+    successTitle: "邮箱验证成功",
+    successBody: "你的邮箱已验证成功，现在可以登录了。",
+    successCta: "前往登录",
+    failTitle: "验证失败",
+    failCta: "返回登录",
+  },
   setup: {
     checking: "正在检查初始化状态…",
     eyebrow: "首次初始化",
@@ -378,6 +389,8 @@ export const zh: Messages = {
     cacheHealthy: "健康",
     cacheCold: "冷缓存",
     cacheChurn: "缓存抖动",
+    successRate: "成功率",
+    cacheHitRate: "缓存命中率",
   },
   dashboard: {
     title: "网关总览",
@@ -2228,6 +2241,8 @@ export const zh: Messages = {
     searchPlaceholder: "搜索用户或关联…",
     allTypes: "全部类型",
     allReferences: "全部关联",
+    totalRecharged: "总充值",
+    totalDebits: "总支出",
     emptyTitle: "暂无流水",
     emptyBody: "随着用量计费与充值入账，余额变动会显示在这里。",
     types: {

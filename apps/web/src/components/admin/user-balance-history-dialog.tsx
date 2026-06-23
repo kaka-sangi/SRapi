@@ -189,7 +189,7 @@ export function UserBalanceHistoryDialog({
             </p>
             <div className="flex shrink-0 items-center gap-2">
               <DataTooltip
-                title="Total recharged"
+                title={t("adminBillingLedger.totalRecharged")}
                 primary={
                   <span className="tabular">
                     {formatMoney(totalRecharged, currency)}
@@ -215,7 +215,7 @@ export function UserBalanceHistoryDialog({
               </DataTooltip>
               {totalDebits > 0 ? (
                 <DataTooltip
-                  title="Total debits"
+                  title={t("adminBillingLedger.totalDebits")}
                   primary={
                     <span className="tabular">
                       {formatMoney(totalDebits, currency)}

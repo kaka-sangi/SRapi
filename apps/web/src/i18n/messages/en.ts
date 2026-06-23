@@ -50,6 +50,9 @@ export const en = {
     apply: "Apply",
     theme: "Theme",
     language: "中 / EN",
+    loadingChart: "Loading chart",
+    loadingHistogram: "Loading histogram",
+    loadingDistribution: "Loading distribution",
   },
   commandPalette: {
     placeholder: "Jump to a page or run an action…",
@@ -329,6 +332,14 @@ export const en = {
     expired: "Sign-in link expired or has already been used.",
     backToSignIn: "Back to sign in",
   },
+  verifyEmail: {
+    verifying: "Verifying your email…",
+    successTitle: "Email verified",
+    successBody: "Your email address has been verified. You can now sign in.",
+    successCta: "Continue to sign in",
+    failTitle: "Verification failed",
+    failCta: "Back to sign in",
+  },
   setup: {
     checking: "Checking setup…",
     eyebrow: "First-run setup",
@@ -385,6 +396,8 @@ export const en = {
     cacheHealthy: "Healthy",
     cacheCold: "Cold",
     cacheChurn: "Churn",
+    successRate: "Success rate",
+    cacheHitRate: "Cache hit rate",
   },
   dashboard: {
     title: "Gateway overview",
@@ -2288,6 +2301,8 @@ export const en = {
     searchPlaceholder: "Search user or reference…",
     allTypes: "All types",
     allReferences: "All references",
+    totalRecharged: "Total recharged",
+    totalDebits: "Total debits",
     emptyTitle: "No ledger entries",
     emptyBody: "Balance movements appear here as usage is billed and credits are applied.",
     types: {

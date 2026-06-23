@@ -180,7 +180,7 @@ function DiagnosticsContent() {
                       </div>
                       <div className="flex items-center gap-4">
                         <DataTooltip
-                          title="Success rate"
+                          title={t("diagnostics.successRate")}
                           primary={`${Math.round(entry.success_rate * 100)}%`}
                           rows={[
                             { label: "State", value: entry.state, tone: "muted" },
@@ -309,7 +309,7 @@ function DiagnosticsContent() {
                           />
                         </div>
                         <DataTooltip
-                          title="Cache hit rate"
+                          title={t("diagnostics.cacheHitRate")}
                           primary={cache.hit_rate}
                           rows={[
                             { label: "size", value: String(cache.size), tone: "muted" },
