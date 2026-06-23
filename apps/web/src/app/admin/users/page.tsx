@@ -345,15 +345,27 @@ function UsersContent() {
       },
     },
     {
+      key: "organization",
+      header: t("adminUsers.orgColumn"),
+      hideOnMobile: true,
+      render: (u) => {
+        const rows = attributesByUserId.get(u.id) ?? [];
+        const org = rows.find((r) => r.key === "organization" && r.value);
+        if (!org) return <span className="text-[12px] text-srapi-text-tertiary">—</span>;
+        return (
+          <DataPill size="sm" tone="accent" className="max-w-[10rem] truncate">
+            <span className="truncate">{org.value}</span>
+          </DataPill>
+        );
+      },
+    },
+    {
       key: "attributes",
       header: t("adminUsers.attributesColumn"),
       hideOnMobile: true,
       render: (u) => {
         const rows = attributesByUserId.get(u.id) ?? [];
-        // Only show definitions the operator has actually set — empty values
-        // are noise. Cap at 3 chips so the column stays compact; the full
-        // editor lives behind the row-actions "Custom attributes" entry.
-        const set = rows.filter((r) => r.value !== "");
+        const set = rows.filter((r) => r.value !== "" && r.key !== "organization");
         if (set.length === 0) {
           return <span className="text-[12px] text-srapi-text-tertiary">—</span>;
         }

@@ -743,6 +743,8 @@ export const en = {
     today: "Today",
     todayIdle: "Idle",
     allRoles: "All roles",
+    allOrgs: "All organizations",
+    orgColumn: "Organization",
     amount: "Amount",
     operation: "Operation",
     note: "Note",

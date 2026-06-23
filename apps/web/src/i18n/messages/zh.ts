@@ -731,6 +731,8 @@ export const zh: Messages = {
     today: "今日",
     todayIdle: "空闲",
     allRoles: "全部角色",
+    allOrgs: "全部组织",
+    orgColumn: "组织",
     amount: "金额",
     operation: "操作",
     note: "备注",
