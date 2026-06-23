@@ -40,10 +40,12 @@ type anthropicStreamUsageAccumulator struct {
 // Anthropic's wire names; cache_read_input_tokens maps to gateway CachedTokens
 // and cache_creation_input_tokens to gateway CacheCreationTokens.
 type anthropicAccumulatedUsage struct {
-	InputTokens              int `json:"input_tokens"`
-	OutputTokens             int `json:"output_tokens"`
-	CacheReadInputTokens     int `json:"cache_read_input_tokens"`
-	CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+	InputTokens                int `json:"input_tokens"`
+	OutputTokens               int `json:"output_tokens"`
+	CacheReadInputTokens       int `json:"cache_read_input_tokens"`
+	CacheCreationInputTokens   int `json:"cache_creation_input_tokens"`
+	CacheCreation5mInputTokens int `json:"cache_creation_ephemeral_5m_input_tokens"`
+	CacheCreation1hInputTokens int `json:"cache_creation_ephemeral_1h_input_tokens"`
 }
 
 // anthropicStreamUsageEvent is the minimal shape needed to read usage off an
@@ -76,6 +78,12 @@ func mergeAnthropicAccumulatedUsage(dst *anthropicAccumulatedUsage, src anthropi
 	}
 	if src.CacheCreationInputTokens > 0 {
 		dst.CacheCreationInputTokens = src.CacheCreationInputTokens
+	}
+	if src.CacheCreation5mInputTokens > 0 {
+		dst.CacheCreation5mInputTokens = src.CacheCreation5mInputTokens
+	}
+	if src.CacheCreation1hInputTokens > 0 {
+		dst.CacheCreation1hInputTokens = src.CacheCreation1hInputTokens
 	}
 }
 
@@ -353,12 +361,14 @@ readLoop:
 	// authoritative whenever it yielded usage.
 	if usageEstimated && usageAcc.seen && (usageAcc.usage.InputTokens > 0 || usageAcc.usage.OutputTokens > 0) {
 		usage = gatewaycontract.Usage{
-			InputTokens:         usageAcc.usage.InputTokens,
-			OutputTokens:        usageAcc.usage.OutputTokens,
-			CachedTokens:        usageAcc.usage.CacheReadInputTokens,
-			CacheCreationTokens: usageAcc.usage.CacheCreationInputTokens,
-			Observed:            true,
-			Estimated:           false,
+			InputTokens:           usageAcc.usage.InputTokens,
+			OutputTokens:          usageAcc.usage.OutputTokens,
+			CachedTokens:          usageAcc.usage.CacheReadInputTokens,
+			CacheCreationTokens:   usageAcc.usage.CacheCreationInputTokens,
+			CacheCreation5mTokens: usageAcc.usage.CacheCreation5mInputTokens,
+			CacheCreation1hTokens: usageAcc.usage.CacheCreation1hInputTokens,
+			Observed:              true,
+			Estimated:             false,
 		}
 		usageEstimated = false
 	}
