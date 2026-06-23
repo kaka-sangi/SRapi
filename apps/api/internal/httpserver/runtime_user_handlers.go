@@ -155,7 +155,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !registrationEmailSuffixAllowed(string(body.Email), settings.Security.RegistrationEmailSuffixAllowlist) {
-		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "email domain not allowed for registration", requestID)
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid email or password (min 8 characters)", requestID)
 		return
 	}
 	inviteCode := optionalStringValue(body.InviteCode)
@@ -179,9 +179,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		switch {
-		case errors.Is(err, usersservice.ErrUserAlreadyExists):
-			writeStandardError(w, http.StatusConflict, apiopenapi.RESOURCECONFLICT, "email already registered", requestID)
-		case errors.Is(err, usersservice.ErrInvalidInput):
+		case errors.Is(err, usersservice.ErrUserAlreadyExists), errors.Is(err, usersservice.ErrInvalidInput):
 			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid email or password (min 8 characters)", requestID)
 		default:
 			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "registration failed", requestID)

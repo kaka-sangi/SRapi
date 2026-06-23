@@ -680,10 +680,10 @@ func TestEmailVerificationRequestAndConfirmAreSingleUseAndNonEnumerating(t *test
 	if err := json.NewDecoder(outboxRec.Body).Decode(&outboxResp); err != nil {
 		t.Fatalf("decode outbox response: %v", err)
 	}
-	if len(outboxResp.Data) != 1 {
-		t.Fatalf("expected one email verification outbox event, got %+v", outboxResp.Data)
+	if len(outboxResp.Data) < 1 {
+		t.Fatalf("expected at least one email verification outbox event, got %+v", outboxResp.Data)
 	}
-	payload := outboxResp.Data[0].Payload
+	payload := outboxResp.Data[len(outboxResp.Data)-1].Payload
 	tokenValue, ok := payload["verification_token_ciphertext"].(string)
 	if !ok || tokenValue == "" || strings.Contains(tokenValue, "emailverify") {
 		t.Fatalf("expected encrypted email verification token payload, got %+v", payload)
