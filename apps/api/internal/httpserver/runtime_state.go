@@ -316,6 +316,11 @@ type runtimeState struct {
 	// streaming request. Keyed by RequestID; entries expire after 5 minutes.
 	streamBillingDedup *localcache.Cache[bool]
 
+	// userAttributeCache caches per-user custom attribute overrides (group,
+	// RPM, cost multiplier) so the gateway hot path doesn't hit the DB on
+	// every request. 30-second TTL; invalidated on attribute change.
+	userAttributeCache *localcache.Cache[userAttributeOverrides]
+
 	// authRateLimit tracks per-IP login attempt counts to prevent brute-force
 	// attacks. Each entry holds the count of attempts in the current window;
 	// entries expire after 15 minutes.
@@ -1135,6 +1140,7 @@ func assembleRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOp
 			MaxEntries: 4096,
 			DefaultTTL: 5 * time.Minute,
 		}),
+		userAttributeCache: newUserAttributeCache(),
 		authRateLimit: localcache.New[int](localcache.Config{
 			MaxEntries: 8192,
 			DefaultTTL: 15 * time.Minute,

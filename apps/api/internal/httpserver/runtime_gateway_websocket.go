@@ -270,7 +270,7 @@ func (s *Server) handleRealtimeWebSocket(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
-	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
+	s.runtime.applyGatewayAdmission(r.Context(), &scheduleReq, admission)
 	result, err := s.runtime.scheduleGatewayRequest(withGatewayInboundClient(r.Context(), r), scheduleReq, modelResolution.Model.ID, gatewayForcedProviderKey(r.Context()), authed.Key)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, nil, false, "no_available_account", http.StatusServiceUnavailable, elapsedMillis(startedAt), admission, nil, ""))
@@ -721,7 +721,7 @@ func (s *Server) relayProviderResponsesWebSocket(r *http.Request, conn *websocke
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
 	scheduleReq.SourceEndpoint = gatewayEvidenceEndpoint(r.Context(), sourceEndpoint)
 	scheduleReq.RequestCapabilities = append(scheduleReq.RequestCapabilities, capabilityRequirement(capabilitiescontract.KeyResponsesWebSocket))
-	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
+	s.runtime.applyGatewayAdmission(r.Context(), &scheduleReq, admission)
 	result, err := s.runtime.scheduleGatewayRequest(withGatewayInboundClient(r.Context(), r), scheduleReq, model.ID, gatewayForcedProviderKey(r.Context()), authed.Key)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, nil, false, "no_available_account", http.StatusServiceUnavailable, elapsedMillis(startedAt), admission, nil, ""))

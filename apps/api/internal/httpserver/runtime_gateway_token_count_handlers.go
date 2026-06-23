@@ -76,7 +76,7 @@ func (s *Server) handleAnthropicCountTokens(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
-	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
+	s.runtime.applyGatewayAdmission(r.Context(), &scheduleReq, admission)
 	failover := s.invokeProviderTokenCountWithFailover(r.Context(), r, authed, canonical, rawBody, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
 	result := failover.ScheduleResult
 	if failover.Err != nil {

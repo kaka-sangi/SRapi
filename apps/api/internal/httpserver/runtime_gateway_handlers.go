@@ -560,7 +560,7 @@ func (s *Server) handleListResponseInputItems(w http.ResponseWriter, r *http.Req
 	admission.EstimatedUsage = gatewaycontract.Usage{}
 	admission.Pricing = zeroGatewayPricing()
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
-	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
+	s.runtime.applyGatewayAdmission(r.Context(), &scheduleReq, admission)
 	failover := s.invokeProviderResponseInputItemsWithFailover(r.Context(), r, authed, canonical, responseID, r.URL.Query(), scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
 	result := failover.ScheduleResult
 	if failover.Err != nil {
@@ -702,7 +702,7 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
-	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
+	s.runtime.applyGatewayAdmission(r.Context(), &scheduleReq, admission)
 	failover := s.invokeProviderConversationWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
 	result := failover.ScheduleResult
 	if failover.Err != nil {
@@ -886,7 +886,7 @@ func (s *Server) handleCreateEmbedding(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
-	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
+	s.runtime.applyGatewayAdmission(r.Context(), &scheduleReq, admission)
 	failover := s.invokeProviderEmbeddingsWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
 	result := failover.ScheduleResult
 	if failover.Err != nil {
@@ -1044,7 +1044,7 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
-	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
+	s.runtime.applyGatewayAdmission(r.Context(), &scheduleReq, admission)
 	failover := s.invokeProviderConversationWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
 	result := failover.ScheduleResult
 	if failover.Err != nil {
@@ -1301,7 +1301,7 @@ func (s *Server) handleGeminiCountTokens(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
-	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
+	s.runtime.applyGatewayAdmission(r.Context(), &scheduleReq, admission)
 	failover := s.invokeProviderTokenCountWithFailover(r.Context(), r, authed, canonical, rawBody, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
 	result := failover.ScheduleResult
 	if failover.Err != nil {

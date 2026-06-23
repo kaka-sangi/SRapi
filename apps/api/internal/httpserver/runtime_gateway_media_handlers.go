@@ -139,7 +139,7 @@ func (s *Server) handleCreateImageGeneration(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
-	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
+	s.runtime.applyGatewayAdmission(r.Context(), &scheduleReq, admission)
 	failover := s.invokeProviderImageGenerationWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
 	result := failover.ScheduleResult
 	if failover.Err != nil {
@@ -308,7 +308,7 @@ func (s *Server) handleCreateImageEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
-	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
+	s.runtime.applyGatewayAdmission(r.Context(), &scheduleReq, admission)
 	failover := s.invokeProviderImageEditWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
 	result := failover.ScheduleResult
 	if failover.Err != nil {
@@ -480,7 +480,7 @@ func (s *Server) handleCreateImageVariation(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
-	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
+	s.runtime.applyGatewayAdmission(r.Context(), &scheduleReq, admission)
 	failover := s.invokeProviderImageVariationWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
 	result := failover.ScheduleResult
 	if failover.Err != nil {
@@ -1211,7 +1211,7 @@ func (s *Server) handleCreateModeration(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
-	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
+	s.runtime.applyGatewayAdmission(r.Context(), &scheduleReq, admission)
 	failover := s.invokeProviderModerationsWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
 	result := failover.ScheduleResult
 	if failover.Err != nil {
@@ -1370,7 +1370,7 @@ func (s *Server) handleCreateRerank(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
-	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
+	s.runtime.applyGatewayAdmission(r.Context(), &scheduleReq, admission)
 	failover := s.invokeProviderRerankWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
 	result := failover.ScheduleResult
 	if failover.Err != nil {

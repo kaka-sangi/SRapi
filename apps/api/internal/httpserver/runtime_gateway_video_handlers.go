@@ -202,7 +202,7 @@ func (s *Server) prepareVideoGatewayRequest(w http.ResponseWriter, r *http.Reque
 		return prepared, false
 	}
 	prepared.ScheduleReq = gatewayScheduleRequest(r, canonical, modelResolution)
-	s.runtime.applyGatewayAdmission(&prepared.ScheduleReq, admission)
+	s.runtime.applyGatewayAdmission(r.Context(), &prepared.ScheduleReq, admission)
 	return prepared, true
 }
 

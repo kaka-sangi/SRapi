@@ -107,6 +107,14 @@ func (rt *runtimeState) prepareGatewayAdmissionWithOptions(ctx context.Context, 
 			return gatewayAdmission{}, err
 		}
 	}
+	// Resolve user attribute overrides (group, RPM, cost multiplier) once per
+	// request. The result is cached for 30s to avoid per-request DB hits.
+	attrOverrides := rt.resolveUserAttributeOverrides(ctx, canonical.UserID)
+	admission.UserAttrOverrides = attrOverrides
+	if attrOverrides.RPMOverride > 0 {
+		user.RPMLimit = &attrOverrides.RPMOverride
+	}
+
 	// Use the request ID (not per-attempt) as the reservation key — admission
 	// runs once per request, while the failover loop inside the dispatcher may
 	// record multiple usage rows. The reservation needs to span the whole
@@ -478,7 +486,7 @@ func positiveLimit(value *int) int {
 	return *value
 }
 
-func (rt *runtimeState) applyGatewayAdmission(req *schedulercontract.ScheduleRequest, admission gatewayAdmission) {
+func (rt *runtimeState) applyGatewayAdmission(ctx context.Context, req *schedulercontract.ScheduleRequest, admission gatewayAdmission) {
 	req.EstimatedInputTokens = admission.EstimatedUsage.InputTokens
 	req.EstimatedOutputTokens = admission.EstimatedUsage.OutputTokens
 	req.EstimatedCost = admission.Pricing.Amount
@@ -487,6 +495,11 @@ func (rt *runtimeState) applyGatewayAdmission(req *schedulercontract.ScheduleReq
 	req.PricingSource = admission.Pricing.PricingSource
 	req.PricingEstimated = true
 	req.AccountGroupScope = append([]int(nil), admission.Entitlement.AccountGroupScope...)
+	if groupName := admission.UserAttrOverrides.GroupOverride; groupName != "" {
+		if groupIDs := rt.resolveAccountGroupByName(ctx, groupName); len(groupIDs) > 0 {
+			req.AccountGroupScope = groupIDs
+		}
+	}
 	if strategy := schedulerStrategyName(admission.Entitlement.SchedulerStrategy); strategy != "" {
 		req.Strategy = strategy
 	}

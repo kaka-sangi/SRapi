@@ -114,10 +114,11 @@ type gatewayUpstreamErrorEvent struct {
 }
 
 type gatewayAdmission struct {
-	EstimatedUsage gatewaycontract.Usage
-	Pricing        gatewayPricingEvidence
-	Entitlement    subscriptioncontract.EntitlementDecision
-	RateLimit      ratelimit.Decision
+	EstimatedUsage     gatewaycontract.Usage
+	Pricing            gatewayPricingEvidence
+	Entitlement        subscriptioncontract.EntitlementDecision
+	RateLimit          ratelimit.Decision
+	UserAttrOverrides  userAttributeOverrides
 }
 
 type gatewayPricingEvidence struct {

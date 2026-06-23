@@ -86,7 +86,7 @@ func (s *Server) invokeGatewayConversationAttempt(
 	startedAt time.Time,
 ) gatewayConversationInvocation {
 	scheduleReq := gatewayScheduleRequest(r, canonical, resolution)
-	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
+	s.runtime.applyGatewayAdmission(r.Context(), &scheduleReq, admission)
 	failover := s.invokeProviderConversationWithFailover(ctx, r, authed, canonical, scheduleReq, resolution.Model.ID, forcedProviderKey, admission, startedAt)
 	return gatewayConversationInvocation{
 		Canonical:      canonical,

@@ -134,7 +134,7 @@ func (s *Server) handleCreateAudioTranscription(w http.ResponseWriter, r *http.R
 		return
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
-	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
+	s.runtime.applyGatewayAdmission(r.Context(), &scheduleReq, admission)
 	failover := s.invokeProviderAudioTranscriptionWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
 	result := failover.ScheduleResult
 	if failover.Err != nil {
@@ -406,7 +406,7 @@ func (s *Server) handleCreateAudioSpeech(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
-	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
+	s.runtime.applyGatewayAdmission(r.Context(), &scheduleReq, admission)
 	failover := s.invokeProviderAudioSpeechWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
 	result := failover.ScheduleResult
 	if failover.Err != nil {
