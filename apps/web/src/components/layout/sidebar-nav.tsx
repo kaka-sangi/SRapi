@@ -92,6 +92,7 @@ export function SidebarNav({
                 <Link
                   key={item.href}
                   href={item.href}
+                  scroll={false}
                   onClick={onNavigate}
                   aria-current={active ? "page" : undefined}
                   data-tour={tourTag}
@@ -141,6 +142,7 @@ export function SidebarNav({
                 <Link
                   key={`${menu.label}-${menu.url}`}
                   href={menu.url}
+                  scroll={false}
                   onClick={onNavigate}
                   className="flex items-center gap-3 rounded-lg px-3 py-2 text-srapi-text-secondary transition-colors hover:bg-srapi-card-muted hover:text-srapi-text-primary"
                 >

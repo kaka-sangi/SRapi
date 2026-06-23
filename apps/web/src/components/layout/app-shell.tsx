@@ -37,7 +37,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
   const live = runtime.data?.connected ?? false;
 
   return (
-    <div className="flex min-h-dvh w-full">
+    <div className="flex h-dvh w-full overflow-hidden">
       {/* Top-of-viewport scroll progress — only renders for tall pages */}
       <ScrollProgress />
       {/* Desktop sidebar — wider, brighter, soft-card user pill at the bottom.
@@ -72,9 +72,9 @@ function ShellInner({ children }: { children: React.ReactNode }) {
 
       <CommandPaletteProvider role={user.role}>
         <TourProvider>
-          <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
             <TopNav user={user} onOpenNav={() => setNavOpen(true)} live={live} />
-            <main className="flex-1">
+            <main className="flex-1 overflow-y-auto overscroll-contain">
               <PageTransition>
                 <div className="mx-auto w-full max-w-[1360px] space-y-8 px-5 py-7 sm:px-8 sm:py-9 lg:px-10">
                   {children}
