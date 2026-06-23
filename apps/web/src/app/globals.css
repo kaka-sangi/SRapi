@@ -249,18 +249,23 @@ textarea:focus-visible,
   .srapi-pet-blink { animation: none !important }
 }
 
-/* Scrollbar: hide vertical, keep horizontal */
-::-webkit-scrollbar:vertical {
-  width: 0;
-  display: none;
+/* Scrollbar: thin elegant style across all browsers.
+   Firefox uses scrollbar-width + scrollbar-color;
+   Webkit/Blink uses ::-webkit-scrollbar pseudo-elements. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-srapi-border-strong) transparent;
 }
-::-webkit-scrollbar:horizontal {
-  height: 8px;
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-thumb {
   background: var(--color-srapi-border-strong);
   border-radius: 9999px;
-  border: 2px solid var(--color-srapi-bg);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-srapi-text-tertiary);
 }
 ::-webkit-scrollbar-track {
   background: transparent;

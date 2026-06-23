@@ -233,7 +233,7 @@ export function ResourceFormDialog<TDraft extends object, TBody>({
               <DialogDescription className="sr-only">{title}</DialogDescription>
             )}
           </DialogHeader>
-          <div className="mt-4 max-h-[60vh] space-y-4 overflow-y-auto pr-1">
+          <div className="mt-4 max-h-[70vh] space-y-4 overflow-y-auto overscroll-contain pr-2">
             {primaryFields.map((field) => (
               <FieldRow
                 key={field.name}

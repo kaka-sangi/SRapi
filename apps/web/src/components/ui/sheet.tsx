@@ -17,9 +17,9 @@ const SheetClose = DialogPrimitive.Close;
 type Side = "left" | "right" | "bottom";
 
 const SIDE_CLASSES: Record<Side, string> = {
-  left: "inset-y-0 left-0 h-full w-80 max-w-[85vw] overflow-y-auto border-r srapi-anim-sheet-left",
-  right: "inset-y-0 right-0 h-full w-80 max-w-[85vw] overflow-y-auto border-l srapi-anim-sheet-right",
-  bottom: "inset-x-0 bottom-0 max-h-[85dvh] w-full overflow-y-auto rounded-t-xl border-t srapi-anim-sheet-bottom",
+  left: "inset-y-0 left-0 h-full w-80 max-w-[85vw] overflow-y-auto overscroll-contain border-r srapi-anim-sheet-left",
+  right: "inset-y-0 right-0 h-full w-80 max-w-[85vw] overflow-y-auto overscroll-contain border-l srapi-anim-sheet-right",
+  bottom: "inset-x-0 bottom-0 max-h-[85dvh] w-full overflow-y-auto overscroll-contain rounded-t-xl border-t srapi-anim-sheet-bottom",
 };
 
 export const SheetContent = React.forwardRef<
