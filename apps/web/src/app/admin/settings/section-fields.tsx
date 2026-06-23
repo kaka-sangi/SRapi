@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { type SettingsTab } from "@/lib/admin-settings-form";
-import { SPECIAL_FIELDS, GATEWAY_NON_NEGATIVE_INT_FIELDS, fieldLabel } from "./settings-fields";
+import { SPECIAL_FIELDS, HIDDEN_FIELDS, GATEWAY_NON_NEGATIVE_INT_FIELDS, fieldLabel } from "./settings-fields";
 
 /** Auto-render the primitive fields of a settings section as typed inputs. */
 export function SectionFields({
@@ -21,9 +21,11 @@ export function SectionFields({
     () => new Set((SPECIAL_FIELDS[section] ?? []).map((f) => f.skip)),
     [section],
   );
+  const hidden = HIDDEN_FIELDS[section];
 
   const entries = Object.entries(value).filter(([key, v]) => {
     if (skip.has(key)) return false;
+    if (hidden?.has(key)) return false;
     const type = typeof v;
     return v === null || type === "boolean" || type === "number" || type === "string";
   });

@@ -53,6 +53,13 @@ export const SPECIAL_FIELDS: Partial<Record<SettingsTab, SpecialField[]>> = {
   email: [{ key: "emailTemplates", kind: "templates", skip: "templates" }],
 };
 
+// HIDDEN_FIELDS hides a field from one tab when it logically belongs in another.
+// payments_enabled lives under features.* in the API schema but is shown on
+// the Payment tab to consolidate all payment controls in one place.
+export const HIDDEN_FIELDS: Partial<Record<SettingsTab, Set<string>>> = {
+  features: new Set(["payments_enabled"]),
+};
+
 /**
  * Gateway numeric settings that must stay non-negative integers (the
  * operator-tunable retry/failover knobs and cooldown/timeout values). The Go
