@@ -37,8 +37,14 @@ import { CopilotTab } from "./copilot-tab";
 import { BackupTab } from "./backup-tab";
 import { CaptchaSettingsPanel } from "./captcha-settings-panel";
 import { MaintenanceTab } from "./maintenance-tab";
+import { GeneralTab } from "./general-tab";
+import { AgreementTab } from "./agreement-tab";
+import { FeaturesTab } from "./features-tab";
 import { SecurityTab } from "./security-tab";
+import { UsersTab } from "./users-tab";
+import { GatewayTab } from "./gateway-tab";
 import { PaymentTab } from "./payment-tab";
+import { EmailTab } from "./email-tab";
 import type { AdminSettingsMaintenance } from "../../../../../../packages/sdk/typescript/src/types.gen";
 
 export default function AdminSettingsPage() {
@@ -244,37 +250,61 @@ function SettingsEditor({ initial }: { initial: Parameters<typeof createSettings
               pending={updateMut.isPending}
               modelOptions={modelOptions}
             />
-          ) : (
-            <Card>
-              <CardContent className="space-y-5">
-                <SectionFields
-                  section={tab.id}
-                  value={draft.value[tab.id] as Record<string, unknown>}
-                  onChange={(key, value) => setSectionField(tab.id, key, value)}
-                />
-                {(SPECIAL_FIELDS[tab.id] ?? []).map((field) => (
-                  <SpecialFieldRow
-                    key={String(field.key)}
-                    field={field}
-                    draft={draft}
-                    onChange={setSpecial}
-                    modelOptions={modelOptions}
-                  />
-                ))}
-                {tab.id === "email" ? <EmailTestPanel /> : null}
-                <div className="flex justify-end border-t border-srapi-border/70 pt-4">
-                  <Button
-                    variant="primary"
-                    loading={updateMut.isPending}
-                    disabled={!isDirty}
-                    onClick={() => requestSave(tab.id)}
-                  >
-                    {t("adminSettings.saveSection")}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          ) : tab.id === "general" ? (
+            <GeneralTab
+              value={draft.value.general as Record<string, unknown>}
+              draft={draft}
+              onField={(key, v) => setSectionField("general", key, v)}
+              onSpecial={setSpecial}
+              onSave={() => requestSave("general")}
+              pending={updateMut.isPending}
+              modelOptions={modelOptions}
+            />
+          ) : tab.id === "agreement" ? (
+            <AgreementTab
+              value={draft.value.agreement as Record<string, unknown>}
+              onField={(key, v) => setSectionField("agreement", key, v)}
+              onSave={() => requestSave("agreement")}
+              pending={updateMut.isPending}
+            />
+          ) : tab.id === "features" ? (
+            <FeaturesTab
+              value={draft.value.features as Record<string, unknown>}
+              draft={draft}
+              onField={(key, v) => setSectionField("features", key, v)}
+              onSpecial={setSpecial}
+              onSave={() => requestSave("features")}
+              pending={updateMut.isPending}
+              modelOptions={modelOptions}
+            />
+          ) : tab.id === "users" ? (
+            <UsersTab
+              value={draft.value.users as Record<string, unknown>}
+              onField={(key, v) => setSectionField("users", key, v)}
+              onSave={() => requestSave("users")}
+              pending={updateMut.isPending}
+            />
+          ) : tab.id === "gateway" ? (
+            <GatewayTab
+              value={draft.value.gateway as Record<string, unknown>}
+              draft={draft}
+              onField={(key, v) => setSectionField("gateway", key, v)}
+              onSpecial={setSpecial}
+              onSave={() => requestSave("gateway")}
+              pending={updateMut.isPending}
+              modelOptions={modelOptions}
+            />
+          ) : tab.id === "email" ? (
+            <EmailTab
+              value={draft.value.email as Record<string, unknown>}
+              draft={draft}
+              onField={(key, v) => setSectionField("email", key, v)}
+              onSpecial={setSpecial}
+              onSave={() => requestSave("email")}
+              pending={updateMut.isPending}
+              modelOptions={modelOptions}
+            />
+          ) : null}
         </TabsContent>
       ))}
 
