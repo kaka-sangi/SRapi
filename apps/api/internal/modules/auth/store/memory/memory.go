@@ -87,6 +87,18 @@ func (s *Store) Touch(_ context.Context, id string, at time.Time) error {
 	return nil
 }
 
+func (s *Store) UpdateCSRFToken(_ context.Context, sessionID string, newToken string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	session, ok := s.sessions[sessionID]
+	if !ok {
+		return errors.New("session not found")
+	}
+	session.CSRFToken = newToken
+	s.sessions[sessionID] = session
+	return nil
+}
+
 func (s *Store) CreatePasswordResetToken(_ context.Context, input contract.CreatePasswordResetToken) (contract.PasswordResetToken, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -122,6 +122,31 @@ func (s *Store) DeleteByUserID(ctx context.Context, userID int) error {
 	return err
 }
 
+func (s *Store) UpdateCSRFToken(ctx context.Context, sessionID string, newToken string) error {
+	sessionID = strings.TrimSpace(sessionID)
+	newToken = strings.TrimSpace(newToken)
+	if sessionID == "" || newToken == "" {
+		return ErrInvalidStore
+	}
+	now := time.Now().UTC()
+	affected, err := s.client.AuthSession.Update().
+		Where(
+			entauthsession.SessionIDHashEQ(tokenHash(sessionID)),
+			entauthsession.StatusEQ(sessionStatusActive),
+			entauthsession.DeletedAtIsNil(),
+		).
+		SetCsrfTokenHash(tokenHash(newToken)).
+		SetUpdatedAt(now).
+		Save(ctx)
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrSessionNotFound
+	}
+	return nil
+}
+
 func (s *Store) Touch(ctx context.Context, id string, at time.Time) error {
 	sessionID := strings.TrimSpace(id)
 	if sessionID == "" || at.IsZero() {

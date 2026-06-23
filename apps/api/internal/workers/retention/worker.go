@@ -26,6 +26,7 @@ type Config struct {
 	SchedulerRequestSnapshotsDays int
 	AuditLogsDays                 int
 	AccountHealthSnapshotsDays    int
+	SystemLogsDays                int
 	BatchLimit                    int
 	Clock                         service.Clock
 	RunGuard                      runonceguard.Guard
@@ -173,6 +174,7 @@ func (w *Worker) cleanupAndLog(ctx context.Context) {
 			"scheduler_request_snapshots", result.SchedulerRequestSnapshots,
 			"audit_logs", result.AuditLogs,
 			"account_health_snapshots", result.AccountHealthSnapshots,
+			"system_logs", result.SystemLogs,
 			"limited", result.Limited,
 		)
 	}
@@ -184,7 +186,8 @@ func totalDeleted(result contract.CleanupResult) int {
 		result.SchedulerFeedbacks +
 		result.SchedulerRequestSnapshots +
 		result.AuditLogs +
-		result.AccountHealthSnapshots
+		result.AccountHealthSnapshots +
+		result.SystemLogs
 }
 
 func policyFromConfig(cfg Config) contract.RetentionPolicy {
@@ -195,6 +198,7 @@ func policyFromConfig(cfg Config) contract.RetentionPolicy {
 		SchedulerRequestSnapshots: days(cfg.SchedulerRequestSnapshotsDays),
 		AuditLogs:                 days(cfg.AuditLogsDays),
 		AccountHealthSnapshots:    days(cfg.AccountHealthSnapshotsDays),
+		SystemLogs:                days(cfg.SystemLogsDays),
 		BatchLimit:                cfg.BatchLimit,
 	}
 }

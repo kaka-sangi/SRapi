@@ -243,6 +243,7 @@ type RetentionConfig struct {
 	SchedulerRequestSnapshotsDays int
 	AuditLogsDays                 int
 	AccountHealthSnapshotsDays    int
+	SystemLogsDays                int
 	BatchLimit                    int
 }
 
@@ -415,6 +416,7 @@ func Load() Config {
 			SchedulerRequestSnapshotsDays: getIntEnv("DATA_RETENTION_SCHEDULER_REQUEST_SNAPSHOTS_DAYS", 30),
 			AuditLogsDays:                 getIntEnv("DATA_RETENTION_AUDIT_LOGS_DAYS", 365),
 			AccountHealthSnapshotsDays:    getIntEnv("DATA_RETENTION_ACCOUNT_HEALTH_SNAPSHOTS_DAYS", 90),
+			SystemLogsDays:                getIntEnv("DATA_RETENTION_SYSTEM_LOGS_DAYS", 30),
 			BatchLimit:                    getIntEnv("DATA_RETENTION_BATCH_LIMIT", 1000),
 		},
 		AuthCleanup: AuthCleanupConfig{

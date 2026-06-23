@@ -310,6 +310,11 @@ func ValidateCSRF(session authcontract.Session, token string) error {
 	return nil
 }
 
+// GenerateCSRFToken creates a new cryptographically random CSRF token.
+func GenerateCSRFToken() (string, error) {
+	return randomToken("csrf", csrfTokenBytes)
+}
+
 func randomToken(prefix string, size int) (string, error) {
 	token, err := randomRawToken(size)
 	if err != nil {

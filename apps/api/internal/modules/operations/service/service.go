@@ -69,6 +69,7 @@ func (s *Service) CleanupRetention(ctx context.Context, policy contract.Retentio
 		SchedulerRequestSnapshots: cutoff(now, policy.SchedulerRequestSnapshots),
 		AuditLogs:                 cutoff(now, policy.AuditLogs),
 		AccountHealthSnapshots:    cutoff(now, policy.AccountHealthSnapshots),
+		SystemLogs:                cutoff(now, policy.SystemLogs),
 		BatchLimit:                normalizeRetentionBatchLimit(policy.BatchLimit),
 	})
 }

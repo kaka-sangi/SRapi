@@ -683,6 +683,7 @@ func retentionCleanupWorker(cfg config.Config, stores *entstore.Stores, logger *
 		SchedulerRequestSnapshotsDays: cfg.Retention.SchedulerRequestSnapshotsDays,
 		AuditLogsDays:                 cfg.Retention.AuditLogsDays,
 		AccountHealthSnapshotsDays:    cfg.Retention.AccountHealthSnapshotsDays,
+		SystemLogsDays:                cfg.Retention.SystemLogsDays,
 		BatchLimit:                    cfg.Retention.BatchLimit,
 		RunGuard:                      optionalWorkerGuard(guards...),
 	})

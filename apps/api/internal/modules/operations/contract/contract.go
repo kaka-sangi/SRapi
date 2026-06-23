@@ -128,6 +128,7 @@ type RetentionPolicy struct {
 	SchedulerRequestSnapshots time.Duration
 	AuditLogs                 time.Duration
 	AccountHealthSnapshots    time.Duration
+	SystemLogs                time.Duration
 	BatchLimit                int
 }
 
@@ -138,6 +139,7 @@ type CleanupResult struct {
 	SchedulerRequestSnapshots int
 	AuditLogs                 int
 	AccountHealthSnapshots    int
+	SystemLogs                int
 	Limited                   bool
 }
 
@@ -152,6 +154,7 @@ type RetentionCutoffs struct {
 	SchedulerRequestSnapshots *time.Time
 	AuditLogs                 *time.Time
 	AccountHealthSnapshots    *time.Time
+	SystemLogs                *time.Time
 	BatchLimit                int
 }
 

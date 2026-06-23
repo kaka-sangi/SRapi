@@ -122,6 +122,13 @@ type Store interface {
 	Touch(ctx context.Context, id string, at time.Time) error
 }
 
+// CSRFRotator is an optional Store capability for rotating CSRF tokens
+// after state-changing operations. Stores that don't implement it cause
+// CSRF rotation to be silently skipped (the existing token stays valid).
+type CSRFRotator interface {
+	UpdateCSRFToken(ctx context.Context, sessionID string, newToken string) error
+}
+
 // CleanupStore removes active sessions that have passed their expiry time.
 type CleanupStore interface {
 	CleanupExpiredSessions(ctx context.Context, now time.Time) (CleanupExpiredSessionsResult, error)

@@ -814,3 +814,26 @@ func writeAdminControlError(w http.ResponseWriter, err error, requestID string) 
 func validateCSRF(session authcontract.Session, token string) error {
 	return authservice.ValidateCSRF(session, token)
 }
+
+// csrfRotationMiddleware wraps admin handlers so that after a successful
+// state-changing request (POST/PUT/PATCH/DELETE with 2xx), the CSRF token is
+// rotated and the new token is sent via the X-CSRF-Token-Rotated header.
+// The frontend should pick this up and use the new token for subsequent
+// requests. This limits the window of a compromised CSRF token.
+func (s *Server) rotateCSRFTokenQuiet(ctx context.Context, sessionID string) string {
+	if sessionID == "" {
+		return ""
+	}
+	rotator, ok := s.runtime.sessionStore.(authcontract.CSRFRotator)
+	if !ok {
+		return ""
+	}
+	newToken, err := authservice.GenerateCSRFToken()
+	if err != nil {
+		return ""
+	}
+	if err := rotator.UpdateCSRFToken(ctx, sessionID, newToken); err != nil {
+		return ""
+	}
+	return newToken
+}

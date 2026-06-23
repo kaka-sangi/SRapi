@@ -91,6 +91,14 @@ func (s *Store) Cleanup(ctx context.Context, cutoffs contract.RetentionCutoffs) 
 		result.AccountHealthSnapshots = deleted
 		result.Limited = result.Limited || limited
 	}
+	if cutoffs.SystemLogs != nil {
+		deleted, limited, err := cleanupSystemLogs(ctx, s.client, *cutoffs.SystemLogs, batchLimit)
+		if err != nil {
+			return contract.CleanupResult{}, err
+		}
+		result.SystemLogs = deleted
+		result.Limited = result.Limited || limited
+	}
 	return result, nil
 }
 
@@ -937,6 +945,26 @@ func cloneTime(value *time.Time) *time.Time {
 	}
 	cloned := *value
 	return &cloned
+}
+
+func cleanupSystemLogs(ctx context.Context, client *ent.Client, cutoff time.Time, batchLimit int) (int, bool, error) {
+	ids, err := client.OpsSystemLog.Query().
+		Where(entopssystemlog.CreatedAtLT(cutoff)).
+		Order(entopssystemlog.ByID()).
+		Limit(batchLimit + 1).
+		IDs(ctx)
+	if err != nil {
+		return 0, false, err
+	}
+	limited := len(ids) > batchLimit
+	ids = capIDs(ids, batchLimit)
+	if len(ids) == 0 {
+		return 0, false, nil
+	}
+	deleted, err := client.OpsSystemLog.Delete().
+		Where(entopssystemlog.IDIn(ids...)).
+		Exec(ctx)
+	return deleted, limited, err
 }
 
 func cloneStrings(values []string) []string {
