@@ -5,7 +5,7 @@
  * cookie; the CSRF token mirrors lib/api.ts (localStorage `srapi_csrf_token`).
  */
 
-const CSRF_STORAGE_KEY = "srapi_csrf_token";
+import { CSRF_STORAGE_KEY } from "@/lib/sdk-client";
 
 interface CopilotToolCall {
   id: string;
