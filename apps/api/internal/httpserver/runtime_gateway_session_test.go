@@ -282,3 +282,45 @@ func TestDeriveGatewaySessionAffinityCascade(t *testing.T) {
 		}
 	})
 }
+
+func TestConnectionFingerprintSessionKey(t *testing.T) {
+	t.Run("produces stable key from IP+UA+keyID", func(t *testing.T) {
+		r := httptest.NewRequest("POST", "/v1/chat/completions", nil)
+		r.RemoteAddr = "10.0.0.1:54321"
+		r.Header.Set("User-Agent", "test-client/1.0")
+		k1 := connectionFingerprintSessionKey(r, 42)
+		k2 := connectionFingerprintSessionKey(r, 42)
+		if k1 == "" {
+			t.Fatal("expected non-empty key")
+		}
+		if k1 != k2 {
+			t.Fatalf("same inputs must produce same key: %q != %q", k1, k2)
+		}
+		if !strings.HasPrefix(k1, "sid:cfp:") {
+			t.Fatalf("expected sid:cfp: prefix, got %q", k1)
+		}
+	})
+
+	t.Run("different keyID produces different key", func(t *testing.T) {
+		r := httptest.NewRequest("POST", "/v1/chat/completions", nil)
+		r.RemoteAddr = "10.0.0.1:54321"
+		r.Header.Set("User-Agent", "test-client/1.0")
+		k1 := connectionFingerprintSessionKey(r, 1)
+		k2 := connectionFingerprintSessionKey(r, 2)
+		if k1 == k2 {
+			t.Fatal("different API key IDs must produce different keys")
+		}
+	})
+
+	t.Run("produces key even with minimal request", func(t *testing.T) {
+		r := httptest.NewRequest("POST", "/v1/chat/completions", nil)
+		// httptest.NewRequest sets RemoteAddr="192.0.2.1:1234" by default
+		k := connectionFingerprintSessionKey(r, 42)
+		if k == "" {
+			t.Fatal("expected non-empty key when RemoteAddr is set")
+		}
+		if !strings.HasPrefix(k, "sid:cfp:") {
+			t.Fatalf("expected sid:cfp: prefix, got %q", k)
+		}
+	})
+}

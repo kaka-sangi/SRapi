@@ -286,6 +286,7 @@ func (s *Server) writeConversationStreamPassthrough(
 	// the terminal message_delta usage event falls beyond the 16MB meter cap.
 	var usageAcc anthropicStreamUsageAccumulator
 	interrupted := false
+	clientDisconnect := false
 readLoop:
 	for {
 		select {
@@ -302,6 +303,7 @@ readLoop:
 				usageAcc.write(sc.data)
 				if _, writeErr := w.Write(sc.data); writeErr != nil {
 					interrupted = true
+					clientDisconnect = true
 					break readLoop
 				}
 				if flusher != nil {
@@ -330,6 +332,7 @@ readLoop:
 		case <-keepaliveCh:
 			if err := writeSSEKeepalive(w, flusher); err != nil {
 				interrupted = true
+				clientDisconnect = true
 				break readLoop
 			}
 			resetStreamTimer(keepaliveTimer, keepalive)
@@ -400,21 +403,7 @@ readLoop:
 		CompatibilityWarnings: canonical.CompatibilityWarnings,
 		ProviderQuotaSignals:  quotaSignals,
 	}
-	if interrupted {
-		if idleTimedOut {
-			record.ErrorClass = ptrStringValue("stream_idle_timeout")
-			record.StreamCompletionState = "idle_timeout"
-		} else {
-			record.ErrorClass = ptrStringValue("stream_interrupted")
-			record.StreamCompletionState = "interrupted"
-		}
-		record.ErrorPhase = "stream"
-		record.ErrorOwner = "provider"
-		record.ErrorSource = "upstream_stream"
-		record.ProviderErrorMessage = *record.ErrorClass
-	} else {
-		record.StreamCompletionState = "completed"
-	}
+	classifyStreamInterruption(&record, interrupted, clientDisconnect, idleTimedOut)
 	s.recordOpsErrorLog(r.Context(), record)
 	s.runtime.recordGatewayUsage(r.Context(), record)
 }
@@ -474,6 +463,7 @@ func (s *Server) writeImageGenerationStreamPassthrough(
 
 	var meter bytes.Buffer
 	interrupted := false
+	clientDisconnect := false
 readLoop:
 	for {
 		select {
@@ -489,6 +479,7 @@ readLoop:
 				}
 				if _, writeErr := w.Write(sc.data); writeErr != nil {
 					interrupted = true
+					clientDisconnect = true
 					break readLoop
 				}
 				if flusher != nil {
@@ -514,6 +505,7 @@ readLoop:
 		case <-keepaliveCh:
 			if err := writeSSEKeepalive(w, flusher); err != nil {
 				interrupted = true
+				clientDisconnect = true
 				break readLoop
 			}
 			resetStreamTimer(keepaliveTimer, keepalive)
@@ -557,21 +549,7 @@ readLoop:
 		CompatibilityWarnings: canonical.CompatibilityWarnings,
 		ProviderQuotaSignals:  quotaSignals,
 	}
-	if interrupted {
-		if idleTimedOut {
-			record.ErrorClass = ptrStringValue("stream_idle_timeout")
-			record.StreamCompletionState = "idle_timeout"
-		} else {
-			record.ErrorClass = ptrStringValue("stream_interrupted")
-			record.StreamCompletionState = "interrupted"
-		}
-		record.ErrorPhase = "stream"
-		record.ErrorOwner = "provider"
-		record.ErrorSource = "upstream_stream"
-		record.ProviderErrorMessage = *record.ErrorClass
-	} else {
-		record.StreamCompletionState = "completed"
-	}
+	classifyStreamInterruption(&record, interrupted, clientDisconnect, idleTimedOut)
 	s.recordOpsErrorLog(r.Context(), record)
 	s.runtime.recordGatewayUsage(r.Context(), record)
 }
@@ -709,4 +687,39 @@ func statusOrOK(status int) int {
 		return http.StatusOK
 	}
 	return status
+}
+
+// classifyStreamInterruption fills the error-class and owner/source fields on a
+// usage record for an interrupted stream, distinguishing three cases:
+//   - idle timeout (upstream stalled)
+//   - client disconnect (downstream closed the connection)
+//   - upstream stream error (upstream dropped mid-stream)
+//
+// This separation (inspired by sub2api's split tracking) makes ops dashboards
+// actionable: client disconnects are not provider faults and should not count
+// against account health or trigger cooldowns.
+func classifyStreamInterruption(record *gatewayUsageRecord, interrupted, clientDisconnect, idleTimedOut bool) {
+	if !interrupted {
+		record.StreamCompletionState = "completed"
+		return
+	}
+	record.ErrorPhase = "stream"
+	switch {
+	case idleTimedOut:
+		record.ErrorClass = ptrStringValue("stream_idle_timeout")
+		record.StreamCompletionState = "idle_timeout"
+		record.ErrorOwner = "provider"
+		record.ErrorSource = "upstream_stream"
+	case clientDisconnect:
+		record.ErrorClass = ptrStringValue("client_disconnect")
+		record.StreamCompletionState = "client_disconnect"
+		record.ErrorOwner = "client"
+		record.ErrorSource = "downstream"
+	default:
+		record.ErrorClass = ptrStringValue("stream_interrupted")
+		record.StreamCompletionState = "interrupted"
+		record.ErrorOwner = "provider"
+		record.ErrorSource = "upstream_stream"
+	}
+	record.ProviderErrorMessage = *record.ErrorClass
 }

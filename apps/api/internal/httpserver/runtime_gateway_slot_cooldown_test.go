@@ -3,6 +3,7 @@ package httpserver
 import (
 	"net/http"
 	"testing"
+	"time"
 )
 
 // TestIsAccountTargetedUpstreamCooldownStatus pins the status codes that
@@ -46,5 +47,62 @@ func TestIsAccountTargetedUpstreamCooldownStatus(t *testing.T) {
 				t.Errorf("status %d: got %v, want %v", tc.status, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestAccountAdaptiveThrottleEnabled(t *testing.T) {
+	if accountAdaptiveThrottleEnabled(nil) {
+		t.Fatal("nil metadata must be disabled")
+	}
+	if accountAdaptiveThrottleEnabled(map[string]any{}) {
+		t.Fatal("empty metadata must be disabled")
+	}
+	if !accountAdaptiveThrottleEnabled(map[string]any{"adaptive_throttle_enabled": true}) {
+		t.Fatal("bool true must enable")
+	}
+	if !accountAdaptiveThrottleEnabled(map[string]any{"adaptive_throttle.enabled": true}) {
+		t.Fatal("dot-separated key must enable")
+	}
+	if !accountAdaptiveThrottleEnabled(map[string]any{"adaptive_throttle_enabled": "true"}) {
+		t.Fatal("string 'true' must enable (metacoerce accepts parseable strings)")
+	}
+}
+
+func TestAccountAdaptiveThrottleDelay(t *testing.T) {
+	enabled := map[string]any{"adaptive_throttle_enabled": true}
+	disabled := map[string]any{}
+
+	if d := accountAdaptiveThrottleDelay(disabled, 60); d != 0 {
+		t.Fatalf("disabled: expected 0, got %v", d)
+	}
+	if d := accountAdaptiveThrottleDelay(enabled, 0); d != 0 {
+		t.Fatalf("rpm=0: expected 0, got %v", d)
+	}
+	if d := accountAdaptiveThrottleDelay(enabled, -1); d != 0 {
+		t.Fatalf("rpm=-1: expected 0, got %v", d)
+	}
+
+	// 60 RPM → 1s delay
+	d := accountAdaptiveThrottleDelay(enabled, 60)
+	if d != time.Second {
+		t.Fatalf("rpm=60: expected 1s, got %v", d)
+	}
+
+	// 600 RPM → 100ms (clamped to min 50ms)
+	d = accountAdaptiveThrottleDelay(enabled, 600)
+	if d != 100*time.Millisecond {
+		t.Fatalf("rpm=600: expected 100ms, got %v", d)
+	}
+
+	// 100000 RPM → clamped to min 50ms
+	d = accountAdaptiveThrottleDelay(enabled, 100000)
+	if d != adaptiveThrottleMinDelay {
+		t.Fatalf("rpm=100000: expected min %v, got %v", adaptiveThrottleMinDelay, d)
+	}
+
+	// 1 RPM → clamped to max 5s
+	d = accountAdaptiveThrottleDelay(enabled, 1)
+	if d != adaptiveThrottleMaxDelay {
+		t.Fatalf("rpm=1: expected max %v, got %v", adaptiveThrottleMaxDelay, d)
 	}
 }

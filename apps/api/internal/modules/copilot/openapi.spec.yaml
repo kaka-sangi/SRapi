@@ -27890,6 +27890,7 @@ components:
             - completed
             - interrupted
             - idle_timeout
+            - client_disconnect
             - failed
             - unknown
           description: |
@@ -33096,6 +33097,7 @@ components:
             - completed
             - interrupted
             - idle_timeout
+            - client_disconnect
             - failed
             - unknown
           description: |
@@ -33276,6 +33278,7 @@ components:
             - completed
             - interrupted
             - idle_timeout
+            - client_disconnect
             - failed
             - unknown
           description: |

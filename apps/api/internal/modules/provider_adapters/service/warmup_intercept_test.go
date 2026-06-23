@@ -33,6 +33,51 @@ func TestIsWarmupRequest(t *testing.T) {
 	}
 }
 
+func TestIsWarmupRequest_MaxTokensOneSmallModel(t *testing.T) {
+	one := 1
+	cases := []struct {
+		name    string
+		req     contract.ConversationRequest
+		warmup  bool
+	}{
+		{
+			name:   "max_tokens=1 on haiku model",
+			req:    contract.ConversationRequest{Model: "claude-3-5-haiku-20241022", MaxOutputTokens: &one, RawBody: []byte(`{}`)},
+			warmup: true,
+		},
+		{
+			name:   "max_tokens=1 on gpt-4o-mini",
+			req:    contract.ConversationRequest{Model: "gpt-4o-mini", MaxOutputTokens: &one, RawBody: []byte(`{}`)},
+			warmup: true,
+		},
+		{
+			name:   "max_tokens=1 on large model should not match",
+			req:    contract.ConversationRequest{Model: "claude-sonnet-4-20250514", MaxOutputTokens: &one, RawBody: []byte(`{}`)},
+			warmup: false,
+		},
+		{
+			name:   "max_tokens=100 on haiku is not warmup",
+			req:    contract.ConversationRequest{Model: "claude-3-5-haiku-20241022", MaxOutputTokens: intPtr(100), RawBody: []byte(`{}`)},
+			warmup: false,
+		},
+		{
+			name:   "nil max_tokens on haiku is not warmup",
+			req:    contract.ConversationRequest{Model: "claude-3-5-haiku-20241022", RawBody: []byte(`{}`)},
+			warmup: false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := isWarmupRequest(tc.req)
+			if got != tc.warmup {
+				t.Fatalf("isWarmupRequest() = %v, want %v", got, tc.warmup)
+			}
+		})
+	}
+}
+
+func intPtr(v int) *int { return &v }
+
 func TestWarmupMockResponse(t *testing.T) {
 	m := warmupMockResponse(contract.ConversationRequest{RequestID: "r1"})
 	if m.StatusCode != 200 {

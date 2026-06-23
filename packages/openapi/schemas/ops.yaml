@@ -385,7 +385,7 @@ OpsErrorLog:
       type: string
     stream_completion_state:
       type: string
-      enum: [completed, interrupted, idle_timeout, failed, unknown]
+      enum: [completed, interrupted, idle_timeout, client_disconnect, failed, unknown]
       description: |
         Low-cardinality terminal state for gateway streaming requests.
         Empty when the request was not streamed or the state was not

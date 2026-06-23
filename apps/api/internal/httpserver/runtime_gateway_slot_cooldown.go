@@ -174,3 +174,48 @@ func errIsConcurrencySlotTransient(err error) bool {
 	// Defensive substring match in case the caller wraps.
 	return strings.Contains(err.Error(), "acquire timeout")
 }
+
+// Adaptive RPM throttle ("自适应限速"): when enabled per account via metadata,
+// introduces a minimum inter-request delay before dispatching to the upstream
+// provider. The delay is derived from the account's RPM limit:
+//
+//	delay = 60s / rpm_limit
+//
+// This prevents burst traffic from tripping upstream abuse detection / account
+// suspension — the same problem sub2api solves with its UMQ "throttle" mode.
+// Only applies when the account metadata flag is set; existing accounts are
+// unaffected.
+
+const (
+	adaptiveThrottleMinDelay = 50 * time.Millisecond
+	adaptiveThrottleMaxDelay = 5 * time.Second
+)
+
+func accountAdaptiveThrottleEnabled(metadata map[string]any) bool {
+	for _, key := range []string{"adaptive_throttle_enabled", "adaptive_throttle.enabled"} {
+		if metadataBool(metadata, key) {
+			return true
+		}
+	}
+	return false
+}
+
+// accountAdaptiveThrottleDelay computes the inter-request delay for an account
+// from its RPM limit. Returns 0 when the feature is disabled or no RPM limit
+// is configured.
+func accountAdaptiveThrottleDelay(metadata map[string]any, rpmLimit int) time.Duration {
+	if !accountAdaptiveThrottleEnabled(metadata) {
+		return 0
+	}
+	if rpmLimit <= 0 {
+		return 0
+	}
+	delay := time.Duration(float64(time.Minute) / float64(rpmLimit))
+	if delay < adaptiveThrottleMinDelay {
+		return adaptiveThrottleMinDelay
+	}
+	if delay > adaptiveThrottleMaxDelay {
+		return adaptiveThrottleMaxDelay
+	}
+	return delay
+}

@@ -191,16 +191,7 @@ func (rt *runtimeState) recordGatewayUsageEffects(ctx context.Context, rec gatew
 		// increments when no aggregator is configured (tests, memory storage) or
 		// the usage_log row wasn't persisted.
 		if rt.usageAggregator != nil && usageLogID > 0 {
-			if _, err := rt.usageAggregator.ApplyAggregation(ctx, usageLogID); err != nil {
-				rt.logger.Warn("failed to aggregate gateway usage billing", "error", err, "request_id", rec.RequestID, "usage_log_id", usageLogID)
-				rt.recordGatewayUsageEffectFailure(ctx, rec, gatewayUsageEffectFailure{
-					Effect:     "billing_aggregation",
-					Message:    "failed to aggregate gateway usage billing",
-					ErrorClass: "billing_aggregation_failed",
-					Error:      err,
-					UsageLogID: usageLogID,
-				})
-			}
+			rt.applyBillingAggregationWithBreaker(ctx, rec, usageLogID)
 		} else {
 			rt.recordGatewayMaterializedCosts(ctx, rec, pricing.BillableCost)
 		}
@@ -252,6 +243,51 @@ type gatewayUsageEffectFailure struct {
 	Error      error
 	UsageLogID int
 	DecisionID int
+}
+
+// applyBillingAggregationWithBreaker wraps the billing aggregation call in a
+// circuit breaker so persistent DB failures don't block request processing.
+// When open, the durable usage_log row (written synchronously earlier) remains
+// the source of truth and the reconciler recovers missed aggregations.
+func (rt *runtimeState) applyBillingAggregationWithBreaker(ctx context.Context, rec gatewayUsageRecord, usageLogID int) {
+	if rt.billingBreaker == nil {
+		if _, err := rt.usageAggregator.ApplyAggregation(ctx, usageLogID); err != nil {
+			rt.logger.Warn("failed to aggregate gateway usage billing", "error", err, "request_id", rec.RequestID, "usage_log_id", usageLogID)
+			rt.recordGatewayUsageEffectFailure(ctx, rec, gatewayUsageEffectFailure{
+				Effect:     "billing_aggregation",
+				Message:    "failed to aggregate gateway usage billing",
+				ErrorClass: "billing_aggregation_failed",
+				Error:      err,
+				UsageLogID: usageLogID,
+			})
+		}
+		return
+	}
+	done, cbErr := rt.billingBreaker.Allow()
+	if cbErr != nil {
+		rt.logger.Info("billing aggregation circuit open — skipping",
+			"usage_log_id", usageLogID, "request_id", rec.RequestID)
+		rt.recordGatewayUsageEffectFailure(ctx, rec, gatewayUsageEffectFailure{
+			Effect:     "billing_aggregation",
+			Message:    "billing aggregation circuit breaker open",
+			ErrorClass: "billing_circuit_open",
+			UsageLogID: usageLogID,
+		})
+		return
+	}
+	if _, err := rt.usageAggregator.ApplyAggregation(ctx, usageLogID); err != nil {
+		done(false)
+		rt.logger.Warn("failed to aggregate gateway usage billing", "error", err, "request_id", rec.RequestID, "usage_log_id", usageLogID)
+		rt.recordGatewayUsageEffectFailure(ctx, rec, gatewayUsageEffectFailure{
+			Effect:     "billing_aggregation",
+			Message:    "failed to aggregate gateway usage billing",
+			ErrorClass: "billing_aggregation_failed",
+			Error:      err,
+			UsageLogID: usageLogID,
+		})
+		return
+	}
+	done(true)
 }
 
 func (rt *runtimeState) recordGatewayUsageEffectFailure(ctx context.Context, rec gatewayUsageRecord, failure gatewayUsageEffectFailure) {

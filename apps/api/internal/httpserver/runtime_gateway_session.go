@@ -65,8 +65,53 @@ func deriveGatewaySessionAffinity(r *http.Request, canonical gatewaycontract.Can
 	if chain := buildGatewayDigestChain(canonical); chain != "" {
 		return chain, "derived:content_digest"
 	}
+	if r != nil && isConversationalEndpoint(canonical.SourceEndpoint) {
+		if key := connectionFingerprintSessionKey(r, canonical.APIKeyID); key != "" {
+			return key, "derived:connection_fingerprint"
+		}
+	}
 	return "", ""
 }
+
+// isConversationalEndpoint returns true for endpoints where session affinity
+// meaningfully improves user experience (multi-turn conversations, prompt
+// caching). Single-shot endpoints (embeddings, moderation, audio) don't
+// benefit from sticky routing.
+func isConversationalEndpoint(endpoint string) bool {
+	switch gatewaycontract.SourceEndpoint(endpoint) {
+	case gatewaycontract.EndpointChatCompletions,
+		gatewaycontract.EndpointMessages,
+		gatewaycontract.EndpointResponses,
+		gatewaycontract.EndpointResponsesCompact,
+		gatewaycontract.EndpointResponseInputItems,
+		gatewaycontract.EndpointGeminiGenerateContent,
+		gatewaycontract.EndpointGeminiStreamContent,
+		gatewaycontract.EndpointRealtime:
+		return true
+	}
+	return false
+}
+
+// connectionFingerprintSessionKey is the last-resort session key derived from
+// SHA256(ClientIP + UserAgent + APIKeyID). It ensures that requests from the
+// same client/key combination route to the same account even when no explicit
+// session header, metadata, or content digest is available. Mirrors sub2api's
+// session hash derivation.
+func connectionFingerprintSessionKey(r *http.Request, apiKeyID int) string {
+	ip := clientIP(r)
+	ua := r.UserAgent()
+	if ip == "" && ua == "" {
+		return ""
+	}
+	h := sha256.New()
+	h.Write([]byte(ip))
+	h.Write([]byte{0})
+	h.Write([]byte(ua))
+	h.Write([]byte{0})
+	h.Write([]byte(strconv.Itoa(apiKeyID)))
+	return "sid:cfp:" + hex.EncodeToString(h.Sum(nil))[:16]
+}
+
 
 func explicitSessionIdentity(r *http.Request, canonical gatewaycontract.CanonicalRequest) (string, string) {
 	var probe struct {

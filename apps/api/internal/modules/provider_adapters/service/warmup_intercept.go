@@ -31,7 +31,14 @@ var warmupMarkers = []string{
 }
 
 // isWarmupRequest detects a priming/title request from the request body.
+// Two detection modes (mirrors sub2api):
+//  1. Phrase-based: known title-generation/topic-analysis prompts.
+//  2. Token-budget: max_tokens=1 on a small model (haiku) — clients use this
+//     to probe connectivity without burning real tokens.
 func isWarmupRequest(req contract.ConversationRequest) bool {
+	if isMaxTokensOneSmallModel(req) {
+		return true
+	}
 	body := strings.ToLower(string(req.RawBody))
 	if strings.TrimSpace(body) == "" {
 		body = strings.ToLower(req.Instructions)
@@ -47,6 +54,27 @@ func isWarmupRequest(req contract.ConversationRequest) bool {
 		}
 	}
 	return false
+}
+
+// isMaxTokensOneSmallModel detects max_tokens=1 on a small/cheap model — a
+// common connectivity probe pattern used by Claude Code and similar clients.
+func isMaxTokensOneSmallModel(req contract.ConversationRequest) bool {
+	if req.MaxOutputTokens == nil || *req.MaxOutputTokens != 1 {
+		return false
+	}
+	model := strings.ToLower(req.Model)
+	for _, prefix := range warmupModelPrefixes {
+		if strings.Contains(model, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+var warmupModelPrefixes = []string{
+	"haiku",
+	"gpt-4o-mini",
+	"gemini-2.0-flash",
 }
 
 // warmupMockResponse is the canned, zero-cost response returned for an

@@ -306,6 +306,12 @@ type runtimeState struct {
 	// direct (unmarked) increment path.
 	usageAggregator usageAggregator
 
+	// billingBreaker guards the billing aggregation write path. When
+	// persistently failing it trips open so request processing continues
+	// without billing — the reconciler recovers dropped rows from the
+	// durable usage_log. Inspired by sub2api's BillingCircuitBreaker.
+	billingBreaker *circuitbreaker.Breaker
+
 	// requestLogFiles holds the optional file-based per-request capture
 	// (gateway HTTP envelope dumps). Lazily populated by
 	// ensureRequestLogFilesState; nil until the first call. Disabling
@@ -1109,7 +1115,17 @@ func assembleRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOp
 			DefaultTTL: 30 * time.Second,
 		}),
 		eventHub:            eventsub.NewHub(),
-		usageAggregator:     opts.usageAggregator,
+		usageAggregator: opts.usageAggregator,
+		billingBreaker: circuitbreaker.New(circuitbreaker.Config{
+			FailureThreshold: 5,
+			SuccessThreshold: 2,
+			Timeout:          30 * time.Second,
+			MaxTimeout:       5 * time.Minute,
+			OnStateChange: func(from, to circuitbreaker.State) {
+				logger.Warn("billing aggregation circuit breaker state change",
+					"from", from.String(), "to", to.String())
+			},
+		}),
 		proxyProbeMetrics:   opts.proxyProbeMetrics,
 		tokenRefreshMetrics: opts.tokenRefreshMetrics,
 		errorEventStream:    erroreventstreamservice.NewMemoryPublisher(erroreventstreamservice.Config{Logger: logger}),

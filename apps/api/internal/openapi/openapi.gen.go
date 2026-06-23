@@ -2380,16 +2380,19 @@ func (e OpsErrorLogResolution) Valid() bool {
 
 // Defines values for OpsErrorLogStreamCompletionState.
 const (
-	OpsErrorLogStreamCompletionStateCompleted   OpsErrorLogStreamCompletionState = "completed"
-	OpsErrorLogStreamCompletionStateFailed      OpsErrorLogStreamCompletionState = "failed"
-	OpsErrorLogStreamCompletionStateIdleTimeout OpsErrorLogStreamCompletionState = "idle_timeout"
-	OpsErrorLogStreamCompletionStateInterrupted OpsErrorLogStreamCompletionState = "interrupted"
-	OpsErrorLogStreamCompletionStateUnknown     OpsErrorLogStreamCompletionState = "unknown"
+	OpsErrorLogStreamCompletionStateClientDisconnect OpsErrorLogStreamCompletionState = "client_disconnect"
+	OpsErrorLogStreamCompletionStateCompleted        OpsErrorLogStreamCompletionState = "completed"
+	OpsErrorLogStreamCompletionStateFailed           OpsErrorLogStreamCompletionState = "failed"
+	OpsErrorLogStreamCompletionStateIdleTimeout      OpsErrorLogStreamCompletionState = "idle_timeout"
+	OpsErrorLogStreamCompletionStateInterrupted      OpsErrorLogStreamCompletionState = "interrupted"
+	OpsErrorLogStreamCompletionStateUnknown          OpsErrorLogStreamCompletionState = "unknown"
 )
 
 // Valid indicates whether the value is a known member of the OpsErrorLogStreamCompletionState enum.
 func (e OpsErrorLogStreamCompletionState) Valid() bool {
 	switch e {
+	case OpsErrorLogStreamCompletionStateClientDisconnect:
+		return true
 	case OpsErrorLogStreamCompletionStateCompleted:
 		return true
 	case OpsErrorLogStreamCompletionStateFailed:
@@ -3232,16 +3235,19 @@ func (e RequestEvidenceRowResolution) Valid() bool {
 
 // Defines values for RequestEvidenceRowStreamCompletionState.
 const (
-	RequestEvidenceRowStreamCompletionStateCompleted   RequestEvidenceRowStreamCompletionState = "completed"
-	RequestEvidenceRowStreamCompletionStateFailed      RequestEvidenceRowStreamCompletionState = "failed"
-	RequestEvidenceRowStreamCompletionStateIdleTimeout RequestEvidenceRowStreamCompletionState = "idle_timeout"
-	RequestEvidenceRowStreamCompletionStateInterrupted RequestEvidenceRowStreamCompletionState = "interrupted"
-	RequestEvidenceRowStreamCompletionStateUnknown     RequestEvidenceRowStreamCompletionState = "unknown"
+	RequestEvidenceRowStreamCompletionStateClientDisconnect RequestEvidenceRowStreamCompletionState = "client_disconnect"
+	RequestEvidenceRowStreamCompletionStateCompleted        RequestEvidenceRowStreamCompletionState = "completed"
+	RequestEvidenceRowStreamCompletionStateFailed           RequestEvidenceRowStreamCompletionState = "failed"
+	RequestEvidenceRowStreamCompletionStateIdleTimeout      RequestEvidenceRowStreamCompletionState = "idle_timeout"
+	RequestEvidenceRowStreamCompletionStateInterrupted      RequestEvidenceRowStreamCompletionState = "interrupted"
+	RequestEvidenceRowStreamCompletionStateUnknown          RequestEvidenceRowStreamCompletionState = "unknown"
 )
 
 // Valid indicates whether the value is a known member of the RequestEvidenceRowStreamCompletionState enum.
 func (e RequestEvidenceRowStreamCompletionState) Valid() bool {
 	switch e {
+	case RequestEvidenceRowStreamCompletionStateClientDisconnect:
+		return true
 	case RequestEvidenceRowStreamCompletionStateCompleted:
 		return true
 	case RequestEvidenceRowStreamCompletionStateFailed:
@@ -3286,16 +3292,19 @@ func (e RequestEvidenceSource) Valid() bool {
 
 // Defines values for RequestEvidenceSummaryStreamCompletionState.
 const (
-	RequestEvidenceSummaryStreamCompletionStateCompleted   RequestEvidenceSummaryStreamCompletionState = "completed"
-	RequestEvidenceSummaryStreamCompletionStateFailed      RequestEvidenceSummaryStreamCompletionState = "failed"
-	RequestEvidenceSummaryStreamCompletionStateIdleTimeout RequestEvidenceSummaryStreamCompletionState = "idle_timeout"
-	RequestEvidenceSummaryStreamCompletionStateInterrupted RequestEvidenceSummaryStreamCompletionState = "interrupted"
-	RequestEvidenceSummaryStreamCompletionStateUnknown     RequestEvidenceSummaryStreamCompletionState = "unknown"
+	RequestEvidenceSummaryStreamCompletionStateClientDisconnect RequestEvidenceSummaryStreamCompletionState = "client_disconnect"
+	RequestEvidenceSummaryStreamCompletionStateCompleted        RequestEvidenceSummaryStreamCompletionState = "completed"
+	RequestEvidenceSummaryStreamCompletionStateFailed           RequestEvidenceSummaryStreamCompletionState = "failed"
+	RequestEvidenceSummaryStreamCompletionStateIdleTimeout      RequestEvidenceSummaryStreamCompletionState = "idle_timeout"
+	RequestEvidenceSummaryStreamCompletionStateInterrupted      RequestEvidenceSummaryStreamCompletionState = "interrupted"
+	RequestEvidenceSummaryStreamCompletionStateUnknown          RequestEvidenceSummaryStreamCompletionState = "unknown"
 )
 
 // Valid indicates whether the value is a known member of the RequestEvidenceSummaryStreamCompletionState enum.
 func (e RequestEvidenceSummaryStreamCompletionState) Valid() bool {
 	switch e {
+	case RequestEvidenceSummaryStreamCompletionStateClientDisconnect:
+		return true
 	case RequestEvidenceSummaryStreamCompletionStateCompleted:
 		return true
 	case RequestEvidenceSummaryStreamCompletionStateFailed:
@@ -5250,9 +5259,6 @@ type AdminSettingsCopilot struct {
 
 	// OwnerOnly Restrict the copilot to owner-role admins.
 	OwnerOnly bool `json:"owner_only"`
-
-	// ProviderAccountGroupId Account group id used when source is "account" (0 = unset). When set, the copilot randomly picks a member account each turn for load distribution.
-	ProviderAccountGroupId int `json:"provider_account_group_id"`
 
 	// ProviderAccountId Provider account id used when source is "account" (0 = unset).
 	ProviderAccountId int `json:"provider_account_id"`

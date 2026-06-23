@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"net/http"
 	"sort"
 	"strconv"
@@ -693,6 +694,18 @@ NextCandidate:
 			if slotAcquired && slotRelease != nil {
 				slotRelease()
 				slotRelease = nil
+			}
+		}
+
+		candidateRPM := 0
+		if result.Candidate.Limits.RPMLimit != nil {
+			candidateRPM = *result.Candidate.Limits.RPMLimit
+		}
+		if throttle := accountAdaptiveThrottleDelay(result.Candidate.Account.Metadata, candidateRPM); throttle > 0 {
+			if sleepErr := sleepGatewayRetryDelay(ctx, throttle); sleepErr != nil {
+				breakerDone(true)
+				releaseConcurrencySlotOnce()
+				return gatewayFailoverResult[T]{ScheduleResult: result, Err: sleepErr}
 			}
 		}
 
@@ -1651,10 +1664,24 @@ func gatewaySameCandidateRetryDelay(policy gatewaySameCandidateRetryPolicy, retr
 	for i := 1; i < retryNo; i++ {
 		delay *= 2
 		if delay >= policy.MaxDelay {
-			return policy.MaxDelay
+			delay = policy.MaxDelay
+			break
 		}
 	}
+	delay = addRetryJitter(delay)
 	return capGatewayRetryDelay(delay, policy.MaxDelay)
+}
+
+// addRetryJitter applies ±25% random jitter to a delay duration to prevent
+// thundering-herd when multiple requests retry against the same upstream at the
+// same cadence (a pattern both sub2api and CLIProxyAPI implement).
+func addRetryJitter(d time.Duration) time.Duration {
+	if d <= 0 {
+		return d
+	}
+	// jitter in [-0.25, +0.25] of d
+	jitter := time.Duration(float64(d) * (rand.Float64()*0.5 - 0.25))
+	return d + jitter
 }
 
 func capGatewayRetryDelay(delay time.Duration, maxDelay time.Duration) time.Duration {

@@ -199,3 +199,39 @@ func TestBuildGatewayUpstreamErrorEvent(t *testing.T) {
 		t.Fatalf("transport status: got %d want 0", ev2.UpstreamStatusCode)
 	}
 }
+
+func TestAddRetryJitter(t *testing.T) {
+	base := 100 * time.Millisecond
+	// Run many iterations to verify jitter stays within ±25%.
+	for i := 0; i < 200; i++ {
+		got := addRetryJitter(base)
+		lo := time.Duration(float64(base) * 0.75)
+		hi := time.Duration(float64(base) * 1.25)
+		if got < lo || got > hi {
+			t.Fatalf("jitter out of range: got %v, want [%v, %v]", got, lo, hi)
+		}
+	}
+	// Zero and negative pass through unchanged.
+	if got := addRetryJitter(0); got != 0 {
+		t.Fatalf("expected 0, got %v", got)
+	}
+	if got := addRetryJitter(-time.Second); got != -time.Second {
+		t.Fatalf("expected -1s, got %v", got)
+	}
+}
+
+func TestGatewaySameCandidateRetryDelay_HasJitter(t *testing.T) {
+	policy := gatewaySameCandidateRetryPolicy{
+		BaseDelay: 100 * time.Millisecond,
+		MaxDelay:  2 * time.Second,
+	}
+	// With jitter, repeated calls should produce at least two distinct values.
+	seen := make(map[time.Duration]struct{})
+	for i := 0; i < 50; i++ {
+		d := gatewaySameCandidateRetryDelay(policy, 1, nil)
+		seen[d] = struct{}{}
+	}
+	if len(seen) < 2 {
+		t.Fatalf("expected jittered delays to produce multiple distinct values, got %d unique values", len(seen))
+	}
+}
