@@ -160,10 +160,16 @@ function BalanceTab() {
       <Card>
         <CardContent>
           {noPaymentMethods ? (
-            <div className="space-y-2 py-4 text-center">
+            <div className="space-y-3 py-6 text-center">
               <CreditCard className="mx-auto size-8 text-srapi-text-tertiary" />
               <p className="text-sm font-medium text-srapi-text-primary">{t("billing.noMethodsTitle")}</p>
-              <p className="text-xs text-srapi-text-tertiary">{t("billing.noMethodsHint")}</p>
+              <p className="mx-auto max-w-sm text-xs text-srapi-text-tertiary">{t("billing.noMethodsHint")}</p>
+              <div className="mx-auto max-w-xs space-y-1.5 rounded-lg border border-srapi-border bg-srapi-card-muted/50 p-3 text-left text-[11px]">
+                <p className="font-semibold text-srapi-text-secondary">{t("billing.setupChecklist")}</p>
+                <p className="text-srapi-text-tertiary">1. {t("billing.setupStep1")}</p>
+                <p className="text-srapi-text-tertiary">2. {t("billing.setupStep2")}</p>
+                <p className="text-srapi-text-tertiary">3. {t("billing.setupStep3")}</p>
+              </div>
             </div>
           ) : (
           <form onSubmit={topUp} className="space-y-4">
