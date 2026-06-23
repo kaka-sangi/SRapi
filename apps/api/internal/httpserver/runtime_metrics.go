@@ -10,6 +10,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	realtimecontract "github.com/srapi/srapi/apps/api/internal/modules/realtime/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
@@ -20,7 +21,7 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	registry := prometheus.NewPedanticRegistry()
 	if err := registry.Register(newRuntimeMetricsCollector(r.Context(), s.runtime)); err != nil {
 		s.logger.Error("failed to register metrics collector", "error", err)
-		http.Error(w, "failed to register metrics collector", http.StatusInternalServerError)
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to register metrics collector", requestIDFromContext(r.Context()))
 		return
 	}
 	promhttp.HandlerFor(registry, promhttp.HandlerOpts{ErrorHandling: promhttp.HTTPErrorOnError}).ServeHTTP(w, r)

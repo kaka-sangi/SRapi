@@ -171,15 +171,16 @@ func (s *Server) handleAdminEventStream(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	requestID := requestIDFromContext(r.Context())
 	hub := s.runtime.eventHub
 	if hub == nil {
-		http.Error(w, "event stream not available", http.StatusServiceUnavailable)
+		writeStandardError(w, http.StatusServiceUnavailable, apiopenapi.INTERNALERROR, "event stream not available", requestID)
 		return
 	}
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		http.Error(w, "streaming not supported", http.StatusInternalServerError)
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "streaming not supported", requestID)
 		return
 	}
 
