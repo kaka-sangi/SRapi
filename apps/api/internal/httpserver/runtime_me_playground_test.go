@@ -117,11 +117,14 @@ func TestCurrentUserAvailableModelsReturnsChannelStatusAndPricing(t *testing.T) 
 		t.Fatalf("unexpected model availability: %+v", *found)
 	}
 	channel := found.Channels[0]
-	if channel.Status != apiopenapi.AvailableModelStatusAvailable || channel.ActiveAccountCount != 1 || channel.TotalAccountCount != 1 {
-		t.Fatalf("unexpected channel status/counts: %+v", channel)
+	if channel.Status != apiopenapi.AvailableModelStatusAvailable {
+		t.Fatalf("unexpected channel status: %+v", channel)
 	}
-	if channel.ProviderName != "available-provider" || channel.UpstreamModel != "available-upstream" {
-		t.Fatalf("unexpected channel identity: %+v", channel)
+	if channel.ActiveAccountCount != 0 || channel.TotalAccountCount != 0 {
+		t.Fatalf("internal account counts must be redacted, got active=%d total=%d", channel.ActiveAccountCount, channel.TotalAccountCount)
+	}
+	if channel.ProviderName != "" || channel.UpstreamModel != "" {
+		t.Fatalf("internal provider identity must be redacted, got name=%q upstream=%q", channel.ProviderName, channel.UpstreamModel)
 	}
 	if channel.Pricing.Source != apiopenapi.AvailableModelPricingSourcePricingRule ||
 		channel.Pricing.Currency != "USD" ||

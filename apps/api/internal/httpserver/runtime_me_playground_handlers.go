@@ -311,16 +311,16 @@ func (s *Server) availableModelItem(ctx context.Context, model modelcontract.Mod
 		counts := catalog.accounts[provider.ID]
 		status := availableChannelStatus(provider, counts)
 		channels = append(channels, apiopenapi.AvailableModelChannel{
-			ActiveAccountCount:  counts.active,
-			AdapterType:         provider.AdapterType,
+			ActiveAccountCount:  0,
+			AdapterType:         "",
 			Pricing:             availableChannelPricing(model, mapping, provider.ID, catalog.pricingRules, catalog.generatedAt),
-			Protocol:            provider.Protocol,
+			Protocol:            "",
 			ProviderDisplayName: provider.DisplayName,
-			ProviderId:          apiopenapi.Id(strconv.Itoa(provider.ID)),
-			ProviderName:        provider.Name,
+			ProviderId:          "",
+			ProviderName:        "",
 			Status:              status,
-			TotalAccountCount:   counts.total,
-			UpstreamModel:       mapping.UpstreamModelName,
+			TotalAccountCount:   0,
+			UpstreamModel:       "",
 		})
 	}
 	if len(channels) == 0 {

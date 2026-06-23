@@ -165,8 +165,6 @@ function StatusBoard({
 function ModelStatusRow({ model }: { model: AvailableModelSummary }) {
   const { t } = useLanguage();
   const [expanded, setExpanded] = useState(false);
-  const available = model.channels.filter((c) => c.status === "available").length;
-  const total = model.channels.length;
 
   return (
     <Card className="overflow-hidden">
@@ -197,8 +195,13 @@ function ModelStatusRow({ model }: { model: AvailableModelSummary }) {
           ))}
         </div>
 
-        <span className="shrink-0 text-xs tabular text-srapi-text-tertiary">
-          {available}/{total}
+        <span className={cn(
+          "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium",
+          model.status === "available" && "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+          model.status === "limited" && "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+          model.status === "unavailable" && "bg-red-500/10 text-red-700 dark:text-red-400",
+        )}>
+          {t(`availableChannels.${model.status}`)}
         </span>
         <ChevronDown className={cn("size-4 text-srapi-text-tertiary transition-transform", expanded && "rotate-180")} />
       </button>
@@ -212,11 +215,13 @@ function ModelStatusRow({ model }: { model: AvailableModelSummary }) {
                 <span className="min-w-0 flex-1 truncate font-medium text-srapi-text-primary">
                   {ch.provider_display_name}
                 </span>
-                <span className="truncate text-srapi-text-tertiary tabular">
-                  {ch.protocol} · {ch.upstream_model}
-                </span>
-                <span className="shrink-0 tabular text-srapi-text-tertiary">
-                  {ch.active_account_count}/{ch.total_account_count} {t("availableChannels.accounts")}
+                <span className={cn(
+                  "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium",
+                  ch.status === "available" && "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+                  ch.status === "limited" && "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+                  ch.status === "unavailable" && "bg-red-500/10 text-red-700 dark:text-red-400",
+                )}>
+                  {t(`availableChannels.${ch.status}`)}
                 </span>
                 <PricingChip channel={ch} />
               </div>

@@ -38,21 +38,8 @@ type gatewayNoAvailableDiagnostic struct {
 	Metadata    map[string]any
 }
 
-func gatewayNoAccountMessage(decision schedulercontract.Decision) string {
-	counts := gatewaySchedulerRejectReasonCounts(decision, false)
-	if len(counts) == 0 {
-		return "no available account"
-	}
-	keys := make([]string, 0, len(counts))
-	for k := range counts {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	parts := make([]string, 0, len(keys))
-	for _, k := range keys {
-		parts = append(parts, fmt.Sprintf("%s(%d)", k, counts[k]))
-	}
-	return fmt.Sprintf("no available account: %d candidate(s) rejected [%s]", decision.CandidateCount, strings.Join(parts, ", "))
+func gatewayNoAccountMessage(_ schedulercontract.Decision) string {
+	return "The requested model is temporarily unavailable. Please try again later."
 }
 
 func gatewayNoAvailableDiagnosticForDecision(decision schedulercontract.Decision) gatewayNoAvailableDiagnostic {

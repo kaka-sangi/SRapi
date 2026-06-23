@@ -269,7 +269,7 @@ func TestRecordGatewayNoAvailableAccountCapturesSchedulerDiagnostics(t *testing.
 		opsLog.ErrorSource != "gateway" {
 		t.Fatalf("unexpected ops error classification: %+v", opsLog)
 	}
-	if !strings.Contains(opsLog.ErrorMessage, "3 candidate(s) rejected") ||
+	if !strings.Contains(opsLog.ErrorMessage, "temporarily unavailable") ||
 		!strings.Contains(opsLog.ErrorBodyExcerpt, `"scheduler_operator_action":"check_model_capabilities_or_mapping"`) ||
 		!strings.Contains(opsLog.ErrorBodyExcerpt, `"capability_mismatch:responses":2`) {
 		t.Fatalf("unexpected ops error evidence: message=%q body=%q", opsLog.ErrorMessage, opsLog.ErrorBodyExcerpt)
