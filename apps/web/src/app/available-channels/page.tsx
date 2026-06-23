@@ -1,25 +1,16 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Search } from "lucide-react";
+import { Search, CheckCircle2, AlertTriangle, XCircle, ChevronDown } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { SectionHero } from "@/components/visual/section-hero";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { IllustratedEmptyState } from "@/components/ui/illustrated-empty-state";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { QuietBadge, type QuietStatus } from "@/components/ui/quiet-badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  TableScroll,
-} from "@/components/ui/table";
+import { cn } from "@/lib/cn";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAvailableModels } from "@/hooks/queries";
 import { formatMoney } from "@/lib/admin-format";
@@ -65,7 +56,7 @@ function AvailableChannelsContent() {
               description={t("availableChannels.emptyBody")}
             />
           ) : (
-            <AvailableModelsTable models={models} search={search} onSearchChange={setSearch} />
+            <StatusBoard models={models} search={search} onSearchChange={setSearch} />
           )
         }
       </PageQueryState>
@@ -73,7 +64,17 @@ function AvailableChannelsContent() {
   );
 }
 
-function AvailableModelsTable({
+function overallStatus(models: AvailableModelSummary[]): "operational" | "degraded" | "outage" {
+  const total = models.length;
+  if (total === 0) return "operational";
+  const unavailable = models.filter((m) => m.status === "unavailable").length;
+  const limited = models.filter((m) => m.status === "limited").length;
+  if (unavailable === total) return "outage";
+  if (unavailable > 0 || limited > 0) return "degraded";
+  return "operational";
+}
+
+function StatusBoard({
   models,
   search,
   onSearchChange,
@@ -90,111 +91,168 @@ function AvailableModelsTable({
       (m) =>
         m.name.toLowerCase().includes(q) ||
         m.id.toLowerCase().includes(q) ||
-        m.channels.some(
-          (c) =>
-            c.provider_display_name.toLowerCase().includes(q) ||
-            c.upstream_model.toLowerCase().includes(q),
-        ),
+        m.channels.some((c) => c.provider_display_name.toLowerCase().includes(q)),
     );
   }, [models, search]);
-  const rows = filtered.flatMap((model) => model.channels.map((channel) => ({ model, channel })));
+
+  const status = overallStatus(models);
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-1 items-center gap-3">
-          <div className="relative w-full sm:w-56">
-            <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-srapi-text-tertiary" />
-            <Input
-              value={search}
-              onChange={(e) => onSearchChange(e.target.value)}
-              placeholder={t("common.search")}
-              className="pl-8 text-xs"
-            />
+    <div className="space-y-4">
+      {/* Overall status banner */}
+      <Card className={cn(
+        "border-l-4",
+        status === "operational" && "border-l-emerald-500",
+        status === "degraded" && "border-l-amber-500",
+        status === "outage" && "border-l-red-500",
+      )}>
+        <CardContent className="flex items-center gap-3 py-4">
+          {status === "operational" ? (
+            <CheckCircle2 className="size-6 text-emerald-500" />
+          ) : status === "degraded" ? (
+            <AlertTriangle className="size-6 text-amber-500" />
+          ) : (
+            <XCircle className="size-6 text-red-500" />
+          )}
+          <div>
+            <div className="text-sm font-semibold text-srapi-text-primary">
+              {t(`availableChannels.overall_${status}`)}
+            </div>
+            <div className="text-xs text-srapi-text-tertiary">
+              {t("availableChannels.overallSub", {
+                available: models.filter((m) => m.status === "available").length,
+                total: models.length,
+              })}
+            </div>
           </div>
-          <span className="ml-auto text-[12px] font-medium text-srapi-text-tertiary tabular">
-            {rows.length} / {models.flatMap((m) => m.channels).length}
-          </span>
-        </div>
-      </CardHeader>
-      <CardContent className="p-0">
-        {rows.length === 0 ? (
-          <IllustratedEmptyState
-            illust="search"
-            title={t("adminCommon.noResults")}
-            description={t("adminCommon.noResultsBody")}
-            action={
-              <Button variant="outline" size="sm" onClick={() => onSearchChange("")}>
-                {t("adminCommon.clearFilters")}
-              </Button>
-            }
-          />
-        ) : (
-        <TableScroll minWidth={720}>
-          <Table>
-            <TableHeader>
-              <tr>
-                <TableHead>{t("availableChannels.model")}</TableHead>
-                <TableHead>{t("availableChannels.channel")}</TableHead>
-                <TableHead>{t("availableChannels.status")}</TableHead>
-                <TableHead>{t("availableChannels.pricing")}</TableHead>
-                <TableHead className="text-right">{t("availableChannels.accounts")}</TableHead>
-              </tr>
-            </TableHeader>
-            <TableBody>
-              {rows.map(({ model, channel }) => (
-                <TableRow key={`${model.id}:${channel.provider_id}:${channel.upstream_model}`}>
-                  <TableCell className="max-w-[180px]">
-                    <div className="truncate font-medium text-srapi-text-primary" title={model.name}>{model.name}</div>
-                    <div className="mt-1 truncate text-[12px] text-srapi-text-tertiary tabular" title={model.id}>{model.id}</div>
-                  </TableCell>
-                  <TableCell className="max-w-[200px]">
-                    <div className="truncate text-srapi-text-primary" title={channel.provider_display_name}>{channel.provider_display_name}</div>
-                    <div className="mt-1 truncate text-[12px] text-srapi-text-tertiary tabular" title={`${channel.protocol} · ${channel.upstream_model}`}>
-                      {channel.protocol} · {channel.upstream_model}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <QuietBadge status={statusTone(channel.status)} label={t(`availableChannels.${channel.status}`)} />
-                  </TableCell>
-                  <TableCell>
-                    <PricingText channel={channel} />
-                  </TableCell>
-                  <TableCell className="text-right text-sm font-medium tabular text-srapi-text-secondary">
-                    {channel.active_account_count}/{channel.total_account_count}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableScroll>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
+          <div className="ml-auto">
+            <div className="relative w-48 sm:w-56">
+              <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-srapi-text-tertiary" />
+              <Input
+                value={search}
+                onChange={(e) => onSearchChange(e.target.value)}
+                placeholder={t("common.search")}
+                className="pl-8 text-xs"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-function PricingText({ channel }: { channel: AvailableModelChannelSummary }) {
-  const { t } = useLanguage();
-  const pricing = channel.pricing;
-  if (pricing.billing_mode === "per_request" || pricing.billing_mode === "image") {
-    return (
-      <div className="text-xs text-srapi-text-secondary tabular">
-        <span className="font-medium">{formatMoney(pricing.per_request_price, pricing.currency)}</span>
-        <span className="ml-1 text-srapi-text-tertiary">{t(`availableChannels.${pricing.billing_mode}`)}</span>
+      {/* Model status rows */}
+      <div className="space-y-2">
+        {filtered.map((model) => (
+          <ModelStatusRow key={model.id} model={model} />
+        ))}
       </div>
-    );
-  }
-  return (
-    <div className="space-y-1 text-xs text-srapi-text-secondary tabular">
-      <div>{t("availableChannels.inputPrice", { price: formatMoney(pricing.input_price_per_million_tokens, pricing.currency) })}</div>
-      <div>{t("availableChannels.outputPrice", { price: formatMoney(pricing.output_price_per_million_tokens, pricing.currency) })}</div>
+
+      {filtered.length === 0 && search && (
+        <IllustratedEmptyState
+          illust="search"
+          title={t("adminCommon.noResults")}
+          description={t("adminCommon.noResultsBody")}
+          action={
+            <Button variant="outline" size="sm" onClick={() => onSearchChange("")}>
+              {t("adminCommon.clearFilters")}
+            </Button>
+          }
+        />
+      )}
     </div>
   );
 }
 
-function statusTone(status: AvailableModelSummary["status"]): QuietStatus {
-  if (status === "available") return "active";
-  if (status === "limited") return "limited";
-  return "disabled";
+function ModelStatusRow({ model }: { model: AvailableModelSummary }) {
+  const { t } = useLanguage();
+  const [expanded, setExpanded] = useState(false);
+  const available = model.channels.filter((c) => c.status === "available").length;
+  const total = model.channels.length;
+
+  return (
+    <Card className="overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-srapi-card-muted/50"
+      >
+        <StatusDot status={model.status} />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-medium text-srapi-text-primary">{model.name}</div>
+          <div className="truncate text-[11px] text-srapi-text-tertiary tabular">{model.id}</div>
+        </div>
+
+        {/* Mini bar chart — one segment per channel */}
+        <div className="hidden items-center gap-[2px] sm:flex">
+          {model.channels.map((ch, i) => (
+            <div
+              key={i}
+              className={cn(
+                "h-6 w-1.5 rounded-full",
+                ch.status === "available" && "bg-emerald-500",
+                ch.status === "limited" && "bg-amber-400",
+                ch.status === "unavailable" && "bg-red-400",
+              )}
+              title={`${ch.provider_display_name}: ${ch.status}`}
+            />
+          ))}
+        </div>
+
+        <span className="shrink-0 text-xs tabular text-srapi-text-tertiary">
+          {available}/{total}
+        </span>
+        <ChevronDown className={cn("size-4 text-srapi-text-tertiary transition-transform", expanded && "rotate-180")} />
+      </button>
+
+      {expanded && (
+        <div className="border-t border-srapi-border bg-srapi-card-muted/30 px-4 py-2">
+          <div className="space-y-1.5">
+            {model.channels.map((ch, i) => (
+              <div key={i} className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-xs">
+                <StatusDot status={ch.status} size="sm" />
+                <span className="min-w-0 flex-1 truncate font-medium text-srapi-text-primary">
+                  {ch.provider_display_name}
+                </span>
+                <span className="truncate text-srapi-text-tertiary tabular">
+                  {ch.protocol} · {ch.upstream_model}
+                </span>
+                <span className="shrink-0 tabular text-srapi-text-tertiary">
+                  {ch.active_account_count}/{ch.total_account_count} {t("availableChannels.accounts")}
+                </span>
+                <PricingChip channel={ch} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function StatusDot({ status, size = "md" }: { status: string; size?: "sm" | "md" }) {
+  const s = size === "sm" ? "size-2" : "size-2.5";
+  return (
+    <span className={cn(
+      "shrink-0 rounded-full",
+      s,
+      status === "available" && "bg-emerald-500",
+      status === "limited" && "bg-amber-400",
+      status === "unavailable" && "bg-red-400",
+    )} />
+  );
+}
+
+function PricingChip({ channel }: { channel: AvailableModelChannelSummary }) {
+  const pricing = channel.pricing;
+  if (pricing.billing_mode === "per_request" || pricing.billing_mode === "image") {
+    return (
+      <span className="shrink-0 rounded bg-srapi-card-muted px-1.5 py-0.5 text-[10px] tabular text-srapi-text-tertiary">
+        {formatMoney(pricing.per_request_price, pricing.currency)}/req
+      </span>
+    );
+  }
+  return (
+    <span className="shrink-0 rounded bg-srapi-card-muted px-1.5 py-0.5 text-[10px] tabular text-srapi-text-tertiary">
+      {formatMoney(pricing.input_price_per_million_tokens, pricing.currency)}/{formatMoney(pricing.output_price_per_million_tokens, pricing.currency)} /M
+    </span>
+  );
 }
