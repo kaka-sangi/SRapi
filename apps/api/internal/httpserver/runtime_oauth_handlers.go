@@ -286,6 +286,14 @@ func (s *Server) handleCompleteOAuthAuthorization(w http.ResponseWriter, r *http
 			return
 		}
 	}
+	// Auto-register: if no existing identity was found and registration is enabled,
+	// create the account immediately (like sub2api) instead of requiring manual
+	// email/password entry via the pending session flow.
+	if flow.Intent == authcontract.PendingOAuthIntentLogin {
+		if s.autoRegisterOAuthUser(w, r, provider, flow, subjectHash, profile, requestID) {
+			return
+		}
+	}
 	pending, err := s.runtime.auth.CreatePendingOAuthSession(r.Context(), authservice.CreatePendingOAuthSessionRequest{
 		Intent:              flow.Intent,
 		Provider:            provider,
@@ -928,6 +936,90 @@ func (s *Server) completeOAuthExistingIdentityLogin(w http.ResponseWriter, r *ht
 		"user_id":      user.ID,
 	}))
 	if strings.TrimSpace(redirectTo) == "" {
+		redirectTo = "/"
+	}
+	http.Redirect(w, r, redirectTo, http.StatusFound)
+	return true
+}
+
+// autoRegisterOAuthUser creates a new account and logs in the user in one step,
+// skipping the pending session flow entirely. Uses a synthetic email
+// (e.g. linuxdo-{subject}@provider.invalid) when the provider didn't supply one.
+// Returns true if it handled the response (success or error); false to fall
+// through to the pending session flow (e.g. registration disabled).
+func (s *Server) autoRegisterOAuthUser(w http.ResponseWriter, r *http.Request, provider userscontract.AuthIdentityProvider, flow authservice.OAuthAuthorizationFlowState, subjectHash string, profile authservice.PendingOAuthProfile, requestID string) bool {
+	settings, err := s.runtime.adminControl.GetAdminSettings(r.Context())
+	if err != nil || !settings.Security.RegistrationEnabled {
+		return false
+	}
+	email := strings.TrimSpace(profile.ResolvedEmail)
+	if email == "" {
+		email = string(provider) + "-" + subjectHash[:12] + "@" + string(provider) + "-connect.invalid"
+	}
+	if !registrationEmailSuffixAllowed(email, settings.Security.RegistrationEmailSuffixAllowlist) {
+		if !strings.HasSuffix(email, ".invalid") {
+			return false
+		}
+	}
+	existing, existErr := s.runtime.users.FindByEmail(r.Context(), email)
+	if existErr == nil && existing.ID > 0 {
+		return false
+	}
+	name := strings.TrimSpace(profile.DisplayName)
+	if name == "" {
+		name = email
+	}
+	var verifiedAt *time.Time
+	if profile.EmailVerified {
+		now := time.Now().UTC()
+		verifiedAt = &now
+	}
+	user, err := s.runtime.users.Create(r.Context(), usersservice.CreateRequest{
+		Email:           email,
+		Name:            name,
+		Password:        "",
+		Balance:         settings.Users.DefaultBalance,
+		RPMLimit:        registrationRPMLimit(settings.Users.RPMLimitDefault),
+		EmailVerifiedAt: verifiedAt,
+	})
+	if err != nil {
+		if s.logger != nil {
+			s.logger.Warn("oauth auto-register failed", "provider", provider, "error", err)
+		}
+		return false
+	}
+	if _, err := s.runtime.users.BindAuthIdentity(r.Context(), usersservice.BindAuthIdentityRequest{
+		UserID:              user.ID,
+		Provider:            provider,
+		ProviderKey:         flow.ProviderKey,
+		ProviderSubjectHash: subjectHash,
+		SubjectHint:         profile.SubjectHint,
+		DisplayName:         profile.DisplayName,
+		Email:               profile.ResolvedEmail,
+		EmailVerified:       profile.EmailVerified,
+		AvatarURL:           profile.AvatarURL,
+	}); err != nil {
+		s.rollbackPendingOAuthCreatedUser(r.Context(), user.ID)
+		if s.logger != nil {
+			s.logger.Warn("oauth auto-register bind failed", "provider", provider, "user_id", user.ID, "error", err)
+		}
+		return false
+	}
+	loginResult, err := s.runtime.auth.CreateSessionForUser(r.Context(), user)
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to create session", requestID)
+		return true
+	}
+	s.clearOAuthFlowCookie(w)
+	s.clearOAuthPendingCookie(w)
+	s.setSessionCookie(w, loginResult)
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, user.ID, "user.register_oauth_auto", "user", strconv.Itoa(user.ID), nil, map[string]any{
+		"provider":     provider,
+		"provider_key": flow.ProviderKey,
+		"email":        email,
+	}))
+	redirectTo := strings.TrimSpace(flow.RedirectTo)
+	if redirectTo == "" {
 		redirectTo = "/"
 	}
 	http.Redirect(w, r, redirectTo, http.StatusFound)

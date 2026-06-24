@@ -25,15 +25,17 @@ import (
 var oauthTokenAuthNone = apiopenapi.OAuthProviderConfigTokenAuthMethodNone
 
 type oauthCallbackTestFlow struct {
-	Handler          http.Handler
-	PendingCookie    *http.Cookie
-	AdminLogin       apiopenapi.LoginResponse
-	AdminCookie      *http.Cookie
-	TokenForm        url.Values
-	UserInfoAuth     string
-	CallbackBody     string
-	CallbackCode     int
-	CallbackLocation string
+	Handler            http.Handler
+	PendingCookie      *http.Cookie
+	AdminLogin         apiopenapi.LoginResponse
+	AdminCookie        *http.Cookie
+	AdminSessionCookie *http.Cookie
+	AdminCSRFToken     string
+	TokenForm          url.Values
+	UserInfoAuth       string
+	CallbackBody       string
+	CallbackCode       int
+	CallbackLocation   string
 }
 
 func TestOAuthStartRedirectsWithPKCEAndEncryptedFlowCookie(t *testing.T) {
@@ -122,6 +124,7 @@ func TestOAuthCallbackExchangesCodeAndCreatesPendingCookie(t *testing.T) {
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 	settingsResp := mustGetAdminSettings(t, handler, sessionCookie)
 	settingsResp.Data.Security.OauthEnabled = true
+	settingsResp.Data.Security.RegistrationEnabled = true
 	settingsResp.Data.Security.OauthProviders = []string{"oidc"}
 	settingsResp.Data.Security.OauthProviderConfigs = []apiopenapi.OAuthProviderConfig{
 		{
@@ -182,98 +185,17 @@ func TestOAuthCallbackExchangesCodeAndCreatesPendingCookie(t *testing.T) {
 	if userInfoAuthorization != "Bearer access-123" {
 		t.Fatalf("unexpected userinfo authorization header %q", userInfoAuthorization)
 	}
-	pendingCookie := oauthPendingCookieFromResponse(t, callbackRec)
-	if pendingCookie.Path != oauthPendingCookiePath || !pendingCookie.HttpOnly || pendingCookie.SameSite != http.SameSiteLaxMode || pendingCookie.Value == "" {
-		t.Fatalf("unexpected pending oauth cookie: %+v", pendingCookie)
-	}
-	if strings.Contains(callbackRec.Header().Get("Location"), pendingCookie.Value) {
-		t.Fatalf("pending token leaked into redirect location")
-	}
-	pendingReq := httptest.NewRequest(http.MethodGet, "/api/v1/auth/oauth/pending", nil)
-	pendingReq.AddCookie(pendingCookie)
-	pendingRec := httptest.NewRecorder()
-	handler.ServeHTTP(pendingRec, pendingReq)
-	if pendingRec.Code != http.StatusOK {
-		t.Fatalf("expected pending oauth preview 200, got %d body=%s", pendingRec.Code, pendingRec.Body.String())
-	}
-	pendingBody := pendingRec.Body.String()
-	var pendingResp apiopenapi.OAuthPendingSessionResponse
-	if err := json.NewDecoder(strings.NewReader(pendingBody)).Decode(&pendingResp); err != nil {
-		t.Fatalf("decode pending oauth preview: %v", err)
-	}
-	if pendingResp.Data.NextStep != apiopenapi.CreateAccountRequired || pendingResp.Data.Profile.ResolvedEmail != "user@example.com" {
-		t.Fatalf("unexpected pending oauth preview: %+v", pendingResp.Data)
-	}
-	if pendingResp.Data.SubjectHint == "" || strings.Contains(pendingBody, pendingCookie.Value) || strings.Contains(pendingBody, "subject-123") {
-		t.Fatalf("pending oauth preview leaked sensitive material: %s", pendingBody)
-	}
-	secondPendingReq := httptest.NewRequest(http.MethodGet, "/api/v1/auth/oauth/pending", nil)
-	secondPendingReq.AddCookie(pendingCookie)
-	secondPendingRec := httptest.NewRecorder()
-	handler.ServeHTTP(secondPendingRec, secondPendingReq)
-	if secondPendingRec.Code != http.StatusOK {
-		t.Fatalf("expected pending oauth preview to be read-only, got %d body=%s", secondPendingRec.Code, secondPendingRec.Body.String())
-	}
-
-	bindMissingCSRFReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/oauth/pending/bind-current-user", nil)
-	bindMissingCSRFReq.AddCookie(sessionCookie)
-	bindMissingCSRFReq.AddCookie(pendingCookie)
-	bindMissingCSRFRec := httptest.NewRecorder()
-	handler.ServeHTTP(bindMissingCSRFRec, bindMissingCSRFReq)
-	if bindMissingCSRFRec.Code != http.StatusForbidden {
-		t.Fatalf("expected pending oauth bind without csrf 403, got %d body=%s", bindMissingCSRFRec.Code, bindMissingCSRFRec.Body.String())
-	}
-
-	bindReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/oauth/pending/bind-current-user", nil)
-	bindReq.AddCookie(sessionCookie)
-	bindReq.AddCookie(pendingCookie)
-	bindReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
-	bindRec := httptest.NewRecorder()
-	handler.ServeHTTP(bindRec, bindReq)
-	if bindRec.Code != http.StatusOK {
-		t.Fatalf("expected pending oauth bind 200, got %d body=%s", bindRec.Code, bindRec.Body.String())
-	}
-	bindBody := bindRec.Body.String()
-	var bindResp apiopenapi.CurrentUserAuthIdentityListResponse
-	if err := json.NewDecoder(strings.NewReader(bindBody)).Decode(&bindResp); err != nil {
-		t.Fatalf("decode pending oauth bind response: %v", err)
-	}
-	var external apiopenapi.CurrentUserAuthIdentity
-	for _, identity := range bindResp.Data {
-		if identity.Provider == apiopenapi.AuthIdentityProviderOidc && identity.External {
-			external = identity
-			break
+	// Auto-register: with registration enabled and a new user, the callback
+	// should have auto-created an account and set a session cookie directly
+	// (no pending session).
+	var sessionCookieFound bool
+	for _, c := range callbackRec.Result().Cookies() {
+		if c.Name == "srapi_session" && c.Value != "" {
+			sessionCookieFound = true
 		}
 	}
-	if external.Id == nil || external.UserId != loginResp.Data.User.Id || external.ProviderKey != "issuer-main" || external.Email == nil || *external.Email != "user@example.com" || !external.EmailVerified {
-		t.Fatalf("expected bound oidc identity in response, got %+v from %+v", external, bindResp.Data)
-	}
-	if external.SubjectHint == nil || *external.SubjectHint == "" || strings.Contains(*external.SubjectHint, "subject-123") {
-		t.Fatalf("expected safe subject hint, got %+v", external.SubjectHint)
-	}
-	if external.LastUsedAt == nil || external.VerifiedAt == nil {
-		t.Fatalf("expected verified and last-used timestamps, got %+v", external)
-	}
-	if strings.Contains(bindBody, pendingCookie.Value) || strings.Contains(bindBody, "subject-123") {
-		t.Fatalf("pending oauth bind response leaked sensitive material: %s", bindBody)
-	}
-	clearedPendingCookie := oauthNamedCookieFromResponse(t, bindRec, oauthPendingCookieName)
-	if clearedPendingCookie.MaxAge != -1 {
-		t.Fatalf("expected pending cookie to be cleared, got %+v", clearedPendingCookie)
-	}
-	consumedPendingReq := httptest.NewRequest(http.MethodGet, "/api/v1/auth/oauth/pending", nil)
-	consumedPendingReq.AddCookie(pendingCookie)
-	consumedPendingRec := httptest.NewRecorder()
-	handler.ServeHTTP(consumedPendingRec, consumedPendingReq)
-	if consumedPendingRec.Code != http.StatusUnauthorized {
-		t.Fatalf("expected consumed pending oauth preview 401, got %d body=%s", consumedPendingRec.Code, consumedPendingRec.Body.String())
-	}
-
-	missingPendingReq := httptest.NewRequest(http.MethodGet, "/api/v1/auth/oauth/pending", nil)
-	missingPendingRec := httptest.NewRecorder()
-	handler.ServeHTTP(missingPendingRec, missingPendingReq)
-	if missingPendingRec.Code != http.StatusUnauthorized {
-		t.Fatalf("expected missing pending oauth cookie 401, got %d body=%s", missingPendingRec.Code, missingPendingRec.Body.String())
+	if !sessionCookieFound {
+		t.Fatalf("expected session cookie after auto-register, cookies=%+v", callbackRec.Result().Cookies())
 	}
 	clearedFlowCookie := oauthNamedCookieFromResponse(t, callbackRec, oauthFlowCookieName)
 	if clearedFlowCookie.MaxAge != -1 {
@@ -320,6 +242,7 @@ func TestOAuthCallbackRejectsStateMismatch(t *testing.T) {
 
 func TestPendingOAuthBindLoginAuthenticatesExistingAccountAndConsumesPending(t *testing.T) {
 	flow := newOAuthPendingCookieForTest(t, config.Load(), "bind-login-subject-123", "bind-login@srapi.local")
+	mustEnableRegistration(t, flow.Handler, flow.AdminSessionCookie, flow.AdminCSRFToken)
 	registerReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", strings.NewReader(`{"email":"bind-login@srapi.local","name":"Bind Login","password":"password123"}`))
 	registerReq.Header.Set("Content-Type", "application/json")
 	registerRec := httptest.NewRecorder()
@@ -394,6 +317,7 @@ func TestPendingOAuthBindLoginAuthenticatesExistingAccountAndConsumesPending(t *
 
 func TestPendingOAuthBindLoginAdoptsProviderDisplayNameWhenRequested(t *testing.T) {
 	flow := newOAuthPendingCookieForTest(t, config.Load(), "bind-login-adopt-subject", "adopt-login@srapi.local")
+	mustEnableRegistration(t, flow.Handler, flow.AdminSessionCookie, flow.AdminCSRFToken)
 	registerReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", strings.NewReader(`{"email":"adopt-login@srapi.local","name":"Bind Login","password":"password123"}`))
 	registerReq.Header.Set("Content-Type", "application/json")
 	registerRec := httptest.NewRecorder()
@@ -464,6 +388,7 @@ func TestPendingOAuthBindCurrentUserAdoptsProviderDisplayNameWhenRequested(t *te
 
 func TestPendingOAuthCreateAccountRequiresActionTokenAndBindsIdentity(t *testing.T) {
 	flow := newOAuthPendingCookieForTest(t, config.Load(), "create-account-subject-123", "create-account@srapi.local")
+	mustEnableRegistration(t, flow.Handler, flow.AdminSessionCookie, flow.AdminCSRFToken)
 	previewReq := httptest.NewRequest(http.MethodGet, "/api/v1/auth/oauth/pending", nil)
 	previewReq.AddCookie(flow.PendingCookie)
 	previewRec := httptest.NewRecorder()
@@ -819,6 +744,7 @@ func newOAuthPendingCookieForTest(t *testing.T, cfg config.Config, subject strin
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 	settingsResp := mustGetAdminSettings(t, handler, sessionCookie)
 	settingsResp.Data.Security.OauthEnabled = true
+	settingsResp.Data.Security.RegistrationEnabled = false
 	settingsResp.Data.Security.OauthProviders = []string{"oidc"}
 	settingsResp.Data.Security.OauthProviderConfigs = []apiopenapi.OAuthProviderConfig{
 		{
@@ -861,10 +787,20 @@ func newOAuthPendingCookieForTest(t *testing.T, cfg config.Config, subject strin
 		AdminCookie:      sessionCookie,
 		TokenForm:        tokenForm,
 		UserInfoAuth:     userInfoAuthorization,
-		CallbackBody:     callbackRec.Body.String(),
-		CallbackCode:     callbackRec.Code,
-		CallbackLocation: callbackRec.Header().Get("Location"),
+		CallbackBody:       callbackRec.Body.String(),
+		CallbackCode:       callbackRec.Code,
+		CallbackLocation:   callbackRec.Header().Get("Location"),
+		AdminSessionCookie: sessionCookie,
+		AdminCSRFToken:     loginResp.Data.CsrfToken,
 	}
+}
+
+func mustEnableRegistration(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrf string) {
+	t.Helper()
+	settingsResp := mustGetAdminSettings(t, handler, sessionCookie)
+	settingsResp.Data.Security.RegistrationEnabled = true
+	settingsResp.Data.Security.RegistrationEmailSuffixAllowlist = nil
+	mustUpdateOAuthSettings(t, handler, sessionCookie, csrf, settingsResp.Data)
 }
 
 func pendingOAuthTestTOTPCode(secret string) (string, error) {
