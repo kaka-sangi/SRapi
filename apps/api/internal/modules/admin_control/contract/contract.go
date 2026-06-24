@@ -226,6 +226,9 @@ type AdminSettingsGateway struct {
 	SchedulerStrategyRolloutAPIKeyHashes []string `json:"scheduler_strategy_rollout_api_key_hashes"`
 	PassthroughUpstreamHeaders           bool     `json:"passthrough_upstream_headers"`
 	PassthroughHeaderAllowlist           []string `json:"passthrough_header_allowlist"`
+	AuthFailureCooldownSeconds           int      `json:"auth_failure_cooldown_seconds"`
+	NetworkErrorCooldownSeconds          int      `json:"network_error_cooldown_seconds"`
+	AuthRateLimitMaxAttempts             int      `json:"auth_rate_limit_max_attempts"`
 }
 type AdminSettingsPayment struct {
 	Enabled                  bool     `json:"enabled"`

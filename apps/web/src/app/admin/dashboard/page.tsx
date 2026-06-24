@@ -573,7 +573,7 @@ function RealtimeSlotsCard({ staggerIndex }: { staggerIndex: number }) {
     <div className="anim-rise-sm" style={rise(staggerIndex)}>
       <StatCard
         className="h-full"
-        label="Realtime slots"
+        label={t("dashboard.realtimeSlots")}
         value={counters.active_slots}
         format={formatInteger}
         unit="active"

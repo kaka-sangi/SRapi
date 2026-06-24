@@ -270,7 +270,7 @@ export function RequestLogFilesPanel() {
                         {/* File size with breakdown so ops can spot an
                             unusually-large dump before opening it. */}
                         <DataTooltip
-                          title="Size"
+                          title={t("adminRequestLogFiles.size")}
                           primary={row.sizeLabel}
                           rows={[
                             { label: "bytes", value: row.size.toLocaleString(), mono: true } as never,

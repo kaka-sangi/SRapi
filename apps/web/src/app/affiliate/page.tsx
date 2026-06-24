@@ -132,7 +132,7 @@ function AffiliateContent() {
   return (
     <>
       <SectionHero
-        eyebrow="Account · Affiliate"
+        eyebrow={t("affiliate.eyebrow")}
         title={t("affiliate.title")}
         description={t("affiliate.subtitle")}
         metrics={

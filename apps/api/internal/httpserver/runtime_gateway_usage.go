@@ -152,13 +152,16 @@ const authRateLimitMaxAttempts = 10
 
 // checkAuthRateLimit enforces a per-IP login attempt limit. Returns true if the
 // request is allowed, false if the IP has exceeded the threshold.
-func (rt *runtimeState) checkAuthRateLimit(ip string) bool {
+func (rt *runtimeState) checkAuthRateLimit(ip string, maxAttempts int) bool {
 	if rt.authRateLimit == nil || ip == "" {
 		return true
 	}
+	if maxAttempts <= 0 {
+		maxAttempts = authRateLimitMaxAttempts
+	}
 	key := "auth:" + ip
 	count, _ := rt.authRateLimit.Get(key)
-	if count >= authRateLimitMaxAttempts {
+	if count >= maxAttempts {
 		return false
 	}
 	rt.authRateLimit.Set(key, count+1)
@@ -750,10 +753,14 @@ func gatewayCooldownDecisionForFailure(metadata map[string]any, errorClass strin
 		return gatewayCooldownDecision{}, false
 	}
 	if errorClass == "forbidden" {
+		w := authFailureCooldownWindow
+		if gatewayCfg.AuthFailureCooldownSeconds > 0 {
+			w = time.Duration(gatewayCfg.AuthFailureCooldownSeconds) * time.Second
+		}
 		return gatewayCooldownDecision{
 			Reason:         "auth_failed",
 			LastErrorClass: "auth_failed",
-			Window:         authFailureCooldownWindow,
+			Window:         w,
 			RetryAfter:     retryAfter,
 		}, true
 	}
@@ -857,10 +864,16 @@ func gatewayCooldownWindow(errorClass string, gatewayCfg admincontrol.AdminSetti
 		}
 		return overloadCooldownWindow
 	case "auth_failed", "forbidden", "validation_required", "policy_violation":
+		if gatewayCfg.AuthFailureCooldownSeconds > 0 {
+			return time.Duration(gatewayCfg.AuthFailureCooldownSeconds) * time.Second
+		}
 		return authFailureCooldownWindow
 	case "network_error":
 		// SHORT, transport-fault cooldown (sub2api transport-error parity) — not
 		// the long auth/overload window.
+		if gatewayCfg.NetworkErrorCooldownSeconds > 0 {
+			return time.Duration(gatewayCfg.NetworkErrorCooldownSeconds) * time.Second
+		}
 		return networkErrorCooldownWindow
 	default:
 		if gatewayCfg.RateLimitCooldownSeconds > 0 {

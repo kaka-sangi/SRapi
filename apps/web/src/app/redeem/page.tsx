@@ -59,7 +59,7 @@ function RedeemContent() {
   return (
     <>
       <SectionHero
-        eyebrow="Account · Redeem"
+        eyebrow={t("redeem.eyebrow")}
         title={t("redeem.title")}
         description={t("redeem.subtitle")}
       />

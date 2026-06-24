@@ -305,7 +305,7 @@ export const en = {
     signingIn: "Signing in...",
     errWrong: "Wrong email or password. Try again.",
     errRequired: "Email and password are required.",
-    providersLine: "OpenAI · Anthropic · Gemini · Grok",
+    providersLine: "OpenAI · Anthropic · Gemini compatible",
     orContinueWith: "or continue with",
     continueWith: "Continue with {name}",
     noAccount: "No account?",
@@ -544,9 +544,11 @@ export const en = {
     byTokens: "by tokens",
     noModelUsage: "No model usage in this window",
     modelShare: "{percent}% of tokens",
+    realtimeSlots: "Realtime slots",
   },
   apiKeys: {
     title: "API keys",
+    eyebrow: "Workspace · API Keys",
     subtitle: "Manage your API keys.",
     create: "Create API key",
     name: "Name",
@@ -661,6 +663,7 @@ export const en = {
   },
   usage: {
     title: "Usage",
+    eyebrow: "Workspace · Usage",
     subtitle: "Request logs.",
     topModelsByCost: "Top models by cost",
     topEndpointsByCost: "Top endpoints by cost",
@@ -698,6 +701,7 @@ export const en = {
   },
   availableChannels: {
     title: "Available channels",
+    eyebrow: "Workspace · Status",
     subtitle: "Models you can use, with channel status and current pricing.",
     models: "Models",
     modelCount: "{count} models",
@@ -3501,6 +3505,8 @@ export const en = {
   },
   playground: {
     greeting: "What would you like to explore?",
+    eyebrow: "Workspace · Playground",
+    subtitle: "Test your API integration with live chat",
     newChat: "New chat",
     thinking: "Thinking…",
     placeholder: "Message the model…",
@@ -3766,6 +3772,7 @@ export const en = {
   },
   account: {
     title: "Account",
+    eyebrow: "Account · Profile",
     subtitle: "Your profile and security.",
     tabProfile: "Profile",
     tabSecurity: "Security",
@@ -3839,6 +3846,7 @@ export const en = {
   },
   billing: {
     title: "Billing",
+    eyebrow: "Account · Billing",
     subtitle: "Balance, orders and subscriptions.",
     tabBalance: "Balance",
     tabOrders: "Orders",
@@ -3893,6 +3901,7 @@ export const en = {
   },
   pricing: {
     title: "Pricing",
+    eyebrow: "Account · Plans",
     subtitle: "Pick a plan and start sending requests in minutes.",
     subscribe: "Subscribe",
     subscribeTo: "Subscribe to {plan}",
@@ -3932,6 +3941,7 @@ export const en = {
   },
   redeem: {
     title: "Redeem a code",
+    eyebrow: "Account · Redeem",
     subtitle: "Enter a redeem code to credit your balance.",
     code: "Redeem code",
     submit: "Redeem",
@@ -3942,6 +3952,7 @@ export const en = {
   },
   affiliate: {
     title: "Affiliate",
+    eyebrow: "Account · Affiliate",
     subtitle: "Your referral earnings.",
     available: "Available",
     accrued: "Accrued",

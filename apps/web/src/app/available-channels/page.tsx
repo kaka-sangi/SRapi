@@ -31,7 +31,7 @@ function AvailableChannelsContent() {
   return (
     <>
       <SectionHero
-        eyebrow="Workspace · Status"
+        eyebrow={t("availableChannels.eyebrow")}
         title={t("availableChannels.title")}
         description={t("availableChannels.subtitle")}
       />

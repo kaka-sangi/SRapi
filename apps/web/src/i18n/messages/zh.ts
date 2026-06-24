@@ -305,7 +305,7 @@ export const zh: Messages = {
     signingIn: "登录中...",
     errWrong: "邮箱或密码不正确，请重试。",
     errRequired: "请输入邮箱和密码。",
-    providersLine: "OpenAI · Anthropic · Gemini · Grok",
+    providersLine: "兼容 OpenAI · Anthropic · Gemini",
     orContinueWith: "或使用以下方式登录",
     continueWith: "使用 {name} 登录",
     noAccount: "还没有账号？",
@@ -537,9 +537,11 @@ export const zh: Messages = {
     byTokens: "按 Token",
     noModelUsage: "该时间段暂无模型用量",
     modelShare: "占 Token {percent}%",
+    realtimeSlots: "实时调度",
   },
   apiKeys: {
     title: "API 密钥",
+    eyebrow: "工作区 · API 密钥",
     subtitle: "管理 API 密钥。",
     create: "新建 API 密钥",
     name: "名称",
@@ -650,6 +652,7 @@ export const zh: Messages = {
   },
   usage: {
     title: "用量",
+    eyebrow: "工作区 · 用量",
     subtitle: "请求日志。",
     topModelsByCost: "按花费排名的模型",
     topEndpointsByCost: "按花费排名的端点",
@@ -687,6 +690,7 @@ export const zh: Messages = {
   },
   availableChannels: {
     title: "可用渠道",
+    eyebrow: "工作区 · 状态",
     subtitle: "当前可用模型、渠道状态与单价。",
     models: "模型",
     modelCount: "{count} 个模型",
@@ -3434,6 +3438,8 @@ export const zh: Messages = {
   },
   playground: {
     greeting: "想聊点什么？",
+    eyebrow: "工作区 · Playground",
+    subtitle: "对话调试你的接入",
     newChat: "新对话",
     thinking: "思考中…",
     placeholder: "给模型发消息…",
@@ -3687,6 +3693,7 @@ export const zh: Messages = {
   },
   account: {
     title: "账户",
+    eyebrow: "账户 · 资料",
     subtitle: "你的资料与安全设置。",
     tabProfile: "资料",
     tabSecurity: "安全",
@@ -3759,6 +3766,7 @@ export const zh: Messages = {
   },
   billing: {
     title: "账单",
+    eyebrow: "账户 · 账单",
     subtitle: "余额、订单与订阅。",
     tabBalance: "余额",
     tabOrders: "订单",
@@ -3813,6 +3821,7 @@ export const zh: Messages = {
   },
   pricing: {
     title: "套餐定价",
+    eyebrow: "账户 · 套餐",
     subtitle: "选择套餐，几分钟内即可开始调用接口。",
     subscribe: "订阅",
     subscribeTo: "订阅 {plan}",
@@ -3849,6 +3858,7 @@ export const zh: Messages = {
   },
   redeem: {
     title: "兑换码",
+    eyebrow: "账户 · 兑换",
     subtitle: "输入兑换码以充值余额。",
     code: "兑换码",
     submit: "兑换",
@@ -3859,6 +3869,7 @@ export const zh: Messages = {
   },
   affiliate: {
     title: "推广",
+    eyebrow: "账户 · 推广",
     subtitle: "你的推广收益。",
     available: "可用",
     accrued: "累计",

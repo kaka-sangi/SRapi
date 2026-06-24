@@ -92,7 +92,7 @@ function BillingContent() {
         </div>
       ) : null}
       <SectionHero
-        eyebrow="Account · Billing"
+        eyebrow={t("billing.eyebrow")}
         title={t("billing.title")}
         description={t("billing.subtitle")}
       />

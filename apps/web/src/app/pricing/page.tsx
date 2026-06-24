@@ -62,7 +62,7 @@ function PricingContent() {
   return (
     <>
       <SectionHero
-        eyebrow="Account · Plans"
+        eyebrow={t("pricing.eyebrow")}
         title={t("pricing.title")}
         description={t("pricing.subtitle")}
       />

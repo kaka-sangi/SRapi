@@ -155,6 +155,9 @@ func defaultAdminSettings(now time.Time) admincontrol.AdminSettings {
 			SchedulerStrategyRolloutAPIKeyHashes: []string{},
 			PassthroughUpstreamHeaders:           false,
 			PassthroughHeaderAllowlist:           cloneStringSlice(defaultGatewayPassthroughHeaderAllowlist),
+			AuthFailureCooldownSeconds:           600,
+			NetworkErrorCooldownSeconds:          300,
+			AuthRateLimitMaxAttempts:             10,
 		},
 		Payment: admincontrol.AdminSettingsPayment{
 			Enabled:                  false,

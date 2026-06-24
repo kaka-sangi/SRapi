@@ -67,7 +67,7 @@ function UsageContent() {
   return (
     <>
       <SectionHero
-        eyebrow="Workspace · Usage"
+        eyebrow={t("usage.eyebrow")}
         title={t("usage.title")}
         description={t("usage.subtitle")}
         metrics={

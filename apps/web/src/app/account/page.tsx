@@ -49,7 +49,7 @@ function AccountContent() {
   return (
     <>
       <SectionHero
-        eyebrow="Account · Profile"
+        eyebrow={t("account.eyebrow")}
         title={t("account.title")}
         description={t("account.subtitle")}
       />

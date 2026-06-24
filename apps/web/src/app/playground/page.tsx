@@ -22,9 +22,9 @@ function PlaygroundContent() {
   return (
     <>
       <SectionHero
-        eyebrow="Workspace · Playground"
+        eyebrow={t("playground.eyebrow")}
         title={t("nav.playground")}
-        description="对话调试你的接入"
+        description={t("playground.subtitle")}
       />
       <PageQueryState query={models} skeleton={<ChatSkeleton />}>
         {(data) => {

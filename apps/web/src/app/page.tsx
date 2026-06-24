@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { ShieldCheck, Zap, Sparkles } from "lucide-react";
+import { ShieldCheck, Sparkles } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { AuroraBackdrop } from "@/components/visual/aurora-backdrop";
 import { SpotlightCard } from "@/components/visual/spotlight-card";
@@ -92,7 +92,6 @@ export default function LandingPage() {
             {/* Trust badges row — soft chips with icons */}
             <div className="mt-8 flex flex-wrap gap-2.5" style={rise(3)}>
               <TrustChip icon={<ShieldCheck className="size-3.5" />} label={t("login.providersLine")} />
-              <TrustChip icon={<Zap className="size-3.5" />} label="OpenAI · Claude · Gemini" />
             </div>
           </div>
 
