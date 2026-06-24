@@ -372,6 +372,15 @@ func (s *Store) ListOrdersByUser(ctx context.Context, userID int) ([]contract.Pa
 	return out, nil
 }
 
+func (s *Store) CountPendingOrdersByUser(ctx context.Context, userID int) (int, error) {
+	return s.client.PaymentOrder.Query().
+		Where(
+			entpaymentorder.UserIDEQ(userID),
+			entpaymentorder.StatusEQ(string(contract.OrderStatusPending)),
+		).
+		Count(ctx)
+}
+
 func (s *Store) CountInProgressOrdersByProviderInstance(ctx context.Context, providerInstanceID int) (int, error) {
 	return s.client.PaymentOrder.Query().
 		Where(

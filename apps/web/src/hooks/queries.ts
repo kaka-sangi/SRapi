@@ -157,6 +157,7 @@ export function useAvailableModels() {
   return useQuery({
     queryKey: queryKeys.me.availableModels(),
     queryFn: () => apiService.listAvailableModels(),
+    refetchInterval: 60_000,
   });
 }
 

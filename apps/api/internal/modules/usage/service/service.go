@@ -135,6 +135,7 @@ func (s *Service) Record(ctx context.Context, req contract.RecordRequest) (contr
 		UpstreamModel:            strings.TrimSpace(req.UpstreamModel),
 		BillingMode:              billingMode,
 		Currency:                 currency,
+		PricingSource:            strings.TrimSpace(req.PricingSource),
 		ChargedAt:                req.ChargedAt,
 		CompatibilityWarnings:    cloneStrings(req.CompatibilityWarnings),
 		CreatedAt:                s.clock.Now(),

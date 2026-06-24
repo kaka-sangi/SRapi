@@ -153,6 +153,12 @@ func (s *Server) handleDeleteCurrentUser(w http.ResponseWriter, r *http.Request)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to revoke user api keys", requestID)
 		return
 	}
+	// Invalidate ALL active console sessions (not just the current one)
+	// so the user is immediately signed out everywhere.
+	if err := s.runtime.auth.LogoutUser(r.Context(), session.User.ID); err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to invalidate user sessions", requestID)
+		return
+	}
 	if err := s.runtime.users.Delete(r.Context(), session.User.ID); err != nil {
 		if err == usersservice.ErrUserNotFound {
 			writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "user not found", requestID)
@@ -161,7 +167,6 @@ func (s *Server) handleDeleteCurrentUser(w http.ResponseWriter, r *http.Request)
 		writeUserServiceError(w, err, requestID)
 		return
 	}
-	_ = s.runtime.auth.Logout(r.Context(), session.Session.ID)
 	s.clearSessionCookie(w)
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "user.self_delete", "user", strconv.Itoa(session.User.ID), nil, nil))
 	writeJSONAny(w, http.StatusOK, map[string]any{

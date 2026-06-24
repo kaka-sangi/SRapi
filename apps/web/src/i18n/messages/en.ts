@@ -3954,6 +3954,7 @@ export const en = {
     emptyLedger: "No ledger entries",
     emptyLedgerBody: "Top-ups, refunds and usage charges will appear here.",
     currentBalance: "Current balance",
+    balanceNote: "May differ from available amount due to pending transactions",
     topUp: "Top up",
     amount: "Amount",
     method: "Payment method",

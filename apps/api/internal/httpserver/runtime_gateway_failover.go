@@ -42,6 +42,23 @@ func gatewayNoAccountMessage(_ schedulercontract.Decision) string {
 	return "The requested model is temporarily unavailable. Please try again later."
 }
 
+// setRetryAfterForCooldownReject sets a Retry-After header when every
+// candidate was rejected because of a transient cooldown. This gives
+// callers a concrete signal to back off rather than hammering a 503.
+func setRetryAfterForCooldownReject(w http.ResponseWriter, decision schedulercontract.Decision) {
+	if decision.CandidateCount == 0 || len(decision.RejectReasons) == 0 {
+		return
+	}
+	for _, reason := range decision.RejectReasons {
+		r := strings.TrimSpace(fmt.Sprint(reason))
+		if r != "cooldown_active" {
+			return
+		}
+	}
+	// All rejected candidates are in cooldown — suggest a 30-second retry.
+	w.Header().Set("Retry-After", "30")
+}
+
 func gatewayNoAvailableDiagnosticForDecision(decision schedulercontract.Decision) gatewayNoAvailableDiagnostic {
 	counts := gatewaySchedulerRejectReasonCounts(decision, true)
 	primaryReason, primaryCount := gatewayPrimaryRejectReason(counts)
@@ -294,6 +311,7 @@ func (s *Server) writeGatewayFailoverFailure(
 ) {
 	if !failureRecorded {
 		s.recordGatewayNoAvailableAccount(r, authed, canonical, result, admission, startedAt)
+		setRetryAfterForCooldownReject(w, result.Decision)
 		writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, gatewayNoAccountMessage(result.Decision), "no_available_account")
 		return
 	}
@@ -313,6 +331,7 @@ func (s *Server) writeGeminiGatewayFailoverFailure(
 ) {
 	if !failureRecorded {
 		s.recordGatewayNoAvailableAccount(r, authed, canonical, result, admission, startedAt)
+		setRetryAfterForCooldownReject(w, result.Decision)
 		writeGeminiGatewayError(w, http.StatusServiceUnavailable, "UNAVAILABLE", gatewayNoAccountMessage(result.Decision))
 		return
 	}

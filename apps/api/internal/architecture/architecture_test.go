@@ -244,6 +244,7 @@ func TestAppBootstrapOnlyImportsBootstrapPackages(t *testing.T) {
 			"github.com/srapi/srapi/apps/api/internal/persistence/redisstore/sessionaffinity":    true,
 			"github.com/srapi/srapi/apps/api/internal/platform/db":                               true,
 			"github.com/srapi/srapi/apps/api/internal/platform/leadergate":                       true,
+			"github.com/srapi/srapi/apps/api/internal/platform/crypto":                           true,
 			"github.com/srapi/srapi/apps/api/internal/platform/otel":                             true,
 			"github.com/srapi/srapi/apps/api/internal/platform/redis":                            true,
 			"github.com/srapi/srapi/apps/api/internal/workers/account_quota_alert":               true,

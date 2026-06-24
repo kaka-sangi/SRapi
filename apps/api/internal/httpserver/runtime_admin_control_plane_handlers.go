@@ -25,6 +25,13 @@ func (s *Server) handleGetAdminSettings(w http.ResponseWriter, r *http.Request) 
 	writeJSONAny(w, http.StatusOK, apiopenapi.AdminSettingsResponse{Data: s.toAPIAdminSettings(settings), RequestId: requestID})
 }
 
+// TODO(H12): Implement optimistic concurrency control for settings updates.
+// The current handler uses last-write-wins, which can silently overwrite
+// concurrent edits from other admin sessions. To fix:
+//   1. Include updated_at in the AdminSettings API response.
+//   2. Require the client to send updated_at back on PUT.
+//   3. Compare the client's updated_at with the stored value here; if they
+//      differ, return 409 Conflict so the UI can prompt the admin to reload.
 func (s *Server) handleUpdateAdminSettings(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	session, err := s.requireAdminSession(r)

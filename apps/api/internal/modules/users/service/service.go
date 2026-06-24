@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -35,6 +36,12 @@ type Service struct {
 	store              contract.Store
 	clock              Clock
 	passwordHasherCost int
+
+	// balanceLocks serializes read-modify-write balance updates per user,
+	// preventing TOCTOU races when concurrent callers update the same
+	// user's balance. Uses the same sync.Map-of-mutexes pattern as the
+	// gateway's accountMetaLocks.
+	balanceLocks sync.Map
 }
 
 type CreateRequest struct {
@@ -545,6 +552,13 @@ func (s *Service) ChangePassword(ctx context.Context, id int, req ChangePassword
 	return updated, nil
 }
 
+// balanceLock returns the per-user mutex that serializes read-modify-write
+// balance updates so concurrent callers for the same user cannot interleave.
+func (s *Service) balanceLock(userID int) *sync.Mutex {
+	actual, _ := s.balanceLocks.LoadOrStore(userID, &sync.Mutex{})
+	return actual.(*sync.Mutex)
+}
+
 func (s *Service) UpdateBalance(ctx context.Context, id int, req BalanceUpdateRequest) (contract.StoredUser, error) {
 	if id <= 0 {
 		return contract.StoredUser{}, ErrInvalidInput
@@ -553,6 +567,14 @@ func (s *Service) UpdateBalance(ctx context.Context, id int, req BalanceUpdateRe
 	if !ok || amount.Sign() < 0 {
 		return contract.StoredUser{}, ErrInvalidInput
 	}
+
+	// Hold the per-user lock across the entire read-modify-write to
+	// prevent TOCTOU races when concurrent callers update the same
+	// user's balance.
+	mu := s.balanceLock(id)
+	mu.Lock()
+	defer mu.Unlock()
+
 	user, err := s.store.FindByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, contract.ErrNotFound) {
@@ -563,6 +585,14 @@ func (s *Service) UpdateBalance(ctx context.Context, id int, req BalanceUpdateRe
 	balance, ok := money.RequiredDecimalRat(user.Balance)
 	if !ok {
 		return contract.StoredUser{}, ErrInvalidInput
+	}
+	currency := normalizeCurrency(user.Currency)
+	if strings.TrimSpace(req.Currency) != "" {
+		requested := normalizeCurrency(req.Currency)
+		if requested != currency && balance.Sign() > 0 {
+			return contract.StoredUser{}, ErrCurrencyMismatch
+		}
+		currency = requested
 	}
 	switch req.Operation {
 	case BalanceOperationSet:
@@ -578,10 +608,6 @@ func (s *Service) UpdateBalance(ctx context.Context, id int, req BalanceUpdateRe
 		return contract.StoredUser{}, ErrInvalidInput
 	}
 	normalizedBalance := money.FormatRatFixed(balance, 8)
-	currency := normalizeCurrency(user.Currency)
-	if strings.TrimSpace(req.Currency) != "" {
-		currency = normalizeCurrency(req.Currency)
-	}
 	updated, err := s.store.Update(ctx, id, contract.UpdateStoredUser{
 		Balance:  &normalizedBalance,
 		Currency: &currency,

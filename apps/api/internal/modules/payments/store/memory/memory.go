@@ -335,6 +335,18 @@ func (s *Store) ListOrdersByUser(_ context.Context, userID int) ([]contract.Paym
 	return out, nil
 }
 
+func (s *Store) CountPendingOrdersByUser(_ context.Context, userID int) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	count := 0
+	for _, order := range s.orders {
+		if order.UserID == userID && order.Status == contract.OrderStatusPending {
+			count++
+		}
+	}
+	return count, nil
+}
+
 func (s *Store) CountInProgressOrdersByProviderInstance(_ context.Context, providerInstanceID int) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

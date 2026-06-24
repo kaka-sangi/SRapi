@@ -25,7 +25,7 @@ export interface SchedulerDecisionListParams {
 
 export const usageApi = {
   async listUsageLogs(): Promise<UsageLogSummary[]> {
-    const response = await sdkGetCurrentUserUsage({ throwOnError: true });
+    const response = await sdkGetCurrentUserUsage({ query: { page_size: 500 }, throwOnError: true });
     if (response.data) {
       return ((response.data.data || []) as LiveUsageLog[]).map((log) => ({
         created_at: log.created_at,

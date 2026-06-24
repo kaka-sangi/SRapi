@@ -52,6 +52,7 @@ func writeMaintenanceResponse(w http.ResponseWriter, r *http.Request, m admincon
 			if seconds > 0 {
 				w.Header().Set("Retry-After", strconv.Itoa(seconds))
 			}
+			message += " (estimated recovery: " + m.ExpectedRecoveryAt.UTC().Format(time.RFC3339) + ")"
 		}
 	}
 	if strings.HasPrefix(r.URL.Path, "/v1beta/") {

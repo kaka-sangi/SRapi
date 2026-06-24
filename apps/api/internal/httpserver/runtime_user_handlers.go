@@ -79,7 +79,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		writeAdminControlError(w, err, requestID)
 		return
 	}
-	if !s.runtime.checkAuthRateLimit(ip, loginSettings.Gateway.AuthRateLimitMaxAttempts) {
+	if !s.runtime.peekAuthRateLimit(ip, loginSettings.Gateway.AuthRateLimitMaxAttempts) {
 		writeStandardError(w, http.StatusTooManyRequests, apiopenapi.INVALIDREQUEST, "too many login attempts, try again later", requestID)
 		return
 	}
@@ -92,8 +92,21 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Per-email rate limit: check before attempting authentication so that
+	// accounts targeted by credential-stuffing are protected even when
+	// requests arrive from many different IPs.
+	email := strings.ToLower(strings.TrimSpace(string(body.Email)))
+	if !s.runtime.checkAuthRateLimitByEmail(email, 0) {
+		writeStandardError(w, http.StatusTooManyRequests, apiopenapi.INVALIDREQUEST, "too many login attempts for this account, try again later", requestID)
+		return
+	}
+
 	result, err := s.runtime.auth.Login(r.Context(), string(body.Email), body.Password)
 	if err != nil {
+		// Only count failures against the per-IP and per-email limits so that
+		// successful logins never penalise the legitimate owner.
+		s.runtime.incrementAuthRateLimit(ip)
+		s.runtime.recordAuthEmailFailure(email)
 		switch {
 		case errors.Is(err, usersservice.ErrInvalidInput):
 			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid login request", requestID)

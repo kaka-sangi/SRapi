@@ -75,6 +75,7 @@ type UsageLog struct {
 	UpstreamModel         string
 	BillingMode           string
 	Currency              string
+	PricingSource         string
 	ChargedAt             *time.Time
 	CompatibilityWarnings []string
 	CreatedAt             time.Time
@@ -145,6 +146,7 @@ type RecordRequest struct {
 	UpstreamModel         string
 	BillingMode           string
 	Currency              string
+	PricingSource         string
 	ChargedAt             *time.Time
 	CompatibilityWarnings []string
 }

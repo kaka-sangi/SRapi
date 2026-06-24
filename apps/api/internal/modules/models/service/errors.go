@@ -10,4 +10,5 @@ var (
 	ErrMappingExists   = errors.New("model provider mapping already exists")
 	ErrAliasNotFound   = errors.New("model alias not found")
 	ErrMappingNotFound = errors.New("model provider mapping not found")
+	ErrModelDisabled   = errors.New("model is disabled")
 )

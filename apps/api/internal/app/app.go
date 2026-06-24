@@ -2,6 +2,10 @@ package app
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -18,6 +22,7 @@ import (
 	redisrealtimestore "github.com/srapi/srapi/apps/api/internal/persistence/redisstore/realtime"
 	redisschedulerstore "github.com/srapi/srapi/apps/api/internal/persistence/redisstore/scheduler"
 	redissessionaffinitystore "github.com/srapi/srapi/apps/api/internal/persistence/redisstore/sessionaffinity"
+	platformcrypto "github.com/srapi/srapi/apps/api/internal/platform/crypto"
 	platformdb "github.com/srapi/srapi/apps/api/internal/platform/db"
 	platformotel "github.com/srapi/srapi/apps/api/internal/platform/otel"
 	platformredis "github.com/srapi/srapi/apps/api/internal/platform/redis"
@@ -94,6 +99,10 @@ type appWorkers struct {
 func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	if logger == nil {
 		logger = slog.Default()
+	}
+
+	if err := verifyMasterKeyIntegrity(cfg, logger); err != nil {
+		return nil, err
 	}
 
 	tracerShutdown, err := platformotel.SetupTracerProvider(context.Background(), cfg.Observability)
@@ -1104,5 +1113,56 @@ func (w appWorkers) shutdown(ctx context.Context) error {
 type notRequiredPinger struct{}
 
 func (notRequiredPinger) Ping(context.Context) error {
+	return nil
+}
+
+// masterKeySentinel is a fixed plaintext that verifyMasterKeyIntegrity
+// encrypts and decrypts on every startup to detect SRAPI_MASTER_KEY rotation
+// or misconfiguration early, before the server accepts traffic that depends on
+// existing ciphertexts being decryptable.
+const masterKeySentinel = "srapi-master-key-sentinel-check"
+
+// verifyMasterKeyIntegrity performs a round-trip encrypt/decrypt of a known
+// sentinel value using the configured SRAPI_MASTER_KEY. If the key is too
+// short or produces a derivation error, the server cannot safely handle
+// encrypted secrets (copilot API keys, OAuth client secrets, etc.), so we
+// fail loudly at startup rather than silently corrupting data at runtime.
+func verifyMasterKeyIntegrity(cfg config.Config, logger *slog.Logger) error {
+	key, err := platformcrypto.DeriveAESKey(cfg.Security.MasterKey)
+	if err != nil {
+		return fmt.Errorf("FATAL: SRAPI_MASTER_KEY cannot derive AES key: %w — "+
+			"encrypted secrets will be unreadable; verify the key matches what was used to encrypt existing data", err)
+	}
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return fmt.Errorf("FATAL: SRAPI_MASTER_KEY produced an invalid AES cipher: %w", err)
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return fmt.Errorf("FATAL: SRAPI_MASTER_KEY GCM initialisation failed: %w", err)
+	}
+
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := rand.Read(nonce); err != nil {
+		return fmt.Errorf("FATAL: failed to generate nonce for master key check: %w", err)
+	}
+
+	ciphertext := gcm.Seal(nil, nonce, []byte(masterKeySentinel), nil)
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return fmt.Errorf("FATAL: SRAPI_MASTER_KEY round-trip decrypt failed: %w — "+
+			"the master key may have been rotated without re-encrypting stored secrets", err)
+	}
+	if string(plaintext) != masterKeySentinel {
+		return fmt.Errorf("FATAL: SRAPI_MASTER_KEY round-trip produced mismatched plaintext — " +
+			"key derivation is broken; check SRAPI_MASTER_KEY value")
+	}
+
+	// Encode the ciphertext to exercise the same base64 path used by
+	// runtime_secret_helpers.go, ensuring no silent encoding drift.
+	_ = base64.RawURLEncoding.EncodeToString(ciphertext)
+
+	logger.Info("master key integrity check passed")
 	return nil
 }

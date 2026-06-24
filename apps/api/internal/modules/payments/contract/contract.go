@@ -30,6 +30,7 @@ const (
 	OrderStatusRefunding         OrderStatus = "refunding"
 	OrderStatusRefunded          OrderStatus = "refunded"
 	OrderStatusRefundFailed      OrderStatus = "refund_failed"
+	OrderStatusFulfillmentFailed OrderStatus = "fulfillment_failed"
 	OrderStatusExpired           OrderStatus = "expired"
 	OrderStatusCanceled          OrderStatus = "canceled"
 	OrderStatusFailed            OrderStatus = "failed"
@@ -294,6 +295,7 @@ type Store interface {
 	ListPendingOrders(ctx context.Context, now time.Time) ([]PaymentOrder, error)
 	ListExpiredPendingOrders(ctx context.Context, now time.Time) ([]PaymentOrder, error)
 	ListOrdersByUser(ctx context.Context, userID int) ([]PaymentOrder, error)
+	CountPendingOrdersByUser(ctx context.Context, userID int) (int, error)
 	CountInProgressOrdersByProviderInstance(ctx context.Context, providerInstanceID int) (int, error)
 	ExpireOrder(ctx context.Context, orderID int, now time.Time) (PaymentOrder, bool, error)
 	CreateAuditLog(ctx context.Context, input PaymentAuditLog) (PaymentAuditLog, bool, error)

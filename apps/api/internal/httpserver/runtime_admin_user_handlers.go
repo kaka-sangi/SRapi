@@ -187,6 +187,12 @@ func (s *Server) handleDeleteAdminUser(w http.ResponseWriter, r *http.Request) {
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to revoke user api keys", requestID)
 		return
 	}
+	// Invalidate all active console sessions so the deleted user is
+	// immediately signed out everywhere.
+	if err := s.runtime.auth.LogoutUser(r.Context(), userID); err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to invalidate user sessions", requestID)
+		return
+	}
 	if err := s.runtime.users.Delete(r.Context(), userID); err != nil {
 		writeUserServiceError(w, err, requestID)
 		return
@@ -249,8 +255,19 @@ func (s *Server) handleUpdateAdminUserBalance(w http.ResponseWriter, r *http.Req
 		},
 	})
 	if err != nil {
-		s.logger.Error("billing ledger record failed after balance update", "error", err, "user_id", updated.ID, "request_id", requestID)
-		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to record balance history", requestID)
+		// Balance was already changed -- returning an error would be
+		// misleading because the caller might retry and double-apply.
+		// Return success with a warning so the admin knows the ledger
+		// entry failed and can reconcile manually.
+		s.logger.Error("CRITICAL: billing ledger record failed after successful balance update — ledger is now inconsistent",
+			"error", err, "user_id", updated.ID, "request_id", requestID,
+			"balance_before", before.Balance, "balance_after", updated.Balance)
+		s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "user.balance_update", "user", strconv.Itoa(updated.ID), userAuditSnapshot(before), userAuditSnapshot(updated)))
+		writeJSONAny(w, http.StatusOK, map[string]any{
+			"data":       toAPIUser(updated.User),
+			"warning":    "balance updated but ledger record failed — check server logs",
+			"request_id": requestID,
+		})
 		return
 	}
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "user.balance_update", "user", strconv.Itoa(updated.ID), userAuditSnapshot(before), userAuditSnapshot(updated)))

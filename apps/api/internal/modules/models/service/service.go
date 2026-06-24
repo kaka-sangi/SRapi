@@ -164,6 +164,10 @@ func (s *Service) ResolveModelReference(ctx context.Context, name string) (contr
 		return contract.ModelResolution{}, ErrInvalidInput
 	}
 	if model, err := s.store.FindByCanonicalName(ctx, name); err == nil {
+		// H7: Disabled or archived models must not be routable.
+		if model.Status != contract.StatusActive {
+			return contract.ModelResolution{}, ErrModelDisabled
+		}
 		return contract.ModelResolution{Model: model}, nil
 	}
 	alias, err := s.store.FindByAlias(ctx, name)
@@ -176,6 +180,10 @@ func (s *Service) ResolveModelReference(ctx context.Context, name string) (contr
 	model, err := s.store.FindByID(ctx, alias.ModelID)
 	if err != nil {
 		return contract.ModelResolution{}, err
+	}
+	// H7: Disabled or archived models must not be routable even via an active alias.
+	if model.Status != contract.StatusActive {
+		return contract.ModelResolution{}, ErrModelDisabled
 	}
 	return contract.ModelResolution{Model: model, Alias: &alias}, nil
 }

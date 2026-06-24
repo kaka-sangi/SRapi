@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math/big"
 	"sort"
 	"strconv"
@@ -34,9 +35,10 @@ import (
 )
 
 const (
-	configVersionV1       = 1
-	configCiphertextV1    = "v1"
-	defaultOrderExpiresIn = 30 * time.Minute
+	configVersionV1            = 1
+	configCiphertextV1         = "v1"
+	defaultOrderExpiresIn      = 30 * time.Minute
+	maxPendingOrdersPerUser    = 5
 )
 
 type Clock interface {
@@ -407,6 +409,15 @@ func (s *Service) CreateOrder(ctx context.Context, req contract.CreateOrderReque
 	amount, ok := normalizeMoney(req.Amount)
 	if !ok || compareMoney(amount, "0.00000000") <= 0 {
 		return contract.PaymentOrder{}, ErrInvalidInput
+	}
+	// H4: Limit the number of concurrent pending orders per user to prevent
+	// resource exhaustion (abandoned carts, payment-provider session hoarding).
+	pendingCount, err := s.store.CountPendingOrdersByUser(ctx, req.UserID)
+	if err != nil {
+		return contract.PaymentOrder{}, err
+	}
+	if pendingCount >= maxPendingOrdersPerUser {
+		return contract.PaymentOrder{}, ErrTooManyPendingOrders
 	}
 	currency := normalizeCurrency(req.Currency)
 	originalAmount := amount
@@ -948,6 +959,27 @@ func (s *Service) HandleWebhook(ctx context.Context, req contract.WebhookRequest
 	if order.Status == contract.OrderStatusFulfilled || order.Status == contract.OrderStatusPaid {
 		return contract.WebhookResult{Order: order, Handled: false}, nil
 	}
+	// C1 fix: If the order expired or was canceled but a legitimate paid webhook
+	// arrived (signature already verified above), revive the order back to pending
+	// so that markPaidAndFulfill's validateTransition(pending -> paid) succeeds.
+	// Without this, validateTransition returns an error, the gateway retries the
+	// webhook forever, and the user's money is lost.
+	if order.Status == contract.OrderStatusExpired || order.Status == contract.OrderStatusCanceled {
+		slog.Warn("payments: reviving expired/canceled order on valid paid webhook",
+			"order_id", order.ID,
+			"order_no", order.OrderNo,
+			"previous_status", string(order.Status),
+		)
+		order.Status = contract.OrderStatusPending
+		order.ClosedAt = nil
+		order.UpdatedAt = s.clock.Now()
+		order, err = s.store.UpdateOrder(ctx, order)
+		if err != nil {
+			// Even on update failure, return 200 (nil error with Handled=false)
+			// to stop the payment gateway from retrying forever.
+			return contract.WebhookResult{Order: order, Handled: false}, nil
+		}
+	}
 	fulfilled, err := s.markPaidAndFulfill(ctx, order, instance, transactionID)
 	if err != nil {
 		return contract.WebhookResult{}, err
@@ -1083,8 +1115,9 @@ func (s *Service) RequestRefund(ctx context.Context, req contract.RefundRequest)
 	}
 	// One-shot refund: the order carries no cumulative-refunded accounting, so a
 	// second refund (PartiallyRefunded -> Refunded, or another partial) would claw
-	// back more balance than was ever paid. Reject once any refund has happened.
-	if order.Status == contract.OrderStatusRefunded || order.Status == contract.OrderStatusPartiallyRefunded || order.Status == contract.OrderStatusRefunding {
+	// back more balance than was ever paid. Reject once any refund has happened or
+	// is in progress, including orders whose previous refund attempt failed.
+	if order.Status == contract.OrderStatusRefunded || order.Status == contract.OrderStatusPartiallyRefunded || order.Status == contract.OrderStatusRefunding || order.Status == contract.OrderStatusRefundFailed {
 		return contract.PaymentOrder{}, ErrInvalidTransition
 	}
 	refundAmount, ok := normalizeMoney(req.Amount)
@@ -1261,8 +1294,24 @@ func (s *Service) markPaidAndFulfill(ctx context.Context, order contract.Payment
 	if err != nil {
 		return contract.PaymentOrder{}, err
 	}
-	if err := s.fulfill(ctx, paid, instance); err != nil {
-		return paid, err
+	if fulfillErr := s.fulfill(ctx, paid, instance); fulfillErr != nil {
+		// H6 fix: If product fulfillment fails after marking paid, set status to
+		// fulfillment_failed with error metadata instead of leaving the order stuck
+		// in "paid" where it would never be retried or surfaced to operators.
+		slog.Warn("payments: fulfillment failed after marking paid, setting fulfillment_failed",
+			"order_id", paid.ID,
+			"order_no", paid.OrderNo,
+			"error", fulfillErr.Error(),
+		)
+		paid.Status = contract.OrderStatusFulfillmentFailed
+		paid.Metadata = cloneMap(paid.Metadata)
+		paid.Metadata["fulfillment_error"] = fulfillErr.Error()
+		paid.Metadata["fulfillment_failed_at"] = s.clock.Now().Format(time.RFC3339Nano)
+		paid.UpdatedAt = s.clock.Now()
+		if updated, updateErr := s.store.UpdateOrder(ctx, paid); updateErr == nil {
+			paid = updated
+		}
+		return paid, fulfillErr
 	}
 	if err := validateTransition(paid.Status, contract.OrderStatusFulfilled); err != nil {
 		return contract.PaymentOrder{}, err
@@ -1369,6 +1418,28 @@ func (s *Service) ReconcilePendingOrders(ctx context.Context, now time.Time) (co
 }
 
 func (s *Service) fulfill(ctx context.Context, order contract.PaymentOrder, instance contract.PaymentProviderInstance) error {
+	// C4 fix: Credit the user's spendable balance FIRST, then record the billing
+	// ledger entry. If billing recording fails after crediting, the money is in
+	// the user's account (better than the reverse: ledger says credited but
+	// balance is empty). The ledger discrepancy is recoverable by operators.
+	if order.ProductType == contract.ProductTypeBalanceCredit {
+		// Make the paid amount spendable. Idempotent per order: fulfill only runs
+		// on the Paid->Fulfilled transition, which validateTransition gates.
+		if s.deps.Balance == nil {
+			return ErrInvalidInput
+		}
+		if err := s.deps.Balance.CreditBalance(ctx, order.UserID, order.Amount, order.Currency); err != nil {
+			slog.Error("payments: failed to credit balance during fulfillment",
+				"order_id", order.ID,
+				"order_no", order.OrderNo,
+				"user_id", order.UserID,
+				"amount", order.Amount,
+				"currency", order.Currency,
+				"error", err.Error(),
+			)
+			return err
+		}
+	}
 	_, err := s.recordBilling(ctx, billingcontract.RecordRequest{
 		UserID:        order.UserID,
 		Type:          billingcontract.LedgerTypePaymentCredit,
@@ -1385,15 +1456,14 @@ func (s *Service) fulfill(ctx context.Context, order contract.PaymentOrder, inst
 		},
 	})
 	if err != nil {
+		slog.Error("payments: failed to record billing ledger entry during fulfillment",
+			"order_id", order.ID,
+			"order_no", order.OrderNo,
+			"user_id", order.UserID,
+			"amount", order.Amount,
+			"error", err.Error(),
+		)
 		return err
-	}
-	if order.ProductType == contract.ProductTypeBalanceCredit {
-		// Make the paid amount spendable. Idempotent per order: fulfill only runs
-		// on the Paid->Fulfilled transition, which validateTransition gates.
-		if s.deps.Balance == nil {
-			return ErrInvalidInput
-		}
-		return s.deps.Balance.CreditBalance(ctx, order.UserID, order.Amount, order.Currency)
 	}
 	if order.ProductType != contract.ProductTypeSubscriptionPlan {
 		return nil
@@ -1707,7 +1777,12 @@ func validateTransition(from contract.OrderStatus, to contract.OrderStatus) erro
 		}
 	case contract.OrderStatusPaid:
 		switch to {
-		case contract.OrderStatusFulfilled, contract.OrderStatusPartiallyRefunded, contract.OrderStatusRefunding, contract.OrderStatusRefunded:
+		case contract.OrderStatusFulfilled, contract.OrderStatusFulfillmentFailed, contract.OrderStatusPartiallyRefunded, contract.OrderStatusRefunding, contract.OrderStatusRefunded:
+			return nil
+		}
+	case contract.OrderStatusFulfillmentFailed:
+		switch to {
+		case contract.OrderStatusFulfilled, contract.OrderStatusRefunding, contract.OrderStatusRefunded:
 			return nil
 		}
 	case contract.OrderStatusFulfilled:

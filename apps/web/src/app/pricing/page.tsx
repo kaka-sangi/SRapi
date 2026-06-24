@@ -271,7 +271,8 @@ function SubscribeDialog({
         ) : methodList.length === 0 ? (
           <div className="space-y-2 py-4 text-center">
             <CreditCard className="mx-auto size-8 text-srapi-text-tertiary" />
-            <p className="text-sm text-srapi-text-secondary">{t("billing.noMethodsTitle")}</p>
+            <p className="text-sm font-medium text-srapi-text-secondary">{t("billing.noMethodsTitle")}</p>
+            <p className="text-xs text-srapi-text-tertiary">{t("billing.noMethodsHint")}</p>
           </div>
         ) : (
           <form onSubmit={subscribe} className="space-y-4">

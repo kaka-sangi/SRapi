@@ -103,6 +103,7 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 		UpstreamModel:         strings.TrimSpace(rec.UpstreamModel),
 		BillingMode:           string(pricing.BillingMode),
 		Currency:              pricing.Currency,
+		PricingSource:         pricing.PricingSource,
 		CompatibilityWarnings: rec.CompatibilityWarnings,
 	})
 	if usageErr != nil {
@@ -150,6 +151,11 @@ func (rt *runtimeState) markStreamingBillingRecorded(_ context.Context, requestI
 
 const authRateLimitMaxAttempts = 10
 
+// authRateLimitEmailMaxAttempts is the default per-email threshold. It is
+// intentionally higher than the per-IP limit so that shared-IP environments
+// (offices, VPNs) are not penalised unfairly.
+const authRateLimitEmailMaxAttempts = 30
+
 // checkAuthRateLimit enforces a per-IP login attempt limit. Returns true if the
 // request is allowed, false if the IP has exceeded the threshold.
 func (rt *runtimeState) checkAuthRateLimit(ip string, maxAttempts int) bool {
@@ -166,6 +172,60 @@ func (rt *runtimeState) checkAuthRateLimit(ip string, maxAttempts int) bool {
 	}
 	rt.authRateLimit.Set(key, count+1)
 	return true
+}
+
+// peekAuthRateLimit checks whether the IP has exceeded the login rate limit
+// without incrementing the counter. Use this to gate the request before
+// password verification so that successful logins do not consume attempts.
+func (rt *runtimeState) peekAuthRateLimit(ip string, maxAttempts int) bool {
+	if rt.authRateLimit == nil || ip == "" {
+		return true
+	}
+	if maxAttempts <= 0 {
+		maxAttempts = authRateLimitMaxAttempts
+	}
+	key := "auth:" + ip
+	count, _ := rt.authRateLimit.Get(key)
+	return count < maxAttempts
+}
+
+// incrementAuthRateLimit bumps the per-IP login attempt counter. Call this
+// only after a login failure so that successful logins are not penalised.
+func (rt *runtimeState) incrementAuthRateLimit(ip string) {
+	if rt.authRateLimit == nil || ip == "" {
+		return
+	}
+	key := "auth:" + ip
+	count, _ := rt.authRateLimit.Get(key)
+	rt.authRateLimit.Set(key, count+1)
+}
+
+// checkAuthRateLimitByEmail enforces a per-email login attempt limit.
+// Returns true if the request is allowed, false if the email has exceeded
+// the threshold. Unlike the per-IP limiter, this counter should only be
+// incremented on authentication failures (see recordAuthEmailFailure).
+func (rt *runtimeState) checkAuthRateLimitByEmail(email string, maxAttempts int) bool {
+	if rt.authRateLimit == nil || email == "" {
+		return true
+	}
+	if maxAttempts <= 0 {
+		maxAttempts = authRateLimitEmailMaxAttempts
+	}
+	key := "auth:email:" + email
+	count, _ := rt.authRateLimit.Get(key)
+	return count < maxAttempts
+}
+
+// recordAuthEmailFailure increments the per-email failure counter. It must
+// only be called after a failed authentication attempt so that successful
+// logins do not penalise the legitimate account owner.
+func (rt *runtimeState) recordAuthEmailFailure(email string) {
+	if rt.authRateLimit == nil || email == "" {
+		return
+	}
+	key := "auth:email:" + email
+	count, _ := rt.authRateLimit.Get(key)
+	rt.authRateLimit.Set(key, count+1)
 }
 
 func (rt *runtimeState) releaseGatewaySchedulerLease(ctx context.Context, result schedulercontract.ScheduleResult, reason string) {
@@ -584,7 +644,7 @@ func (rt *runtimeState) warnDefaultZeroGatewayPricing(rec gatewayUsageRecord, mo
 	if rec.ProviderID != nil && *rec.ProviderID > 0 {
 		args = append(args, "provider_id", *rec.ProviderID)
 	}
-	rt.logger.Warn("gateway usage recorded with default zero pricing — no PricingRule matched this (model, provider). Verify the rule's model_id, provider_id, and effective_at window.", args...)
+	rt.logger.Error("gateway usage recorded with default zero pricing — no PricingRule matched this (model, provider). Verify the rule's model_id, provider_id, and effective_at window.", args...)
 }
 
 // networkErrorCooldownWindow is the SHORT account cooldown applied after a

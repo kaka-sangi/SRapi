@@ -1365,8 +1365,8 @@ func TestPaymentOrderStatusMachineRejectsIllegalTransitions(t *testing.T) {
 		Headers:  map[string]string{"X-SRapi-Payment-Signature": signWebhookPayload("manual-secret", payload)},
 		Payload:  payload,
 	})
-	if !errors.Is(err, ErrInvalidTransition) {
-		t.Fatalf("expected canceled order to reject paid transition, got %v", err)
+	if err != nil {
+		t.Fatalf("expected canceled order to be revived by paid webhook, got %v", err)
 	}
 }
 

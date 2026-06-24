@@ -179,9 +179,12 @@ function BalanceTab() {
           {balance.isLoading ? (
             <Skeleton className="mt-3 h-10 w-40" />
           ) : (
-            <div className="mt-2 text-3xl font-semibold tracking-tight tabular text-srapi-text-primary">
-              {balance.data ? formatMoney(balance.data.balance, balance.data.currency) : "—"}
-            </div>
+            <>
+              <div className="mt-2 text-3xl font-semibold tracking-tight tabular text-srapi-text-primary">
+                {balance.data ? formatMoney(balance.data.balance, balance.data.currency) : "—"}
+              </div>
+              <p className="mt-1 text-[11px] text-srapi-text-tertiary">{t("billing.balanceNote")}</p>
+            </>
           )}
         </CardContent>
       </Card>

@@ -9,6 +9,7 @@ import (
 	"image/jpeg"
 	"io"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -771,6 +772,118 @@ func TestUpdateBalanceUsesDecimalMath(t *testing.T) {
 	}
 	if updated.Balance != "1.00000000" {
 		t.Fatalf("expected exact decimal balance, got %s", updated.Balance)
+	}
+}
+
+func TestUpdateBalanceCurrencyMismatchBlocked(t *testing.T) {
+	store := newMemoryStore()
+	svc := newTestService(t, store)
+	created, err := svc.Create(context.Background(), CreateRequest{
+		Email:    "currency@srapi.local",
+		Name:     "Currency",
+		Password: "password123",
+		Balance:  "10.00000000",
+		Currency: "USD",
+	})
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	// Incrementing with a different currency while balance > 0 must fail.
+	_, err = svc.UpdateBalance(context.Background(), created.ID, BalanceUpdateRequest{
+		Operation: BalanceOperationIncrement,
+		Amount:    "50.00000000",
+		Currency:  "CNY",
+	})
+	if !errors.Is(err, ErrCurrencyMismatch) {
+		t.Fatalf("expected ErrCurrencyMismatch, got %v", err)
+	}
+
+	// Same currency should succeed.
+	updated, err := svc.UpdateBalance(context.Background(), created.ID, BalanceUpdateRequest{
+		Operation: BalanceOperationIncrement,
+		Amount:    "5.00000000",
+		Currency:  "USD",
+	})
+	if err != nil {
+		t.Fatalf("same-currency update should succeed: %v", err)
+	}
+	if updated.Balance != "15.00000000" {
+		t.Fatalf("expected 15.00000000, got %s", updated.Balance)
+	}
+
+	// Set balance to zero, then currency change should be allowed.
+	updated, err = svc.UpdateBalance(context.Background(), created.ID, BalanceUpdateRequest{
+		Operation: BalanceOperationSet,
+		Amount:    "0.00000000",
+		Currency:  "USD",
+	})
+	if err != nil {
+		t.Fatalf("set to zero: %v", err)
+	}
+
+	updated, err = svc.UpdateBalance(context.Background(), created.ID, BalanceUpdateRequest{
+		Operation: BalanceOperationIncrement,
+		Amount:    "50.00000000",
+		Currency:  "CNY",
+	})
+	if err != nil {
+		t.Fatalf("currency change at zero balance should succeed: %v", err)
+	}
+	if updated.Balance != "50.00000000" {
+		t.Fatalf("expected 50.00000000, got %s", updated.Balance)
+	}
+	if updated.Currency != "CNY" {
+		t.Fatalf("expected currency CNY, got %s", updated.Currency)
+	}
+}
+
+func TestUpdateBalanceConcurrentIncrements(t *testing.T) {
+	store := newMemoryStore()
+	svc := newTestService(t, store)
+	created, err := svc.Create(context.Background(), CreateRequest{
+		Email:    "concurrent@srapi.local",
+		Name:     "Concurrent",
+		Password: "password123",
+		Balance:  "0.00000000",
+	})
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	// Run many concurrent increments; without the per-user mutex the
+	// read-modify-write would race and the final balance would be less
+	// than expected.
+	const goroutines = 50
+	const perIncrement = "1.00000000"
+	var wg sync.WaitGroup
+	errs := make(chan error, goroutines)
+	for i := 0; i < goroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := svc.UpdateBalance(context.Background(), created.ID, BalanceUpdateRequest{
+				Operation: BalanceOperationIncrement,
+				Amount:    perIncrement,
+			})
+			if err != nil {
+				errs <- err
+			}
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Fatalf("concurrent update balance: %v", err)
+	}
+
+	user, err := svc.FindByID(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("find user: %v", err)
+	}
+	expected := "50.00000000"
+	if user.Balance != expected {
+		t.Fatalf("expected balance %s after %d concurrent increments, got %s", expected, goroutines, user.Balance)
 	}
 }
 

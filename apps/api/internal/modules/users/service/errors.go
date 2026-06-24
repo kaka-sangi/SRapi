@@ -13,4 +13,5 @@ var (
 	ErrIdentityAlreadyBound  = errors.New("user auth identity already bound")
 	ErrIdentityNotFound      = errors.New("user auth identity not found")
 	ErrIdentityUnbindBlocked = errors.New("user auth identity cannot be unbound")
+	ErrCurrencyMismatch      = errors.New("cannot mix currencies: change currency only when balance is zero")
 )

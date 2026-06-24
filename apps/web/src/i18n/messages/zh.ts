@@ -3895,6 +3895,7 @@ export const zh: Messages = {
     emptyLedger: "暂无账本记录",
     emptyLedgerBody: "充值、退款与用量扣费会显示在这里。",
     currentBalance: "当前余额",
+    balanceNote: "可能因待处理交易而与可用金额不同",
     topUp: "充值",
     amount: "金额",
     method: "支付方式",

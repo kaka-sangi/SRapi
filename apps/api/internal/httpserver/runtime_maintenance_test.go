@@ -84,7 +84,7 @@ func TestMaintenanceGateBlocksGatewayAndSurfacesSiteConfig(t *testing.T) {
 		t.Fatalf("decode gateway error: %v", err)
 	}
 	if gatewayErr.Error.Type != apiopenapi.ServiceUnavailableError ||
-		gatewayErr.Error.Message != "scheduled upgrade" ||
+		!strings.Contains(gatewayErr.Error.Message, "scheduled upgrade") ||
 		gatewayErr.Error.Code == nil ||
 		*gatewayErr.Error.Code != "maintenance" {
 		t.Fatalf("unexpected gateway error during maintenance: %+v", gatewayErr.Error)
@@ -99,7 +99,7 @@ func TestMaintenanceGateBlocksGatewayAndSurfacesSiteConfig(t *testing.T) {
 	if err := json.NewDecoder(geminiRec.Body).Decode(&geminiErr); err != nil {
 		t.Fatalf("decode gemini error: %v", err)
 	}
-	if geminiErr.Error.Status != "UNAVAILABLE" || geminiErr.Error.Message != "scheduled upgrade" {
+	if geminiErr.Error.Status != "UNAVAILABLE" || !strings.Contains(geminiErr.Error.Message, "scheduled upgrade") {
 		t.Fatalf("unexpected gemini error during maintenance: %+v", geminiErr.Error)
 	}
 

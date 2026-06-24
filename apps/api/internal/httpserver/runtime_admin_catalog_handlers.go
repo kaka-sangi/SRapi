@@ -276,6 +276,21 @@ func (s *Server) handleDeleteAdminProvider(w http.ResponseWriter, r *http.Reques
 		writeStandardError(w, http.StatusConflict, apiopenapi.RESOURCECONFLICT, "provider still has accounts; remove or archive them first", requestID)
 		return
 	}
+	// Cascade-delete model_provider_mappings that reference this provider so
+	// they don't orphan once the provider row is gone (H11).
+	if mappings, err := s.runtime.models.ListMappings(r.Context()); err == nil {
+		for _, mapping := range mappings {
+			if mapping.ProviderID == providerID {
+				if delErr := s.runtime.models.DeleteMapping(r.Context(), mapping.ModelID, mapping.ID); delErr != nil {
+					s.logger.Error("failed to cascade-delete model provider mapping", "mapping_id", mapping.ID, "model_id", mapping.ModelID, "provider_id", providerID, "error", delErr, "request_id", requestID)
+				}
+			}
+		}
+	} else {
+		s.logger.Error("failed to list model mappings for cascade delete", "provider_id", providerID, "error", err, "request_id", requestID)
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to cascade delete model mappings", requestID)
+		return
+	}
 	if err := s.runtime.providers.Delete(r.Context(), providerID); err != nil {
 		switch {
 		case errors.Is(err, providerservice.ErrInvalidInput):

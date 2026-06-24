@@ -211,6 +211,19 @@ func (s *Service) CreateUserSubscription(ctx context.Context, req contract.Creat
 	if req.StartsAt != nil {
 		startsAt = req.StartsAt.UTC()
 	}
+	// H5: Reject if the user already has an active subscription on the same plan.
+	// This prevents duplicate subscriptions from double-paid orders, webhook
+	// replays, or concurrent checkout sessions.
+	activeSubs, err := s.store.ListActiveUserSubscriptions(ctx, req.UserID, startsAt)
+	if err != nil {
+		return contract.UserSubscription{}, err
+	}
+	now := s.clock.Now()
+	for _, sub := range activeSubs {
+		if sub.PlanID == req.PlanID && sub.ExpiresAt.After(now) {
+			return contract.UserSubscription{}, ErrDuplicateSubscription
+		}
+	}
 	expiresAt := startsAt.AddDate(0, 0, plan.ValidityDays)
 	if req.ExpiresAt != nil {
 		expiresAt = req.ExpiresAt.UTC()

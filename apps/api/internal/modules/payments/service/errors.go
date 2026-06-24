@@ -13,4 +13,5 @@ var (
 	ErrProviderConfigInvalid = errors.New("payment provider config invalid")
 	ErrSignatureInvalid      = errors.New("payment webhook signature invalid")
 	ErrOrderMismatch         = errors.New("payment order mismatch")
+	ErrTooManyPendingOrders  = errors.New("too many pending payment orders")
 )

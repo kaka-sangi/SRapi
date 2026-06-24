@@ -392,11 +392,21 @@ func TestExpireActiveUserSubscriptionsMarksExpiredAndEnqueuesEvent(t *testing.T)
 	if err != nil {
 		t.Fatalf("create expired candidate subscription: %v", err)
 	}
+	plan2, err := svc.CreatePlan(t.Context(), contract.CreatePlanRequest{
+		Name:         "premium",
+		Price:        "19.99",
+		Currency:     "USD",
+		ValidityDays: 30,
+		Entitlements: map[string]any{"allowed_models": []any{"premium-model"}},
+	})
+	if err != nil {
+		t.Fatalf("create plan2: %v", err)
+	}
 	futureStart := now.Add(-time.Hour)
 	futureExpiry := now.Add(time.Hour)
 	futureSub, err := svc.CreateUserSubscription(t.Context(), contract.CreateSubscriptionRequest{
 		UserID:    1,
-		PlanID:    plan.ID,
+		PlanID:    plan2.ID,
 		StartsAt:  &futureStart,
 		ExpiresAt: &futureExpiry,
 	})
