@@ -1326,12 +1326,24 @@ func (s *Server) handleGetPaymentOrder(w http.ResponseWriter, r *http.Request) {
 		writeStandardError(w, http.StatusUnauthorized, apiopenapi.UNAUTHORIZED, "unauthorized", requestID)
 		return
 	}
-	orderID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil || orderID <= 0 {
+	idOrNo := strings.TrimSpace(r.PathValue("id"))
+	var order paymentcontract.PaymentOrder
+	if orderID, err := strconv.Atoi(idOrNo); err == nil && orderID > 0 {
+		order, err = s.runtime.payments.FindOrderByID(r.Context(), orderID)
+		if err != nil {
+			writePaymentServiceError(w, err, requestID)
+			return
+		}
+	} else if strings.HasPrefix(idOrNo, "pay_") {
+		order, err = s.runtime.payments.FindOrderByOrderNo(r.Context(), idOrNo)
+		if err != nil {
+			writePaymentServiceError(w, err, requestID)
+			return
+		}
+	} else {
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid payment order id", requestID)
 		return
 	}
-	order, err := s.runtime.payments.FindOrderByID(r.Context(), orderID)
 	if err != nil {
 		writePaymentServiceError(w, err, requestID)
 		return

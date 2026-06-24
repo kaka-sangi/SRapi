@@ -742,6 +742,14 @@ func (s *Service) FindOrderByID(ctx context.Context, id int) (contract.PaymentOr
 	return s.store.FindOrderByID(ctx, id)
 }
 
+func (s *Service) FindOrderByOrderNo(ctx context.Context, orderNo string) (contract.PaymentOrder, error) {
+	orderNo = strings.TrimSpace(orderNo)
+	if orderNo == "" {
+		return contract.PaymentOrder{}, ErrInvalidInput
+	}
+	return s.store.FindOrderByOrderNo(ctx, orderNo)
+}
+
 func (s *Service) ListAuditLogsByOrder(ctx context.Context, orderID int) ([]contract.PaymentAuditLog, error) {
 	if orderID <= 0 {
 		return nil, ErrInvalidInput

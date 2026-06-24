@@ -42,7 +42,7 @@ export default function PaymentResultPage() {
 function ResultContent() {
   const { t } = useLanguage();
   const params = useSearchParams();
-  const orderId = params.get("order_id") || params.get("id") || "";
+  const orderId = params.get("order_id") || params.get("id") || params.get("order_no") || params.get("out_trade_no") || "";
   const status = usePaymentOrderStatus(orderId || null);
 
   if (!orderId) {
