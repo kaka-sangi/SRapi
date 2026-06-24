@@ -134,12 +134,19 @@ func NewWithPasswordCost(store contract.Store, clock Clock, passwordHashCost int
 func (s *Service) Create(ctx context.Context, req CreateRequest) (contract.StoredUser, error) {
 	email := strings.ToLower(strings.TrimSpace(req.Email))
 	name := strings.TrimSpace(req.Name)
-	if email == "" || !strings.Contains(email, "@") || name == "" || len(req.Password) < 8 {
+	if email == "" || !strings.Contains(email, "@") || name == "" {
 		return contract.StoredUser{}, ErrInvalidInput
 	}
-	passwordHash, err := s.hashPassword(req.Password)
-	if err != nil {
-		return contract.StoredUser{}, err
+	if req.Password != "" && len(req.Password) < 8 {
+		return contract.StoredUser{}, ErrInvalidInput
+	}
+	var passwordHash string
+	if req.Password != "" {
+		var err error
+		passwordHash, err = s.hashPassword(req.Password)
+		if err != nil {
+			return contract.StoredUser{}, err
+		}
 	}
 	status := contract.StatusActive
 	if req.Status != nil {

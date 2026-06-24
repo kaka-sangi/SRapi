@@ -344,6 +344,7 @@ export const zh: Messages = {
     bindFailed: "邮箱或密码不正确。",
     createTitle: "完成账号创建",
     createHint: "确认信息以创建控制台账号。",
+    passwordOptionalHint: "可选——留空则仅通过第三方登录。",
     displayName: "显示名称",
     emailLabel: "邮箱",
     createAccount: "创建账号",

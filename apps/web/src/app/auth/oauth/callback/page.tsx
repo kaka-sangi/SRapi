@@ -176,7 +176,7 @@ export default function OAuthCallbackPage() {
 
   const bindReady = emailLooksValid && password.length > 0;
   const codeReady = code.length === 6;
-  const createReady = password.length >= 8;
+  const createReady = password.length === 0 || password.length >= 8;
   const tokenReady = token.trim().length > 0;
 
   return (
@@ -327,8 +327,8 @@ export default function OAuthCallbackPage() {
                     autoComplete="new-password"
                     value={password}
                     onChange={setPassword}
-                    hint={password.length === 0 ? t("authRegister.passwordHint") : undefined}
-                    error={password.length > 0 && !createReady ? t("authRegister.passwordHint") : undefined}
+                    hint={t("oauthCallback.passwordOptionalHint")}
+                    error={password.length > 0 && password.length < 8 ? t("authRegister.passwordHint") : undefined}
                     className="[&_input]:pr-12"
                   />
                   <button

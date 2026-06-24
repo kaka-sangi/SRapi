@@ -346,6 +346,7 @@ export const en = {
     bindFailed: "Email or password is incorrect.",
     createTitle: "Finish creating your account",
     createHint: "Confirm your details to create a console account.",
+    passwordOptionalHint: "Optional — leave blank to sign in with this provider only.",
     displayName: "Display name",
     emailLabel: "Email",
     createAccount: "Create account",
