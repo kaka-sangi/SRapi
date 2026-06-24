@@ -742,6 +742,8 @@ func writePaymentServiceError(w http.ResponseWriter, err error, requestID string
 	switch {
 	case errors.Is(err, paymentservice.ErrInvalidInput), errors.Is(err, paymentservice.ErrInvalidTransition), errors.Is(err, paymentservice.ErrOrderMismatch):
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid payment request", requestID)
+	case errors.Is(err, paymentservice.ErrProviderConfigInvalid):
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, err.Error(), requestID)
 	case errors.Is(err, paymentservice.ErrSignatureInvalid):
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid payment webhook signature", requestID)
 	case errors.Is(err, paymentservice.ErrProviderUnavailable):

@@ -991,7 +991,7 @@ func (s *Service) attachProviderCheckout(ctx context.Context, order contract.Pay
 	}
 	config, err := s.decryptConfig(instance, instance.ConfigCiphertext)
 	if err != nil {
-		return contract.PaymentOrder{}, err
+		return contract.PaymentOrder{}, fmt.Errorf("%w: failed to decrypt config for %s provider %q", ErrProviderConfigInvalid, instance.Provider, instance.Name)
 	}
 	session, err := provider.CreateSession(checkoutprovider.Request{
 		Provider:      instance.Provider,
@@ -1013,6 +1013,9 @@ func (s *Service) attachProviderCheckout(ctx context.Context, order contract.Pay
 	if err != nil {
 		if errors.Is(err, checkoutprovider.ErrUnavailable) {
 			return contract.PaymentOrder{}, ErrProviderUnavailable
+		}
+		if errors.Is(err, checkoutprovider.ErrInvalidConfig) {
+			return contract.PaymentOrder{}, fmt.Errorf("%w: %s provider %q: %v", ErrProviderConfigInvalid, instance.Provider, instance.Name, err)
 		}
 		return contract.PaymentOrder{}, ErrInvalidInput
 	}
