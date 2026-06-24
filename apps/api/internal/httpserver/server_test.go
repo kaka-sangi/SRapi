@@ -9799,8 +9799,8 @@ func TestGatewayOverloadedFeedbackAppliesAccountCooldown(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected RFC3339 cooldown_until, got %+v", (*cooldownAccount.Metadata)["cooldown_until"])
 	}
-	if cooldownUntil.Before(time.Now().UTC().Add(9 * time.Minute)) {
-		t.Fatalf("expected overloaded cooldown near 10 minutes, got %v", cooldownUntil)
+	if cooldownUntil.Before(time.Now().UTC().Add(20 * time.Second)) {
+		t.Fatalf("expected overloaded cooldown near 30 seconds (settings default), got %v", cooldownUntil)
 	}
 
 	secondReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"overload-model","messages":[{"role":"user","content":"second"}]}`))

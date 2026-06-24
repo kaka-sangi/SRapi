@@ -125,7 +125,7 @@ function RedeemContent() {
       toast({ title: t("feedback.batchAllSucceeded", { count: ids.length }), tone: "success" });
       list.clearSelection();
     } catch (err) {
-      toast({ title: t("feedback.failed"), tone: "error" });
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
       throw err;
     }
   }
@@ -161,7 +161,7 @@ function RedeemContent() {
       });
       list.clearSelection();
     } catch (err) {
-      toast({ title: t("feedback.failed"), tone: "error" });
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
       throw err;
     }
   }
@@ -353,7 +353,7 @@ function RedeemContent() {
   return (
     <>
       <SectionHero
-        eyebrow="Commerce · Redeem Codes"
+        eyebrow={t("hero.eyebrowCommerceRedeem")}
         title={t("adminPromos.redeemTitle")}
         description={t("adminPromos.redeemSubtitle")}
         metrics={
@@ -532,7 +532,6 @@ function RedeemContent() {
           title={t("adminPromos.disable")}
           body={t("feedback.confirmDeleteBody")}
           confirmLabel={t("adminPromos.disable")}
-          confirmPhrase={disableTarget.code}
           onConfirm={() => disableMut.mutateAsync({ ids: [disableTarget.id] })}
           successMessage={t("feedback.updated")}
           isPending={disableMut.isPending}

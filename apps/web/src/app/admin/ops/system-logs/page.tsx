@@ -138,17 +138,17 @@ function Content() {
   return (
     <>
       <SectionHero
-        eyebrow="Ops · System Logs"
+        eyebrow={t("hero.eyebrowOpsSystemLogs")}
         title={t("adminOpsSystemLogs.title")}
         description={t("adminOpsSystemLogs.subtitle")}
         metrics={[
           {
-            label: "error",
+            label: t("adminOpsSystemLogs.levelError"),
             value: formatInteger(health.data?.level_counts?.error ?? 0),
             tone: (health.data?.level_counts?.error ?? 0) > 0 ? "error" : "default",
           },
           {
-            label: "warn",
+            label: t("adminOpsSystemLogs.levelWarn"),
             value: formatInteger(health.data?.level_counts?.warn ?? 0),
             tone: (health.data?.level_counts?.warn ?? 0) > 0 ? "warning" : "default",
           },

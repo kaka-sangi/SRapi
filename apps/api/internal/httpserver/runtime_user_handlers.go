@@ -1436,15 +1436,28 @@ func (s *Server) handlePaymentWebhook(w http.ResponseWriter, r *http.Request) {
 		}
 		body["raw_body"] = string(raw)
 
-	case provider == "linuxdo" || provider == "easypay":
-		if err := r.ParseForm(); err != nil {
-			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid payment webhook request", requestID)
-			return
-		}
-		body = make(apiopenapi.PaymentWebhookRequest)
-		for key, values := range r.PostForm {
-			if len(values) > 0 {
-				body[key] = values[0]
+	case provider == "linuxdo" || provider == "easypay" || provider == "alipay":
+		ct := r.Header.Get("Content-Type")
+		if strings.HasPrefix(ct, "application/json") {
+			raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, s.cfg.Gateway.MaxBodySize))
+			if err != nil {
+				writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid payment webhook request", requestID)
+				return
+			}
+			if err := json.Unmarshal(raw, &body); err != nil {
+				writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid payment webhook request", requestID)
+				return
+			}
+		} else {
+			if err := r.ParseForm(); err != nil {
+				writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid payment webhook request", requestID)
+				return
+			}
+			body = make(apiopenapi.PaymentWebhookRequest)
+			for key, values := range r.PostForm {
+				if len(values) > 0 {
+					body[key] = values[0]
+				}
 			}
 		}
 

@@ -236,7 +236,7 @@ function RiskContent() {
   return (
     <>
       <SectionHero
-        eyebrow="Ops · Risk Control"
+        eyebrow={t("hero.eyebrowOpsRiskControl")}
         title={t("adminRisk.title")}
         description={t("adminRisk.subtitle")}
         metrics={

@@ -237,17 +237,17 @@ function OpsOverviewContent() {
   return (
     <>
       <SectionHero
-        eyebrow="Ops · Overview"
+        eyebrow={t("hero.eyebrowOpsOverview")}
         title={t("adminOps.title")}
         description={t("adminOps.subtitle")}
         metrics={[
           {
-            label: "在线 channel",
+            label: t("adminOps.activeChannels"),
             value: formatInteger(
               (notificationChannels.data?.data ?? []).filter((c) => c.status === "active").length,
             ),
           },
-          { label: "活跃告警", value: formatInteger(activeAlerts.length), tone: activeAlerts.length > 0 ? "warning" : "default" },
+          { label: t("adminOps.activeAlerts"), value: formatInteger(activeAlerts.length), tone: activeAlerts.length > 0 ? "warning" : "default" },
         ]}
         actions={
           <div className="flex items-center gap-2">

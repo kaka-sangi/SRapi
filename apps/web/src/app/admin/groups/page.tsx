@@ -217,7 +217,7 @@ function GroupsContent() {
   return (
     <>
       <SectionHero
-        eyebrow="Gateway · Groups"
+        eyebrow={t("hero.eyebrowGatewayGroups")}
         title={t("adminGroups.title")}
         description={t("adminGroups.subtitle")}
         metrics={

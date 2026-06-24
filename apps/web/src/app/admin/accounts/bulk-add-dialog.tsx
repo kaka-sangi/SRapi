@@ -569,7 +569,7 @@ export function BulkAddAccountsDialog({
 
         <DialogFooter className="mt-4">
           <Button variant="outline" onClick={() => handleOpenChange(false)}>
-            {result ? "Close" : "Cancel"}
+            {result ? t("common.close") : t("common.cancel")}
           </Button>
           {!result ? (
             <Button

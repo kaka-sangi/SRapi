@@ -64,9 +64,9 @@ function SettingsContent() {
   return (
     <>
       <SectionHero
-        eyebrow="System · Settings"
+        eyebrow={t("hero.eyebrowSystemSettings")}
         title={t("adminSettings.title")}
-        description="站点 / 安全 / 限速 / 集成"
+        description={t("adminSettings.subtitle")}
       />
       <PageQueryState query={settings} skeleton={<FormSkeleton rows={6} className="p-5" />}>
         {(data) => <SettingsEditor initial={data} />}

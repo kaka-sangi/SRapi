@@ -97,13 +97,25 @@ function downloadMarkdown(messages: CopilotMessage[]) {
   URL.revokeObjectURL(url);
 }
 
+/** Known copilot error i18n keys set by CopilotSessionContext. */
+const COPILOT_ERROR_KEYS = new Set([
+  "copilot.connectionLost",
+  "copilot.streamError",
+  "copilot.loadConversationFailed",
+]);
+
+/** Resolve a copilot error string — if it matches a known i18n key, translate it; otherwise pass through as-is (e.g. server error messages). */
+function resolveCopilotError(error: string, t: (key: string) => string): string {
+  return COPILOT_ERROR_KEYS.has(error) ? t(error) : error;
+}
+
 export function CopilotChat({ models, defaultModel }: { models: string[]; defaultModel: string }) {
   const session = useCopilotSession();
   const {
     messages,
     running,
     pending,
-    error,
+    error: rawError,
     usage,
     model,
     effort,
@@ -117,6 +129,7 @@ export function CopilotChat({ models, defaultModel }: { models: string[]; defaul
     regenerate,
   } = session;
   const { t } = useLanguage();
+  const error = rawError ? resolveCopilotError(rawError, t) : rawError;
   const [input, setInput] = useState("");
   const [images, setImages] = useState<CopilotImage[]>([]);
   const [files, setFiles] = useState<CopilotFilePart[]>([]);

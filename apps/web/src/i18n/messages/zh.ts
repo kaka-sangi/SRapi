@@ -150,6 +150,7 @@ export const zh: Messages = {
     confirmDeleteBody: "此操作不可撤销。",
     typeToConfirm: "输入 {phrase} 以确认。",
     sessionExpired: "会话已过期，请重新登录。",
+    invalidJson: "JSON 格式无效",
   },
   status: {
     active: "启用",
@@ -258,6 +259,28 @@ export const zh: Messages = {
     adminGatewayPolicies: "网关策略",
     adminIdentity: "身份与权限",
     signOut: "退出登录",
+  },
+  hero: {
+    eyebrowOpsAnnouncements: "运营 · 公告",
+    eyebrowCommerceRedeem: "商业化 · 兑换码",
+    eyebrowSystemSettings: "系统 · 设置",
+    eyebrowCommercePromo: "商业化 · 优惠码",
+    eyebrowGatewayAccounts: "网关 · 账号",
+    eyebrowOpsAlerts: "运营 · 告警",
+    eyebrowOpsEvents: "运营 · 事件",
+    eyebrowCommerceOrders: "商业化 · 订单",
+    eyebrowGatewayModels: "网关 · 模型",
+    eyebrowGatewayPricing: "网关 · 定价",
+    eyebrowGatewayResources: "网关 · 资源",
+    eyebrowGatewayApiKeys: "网关 · API 密钥",
+    eyebrowGatewayQuickSetup: "网关 · 快速配置",
+    eyebrowGatewayProxies: "网关 · 代理",
+    eyebrowGatewayProviders: "网关 · 服务商",
+    eyebrowOpsOverview: "运营 · 概览",
+    eyebrowGatewayGroups: "网关 · 分组",
+    eyebrowOpsRiskControl: "运营 · 风控",
+    eyebrowOpsSystemLogs: "运营 · 系统日志",
+    eyebrowOpsDiagnostics: "运营 · 诊断",
   },
   announcements: {
     title: "公告",
@@ -409,6 +432,8 @@ export const zh: Messages = {
   },
   diagnostics: {
     title: "运行时诊断",
+    subtitle: "实时熔断器与缓存命中诊断，定位故障源头。",
+    lastRun: "最近运行",
     circuitBreakers: "熔断器",
     cacheStats: "缓存统计",
     noBreakers: "尚未激活任何熔断器。",
@@ -430,6 +455,7 @@ export const zh: Messages = {
   },
   dashboard: {
     title: "网关总览",
+    subtitle: "Gateway 全局态势 · 流量、Token、收入、上游健康一屏可览",
     eyebrow: "工作区 / 工作台",
     adminEyebrow: "管理后台 / 工作台",
     providers: "服务商",
@@ -1072,6 +1098,7 @@ export const zh: Messages = {
     },
     setPriority: "设置优先级",
     setPriorityPrompt: "输入优先级（数字越小优先级越高，0 = 默认）：",
+    priorityInvalid: "优先级必须为有效数字",
     baseUrl: "Base URL",
     baseUrlPlaceholder: "https://api.openai.com/v1",
     baseUrlHint: "自定义上游 API 地址。留空则使用服务商默认地址。",
@@ -1812,6 +1839,7 @@ export const zh: Messages = {
   adminPromos: {
     promoTitle: "促销码",
     promoSubtitle: "结算时使用的折扣码。",
+    activeCount: "在用",
     searchPlaceholder: "按码搜索…",
     redeemTitle: "兑换码",
     redeemSubtitle: "一次性充值余额的兑换码。",
@@ -2093,6 +2121,8 @@ export const zh: Messages = {
   adminOutbox: {
     title: "事件出站箱",
     subtitle: "排队投递的领域事件——待投递 / 已发布 / 失败，含重试与错误详情。",
+    failedCount: "失败",
+    pendingCount: "待发布",
     time: "入队时间",
     event: "事件",
     producer: "生产者",
@@ -2113,6 +2143,9 @@ export const zh: Messages = {
   adminOpsAlertEvents: {
     title: "告警事件",
     subtitle: "用于事故复盘的历史运维告警，并关联请求、调度和账号证据。",
+    unacknowledged: "未确认",
+    firingCount: "触发中",
+    criticalCount: "Critical",
     time: "开始时间",
     alert: "告警",
     updated: "更新时间",
@@ -2181,6 +2214,8 @@ export const zh: Messages = {
   adminOpsSystemLogs: {
     title: "系统日志",
     subtitle: "由 operations 拥有的网关与运行时事件证据；清理前先确认存储健康。",
+    levelError: "错误",
+    levelWarn: "警告",
     time: "时间",
     level: "级别",
     source: "来源",
@@ -2627,6 +2662,7 @@ export const zh: Messages = {
   adminAnnouncements: {
     title: "公告",
     subtitle: "向用户广播的消息。",
+    publishedCount: "已发布",
     headline: "标题",
     state: "状态",
     published: "发布时间",
@@ -2654,6 +2690,8 @@ export const zh: Messages = {
   adminOps: {
     title: "运维",
     subtitle: "吞吐、错误、延迟与 SLO。",
+    activeChannels: "在线渠道",
+    activeAlerts: "活跃告警",
     tabs: {
       overview: "总览",
       channelMonitor: "渠道监控",
@@ -3075,7 +3113,7 @@ export const zh: Messages = {
   },
   adminSettings: {
     title: "设置",
-    subtitle: "系统配置。",
+    subtitle: "站点 / 安全 / 限速 / 集成",
     comingSoon: "设置编辑器正在重建中。",
     saveSection: "保存更改",
     export: "导出",
@@ -3421,6 +3459,9 @@ export const zh: Messages = {
   copilot: {
     title: "AI 副驾驶",
     subtitle: "与可代你执行管理操作的 AI 操作员对话。",
+    connectionLost: "连接断开 — 回复可能不完整",
+    streamError: "流式传输错误",
+    loadConversationFailed: "加载对话失败",
     greeting: "我能帮你做什么？",
     newChat: "新对话",
     thinking: "思考中…",

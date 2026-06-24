@@ -250,7 +250,7 @@ func (s *Server) handleCompleteOAuthAuthorization(w http.ResponseWriter, r *http
 	if err != nil {
 		s.clearOAuthFlowCookie(w)
 		s.logger.Warn("oauth token exchange failed", "provider", provider, "provider_key", flow.ProviderKey, "secret_present", clientSecret != "", "method", config.TokenAuthMethod, "error", err)
-		writeStandardError(w, http.StatusBadGateway, apiopenapi.PROVIDERAUTHFAILED, err.Error(), requestID)
+		writeStandardError(w, http.StatusBadGateway, apiopenapi.PROVIDERAUTHFAILED, "oauth token exchange failed", requestID)
 		return
 	}
 	if issuer := s.runtime.oauthIssuer(flow.ProviderKey); issuer != "" {

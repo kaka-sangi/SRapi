@@ -147,6 +147,12 @@ func (s *Server) handleDeleteCurrentUser(w http.ResponseWriter, r *http.Request)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to delete user attributes", requestID)
 		return
 	}
+	// Revoke all API keys before soft-deleting the user so that keys
+	// belonging to the deleted user can no longer authenticate requests.
+	if err := s.runtime.apiKeys.RevokeByUser(r.Context(), session.User.ID); err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to revoke user api keys", requestID)
+		return
+	}
 	if err := s.runtime.users.Delete(r.Context(), session.User.ID); err != nil {
 		if err == usersservice.ErrUserNotFound {
 			writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "user not found", requestID)

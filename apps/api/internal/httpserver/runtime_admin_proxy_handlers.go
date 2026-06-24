@@ -297,6 +297,24 @@ func (s *Server) handleDeleteAdminProxy(w http.ResponseWriter, r *http.Request) 
 		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "proxy not found", requestID)
 		return
 	}
+	// Guard: refuse to delete a proxy that is still referenced by live accounts.
+	// The operator must reassign or archive those accounts first.
+	accounts, err := s.runtime.accounts.List(r.Context())
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to check proxy accounts", requestID)
+		return
+	}
+	proxyIDStr := strconv.Itoa(id)
+	inUse := 0
+	for _, account := range accounts {
+		if account.ProxyID != nil && *account.ProxyID == proxyIDStr && account.Status != accountcontract.StatusArchived {
+			inUse++
+		}
+	}
+	if inUse > 0 {
+		writeStandardError(w, http.StatusConflict, apiopenapi.RESOURCECONFLICT, "proxy still referenced by accounts", requestID)
+		return
+	}
 	if err := s.runtime.accounts.DeleteProxy(r.Context(), id); err != nil {
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to delete proxy", requestID)
 		return

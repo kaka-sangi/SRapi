@@ -117,8 +117,8 @@ function ProvidersContent() {
           result.message ?? (result.latency_ms != null ? `${result.latency_ms} ms` : undefined),
         tone: result.ok ? "success" : "error",
       });
-    } catch {
-      toast({ title: t("feedback.failed"), tone: "error" });
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
     }
   }
 
@@ -332,7 +332,7 @@ function ProvidersContent() {
   return (
     <>
       <SectionHero
-        eyebrow="Gateway · Providers"
+        eyebrow={t("hero.eyebrowGatewayProviders")}
         title={t("adminProviders.title")}
         description={t("adminProviders.subtitle")}
         metrics={

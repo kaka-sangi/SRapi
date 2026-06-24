@@ -147,9 +147,9 @@ function GatewayResourcesContent() {
   return (
     <>
       <SectionHero
-        eyebrow="Gateway · Resources"
+        eyebrow={t("hero.eyebrowGatewayResources")}
         title={t("adminGatewayResources.title")}
-        description="一屏总览 gateway 资源拓扑：provider、模型、账号、代理、密钥的健康度。"
+        description={t("adminGatewayResources.subtitle")}
         metrics={
           summary
             ? [

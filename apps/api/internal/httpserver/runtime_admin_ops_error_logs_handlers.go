@@ -479,7 +479,7 @@ func (s *Server) handleUpdateAdminOpsErrorLogResolution(w http.ResponseWriter, r
 			writeJSONString(w, http.StatusNotFound, `{"error":{"code":"NOT_FOUND","message":"ops error log not found"},"request_id":"`+requestID+`"}`)
 			return
 		}
-		writeJSONString(w, http.StatusBadRequest, `{"error":{"code":"INVALID_INPUT","message":"`+err.Error()+`"},"request_id":"`+requestID+`"}`)
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, err.Error(), requestID)
 		return
 	}
 	encoded, err := json.Marshal(map[string]any{

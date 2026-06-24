@@ -201,13 +201,13 @@ function AnnouncementsContent() {
   return (
     <>
       <SectionHero
-        eyebrow="Ops · Announcements"
+        eyebrow={t("hero.eyebrowOpsAnnouncements")}
         title={t("adminAnnouncements.title")}
         description={t("adminAnnouncements.subtitle")}
         metrics={(() => {
           const rows = items.data?.data ?? [];
           const published = rows.filter((a) => a.status === "published").length;
-          return [{ label: "已发布", value: String(published) }];
+          return [{ label: t("adminAnnouncements.publishedCount"), value: String(published) }];
         })()}
         actions={
           <div className="flex items-center gap-3">

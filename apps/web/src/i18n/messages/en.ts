@@ -149,6 +149,7 @@ export const en = {
     confirmDeleteBody: "This cannot be undone.",
     typeToConfirm: "Type {phrase} to confirm.",
     sessionExpired: "Session expired — sign in again.",
+    invalidJson: "Invalid JSON",
   },
   status: {
     active: "Active",
@@ -257,6 +258,28 @@ export const en = {
     adminGatewayPolicies: "Gateway policies",
     adminIdentity: "Identity",
     signOut: "Sign out",
+  },
+  hero: {
+    eyebrowOpsAnnouncements: "Ops · Announcements",
+    eyebrowCommerceRedeem: "Commerce · Redeem Codes",
+    eyebrowSystemSettings: "System · Settings",
+    eyebrowCommercePromo: "Commerce · Promo Codes",
+    eyebrowGatewayAccounts: "Gateway · Accounts",
+    eyebrowOpsAlerts: "Ops · Alerts",
+    eyebrowOpsEvents: "Ops · Events",
+    eyebrowCommerceOrders: "Commerce · Orders",
+    eyebrowGatewayModels: "Gateway · Models",
+    eyebrowGatewayPricing: "Gateway · Pricing",
+    eyebrowGatewayResources: "Gateway · Resources",
+    eyebrowGatewayApiKeys: "Gateway · API Keys",
+    eyebrowGatewayQuickSetup: "Gateway · Quick Setup",
+    eyebrowGatewayProxies: "Gateway · Proxies",
+    eyebrowGatewayProviders: "Gateway · Providers",
+    eyebrowOpsOverview: "Ops · Overview",
+    eyebrowGatewayGroups: "Gateway · Groups",
+    eyebrowOpsRiskControl: "Ops · Risk Control",
+    eyebrowOpsSystemLogs: "Ops · System Logs",
+    eyebrowOpsDiagnostics: "Ops · Diagnostics",
   },
   announcements: {
     title: "Announcements",
@@ -416,6 +439,8 @@ export const en = {
   },
   diagnostics: {
     title: "Runtime diagnostics",
+    subtitle: "Real-time circuit breaker and cache hit diagnostics for root cause analysis.",
+    lastRun: "Last run",
     circuitBreakers: "Circuit breakers",
     cacheStats: "Cache statistics",
     noBreakers: "No circuit breakers have been activated yet.",
@@ -437,6 +462,7 @@ export const en = {
   },
   dashboard: {
     title: "Gateway overview",
+    subtitle: "Gateway global status: traffic, tokens, revenue, upstream health at a glance",
     eyebrow: "Workspace / Dashboard",
     adminEyebrow: "Admin / Dashboard",
     providers: "Providers",
@@ -1093,6 +1119,7 @@ export const en = {
     },
     setPriority: "Set priority",
     setPriorityPrompt: "Enter priority (lower = higher priority, 0 = default):",
+    priorityInvalid: "Priority must be a valid number",
     baseUrl: "Base URL",
     baseUrlPlaceholder: "https://api.openai.com/v1",
     baseUrlHint: "Custom upstream API endpoint. Leave empty to use the provider default.",
@@ -1862,6 +1889,7 @@ export const en = {
   adminPromos: {
     promoTitle: "Promo codes",
     promoSubtitle: "Discount codes for checkout.",
+    activeCount: "In use",
     searchPlaceholder: "Search by code…",
     redeemTitle: "Redeem codes",
     redeemSubtitle: "One-time codes that credit a balance.",
@@ -2150,6 +2178,8 @@ export const en = {
     title: "Event outbox",
     subtitle:
       "Domain events queued for delivery — pending, published, or failed, with retry and error detail.",
+    failedCount: "Failed",
+    pendingCount: "Pending",
     time: "Queued",
     event: "Event",
     producer: "Producer",
@@ -2171,6 +2201,9 @@ export const en = {
     title: "Alert events",
     subtitle:
       "Historical ops alerts for incident review, with links back to request and account evidence.",
+    unacknowledged: "Unacknowledged",
+    firingCount: "Firing",
+    criticalCount: "Critical",
     time: "Started",
     alert: "Alert",
     updated: "Updated",
@@ -2240,6 +2273,8 @@ export const en = {
     title: "System logs",
     subtitle:
       "Operations-owned evidence for gateway and runtime events. Inspect storage health before cleanup.",
+    levelError: "Error",
+    levelWarn: "Warn",
     time: "Time",
     level: "Level",
     source: "Source",
@@ -2692,6 +2727,7 @@ export const en = {
   adminAnnouncements: {
     title: "Announcements",
     subtitle: "Broadcast messages shown to users.",
+    publishedCount: "Published",
     headline: "Title",
     state: "State",
     published: "Published",
@@ -2720,6 +2756,8 @@ export const en = {
   adminOps: {
     title: "Operations",
     subtitle: "Throughput, errors, latency and SLOs.",
+    activeChannels: "Active channels",
+    activeAlerts: "Active alerts",
     tabs: {
       overview: "Overview",
       channelMonitor: "Channel monitor",
@@ -3146,7 +3184,7 @@ export const en = {
   },
   adminSettings: {
     title: "Settings",
-    subtitle: "System configuration.",
+    subtitle: "Site / Security / Rate limits / Integrations",
     comingSoon: "Settings editor is being rebuilt.",
     saveSection: "Save changes",
     export: "Export",
@@ -3489,6 +3527,9 @@ export const en = {
   copilot: {
     title: "AI Copilot",
     subtitle: "Chat with an AI operator that can run admin actions on your behalf.",
+    connectionLost: "Connection lost — the response may be incomplete",
+    streamError: "Stream error",
+    loadConversationFailed: "Failed to load conversation",
     greeting: "How can I help?",
     newChat: "New chat",
     thinking: "Thinking…",

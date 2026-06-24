@@ -179,7 +179,7 @@ function AlertEventsContent() {
   return (
     <>
       <SectionHero
-        eyebrow="Ops · Alerts"
+        eyebrow={t("hero.eyebrowOpsAlerts")}
         title={t("adminOpsAlertEvents.title")}
         description={t("adminOpsAlertEvents.subtitle")}
         metrics={(() => {
@@ -193,17 +193,17 @@ function AlertEventsContent() {
           ).length;
           return [
             {
-              label: "未确认",
+              label: t("adminOpsAlertEvents.unacknowledged"),
               value: formatInteger(unack),
               tone: unack > 0 ? "warning" : "default",
             },
             {
-              label: "触发中",
+              label: t("adminOpsAlertEvents.firingCount"),
               value: formatInteger(firing),
               tone: firing > 0 ? "error" : "default",
             },
             {
-              label: "Critical",
+              label: t("adminOpsAlertEvents.criticalCount"),
               value: formatInteger(critical),
               tone: critical > 0 ? "error" : "default",
             },

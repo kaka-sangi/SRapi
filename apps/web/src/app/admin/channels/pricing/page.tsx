@@ -363,7 +363,7 @@ function PricingContent() {
   return (
     <>
       <SectionHero
-        eyebrow="Gateway · Pricing"
+        eyebrow={t("hero.eyebrowGatewayPricing")}
         title={t("adminPricing.title")}
         description={t("adminPricing.subtitle")}
         metrics={

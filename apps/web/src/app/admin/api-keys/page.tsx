@@ -181,7 +181,7 @@ function ApiKeysContent() {
   return (
     <>
       <SectionHero
-        eyebrow="Gateway · API Keys"
+        eyebrow={t("hero.eyebrowGatewayApiKeys")}
         title={t("adminApiKeys.title")}
         description={t("adminApiKeys.subtitle")}
         metrics={

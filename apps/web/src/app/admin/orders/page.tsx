@@ -234,7 +234,7 @@ function OrdersContent() {
   return (
     <>
       <SectionHero
-        eyebrow="Commerce · Orders"
+        eyebrow={t("hero.eyebrowCommerceOrders")}
         title={t("adminOrders.title")}
         description={t("adminOrders.subtitle")}
         actions={

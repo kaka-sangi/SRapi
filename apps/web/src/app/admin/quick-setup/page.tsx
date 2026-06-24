@@ -225,7 +225,7 @@ function QuickSetupContent() {
   return (
     <>
       <SectionHero
-        eyebrow="Gateway · Quick Setup"
+        eyebrow={t("hero.eyebrowGatewayQuickSetup")}
         title={t("adminQuickSetup.title")}
         description={t("adminQuickSetup.subtitle")}
       />

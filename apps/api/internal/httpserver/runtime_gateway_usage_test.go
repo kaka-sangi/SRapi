@@ -17,6 +17,7 @@ import (
 	"github.com/srapi/srapi/apps/api/internal/config"
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	accountservice "github.com/srapi/srapi/apps/api/internal/modules/accounts/service"
+	admincontrol "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
 	accountmemory "github.com/srapi/srapi/apps/api/internal/modules/accounts/store/memory"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	apikeyservice "github.com/srapi/srapi/apps/api/internal/modules/api_keys/service"
@@ -809,7 +810,7 @@ func TestGatewayConfiguredErrorCooldownRulesMatchCanonicalAndLegacyMetadata(t *t
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			decision, ok := gatewayCooldownDecisionForFailure(tt.metadata, tt.errorClass, ptrInt(tt.statusCode), tt.providerMessage, nil)
+			decision, ok := gatewayCooldownDecisionForFailure(tt.metadata, tt.errorClass, ptrInt(tt.statusCode), tt.providerMessage, nil, admincontrol.AdminSettingsGateway{})
 			if !ok {
 				t.Fatalf("expected configured cooldown decision")
 			}
@@ -1959,7 +1960,7 @@ func TestGatewayErrorClassUsesCooldownNetworkError(t *testing.T) {
 
 	// network_error must derive the SHORT transport cooldown, not the long
 	// auth/overload window.
-	if got := gatewayCooldownWindow("network_error"); got != networkErrorCooldownWindow {
+	if got := gatewayCooldownWindow("network_error", admincontrol.AdminSettingsGateway{}); got != networkErrorCooldownWindow {
 		t.Fatalf("expected network_error cooldown window %s, got %s", networkErrorCooldownWindow, got)
 	}
 	if networkErrorCooldownWindow >= authFailureCooldownWindow || networkErrorCooldownWindow >= overloadCooldownWindow {
@@ -1972,7 +1973,7 @@ func TestGatewayErrorClassUsesCooldownNetworkError(t *testing.T) {
 
 	// End-to-end: a network_error failure with no configured rule yields a
 	// cooldown decision carrying the short window.
-	decision, ok := gatewayCooldownDecisionForFailure(nil, "network_error", nil, "dial tcp: lookup proxy.example: no such host", nil)
+	decision, ok := gatewayCooldownDecisionForFailure(nil, "network_error", nil, "dial tcp: lookup proxy.example: no such host", nil, admincontrol.AdminSettingsGateway{})
 	if !ok {
 		t.Fatalf("expected network_error to produce a cooldown decision")
 	}
@@ -1984,7 +1985,7 @@ func TestGatewayErrorClassUsesCooldownNetworkError(t *testing.T) {
 	}
 
 	// An unrelated class still yields no cooldown decision.
-	if _, ok := gatewayCooldownDecisionForFailure(nil, "invalid_request", nil, "", nil); ok {
+	if _, ok := gatewayCooldownDecisionForFailure(nil, "invalid_request", nil, "", nil, admincontrol.AdminSettingsGateway{}); ok {
 		t.Fatalf("expected invalid_request to produce no cooldown decision")
 	}
 }

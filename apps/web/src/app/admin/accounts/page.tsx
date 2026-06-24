@@ -1415,7 +1415,7 @@ function AccountsContent() {
           if (Number.isNaN(val)) {
             toast({
               title: t("feedback.failed"),
-              description: "Priority must be a valid number",
+              description: t("adminAccounts.priorityInvalid"),
               tone: "error",
             });
             return;
@@ -1498,7 +1498,7 @@ function AccountsContent() {
   return (
     <>
       <SectionHero
-        eyebrow="Gateway · Accounts"
+        eyebrow={t("hero.eyebrowGatewayAccounts")}
         title={t("adminAccounts.title")}
         description={
           readOnlyHealthView ? t("adminAccounts.healthViewSubtitle") : t("adminAccounts.subtitle")

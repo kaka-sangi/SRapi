@@ -9,6 +9,7 @@ import (
 	"time"
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
+	admincontrol "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
@@ -680,7 +681,15 @@ func (rt *runtimeState) applyProviderAccountCooldown(ctx context.Context, rec ga
 	if !gatewayAccountFailureStatusHandled(account.Metadata, rec.StatusCode) {
 		return
 	}
-	decision, ok := gatewayCooldownDecisionForFailure(account.Metadata, *rec.ErrorClass, rec.StatusCode, rec.ProviderErrorMessage, rec.ProviderRetryAfter)
+	// Load admin settings so cooldown windows honour the operator's configuration
+	// instead of using only the compiled-in defaults.
+	var gatewayCfg admincontrol.AdminSettingsGateway
+	if rt.adminControl != nil {
+		if settings, err := rt.adminControl.GetAdminSettings(ctx); err == nil {
+			gatewayCfg = settings.Gateway
+		}
+	}
+	decision, ok := gatewayCooldownDecisionForFailure(account.Metadata, *rec.ErrorClass, rec.StatusCode, rec.ProviderErrorMessage, rec.ProviderRetryAfter, gatewayCfg)
 	if !ok {
 		return
 	}
@@ -728,7 +737,7 @@ func (rt *runtimeState) applyProviderAccountCooldown(ctx context.Context, rec ga
 	})
 }
 
-func gatewayCooldownDecisionForFailure(metadata map[string]any, errorClass string, statusCode *int, providerMessage string, retryAfter *time.Time) (gatewayCooldownDecision, bool) {
+func gatewayCooldownDecisionForFailure(metadata map[string]any, errorClass string, statusCode *int, providerMessage string, retryAfter *time.Time, gatewayCfg admincontrol.AdminSettingsGateway) (gatewayCooldownDecision, bool) {
 	if rule, ok := gatewayConfiguredErrorCooldownRule(metadata, errorClass, statusCode, providerMessage); ok {
 		return gatewayCooldownDecision{
 			Reason:         rule.Reason,
@@ -751,7 +760,7 @@ func gatewayCooldownDecisionForFailure(metadata map[string]any, errorClass strin
 	return gatewayCooldownDecision{
 		Reason:         errorClass,
 		LastErrorClass: errorClass,
-		Window:         gatewayCooldownWindow(errorClass),
+		Window:         gatewayCooldownWindow(errorClass, gatewayCfg),
 		RetryAfter:     retryAfter,
 	}, true
 }
@@ -840,9 +849,12 @@ func gatewayStatusCode(value any) (int, bool) {
 	return status, true
 }
 
-func gatewayCooldownWindow(errorClass string) time.Duration {
+func gatewayCooldownWindow(errorClass string, gatewayCfg admincontrol.AdminSettingsGateway) time.Duration {
 	switch errorClass {
 	case "overloaded":
+		if gatewayCfg.OverloadCooldownSeconds > 0 {
+			return time.Duration(gatewayCfg.OverloadCooldownSeconds) * time.Second
+		}
 		return overloadCooldownWindow
 	case "auth_failed", "forbidden", "validation_required", "policy_violation":
 		return authFailureCooldownWindow
@@ -851,6 +863,9 @@ func gatewayCooldownWindow(errorClass string) time.Duration {
 		// the long auth/overload window.
 		return networkErrorCooldownWindow
 	default:
+		if gatewayCfg.RateLimitCooldownSeconds > 0 {
+			return time.Duration(gatewayCfg.RateLimitCooldownSeconds) * time.Second
+		}
 		return rateLimitCooldownWindow
 	}
 }

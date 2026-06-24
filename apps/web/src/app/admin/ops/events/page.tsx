@@ -171,7 +171,7 @@ function OutboxContent() {
   return (
     <>
       <SectionHero
-        eyebrow="Ops · Events"
+        eyebrow={t("hero.eyebrowOpsEvents")}
         title={t("adminOutbox.title")}
         description={t("adminOutbox.subtitle")}
         metrics={(() => {
@@ -179,8 +179,8 @@ function OutboxContent() {
           const failed = rows.filter((e) => e.status === "failed").length;
           const pending = rows.filter((e) => e.status === "pending").length;
           return [
-            { label: "失败", value: String(failed), tone: failed > 0 ? "error" : "default" },
-            { label: "待发布", value: String(pending), tone: pending > 0 ? "warning" : "default" },
+            { label: t("adminOutbox.failedCount"), value: String(failed), tone: failed > 0 ? "error" : "default" },
+            { label: t("adminOutbox.pendingCount"), value: String(pending), tone: pending > 0 ? "warning" : "default" },
           ];
         })()}
         actions={

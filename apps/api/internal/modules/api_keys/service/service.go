@@ -220,6 +220,28 @@ func (s *Service) ResetUsage(ctx context.Context, keyID int) (contract.APIKey, e
 	return withoutHash(key), nil
 }
 
+// RevokeByUser soft-deletes every API key owned by userID and busts the
+// auth cache for each one. Intended for the user-deletion path so that a
+// soft-deleted user's keys can no longer authenticate gateway requests.
+func (s *Service) RevokeByUser(ctx context.Context, userID int) error {
+	if userID <= 0 {
+		return ErrInvalidInput
+	}
+	keys, err := s.store.ListByUser(ctx, userID)
+	if err != nil {
+		return err
+	}
+	for _, key := range keys {
+		if err := s.store.Delete(ctx, key.ID); err != nil {
+			return err
+		}
+		if s.authCache != nil {
+			s.authCache.InvalidateByKeyID(key.ID)
+		}
+	}
+	return nil
+}
+
 func (s *Service) ListByUser(ctx context.Context, userID int) ([]contract.APIKey, error) {
 	if userID <= 0 {
 		return nil, ErrInvalidInput

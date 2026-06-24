@@ -427,7 +427,7 @@ function ProxiesContent() {
   return (
     <>
       <SectionHero
-        eyebrow="Gateway · Proxies"
+        eyebrow={t("hero.eyebrowGatewayProxies")}
         title={t("adminProxies.title")}
         description={t("adminProxies.subtitle")}
         metrics={

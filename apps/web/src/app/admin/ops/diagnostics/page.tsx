@@ -26,6 +26,7 @@ import {
   circuitBreakerSummary,
 } from "@/lib/admin-diagnostics-summary";
 import { quietStatusFor } from "@/lib/status-badge";
+import { adminErrorMessage } from "@/lib/admin-api";
 import type { CircuitBreakerEntry } from "@/lib/admin-api";
 
 export default function AdminDiagnosticsPage() {
@@ -70,8 +71,8 @@ function DiagnosticsContent() {
     try {
       await resetMut.mutateAsync(accountId);
       toast({ title: t("feedback.saved"), tone: "success" });
-    } catch {
-      toast({ title: t("feedback.failed"), tone: "error" });
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
     }
   }
 
@@ -83,12 +84,12 @@ function DiagnosticsContent() {
   return (
     <>
       <SectionHero
-        eyebrow="Ops · Diagnostics"
+        eyebrow={t("hero.eyebrowOpsDiagnostics")}
         title={t("diagnostics.title")}
-        description="实时熔断器与缓存命中诊断，定位故障源头。"
+        description={t("diagnostics.subtitle")}
         metrics={[
           {
-            label: "最近运行",
+            label: t("diagnostics.lastRun"),
             value: breakers.dataUpdatedAt
               ? new Date(breakers.dataUpdatedAt).toLocaleTimeString()
               : "—",
@@ -244,8 +245,8 @@ function DiagnosticsContent() {
               onClick={() => {
                 void clearCacheMut.mutateAsync().then((r) =>
                   toast({ title: t("diagnostics.cacheCleared", { count: r.cleared }), tone: "success" }),
-                ).catch(() =>
-                  toast({ title: t("feedback.failed"), tone: "error" }),
+                ).catch((err: unknown) =>
+                  toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" }),
                 );
               }}
               disabled={clearCacheMut.isPending}

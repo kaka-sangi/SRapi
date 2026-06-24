@@ -282,11 +282,11 @@ export function CopilotSessionProvider({ children }: { children: ReactNode }) {
         onEvent,
       });
       if (!receivedTerminal) {
-        setError("Connection lost — the response may be incomplete");
+        setError("copilot.connectionLost");
         if (working.length > history.length) persistSession([...working], activeIdRef.current);
       }
     } catch (err) {
-      if ((err as Error)?.name !== "AbortError") setError((err as Error)?.message ?? "Stream error");
+      if ((err as Error)?.name !== "AbortError") setError((err as Error)?.message ?? "copilot.streamError");
     } finally {
       cancelFlush();
       setRunning(false);
@@ -353,7 +353,7 @@ export function CopilotSessionProvider({ children }: { children: ReactNode }) {
       // Clear the previously-loaded conversation so a failed switch doesn't leave
       // the old messages on screen, misattributed under the new error.
       persistSession([], null);
-      setError((err as Error)?.message ?? "Failed to load conversation");
+      setError((err as Error)?.message ?? "copilot.loadConversationFailed");
     }
   }
 

@@ -343,7 +343,7 @@ function ModelsContent() {
   return (
     <>
       <SectionHero
-        eyebrow="Gateway · Models"
+        eyebrow={t("hero.eyebrowGatewayModels")}
         title={t("adminModels.title")}
         description={t("adminModels.subtitle")}
         metrics={

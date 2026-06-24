@@ -172,7 +172,7 @@ export function PaymentProvidersPanel() {
       await updateMut.mutateAsync({ id: p.id, body: { status: next } });
       toast({ title: t("feedback.saved"), tone: "success" });
     } catch (err) {
-      toast({ title: adminErrorMessage(err), tone: "error" });
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
     } finally {
       setTogglingId(null);
     }
@@ -187,8 +187,8 @@ export function PaymentProvidersPanel() {
           result.message ?? (result.latency_ms != null ? `${result.latency_ms} ms` : undefined),
         tone: result.ok ? "success" : "error",
       });
-    } catch {
-      toast({ title: t("feedback.failed"), tone: "error" });
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
     }
   }
 

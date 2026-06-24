@@ -181,6 +181,12 @@ func (s *Server) handleDeleteAdminUser(w http.ResponseWriter, r *http.Request) {
 		writeUserServiceError(w, err, requestID)
 		return
 	}
+	// Revoke all API keys before soft-deleting the user so that keys
+	// belonging to the deleted user can no longer authenticate requests.
+	if err := s.runtime.apiKeys.RevokeByUser(r.Context(), userID); err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to revoke user api keys", requestID)
+		return
+	}
 	if err := s.runtime.users.Delete(r.Context(), userID); err != nil {
 		writeUserServiceError(w, err, requestID)
 		return
@@ -243,6 +249,7 @@ func (s *Server) handleUpdateAdminUserBalance(w http.ResponseWriter, r *http.Req
 		},
 	})
 	if err != nil {
+		s.logger.Error("billing ledger record failed after balance update", "error", err, "user_id", updated.ID, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to record balance history", requestID)
 		return
 	}
@@ -270,6 +277,7 @@ func (s *Server) handleAdminUserBalanceHistory(w http.ResponseWriter, r *http.Re
 		Offset: offset,
 	})
 	if err != nil {
+		s.logger.Error("failed to list balance history", "error", err, "user_id", userID, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list balance history", requestID)
 		return
 	}
@@ -455,6 +463,7 @@ func (s *Server) handleAdminUsageExport(w http.ResponseWriter, r *http.Request) 
 	}
 	exported, err := s.runtime.usage.Export(r.Context(), filter)
 	if err != nil {
+		s.logger.Error("failed to export usage", "error", err, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to export usage", requestID)
 		return
 	}

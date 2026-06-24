@@ -87,7 +87,7 @@ function DashboardContent() {
       <SectionHero
         eyebrow={t("nav.sectionAdmin")}
         title={t("dashboard.title")}
-        description="Gateway 全局态势 · 流量、Token、收入、上游健康一屏可览"
+        description={t("dashboard.subtitle")}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-0.5 rounded-xl border border-srapi-border bg-srapi-card/85 p-1 backdrop-blur-sm">

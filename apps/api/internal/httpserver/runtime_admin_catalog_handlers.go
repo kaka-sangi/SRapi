@@ -31,36 +31,43 @@ func (s *Server) handleAdminOverview(w http.ResponseWriter, r *http.Request) {
 	}
 	providers, err := s.runtime.providers.List(r.Context())
 	if err != nil {
+		s.logger.Error("failed to list providers for admin overview", "error", err, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list providers", requestID)
 		return
 	}
 	models, err := s.runtime.models.List(r.Context())
 	if err != nil {
+		s.logger.Error("failed to list models for admin overview", "error", err, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list models", requestID)
 		return
 	}
 	accounts, err := s.runtime.accounts.List(r.Context())
 	if err != nil {
+		s.logger.Error("failed to list accounts for admin overview", "error", err, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list accounts", requestID)
 		return
 	}
 	usageLogs, err := s.runtime.usage.List(r.Context())
 	if err != nil {
+		s.logger.Error("failed to list usage logs for admin overview", "error", err, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list usage logs", requestID)
 		return
 	}
 	decisions, err := s.runtime.scheduler.ListDecisions(r.Context())
 	if err != nil {
+		s.logger.Error("failed to list scheduler decisions for admin overview", "error", err, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list scheduler decisions", requestID)
 		return
 	}
 	users, err := s.runtime.users.List(r.Context(), usersservice.ListRequest{})
 	if err != nil {
+		s.logger.Error("failed to list users for admin overview", "error", err, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list users", requestID)
 		return
 	}
 	dailyAggregates, err := s.runtime.usage.Aggregate(r.Context(), usagecontract.QueryFilter{}, usagecontract.AggregateDimensionDay)
 	if err != nil {
+		s.logger.Error("failed to aggregate usage for admin overview", "error", err, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to aggregate usage", requestID)
 		return
 	}
@@ -111,6 +118,7 @@ func (s *Server) handleListAdminProviders(w http.ResponseWriter, r *http.Request
 	}
 	providers, err := s.runtime.providers.List(r.Context())
 	if err != nil {
+		s.logger.Error("failed to list providers", "error", err, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list providers", requestID)
 		return
 	}
@@ -159,6 +167,7 @@ func (s *Server) handleCreateAdminProvider(w http.ResponseWriter, r *http.Reques
 		case errors.Is(err, providerservice.ErrInvalidInput):
 			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid provider request", requestID)
 		default:
+			s.logger.Error("failed to create provider", "error", err, "request_id", requestID)
 			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to create provider", requestID)
 		}
 		return
@@ -215,6 +224,7 @@ func (s *Server) handleUpdateAdminProvider(w http.ResponseWriter, r *http.Reques
 		case errors.Is(err, providerservice.ErrInvalidInput):
 			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid provider update request", requestID)
 		default:
+			s.logger.Error("failed to update provider", "error", err, "provider_id", providerID, "request_id", requestID)
 			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to update provider", requestID)
 		}
 		return
@@ -252,6 +262,7 @@ func (s *Server) handleDeleteAdminProvider(w http.ResponseWriter, r *http.Reques
 	// orphan them. The operator must archive/remove the accounts first.
 	accounts, err := s.runtime.accounts.List(r.Context())
 	if err != nil {
+		s.logger.Error("failed to check provider accounts before delete", "error", err, "provider_id", providerID, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to check provider accounts", requestID)
 		return
 	}
@@ -270,6 +281,7 @@ func (s *Server) handleDeleteAdminProvider(w http.ResponseWriter, r *http.Reques
 		case errors.Is(err, providerservice.ErrInvalidInput):
 			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid provider id", requestID)
 		default:
+			s.logger.Error("failed to delete provider", "error", err, "provider_id", providerID, "request_id", requestID)
 			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to delete provider", requestID)
 		}
 		return
@@ -320,6 +332,7 @@ func (s *Server) handleListAdminModels(w http.ResponseWriter, r *http.Request) {
 	}
 	models, err := s.runtime.models.List(r.Context())
 	if err != nil {
+		s.logger.Error("failed to list models", "error", err, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list models", requestID)
 		return
 	}
@@ -344,6 +357,7 @@ func (s *Server) handleListAdminModelMappingsAll(w http.ResponseWriter, r *http.
 	}
 	mappings, err := s.runtime.models.ListMappings(r.Context())
 	if err != nil {
+		s.logger.Error("failed to list model mappings", "error", err, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list model mappings", requestID)
 		return
 	}
@@ -393,6 +407,7 @@ func (s *Server) handleCreateAdminModel(w http.ResponseWriter, r *http.Request) 
 		case errors.Is(err, modelservice.ErrInvalidInput):
 			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model request", requestID)
 		default:
+			s.logger.Error("failed to create model", "error", err, "request_id", requestID)
 			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to create model", requestID)
 		}
 		return
@@ -451,6 +466,7 @@ func (s *Server) handleUpdateAdminModel(w http.ResponseWriter, r *http.Request) 
 		case errors.Is(err, modelservice.ErrInvalidInput):
 			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model update request", requestID)
 		default:
+			s.logger.Error("failed to update model", "error", err, "model_id", modelID, "request_id", requestID)
 			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to update model", requestID)
 		}
 		return
@@ -491,6 +507,7 @@ func (s *Server) handleDeleteAdminModel(w http.ResponseWriter, r *http.Request) 
 		case errors.Is(err, modelservice.ErrInvalidInput):
 			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model id", requestID)
 		default:
+			s.logger.Error("failed to delete model", "error", err, "model_id", modelID, "request_id", requestID)
 			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to delete model", requestID)
 		}
 		return
@@ -536,6 +553,7 @@ func (s *Server) handleCreateAdminModelAlias(w http.ResponseWriter, r *http.Requ
 		case errors.Is(err, modelservice.ErrInvalidInput):
 			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model alias request", requestID)
 		default:
+			s.logger.Error("failed to create model alias", "error", err, "model_id", modelID, "request_id", requestID)
 			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to create model alias", requestID)
 		}
 		return
@@ -599,6 +617,7 @@ func (s *Server) handleCreateAdminModelMapping(w http.ResponseWriter, r *http.Re
 		case errors.Is(err, modelservice.ErrInvalidInput):
 			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model mapping request", requestID)
 		default:
+			s.logger.Error("failed to create model mapping", "error", err, "model_id", modelID, "provider_id", providerID, "request_id", requestID)
 			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to create model mapping", requestID)
 		}
 		return
@@ -634,6 +653,7 @@ func (s *Server) handleListAdminModelAliases(w http.ResponseWriter, r *http.Requ
 		case errors.Is(err, modelservice.ErrInvalidInput):
 			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model id", requestID)
 		default:
+			s.logger.Error("failed to list model aliases", "error", err, "model_id", modelID, "request_id", requestID)
 			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list model aliases", requestID)
 		}
 		return
@@ -676,6 +696,7 @@ func (s *Server) handleDeleteAdminModelAlias(w http.ResponseWriter, r *http.Requ
 		case errors.Is(err, modelservice.ErrInvalidInput):
 			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model alias id", requestID)
 		default:
+			s.logger.Error("failed to delete model alias", "error", err, "model_id", modelID, "alias_id", aliasID, "request_id", requestID)
 			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to delete model alias", requestID)
 		}
 		return
@@ -730,6 +751,7 @@ func (s *Server) handleUpdateAdminModelAlias(w http.ResponseWriter, r *http.Requ
 		case errors.Is(err, modelservice.ErrInvalidInput):
 			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model alias update request", requestID)
 		default:
+			s.logger.Error("failed to update model alias", "error", err, "model_id", modelID, "alias_id", aliasID, "request_id", requestID)
 			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to update model alias", requestID)
 		}
 		return
@@ -770,6 +792,7 @@ func (s *Server) handleListAdminModelMappings(w http.ResponseWriter, r *http.Req
 		case errors.Is(err, modelservice.ErrInvalidInput):
 			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model id", requestID)
 		default:
+			s.logger.Error("failed to list model mappings by model", "error", err, "model_id", modelID, "request_id", requestID)
 			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list model mappings", requestID)
 		}
 		return
@@ -812,6 +835,7 @@ func (s *Server) handleDeleteAdminModelMapping(w http.ResponseWriter, r *http.Re
 		case errors.Is(err, modelservice.ErrInvalidInput):
 			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model mapping id", requestID)
 		default:
+			s.logger.Error("failed to delete model mapping", "error", err, "model_id", modelID, "mapping_id", mappingID, "request_id", requestID)
 			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to delete model mapping", requestID)
 		}
 		return
@@ -866,6 +890,7 @@ func (s *Server) handleUpdateAdminModelMapping(w http.ResponseWriter, r *http.Re
 		case errors.Is(err, modelservice.ErrInvalidInput):
 			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model mapping update request", requestID)
 		default:
+			s.logger.Error("failed to update model mapping", "error", err, "model_id", modelID, "mapping_id", mappingID, "request_id", requestID)
 			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to update model mapping", requestID)
 		}
 		return
@@ -902,6 +927,7 @@ func (s *Server) handleListAdminAccounts(w http.ResponseWriter, r *http.Request)
 	limit, offset, page, pageSize := paginationParams(r)
 	result, err := s.runtime.accounts.ListPage(r.Context(), filter, limit, offset)
 	if err != nil {
+		s.logger.Error("failed to list accounts", "error", err, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list accounts", requestID)
 		return
 	}
@@ -1140,6 +1166,7 @@ func (s *Server) handleCreateAdminAccount(w http.ResponseWriter, r *http.Request
 		case errors.Is(err, accountservice.ErrCredentialMissing), errors.Is(err, accountservice.ErrInvalidInput):
 			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account request", requestID)
 		default:
+			s.logger.Error("failed to create account", "error", err, "provider_id", providerID, "request_id", requestID)
 			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to create account", requestID)
 		}
 		return
@@ -1302,6 +1329,7 @@ func (s *Server) handleExportAdminAccounts(w http.ResponseWriter, r *http.Reques
 	}
 	accounts, err := s.runtime.accounts.List(r.Context())
 	if err != nil {
+		s.logger.Error("failed to export accounts", "error", err, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to export accounts", requestID)
 		return
 	}
@@ -1527,6 +1555,7 @@ func (s *Server) handleUpdateAdminAccount(w http.ResponseWriter, r *http.Request
 		case errors.Is(err, accountservice.ErrCredentialMissing), errors.Is(err, accountservice.ErrInvalidInput), errors.Is(err, accountservice.ErrProxyUnavailable):
 			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account update request", requestID)
 		default:
+			s.logger.Error("failed to update account", "error", err, "account_id", accountID, "request_id", requestID)
 			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to update account", requestID)
 		}
 		return
@@ -1627,6 +1656,7 @@ func (s *Server) handleDeleteAdminAccount(w http.ResponseWriter, r *http.Request
 		case errors.Is(err, accountservice.ErrInvalidInput):
 			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account id", requestID)
 		default:
+			s.logger.Error("failed to delete account", "error", err, "account_id", accountID, "request_id", requestID)
 			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to delete account", requestID)
 		}
 		return
@@ -1704,6 +1734,7 @@ func (s *Server) handleRecoverAdminAccount(w http.ResponseWriter, r *http.Reques
 	}
 	account, err := s.runtime.accounts.Recover(r.Context(), accountID)
 	if err != nil {
+		s.logger.Error("failed to recover account", "error", err, "account_id", accountID, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to recover account", requestID)
 		return
 	}
@@ -1777,6 +1808,7 @@ func (s *Server) handleRefreshAdminAccount(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if s.runtime.reverseProxy == nil {
+		s.logger.Error("reverse proxy refresher unavailable for account refresh", "account_id", accountID, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "reverse proxy refresher unavailable", requestID)
 		return
 	}
@@ -1951,6 +1983,7 @@ func (s *Server) handleDiscoverAdminAccountModels(w http.ResponseWriter, r *http
 		case errors.Is(err, errModelDiscoveryUpstream):
 			writeStandardError(w, http.StatusBadGateway, apiopenapi.INTERNALERROR, "upstream model discovery failed", requestID)
 		default:
+			s.logger.Error("failed to discover account models", "error", err, "account_id", accountID, "request_id", requestID)
 			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to discover account models", requestID)
 		}
 		return
@@ -1991,6 +2024,7 @@ func (s *Server) handleSetAdminAccountStatus(w http.ResponseWriter, r *http.Requ
 	}
 	account, err := s.runtime.accounts.Update(r.Context(), accountID, accountcontract.UpdateRequest{Status: &status})
 	if err != nil {
+		s.logger.Error("failed to update account status", "error", err, "account_id", accountID, "status", status, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to update account status", requestID)
 		return
 	}
@@ -2018,11 +2052,13 @@ func (s *Server) handleAdminAccountsHealthSummary(w http.ResponseWriter, r *http
 	}
 	accounts, err := s.runtime.accountStore.List(r.Context())
 	if err != nil {
+		s.logger.Error("failed to list accounts for health summary", "error", err, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list accounts", requestID)
 		return
 	}
 	usageLogs, err := s.runtime.usage.List(r.Context())
 	if err != nil {
+		s.logger.Error("failed to list usage logs for health summary", "error", err, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list usage logs", requestID)
 		return
 	}
@@ -2077,6 +2113,7 @@ func (s *Server) handleAdminAccountHealth(w http.ResponseWriter, r *http.Request
 	}
 	usageLogs, err := s.runtime.usage.List(r.Context())
 	if err != nil {
+		s.logger.Error("failed to list usage logs for account health", "error", err, "account_id", accountID, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list usage logs", requestID)
 		return
 	}
@@ -2114,11 +2151,13 @@ func (s *Server) handleAdminAccountQuota(w http.ResponseWriter, r *http.Request)
 	}
 	usageLogs, err := s.runtime.usage.List(r.Context())
 	if err != nil {
+		s.logger.Error("failed to list usage logs for account quota", "error", err, "account_id", account.ID, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list usage logs", requestID)
 		return
 	}
 	snapshots, err := s.runtime.accounts.ListQuotaSnapshotsByAccount(r.Context(), account.ID, 50)
 	if err != nil {
+		s.logger.Error("failed to list account quota snapshots", "error", err, "account_id", account.ID, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list account quota snapshots", requestID)
 		return
 	}

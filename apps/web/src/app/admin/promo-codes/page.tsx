@@ -214,14 +214,14 @@ function PromoContent() {
   return (
     <>
       <SectionHero
-        eyebrow="Commerce · Promo Codes"
+        eyebrow={t("hero.eyebrowCommercePromo")}
         title={t("adminPromos.promoTitle")}
         description={t("adminPromos.promoSubtitle")}
         metrics={
           promos.data
             ? [
                 {
-                  label: "在用",
+                  label: t("adminPromos.activeCount"),
                   value: String(
                     promos.data.data.filter((p) => p.status === "active").length,
                   ),

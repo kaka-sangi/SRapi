@@ -129,6 +129,7 @@ func (s *Server) handleListAdminUsageLogs(w http.ResponseWriter, r *http.Request
 	}
 	page, err := s.runtime.usage.ListPage(r.Context(), filter, opts.PageSize, offset)
 	if err != nil {
+		s.logger.Error("failed to list usage logs", "error", err, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list usage logs", requestID)
 		return
 	}
@@ -169,6 +170,7 @@ func (s *Server) handleListAdminAuditLogs(w http.ResponseWriter, r *http.Request
 	limit, offset, page, pageSize := paginationParams(r)
 	result, err := s.runtime.audit.ListPage(r.Context(), filter, limit, offset)
 	if err != nil {
+		s.logger.Error("failed to list audit logs", "error", err, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list audit logs", requestID)
 		return
 	}
@@ -211,6 +213,7 @@ func (s *Server) handleListAdminBillingLedger(w http.ResponseWriter, r *http.Req
 	filter.Offset = offset
 	result, err := s.runtime.billing.ListPage(r.Context(), filter)
 	if err != nil {
+		s.logger.Error("failed to list billing ledger", "error", err, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list billing ledger", requestID)
 		return
 	}
@@ -577,6 +580,7 @@ func (s *Server) handleListAdminSubscriptionPlans(w http.ResponseWriter, r *http
 	}
 	items, err := s.runtime.subscriptions.ListPlans(r.Context())
 	if err != nil {
+		s.logger.Error("failed to list subscription plans", "error", err, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list subscription plans", requestID)
 		return
 	}
@@ -719,6 +723,7 @@ func (s *Server) handleDeleteAdminSubscriptionPlan(w http.ResponseWriter, r *htt
 			writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "subscription plan not found", requestID)
 			return
 		}
+		s.logger.Error("failed to delete subscription plan", "error", err, "plan_id", planID, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to delete subscription plan", requestID)
 		return
 	}
@@ -750,6 +755,7 @@ func (s *Server) handleListAdminUserSubscriptions(w http.ResponseWriter, r *http
 		items, err = s.runtime.subscriptions.ListUserSubscriptions(r.Context())
 	}
 	if err != nil {
+		s.logger.Error("failed to list user subscriptions", "error", err, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list user subscriptions", requestID)
 		return
 	}
@@ -850,6 +856,7 @@ func (s *Server) handleDeleteAdminUserSubscription(w http.ResponseWriter, r *htt
 			writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "user subscription not found", requestID)
 			return
 		}
+		s.logger.Error("failed to delete user subscription", "error", err, "subscription_id", subscriptionID, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to delete user subscription", requestID)
 		return
 	}
@@ -868,6 +875,7 @@ func (s *Server) handleListAdminPricingRules(w http.ResponseWriter, r *http.Requ
 	}
 	items, err := s.runtime.billing.ListPricingRules(r.Context())
 	if err != nil {
+		s.logger.Error("failed to list pricing rules", "error", err, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list pricing rules", requestID)
 		return
 	}
@@ -1006,6 +1014,7 @@ func (s *Server) handleDeleteAdminPricingRule(w http.ResponseWriter, r *http.Req
 			writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "pricing rule not found", requestID)
 			return
 		}
+		s.logger.Error("failed to delete pricing rule", "error", err, "rule_id", ruleID, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to delete pricing rule", requestID)
 		return
 	}
@@ -1514,6 +1523,7 @@ func (s *Server) handleListAdminOutboxEvents(w http.ResponseWriter, r *http.Requ
 	limit, offset, page, pageSize := paginationParams(r)
 	result, err := s.runtime.events.ListOutboxPage(r.Context(), filter, limit, offset)
 	if err != nil {
+		s.logger.Error("failed to list outbox events", "error", err, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list outbox events", requestID)
 		return
 	}
@@ -1542,6 +1552,7 @@ func (s *Server) handleListAdminOpsRealtimeSlots(w http.ResponseWriter, r *http.
 	}
 	list, err := s.runtime.realtime.ListActiveSlots(r.Context())
 	if err != nil {
+		s.logger.Error("failed to list realtime slots", "error", err, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list realtime slots", requestID)
 		return
 	}
@@ -1770,11 +1781,13 @@ func (s *Server) handleAdminSchedulerOverview(w http.ResponseWriter, r *http.Req
 	}
 	decisions, err := s.runtime.scheduler.ListDecisions(r.Context())
 	if err != nil {
+		s.logger.Error("failed to list scheduler decisions for overview", "error", err, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list scheduler decisions", requestID)
 		return
 	}
 	usageLogs, err := s.runtime.usage.List(r.Context())
 	if err != nil {
+		s.logger.Error("failed to list usage logs for scheduler overview", "error", err, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list usage logs", requestID)
 		return
 	}
@@ -1811,6 +1824,7 @@ func (s *Server) handleListAdminSchedulerDecisions(w http.ResponseWriter, r *htt
 	if hasAccountID {
 		items, err := s.runtime.scheduler.ListDecisions(r.Context())
 		if err != nil {
+			s.logger.Error("failed to list scheduler decisions (account filter fallback)", "error", err, "request_id", requestID)
 			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list scheduler decisions", requestID)
 			return
 		}
@@ -1841,6 +1855,7 @@ func (s *Server) handleListAdminSchedulerDecisions(w http.ResponseWriter, r *htt
 	}
 	result, supported, err := s.runtime.scheduler.ListDecisionsPage(r.Context(), filter, limit, offset)
 	if err != nil {
+		s.logger.Error("failed to list scheduler decisions page", "error", err, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list scheduler decisions", requestID)
 		return
 	}
@@ -1850,6 +1865,7 @@ func (s *Server) handleListAdminSchedulerDecisions(w http.ResponseWriter, r *htt
 		// consistent across store implementations.
 		items, listErr := s.runtime.scheduler.ListDecisions(r.Context())
 		if listErr != nil {
+			s.logger.Error("failed to list scheduler decisions (unsupported page fallback)", "error", listErr, "request_id", requestID)
 			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list scheduler decisions", requestID)
 			return
 		}
@@ -1891,6 +1907,7 @@ func (s *Server) handleListSchedulerStrategies(w http.ResponseWriter, r *http.Re
 	}
 	strategies, err := s.runtime.scheduler.ListStrategies(r.Context())
 	if err != nil {
+		s.logger.Error("failed to list scheduler strategies", "error", err, "request_id", requestID)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list scheduler strategies", requestID)
 		return
 	}

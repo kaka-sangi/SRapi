@@ -61,7 +61,7 @@ export function BackupTab() {
     try {
       body = JSON.parse(importText || "{}");
     } catch {
-      toast({ title: t("feedback.failed"), description: "Invalid JSON", tone: "error" });
+      toast({ title: t("feedback.failed"), description: t("feedback.invalidJson"), tone: "error" });
       return;
     }
     try {
