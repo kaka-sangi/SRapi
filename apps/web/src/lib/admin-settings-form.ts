@@ -133,12 +133,6 @@ function updateSettingsValue(
 }
 
 const HIGH_RISK_SETTINGS_TABS = new Set<SettingsTab>([
-  "security",
-  "users",
-  "gateway",
-  "payment",
-  "email",
-  "backup",
   "maintenance",
 ]);
 
@@ -204,18 +198,25 @@ function cloneOAuthProviderConfigs(
 function cleanOAuthProviderConfigs(
   values: readonly OAuthProviderConfig[] | undefined,
 ): OAuthProviderConfig[] {
-  return (values ?? []).map((value) => ({
-    provider: value.provider,
-    provider_key: value.provider_key.trim(),
-    display_name: value.display_name.trim(),
-    client_id: value.client_id.trim(),
-    authorize_url: value.authorize_url.trim(),
-    token_url: value.token_url?.trim() || undefined,
-    userinfo_url: value.userinfo_url?.trim() || undefined,
-    token_auth_method: "none",
-    redirect_uri: value.redirect_uri.trim(),
-    scopes: cleanOAuthScopes(value.scopes),
-  }));
+  return (values ?? []).map((value) => {
+    const cleaned: OAuthProviderConfig = {
+      provider: value.provider,
+      provider_key: value.provider_key.trim(),
+      display_name: value.display_name.trim(),
+      client_id: value.client_id.trim(),
+      authorize_url: value.authorize_url.trim(),
+      token_url: value.token_url?.trim() || undefined,
+      userinfo_url: value.userinfo_url?.trim() || undefined,
+      token_auth_method: value.token_auth_method || "none",
+      redirect_uri: value.redirect_uri.trim(),
+      scopes: cleanOAuthScopes(value.scopes),
+    };
+    const secret = (value as Record<string, unknown>).client_secret as string | undefined;
+    if (secret?.trim()) {
+      (cleaned as Record<string, unknown>).client_secret = secret.trim();
+    }
+    return cleaned;
+  });
 }
 
 function cleanOAuthScopes(items: readonly string[] | undefined): string[] {
