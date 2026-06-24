@@ -11,7 +11,7 @@ type Workspace struct {
 }
 
 func (Workspace) Mixin() []ent.Mixin {
-	return []ent.Mixin{TimeMixin{}, SoftDeleteMixin{}}
+	return []ent.Mixin{TimeMixin{}}
 }
 
 func (Workspace) Fields() []ent.Field {

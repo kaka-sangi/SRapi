@@ -33,7 +33,7 @@ func (s *Service) normalizeEpayWebhook(ctx context.Context, req contract.Webhook
 	if err != nil {
 		return normalizedWebhook{}, err
 	}
-	if (instance.Provider != "linuxdo" && instance.Provider != "easypay") || instance.DeletedAt != nil {
+	if instance.Provider != "linuxdo" && instance.Provider != "easypay" {
 		return normalizedWebhook{}, ErrOrderMismatch
 	}
 

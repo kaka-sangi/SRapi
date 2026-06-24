@@ -24,7 +24,7 @@ func (s *Service) normalizeAlipayWebhook(ctx context.Context, req contract.Webho
 	if err != nil {
 		return normalizedWebhook{}, err
 	}
-	if instance.Provider != "alipay" || instance.Status != contract.ProviderStatusActive || instance.DeletedAt != nil {
+	if instance.Provider != "alipay" || instance.Status != contract.ProviderStatusActive {
 		return normalizedWebhook{}, ErrOrderMismatch
 	}
 	config, err := s.decryptConfig(instance, instance.ConfigCiphertext)

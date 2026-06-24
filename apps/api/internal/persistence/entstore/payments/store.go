@@ -56,7 +56,6 @@ func (s *Store) CreateProviderInstance(ctx context.Context, input contract.Creat
 
 func (s *Store) ListProviderInstances(ctx context.Context) ([]contract.PaymentProviderInstance, error) {
 	rows, err := s.client.PaymentProviderInstance.Query().
-		Where(entpaymentproviderinstance.DeletedAtIsNil()).
 		Order(entpaymentproviderinstance.BySortOrder(), entpaymentproviderinstance.ByID()).
 		All(ctx)
 	if err != nil {
@@ -71,7 +70,7 @@ func (s *Store) ListProviderInstances(ctx context.Context) ([]contract.PaymentPr
 
 func (s *Store) FindProviderInstanceByID(ctx context.Context, id int) (contract.PaymentProviderInstance, error) {
 	row, err := s.client.PaymentProviderInstance.Query().
-		Where(entpaymentproviderinstance.IDEQ(id), entpaymentproviderinstance.DeletedAtIsNil()).
+		Where(entpaymentproviderinstance.IDEQ(id)).
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -84,7 +83,6 @@ func (s *Store) FindProviderInstanceByID(ctx context.Context, id int) (contract.
 
 func (s *Store) UpdateProviderInstance(ctx context.Context, input contract.PaymentProviderInstance) (contract.PaymentProviderInstance, error) {
 	update := s.client.PaymentProviderInstance.UpdateOneID(input.ID).
-		Where(entpaymentproviderinstance.DeletedAtIsNil()).
 		SetProvider(input.Provider).
 		SetName(input.Name).
 		SetStatus(string(input.Status)).
@@ -112,17 +110,13 @@ func (s *Store) UpdateProviderInstance(ctx context.Context, input contract.Payme
 	return toProvider(updated), nil
 }
 
-func (s *Store) SoftDeleteProviderInstance(ctx context.Context, id int) error {
-	affected, err := s.client.PaymentProviderInstance.Update().
-		Where(entpaymentproviderinstance.IDEQ(id), entpaymentproviderinstance.DeletedAtIsNil()).
-		SetDeletedAt(time.Now().UTC()).
-		SetStatus(string(contract.ProviderStatusDisabled)).
-		Save(ctx)
+func (s *Store) DeleteProviderInstance(ctx context.Context, id int) error {
+	err := s.client.PaymentProviderInstance.DeleteOneID(id).Exec(ctx)
 	if err != nil {
+		if ent.IsNotFound(err) {
+			return contract.ErrNotFound
+		}
 		return err
-	}
-	if affected == 0 {
-		return contract.ErrNotFound
 	}
 	return nil
 }
@@ -489,7 +483,6 @@ func toProvider(row *ent.PaymentProviderInstance) contract.PaymentProviderInstan
 		Metadata:         cloneMap(row.MetadataJSON),
 		CreatedAt:        row.CreatedAt,
 		UpdatedAt:        row.UpdatedAt,
-		DeletedAt:        cloneTime(row.DeletedAt),
 	}
 }
 

@@ -3,7 +3,6 @@ package providers
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/srapi/srapi/apps/api/ent"
 	entprovider "github.com/srapi/srapi/apps/api/ent/provider"
@@ -24,25 +23,6 @@ func New(client *ent.Client) (*Store, error) {
 }
 
 func (s *Store) Create(ctx context.Context, input contract.CreateStoredProvider) (contract.Provider, error) {
-	tombstone, _ := s.client.Provider.Query().
-		Where(entprovider.NameEqualFold(input.Name), entprovider.DeletedAtNotNil()).
-		Only(ctx)
-	if tombstone != nil {
-		restored, err := s.client.Provider.UpdateOneID(tombstone.ID).
-			ClearDeletedAt().
-			SetDisplayName(input.DisplayName).
-			SetAdapterType(input.AdapterType).
-			SetProtocol(input.Protocol).
-			SetStatus(string(input.Status)).
-			SetCapabilitiesJSON(cloneMap(input.Capabilities)).
-			SetConfigSchemaJSON(cloneMap(input.ConfigSchema)).
-			Save(ctx)
-		if err != nil {
-			return contract.Provider{}, err
-		}
-		return toProvider(restored), nil
-	}
-
 	created, err := s.client.Provider.Create().
 		SetName(input.Name).
 		SetDisplayName(input.DisplayName).
@@ -60,7 +40,6 @@ func (s *Store) Create(ctx context.Context, input contract.CreateStoredProvider)
 
 func (s *Store) Update(ctx context.Context, provider contract.Provider) (contract.Provider, error) {
 	update := s.client.Provider.UpdateOneID(provider.ID).
-		Where(entprovider.DeletedAtIsNil()).
 		SetDisplayName(provider.DisplayName).
 		SetAdapterType(provider.AdapterType).
 		SetProtocol(provider.Protocol).
@@ -79,7 +58,7 @@ func (s *Store) Update(ctx context.Context, provider contract.Provider) (contrac
 
 func (s *Store) FindByID(ctx context.Context, id int) (contract.Provider, error) {
 	found, err := s.client.Provider.Query().
-		Where(entprovider.IDEQ(id), entprovider.DeletedAtIsNil()).
+		Where(entprovider.IDEQ(id)).
 		Only(ctx)
 	if err != nil {
 		return contract.Provider{}, err
@@ -89,7 +68,7 @@ func (s *Store) FindByID(ctx context.Context, id int) (contract.Provider, error)
 
 func (s *Store) FindByName(ctx context.Context, name string) (contract.Provider, error) {
 	found, err := s.client.Provider.Query().
-		Where(entprovider.NameEqualFold(name), entprovider.DeletedAtIsNil()).
+		Where(entprovider.NameEqualFold(name)).
 		Only(ctx)
 	if err != nil {
 		return contract.Provider{}, err
@@ -99,7 +78,6 @@ func (s *Store) FindByName(ctx context.Context, name string) (contract.Provider,
 
 func (s *Store) List(ctx context.Context) ([]contract.Provider, error) {
 	rows, err := s.client.Provider.Query().
-		Where(entprovider.DeletedAtIsNil()).
 		Order(entprovider.ByID()).
 		All(ctx)
 	if err != nil {
@@ -112,17 +90,13 @@ func (s *Store) List(ctx context.Context) ([]contract.Provider, error) {
 	return out, nil
 }
 
-func (s *Store) SoftDelete(ctx context.Context, id int) error {
-	affected, err := s.client.Provider.Update().
-		Where(entprovider.IDEQ(id), entprovider.DeletedAtIsNil()).
-		SetDeletedAt(time.Now().UTC()).
-		SetStatus(string(contract.StatusArchived)).
-		Save(ctx)
+func (s *Store) Delete(ctx context.Context, id int) error {
+	err := s.client.Provider.DeleteOneID(id).Exec(ctx)
 	if err != nil {
+		if ent.IsNotFound(err) {
+			return errors.New("provider not found")
+		}
 		return err
-	}
-	if affected == 0 {
-		return errors.New("provider not found")
 	}
 	return nil
 }
@@ -139,7 +113,6 @@ func toProvider(row *ent.Provider) contract.Provider {
 		ConfigSchema: cloneMap(row.ConfigSchemaJSON),
 		CreatedAt:    row.CreatedAt,
 		UpdatedAt:    row.UpdatedAt,
-		DeletedAt:    timePtrToUnix(row.DeletedAt),
 	}
 }
 
@@ -154,10 +127,3 @@ func cloneMap(value map[string]any) map[string]any {
 	return cloned
 }
 
-func timePtrToUnix(value *time.Time) *int64 {
-	if value == nil {
-		return nil
-	}
-	unix := value.Unix()
-	return &unix
-}

@@ -361,24 +361,20 @@ func (s *Store) FindProxyByID(_ context.Context, id int) (contract.ProxyDefiniti
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	proxy, ok := s.proxiesByID[id]
-	if !ok || proxy.DeletedAt != nil {
+	if !ok {
 		return contract.ProxyDefinition{}, errors.New("proxy not found")
 	}
 	return cloneProxy(proxy), nil
 }
 
-func (s *Store) SoftDeleteProxy(_ context.Context, id int) error {
+func (s *Store) DeleteProxy(_ context.Context, id int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	proxy, ok := s.proxiesByID[id]
-	if !ok || proxy.DeletedAt != nil {
+	if !ok {
 		return errors.New("proxy not found")
 	}
-	now := time.Now().UTC()
-	proxy.DeletedAt = &now
-	proxy.Status = contract.ProxyStatusDisabled
-	proxy.UpdatedAt = now
-	s.proxiesByID[id] = proxy
+	delete(s.proxiesByID, id)
 	delete(s.proxiesByName, strings.ToLower(proxy.Name))
 	// Clear bindings: accounts whose proxy_id points at this proxy fall back to
 	// a direct connection.
@@ -386,7 +382,7 @@ func (s *Store) SoftDeleteProxy(_ context.Context, id int) error {
 	for accountID, account := range s.byID {
 		if account.ProxyID != nil && *account.ProxyID == target {
 			account.ProxyID = nil
-			account.UpdatedAt = now
+			account.UpdatedAt = time.Now().UTC()
 			s.byID[accountID] = account
 		}
 	}
@@ -398,9 +394,6 @@ func (s *Store) ListProxies(_ context.Context) ([]contract.ProxyDefinition, erro
 	defer s.mu.Unlock()
 	out := make([]contract.ProxyDefinition, 0, len(s.proxiesByID))
 	for _, proxy := range s.proxiesByID {
-		if proxy.DeletedAt != nil {
-			continue
-		}
 		out = append(out, cloneProxy(proxy))
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
@@ -740,10 +733,6 @@ func cloneProxy(value contract.ProxyDefinition) contract.ProxyDefinition {
 	value.Metadata = cloneMap(value.Metadata)
 	value.ExpiresAt = cloneTime(value.ExpiresAt)
 	value.BackupProxyID = cloneInt(value.BackupProxyID)
-	if value.DeletedAt != nil {
-		cloned := *value.DeletedAt
-		value.DeletedAt = &cloned
-	}
 	if value.LastProbedAt != nil {
 		cloned := *value.LastProbedAt
 		value.LastProbedAt = &cloned

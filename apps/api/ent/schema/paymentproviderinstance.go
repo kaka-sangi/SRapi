@@ -11,7 +11,7 @@ type PaymentProviderInstance struct {
 }
 
 func (PaymentProviderInstance) Mixin() []ent.Mixin {
-	return []ent.Mixin{TimeMixin{}, SoftDeleteMixin{}}
+	return []ent.Mixin{TimeMixin{}}
 }
 
 func (PaymentProviderInstance) Fields() []ent.Field {

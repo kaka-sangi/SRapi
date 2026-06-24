@@ -65,7 +65,7 @@ func (s *Store) FindByID(_ context.Context, id int) (contract.Provider, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	provider, ok := s.byID[id]
-	if !ok || provider.DeletedAt != nil {
+	if !ok {
 		return contract.Provider{}, errors.New("provider not found")
 	}
 	return provider, nil
@@ -79,9 +79,6 @@ func (s *Store) FindByName(_ context.Context, name string) (contract.Provider, e
 		return contract.Provider{}, errors.New("provider not found")
 	}
 	provider := s.byID[id]
-	if provider.DeletedAt != nil {
-		return contract.Provider{}, errors.New("provider not found")
-	}
 	return provider, nil
 }
 
@@ -90,27 +87,20 @@ func (s *Store) List(_ context.Context) ([]contract.Provider, error) {
 	defer s.mu.Unlock()
 	out := make([]contract.Provider, 0, len(s.byID))
 	for _, provider := range s.byID {
-		if provider.DeletedAt != nil {
-			continue
-		}
 		out = append(out, provider)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out, nil
 }
 
-func (s *Store) SoftDelete(_ context.Context, id int) error {
+func (s *Store) Delete(_ context.Context, id int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	provider, ok := s.byID[id]
-	if !ok || provider.DeletedAt != nil {
+	if !ok {
 		return errors.New("provider not found")
 	}
-	now := time.Now().UTC().Unix()
-	provider.DeletedAt = &now
-	provider.Status = contract.StatusArchived
-	provider.UpdatedAt = time.Now().UTC()
-	s.byID[id] = provider
+	delete(s.byID, id)
 	delete(s.byName, strings.ToLower(provider.Name))
 	return nil
 }

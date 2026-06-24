@@ -267,7 +267,7 @@ func (s *Service) FindProxyByID(ctx context.Context, id int) (contract.ProxyDefi
 	return s.store.FindProxyByID(ctx, id)
 }
 
-// DeleteProxy soft-deletes a proxy and unbinds any accounts that route through
+// DeleteProxy removes a proxy and unbinds any accounts that route through
 // it (by id), which fall back to a direct connection.
 func (s *Service) DeleteProxy(ctx context.Context, id int) error {
 	if id <= 0 {
@@ -276,7 +276,7 @@ func (s *Service) DeleteProxy(ctx context.Context, id int) error {
 	if _, err := s.store.FindProxyByID(ctx, id); err != nil {
 		return err
 	}
-	return s.store.SoftDeleteProxy(ctx, id)
+	return s.store.DeleteProxy(ctx, id)
 }
 
 // defaultProxyTestTarget is a small, plain-text, dependable response over

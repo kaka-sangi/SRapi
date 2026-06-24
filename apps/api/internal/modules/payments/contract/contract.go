@@ -57,7 +57,6 @@ type PaymentProviderInstance struct {
 	Metadata         map[string]any
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
-	DeletedAt        *time.Time
 }
 
 type PaymentMethod struct {
@@ -284,7 +283,7 @@ type Store interface {
 	ListProviderInstances(ctx context.Context) ([]PaymentProviderInstance, error)
 	FindProviderInstanceByID(ctx context.Context, id int) (PaymentProviderInstance, error)
 	UpdateProviderInstance(ctx context.Context, input PaymentProviderInstance) (PaymentProviderInstance, error)
-	SoftDeleteProviderInstance(ctx context.Context, id int) error
+	DeleteProviderInstance(ctx context.Context, id int) error
 	PreviewPromoCode(ctx context.Context, input PromoCodePreviewInput) (PromoCodeApplication, error)
 	ReleasePromoCode(ctx context.Context, input PromoCodeReleaseInput) (PromoCodeApplication, bool, error)
 	CreateOrder(ctx context.Context, input CreateStoredOrder) (PaymentOrder, error)

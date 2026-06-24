@@ -11,7 +11,7 @@ type Provider struct {
 }
 
 func (Provider) Mixin() []ent.Mixin {
-	return []ent.Mixin{TimeMixin{}, SoftDeleteMixin{}}
+	return []ent.Mixin{TimeMixin{}}
 }
 
 func (Provider) Fields() []ent.Field {

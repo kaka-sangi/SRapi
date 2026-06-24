@@ -11,7 +11,7 @@ type Proxy struct {
 }
 
 func (Proxy) Mixin() []ent.Mixin {
-	return []ent.Mixin{TimeMixin{}, SoftDeleteMixin{}}
+	return []ent.Mixin{TimeMixin{}}
 }
 
 func (Proxy) Fields() []ent.Field {

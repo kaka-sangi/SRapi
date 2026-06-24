@@ -29,7 +29,7 @@ func (s *Service) normalizeStripeWebhook(ctx context.Context, req contract.Webho
 		verified   bool
 	)
 	for _, instance := range instances {
-		if instance.Provider != "stripe" || instance.Status != contract.ProviderStatusActive || instance.DeletedAt != nil {
+		if instance.Provider != "stripe" || instance.Status != contract.ProviderStatusActive {
 			continue
 		}
 		config, err := s.decryptConfig(instance, instance.ConfigCiphertext)

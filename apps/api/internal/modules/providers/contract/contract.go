@@ -28,7 +28,6 @@ type Provider struct {
 	ConfigSchema map[string]any
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
-	DeletedAt    *int64
 }
 
 type CreateRequest struct {
@@ -66,7 +65,7 @@ type Store interface {
 	FindByID(ctx context.Context, id int) (Provider, error)
 	FindByName(ctx context.Context, name string) (Provider, error)
 	List(ctx context.Context) ([]Provider, error)
-	SoftDelete(ctx context.Context, id int) error
+	Delete(ctx context.Context, id int) error
 }
 
 // PresetBaseURL resolves the canonical upstream base URL declared by the

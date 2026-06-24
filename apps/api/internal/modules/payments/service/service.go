@@ -180,9 +180,6 @@ func (s *Service) UpdateProviderInstance(ctx context.Context, id int, req contra
 	if err != nil {
 		return contract.PaymentProviderInstance{}, err
 	}
-	if provider.DeletedAt != nil {
-		return contract.PaymentProviderInstance{}, contract.ErrNotFound
-	}
 	originalProvider := provider
 
 	config := map[string]any(nil)
@@ -276,7 +273,7 @@ func (s *Service) DeleteProviderInstance(ctx context.Context, id int) error {
 	if count > 0 {
 		return contract.ErrConflict
 	}
-	return s.store.SoftDeleteProviderInstance(ctx, id)
+	return s.store.DeleteProviderInstance(ctx, id)
 }
 
 func (s *Service) validateProviderUpdateInProgressOrderSafety(ctx context.Context, current contract.PaymentProviderInstance, next contract.PaymentProviderInstance, configReplaced bool) error {
@@ -379,7 +376,7 @@ func (s *Service) ListMethods(ctx context.Context) ([]contract.PaymentMethod, er
 	}
 	out := make([]contract.PaymentMethod, 0)
 	for _, instance := range instances {
-		if instance.Status != contract.ProviderStatusActive || instance.DeletedAt != nil {
+		if instance.Status != contract.ProviderStatusActive {
 			continue
 		}
 		metadata := publicProviderMetadata(instance.Metadata)
@@ -1499,7 +1496,7 @@ func (s *Service) selectProviderInstance(ctx context.Context, method string, amo
 	currency = normalizeCurrency(currency)
 	var candidates []contract.PaymentProviderInstance
 	for _, instance := range instances {
-		if instance.Status != contract.ProviderStatusActive || instance.DeletedAt != nil {
+		if instance.Status != contract.ProviderStatusActive {
 			continue
 		}
 		if !supportsMethod(instance, method) {

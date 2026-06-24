@@ -164,7 +164,6 @@ type ProxyDefinition struct {
 	LastProbeLatencyMs int
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
-	DeletedAt          *time.Time
 }
 
 // ProbeSuccessPct7d returns the rolling 7-day availability percentage rounded
@@ -775,7 +774,7 @@ type Store interface {
 	UpdateProxy(ctx context.Context, proxy ProxyDefinition) (ProxyDefinition, error)
 	FindProxyByID(ctx context.Context, id int) (ProxyDefinition, error)
 	ListProxies(ctx context.Context) ([]ProxyDefinition, error)
-	SoftDeleteProxy(ctx context.Context, id int) error
+	DeleteProxy(ctx context.Context, id int) error
 	CreateGroup(ctx context.Context, input CreateStoredAccountGroup) (AccountGroup, error)
 	UpdateGroup(ctx context.Context, group AccountGroup) (AccountGroup, error)
 	FindGroupByID(ctx context.Context, id int) (AccountGroup, error)

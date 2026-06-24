@@ -549,7 +549,7 @@ func (s *Store) pricingRuleModelFamilies(ctx context.Context, rows []*ent.Pricin
 		return map[int]string{}, nil
 	}
 	models, err := s.client.ModelRegistry.Query().
-		Where(entmodelregistry.IDIn(ids...), entmodelregistry.DeletedAtIsNil()).
+		Where(entmodelregistry.IDIn(ids...)).
 		All(ctx)
 	if err != nil {
 		return nil, err

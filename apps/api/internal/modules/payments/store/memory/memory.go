@@ -72,9 +72,6 @@ func (s *Store) ListProviderInstances(_ context.Context) ([]contract.PaymentProv
 	defer s.mu.Unlock()
 	out := make([]contract.PaymentProviderInstance, 0, len(s.providers))
 	for _, provider := range s.providers {
-		if provider.DeletedAt != nil {
-			continue
-		}
 		out = append(out, cloneProvider(provider))
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -90,24 +87,19 @@ func (s *Store) FindProviderInstanceByID(_ context.Context, id int) (contract.Pa
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	provider, ok := s.providers[id]
-	if !ok || provider.DeletedAt != nil {
+	if !ok {
 		return contract.PaymentProviderInstance{}, contract.ErrNotFound
 	}
 	return cloneProvider(provider), nil
 }
 
-func (s *Store) SoftDeleteProviderInstance(_ context.Context, id int) error {
+func (s *Store) DeleteProviderInstance(_ context.Context, id int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	provider, ok := s.providers[id]
-	if !ok || provider.DeletedAt != nil {
+	if _, ok := s.providers[id]; !ok {
 		return contract.ErrNotFound
 	}
-	now := time.Now().UTC()
-	provider.DeletedAt = &now
-	provider.Status = contract.ProviderStatusDisabled
-	provider.UpdatedAt = now
-	s.providers[id] = provider
+	delete(s.providers, id)
 	return nil
 }
 
@@ -115,11 +107,11 @@ func (s *Store) UpdateProviderInstance(_ context.Context, input contract.Payment
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	current, ok := s.providers[input.ID]
-	if !ok || current.DeletedAt != nil {
+	if !ok {
 		return contract.PaymentProviderInstance{}, contract.ErrNotFound
 	}
 	for _, candidate := range s.providers {
-		if candidate.ID != input.ID && candidate.DeletedAt == nil && candidate.Provider == input.Provider && candidate.Name == input.Name {
+		if candidate.ID != input.ID && candidate.Provider == input.Provider && candidate.Name == input.Name {
 			return contract.PaymentProviderInstance{}, contract.ErrConflict
 		}
 	}
@@ -417,7 +409,6 @@ func cloneProvider(value contract.PaymentProviderInstance) contract.PaymentProvi
 	value.SupportedMethods = cloneStringSlice(value.SupportedMethods)
 	value.Limits = cloneMap(value.Limits)
 	value.Metadata = cloneMap(value.Metadata)
-	value.DeletedAt = cloneTime(value.DeletedAt)
 	return value
 }
 

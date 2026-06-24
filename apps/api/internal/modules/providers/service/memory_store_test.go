@@ -61,7 +61,7 @@ func (s *memoryStore) FindByID(_ context.Context, id int) (contract.Provider, er
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	provider, ok := s.byID[id]
-	if !ok || provider.DeletedAt != nil {
+	if !ok {
 		return contract.Provider{}, errors.New("provider not found")
 	}
 	return provider, nil
@@ -75,9 +75,6 @@ func (s *memoryStore) FindByName(_ context.Context, name string) (contract.Provi
 		return contract.Provider{}, errors.New("provider not found")
 	}
 	provider := s.byID[id]
-	if provider.DeletedAt != nil {
-		return contract.Provider{}, errors.New("provider not found")
-	}
 	return provider, nil
 }
 
@@ -86,25 +83,19 @@ func (s *memoryStore) List(_ context.Context) ([]contract.Provider, error) {
 	defer s.mu.Unlock()
 	out := make([]contract.Provider, 0, len(s.byID))
 	for _, provider := range s.byID {
-		if provider.DeletedAt != nil {
-			continue
-		}
 		out = append(out, provider)
 	}
 	return out, nil
 }
 
-func (s *memoryStore) SoftDelete(_ context.Context, id int) error {
+func (s *memoryStore) Delete(_ context.Context, id int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	provider, ok := s.byID[id]
-	if !ok || provider.DeletedAt != nil {
+	if !ok {
 		return errors.New("provider not found")
 	}
-	now := time.Now().UTC().Unix()
-	provider.DeletedAt = &now
-	provider.Status = contract.StatusArchived
-	s.byID[id] = provider
+	delete(s.byID, id)
 	delete(s.byName, strings.ToLower(provider.Name))
 	return nil
 }

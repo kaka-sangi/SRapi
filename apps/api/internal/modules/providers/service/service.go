@@ -82,7 +82,7 @@ func (s *Service) List(ctx context.Context) ([]contract.Provider, error) {
 	return out, nil
 }
 
-// Delete soft-deletes a provider. The caller is responsible for any
+// Delete removes a provider. The caller is responsible for any
 // cross-module guards (e.g. blocking when accounts still reference it).
 func (s *Service) Delete(ctx context.Context, id int) error {
 	if id <= 0 {
@@ -91,7 +91,7 @@ func (s *Service) Delete(ctx context.Context, id int) error {
 	if _, err := s.store.FindByID(ctx, id); err != nil {
 		return err
 	}
-	return s.store.SoftDelete(ctx, id)
+	return s.store.Delete(ctx, id)
 }
 
 func (s *Service) Update(ctx context.Context, id int, req contract.UpdateRequest) (contract.Provider, error) {

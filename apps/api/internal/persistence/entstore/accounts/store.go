@@ -317,7 +317,6 @@ func (s *Store) UpdateProxy(ctx context.Context, proxy contract.ProxyDefinition)
 		proxy.FallbackMode = contract.ProxyFallbackModeNone
 	}
 	update := s.client.Proxy.UpdateOneID(proxy.ID).
-		Where(entproxy.DeletedAtIsNil()).
 		SetName(proxy.Name).
 		SetType(string(proxy.Type)).
 		SetURLCiphertext([]byte(proxy.URLCiphertext)).
@@ -357,7 +356,7 @@ func (s *Store) UpdateProxy(ctx context.Context, proxy contract.ProxyDefinition)
 
 func (s *Store) FindProxyByID(ctx context.Context, id int) (contract.ProxyDefinition, error) {
 	found, err := s.client.Proxy.Query().
-		Where(entproxy.IDEQ(id), entproxy.DeletedAtIsNil()).
+		Where(entproxy.IDEQ(id)).
 		Only(ctx)
 	if err != nil {
 		return contract.ProxyDefinition{}, err
@@ -367,7 +366,6 @@ func (s *Store) FindProxyByID(ctx context.Context, id int) (contract.ProxyDefini
 
 func (s *Store) ListProxies(ctx context.Context) ([]contract.ProxyDefinition, error) {
 	rows, err := s.client.Proxy.Query().
-		Where(entproxy.DeletedAtIsNil()).
 		Order(entproxy.ByID()).
 		All(ctx)
 	if err != nil {
@@ -380,24 +378,20 @@ func (s *Store) ListProxies(ctx context.Context) ([]contract.ProxyDefinition, er
 	return out, nil
 }
 
-func (s *Store) SoftDeleteProxy(ctx context.Context, id int) error {
-	affected, err := s.client.Proxy.Update().
-		Where(entproxy.IDEQ(id), entproxy.DeletedAtIsNil()).
-		SetDeletedAt(time.Now().UTC()).
-		SetStatus(string(contract.ProxyStatusDisabled)).
-		Save(ctx)
-	if err != nil {
-		return err
-	}
-	if affected == 0 {
-		return errors.New("proxy not found")
-	}
+func (s *Store) DeleteProxy(ctx context.Context, id int) error {
 	// Clear bindings: accounts referencing this proxy fall back to a direct
 	// connection.
 	if _, err := s.client.ProviderAccount.Update().
 		Where(entaccount.ProxyIDEQ(strconv.Itoa(id))).
 		ClearProxyID().
 		Save(ctx); err != nil {
+		return err
+	}
+	err := s.client.Proxy.DeleteOneID(id).Exec(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return errors.New("proxy not found")
+		}
 		return err
 	}
 	return nil
@@ -710,7 +704,6 @@ func toProxy(row *ent.Proxy) contract.ProxyDefinition {
 		LastProbeLatencyMs: row.LastProbeLatencyMs,
 		CreatedAt:          row.CreatedAt,
 		UpdatedAt:          row.UpdatedAt,
-		DeletedAt:          cloneTime(row.DeletedAt),
 	}
 }
 

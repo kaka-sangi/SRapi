@@ -325,11 +325,7 @@ func (s *Store) Delete(ctx context.Context, id int) error {
 		return err
 	}
 	if updated.WorkspaceID != nil {
-		_, err := tx.Workspace.UpdateOneID(*updated.WorkspaceID).
-			SetDeletedAt(now).
-			SetSlug(fmt.Sprintf("deleted-%d-%d", *updated.WorkspaceID, now.UnixNano())).
-			SetStatus("disabled").
-			Save(ctx)
+		err := tx.Workspace.DeleteOneID(*updated.WorkspaceID).Exec(ctx)
 		if err != nil && !ent.IsNotFound(err) {
 			_ = tx.Rollback()
 			return err

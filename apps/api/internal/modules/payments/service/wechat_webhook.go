@@ -17,7 +17,7 @@ func (s *Service) normalizeWechatWebhook(ctx context.Context, req contract.Webho
 		return normalizedWebhook{}, err
 	}
 	for _, instance := range instances {
-		if instance.Provider != "wechat" || instance.Status != contract.ProviderStatusActive || instance.DeletedAt != nil {
+		if instance.Provider != "wechat" || instance.Status != contract.ProviderStatusActive {
 			continue
 		}
 		config, err := s.decryptConfig(instance, instance.ConfigCiphertext)

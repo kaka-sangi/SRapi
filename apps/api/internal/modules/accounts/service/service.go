@@ -164,9 +164,6 @@ func (s *Service) BatchCreateAccounts(ctx context.Context, defaults contract.Bat
 	}
 	taken := make(map[string]struct{}, len(existing))
 	for _, account := range existing {
-		if account.DeletedAt != nil {
-			continue
-		}
 		taken[strings.ToLower(strings.TrimSpace(account.Name))] = struct{}{}
 	}
 
@@ -618,9 +615,6 @@ func (s *Service) ListPage(ctx context.Context, filter contract.ListFilter, limi
 // that lack PageReader. Kept here rather than in the contract so it does not
 // add a runtime-data dependency to the public interface.
 func accountFilterFallbackMatches(account contract.ProviderAccount, filter contract.ListFilter) bool {
-	if account.DeletedAt != nil {
-		return false
-	}
 	if filter.Status == "" {
 		if !filter.IncludeArchived && account.Status == contract.StatusArchived {
 			return false

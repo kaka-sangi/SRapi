@@ -11,7 +11,7 @@ type ModelRegistry struct {
 }
 
 func (ModelRegistry) Mixin() []ent.Mixin {
-	return []ent.Mixin{TimeMixin{}, SoftDeleteMixin{}}
+	return []ent.Mixin{TimeMixin{}}
 }
 
 func (ModelRegistry) Fields() []ent.Field {

@@ -28,7 +28,6 @@ type Model struct {
 	Capabilities    []capabilitiescontract.Descriptor
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
-	DeletedAt       *time.Time
 }
 
 type CreateRequest struct {

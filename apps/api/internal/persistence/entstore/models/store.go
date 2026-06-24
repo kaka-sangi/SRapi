@@ -28,26 +28,6 @@ func New(client *ent.Client) (*Store, error) {
 }
 
 func (s *Store) Create(ctx context.Context, input contract.CreateStoredModel) (contract.Model, error) {
-	tombstone, _ := s.client.ModelRegistry.Query().
-		Where(entmodel.CanonicalNameEqualFold(input.CanonicalName), entmodel.DeletedAtNotNil()).
-		Only(ctx)
-	if tombstone != nil {
-		restored, err := s.client.ModelRegistry.UpdateOneID(tombstone.ID).
-			ClearDeletedAt().
-			SetDisplayName(input.DisplayName).
-			SetNillableFamily(input.Family).
-			SetNillableContextWindow(input.ContextWindow).
-			SetNillableMaxOutputTokens(input.MaxOutputTokens).
-			SetNillableQualityTier(input.QualityTier).
-			SetStatus(string(input.Status)).
-			SetCapabilitiesJSON(descriptorsToMaps(input.Capabilities)).
-			Save(ctx)
-		if err != nil {
-			return contract.Model{}, err
-		}
-		return toModel(restored), nil
-	}
-
 	created, err := s.client.ModelRegistry.Create().
 		SetCanonicalName(input.CanonicalName).
 		SetDisplayName(input.DisplayName).
@@ -66,7 +46,6 @@ func (s *Store) Create(ctx context.Context, input contract.CreateStoredModel) (c
 
 func (s *Store) Update(ctx context.Context, model contract.Model) (contract.Model, error) {
 	update := s.client.ModelRegistry.UpdateOneID(model.ID).
-		Where(entmodel.DeletedAtIsNil()).
 		SetDisplayName(model.DisplayName).
 		SetStatus(string(model.Status)).
 		SetCapabilitiesJSON(descriptorsToMaps(model.Capabilities))
@@ -104,27 +83,20 @@ func (s *Store) Delete(ctx context.Context, id int) error {
 	if id <= 0 {
 		return ErrInvalidStore
 	}
-	// Remove routing sub-resources first so a tombstoned model can never be
-	// resolved through a lingering alias/mapping, then soft-delete the model row
-	// (all queries filter DeletedAtIsNil) to keep historical usage references.
+	// Remove routing sub-resources first so a deleted model can never be
+	// resolved through a lingering alias/mapping.
 	if _, err := s.client.ModelAlias.Delete().Where(entmodelalias.ModelIDEQ(id)).Exec(ctx); err != nil {
 		return err
 	}
 	if _, err := s.client.ModelProviderMapping.Delete().Where(entmodelmapping.ModelIDEQ(id)).Exec(ctx); err != nil {
 		return err
 	}
-	if _, err := s.client.ModelRegistry.Update().
-		Where(entmodel.IDEQ(id), entmodel.DeletedAtIsNil()).
-		SetDeletedAt(time.Now().UTC()).
-		Save(ctx); err != nil {
-		return err
-	}
-	return nil
+	return s.client.ModelRegistry.DeleteOneID(id).Exec(ctx)
 }
 
 func (s *Store) FindByID(ctx context.Context, id int) (contract.Model, error) {
 	found, err := s.client.ModelRegistry.Query().
-		Where(entmodel.IDEQ(id), entmodel.DeletedAtIsNil()).
+		Where(entmodel.IDEQ(id)).
 		Only(ctx)
 	if err != nil {
 		return contract.Model{}, err
@@ -134,7 +106,7 @@ func (s *Store) FindByID(ctx context.Context, id int) (contract.Model, error) {
 
 func (s *Store) FindByCanonicalName(ctx context.Context, canonicalName string) (contract.Model, error) {
 	found, err := s.client.ModelRegistry.Query().
-		Where(entmodel.CanonicalNameEqualFold(canonicalName), entmodel.DeletedAtIsNil()).
+		Where(entmodel.CanonicalNameEqualFold(canonicalName)).
 		Only(ctx)
 	if err != nil {
 		return contract.Model{}, err
@@ -291,7 +263,6 @@ func (s *Store) UpdateMapping(ctx context.Context, id int, input contract.Update
 
 func (s *Store) List(ctx context.Context) ([]contract.Model, error) {
 	rows, err := s.client.ModelRegistry.Query().
-		Where(entmodel.DeletedAtIsNil()).
 		Order(entmodel.ByID()).
 		All(ctx)
 	if err != nil {
@@ -317,7 +288,6 @@ func toModel(row *ent.ModelRegistry) contract.Model {
 		Capabilities:    mapsToDescriptors(row.CapabilitiesJSON),
 		CreatedAt:       row.CreatedAt,
 		UpdatedAt:       row.UpdatedAt,
-		DeletedAt:       cloneTime(row.DeletedAt),
 	}
 }
 
