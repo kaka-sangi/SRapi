@@ -53,8 +53,21 @@ func (p Provider) CreateSession(req checkoutprovider.Request) (checkoutprovider.
 	signingSecret := configString(req.Config, "client_secret", "key", "signing_secret", "secret")
 	notifyURL := configString(req.Config, "notify_url", "webhook_url")
 	returnURL := configString(req.Config, "return_url", "success_url")
-	if merchantID == "" || signingSecret == "" || notifyURL == "" || returnURL == "" {
-		return checkoutprovider.Session{}, checkoutprovider.ErrInvalidConfig
+	var missing []string
+	if merchantID == "" {
+		missing = append(missing, "client_id")
+	}
+	if signingSecret == "" {
+		missing = append(missing, "client_secret")
+	}
+	if notifyURL == "" {
+		missing = append(missing, "notify_url")
+	}
+	if returnURL == "" {
+		missing = append(missing, "return_url")
+	}
+	if len(missing) > 0 {
+		return checkoutprovider.Session{}, fmt.Errorf("%w: missing %s", checkoutprovider.ErrInvalidConfig, strings.Join(missing, ", "))
 	}
 
 	exchangeRate := configFloat(req.Config, "exchange_rate", "rate")
