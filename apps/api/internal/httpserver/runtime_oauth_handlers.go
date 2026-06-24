@@ -239,7 +239,14 @@ func (s *Server) handleCompleteOAuthAuthorization(w http.ResponseWriter, r *http
 
 	ctx, cancel := context.WithTimeout(r.Context(), oauthProviderHTTPTimeout)
 	defer cancel()
-	accessToken, idToken, err := exchangeOAuthAuthorizationCode(ctx, http.DefaultClient, config, flow, code, s.oauthClientSecretWithStored(flow.ProviderKey))
+	clientSecret := s.oauthClientSecretWithStored(flow.ProviderKey)
+	if strings.ToLower(strings.TrimSpace(config.TokenAuthMethod)) != oauthTokenAuthMethodNone && clientSecret == "" {
+		s.clearOAuthFlowCookie(w)
+		s.logger.Warn("oauth client secret not configured", "provider", provider, "provider_key", flow.ProviderKey)
+		writeStandardError(w, http.StatusBadGateway, apiopenapi.PROVIDERAUTHFAILED, "oauth client secret not configured", requestID)
+		return
+	}
+	accessToken, idToken, err := exchangeOAuthAuthorizationCode(ctx, http.DefaultClient, config, flow, code, clientSecret)
 	if err != nil {
 		s.clearOAuthFlowCookie(w)
 		s.logger.Warn("oauth token exchange failed", "provider", provider, "provider_key", flow.ProviderKey, "error", err)
@@ -1042,21 +1049,29 @@ func exchangeOAuthAuthorizationCode(ctx context.Context, client *http.Client, co
 		return "", "", err
 	}
 	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
-		return "", "", fmt.Errorf("oauth token endpoint status %d", resp.StatusCode)
+		return "", "", fmt.Errorf("oauth token endpoint status %d: %s", resp.StatusCode, string(respBody))
 	}
 	var body struct {
-		AccessToken string `json:"access_token"`
-		IDToken     string `json:"id_token"`
-		TokenType   string `json:"token_type"`
-		Error       string `json:"error"`
+		AccessToken      string `json:"access_token"`
+		IDToken          string `json:"id_token"`
+		TokenType        string `json:"token_type"`
+		Error            string `json:"error"`
+		ErrorDescription string `json:"error_description"`
 	}
-	if err := decodeOAuthProviderJSON(resp.Body, &body); err != nil {
-		return "", "", err
+	if err := json.Unmarshal(respBody, &body); err != nil {
+		return "", "", fmt.Errorf("oauth token endpoint returned invalid json: %s", string(respBody))
 	}
 	if strings.TrimSpace(body.Error) != "" || strings.TrimSpace(body.AccessToken) == "" {
-		return "", "", errors.New("oauth token endpoint returned no access token")
+		desc := strings.TrimSpace(body.ErrorDescription)
+		if desc == "" {
+			desc = strings.TrimSpace(body.Error)
+		}
+		if desc == "" {
+			desc = "no access_token in response"
+		}
+		return "", "", fmt.Errorf("oauth token exchange failed: %s", desc)
 	}
 	if body.TokenType != "" && !strings.EqualFold(strings.TrimSpace(body.TokenType), "bearer") {
 		return "", "", errors.New("oauth token endpoint returned unsupported token type")
