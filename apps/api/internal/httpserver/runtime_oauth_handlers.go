@@ -1023,6 +1023,12 @@ func exchangeOAuthAuthorizationCode(ctx context.Context, client *http.Client, co
 	method := strings.ToLower(strings.TrimSpace(config.TokenAuthMethod))
 	secret := strings.TrimSpace(clientSecret)
 
+	// If a secret is stored but method says "none" (misconfiguration from old
+	// normalizer bug), fall back to client_secret_post so the secret is sent.
+	if method == oauthTokenAuthMethodNone && secret != "" {
+		method = oauthTokenAuthMethodClientSecretPost
+	}
+
 	switch method {
 	case "", oauthTokenAuthMethodClientSecretPost:
 		if secret != "" {
