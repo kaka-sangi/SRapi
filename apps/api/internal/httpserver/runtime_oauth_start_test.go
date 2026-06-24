@@ -161,8 +161,11 @@ func TestOAuthCallbackExchangesCodeAndCreatesPendingCookie(t *testing.T) {
 	if callbackRec.Code != http.StatusFound {
 		t.Fatalf("expected oauth callback 302, got %d body=%s", callbackRec.Code, callbackRec.Body.String())
 	}
-	if got := callbackRec.Header().Get("Location"); got != "/dashboard" {
+	if got := callbackRec.Header().Get("Location"); !strings.HasPrefix(got, "/dashboard") {
 		t.Fatalf("expected callback redirect /dashboard, got %q", got)
+	}
+	if got := callbackRec.Header().Get("Location"); !strings.Contains(got, "_csrf=") {
+		t.Fatalf("expected _csrf in redirect URL, got %q", got)
 	}
 	for key, want := range map[string]string{
 		"grant_type":    "authorization_code",

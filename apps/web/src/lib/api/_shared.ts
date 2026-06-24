@@ -12,6 +12,19 @@ const DEFAULT_PROXY_TARGET = 'http://127.0.0.1:8080';
 const HEALTH_TIMEOUT_MS = 2500;
 const USER_STORAGE_KEY = 'srapi_user';
 
+// Pick up a CSRF token from the URL (set by OAuth redirect-based login)
+// and store it in localStorage so subsequent API calls include it.
+if (typeof window !== "undefined") {
+  const params = new URLSearchParams(window.location.search);
+  const oauthCSRF = params.get("_csrf");
+  if (oauthCSRF) {
+    localStorage.setItem(CSRF_STORAGE_KEY, oauthCSRF);
+    params.delete("_csrf");
+    const clean = params.toString();
+    window.history.replaceState({}, "", window.location.pathname + (clean ? "?" + clean : ""));
+  }
+}
+
 export function parseMoneyValue(value: string | number | undefined): number {
   if (typeof value === 'number') return value;
   return parseFloat(value || '0');

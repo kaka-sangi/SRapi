@@ -935,10 +935,7 @@ func (s *Server) completeOAuthExistingIdentityLogin(w http.ResponseWriter, r *ht
 		"provider_key": providerKey,
 		"user_id":      user.ID,
 	}))
-	if strings.TrimSpace(redirectTo) == "" {
-		redirectTo = "/"
-	}
-	http.Redirect(w, r, redirectTo, http.StatusFound)
+	http.Redirect(w, r, oauthRedirectWithCSRF(redirectTo, loginResult.Session.CSRFToken), http.StatusFound)
 	return true
 }
 
@@ -1018,12 +1015,28 @@ func (s *Server) autoRegisterOAuthUser(w http.ResponseWriter, r *http.Request, p
 		"provider_key": flow.ProviderKey,
 		"email":        email,
 	}))
-	redirectTo := strings.TrimSpace(flow.RedirectTo)
+	redirectTo := oauthRedirectWithCSRF(flow.RedirectTo, loginResult.Session.CSRFToken)
+	http.Redirect(w, r, redirectTo, http.StatusFound)
+	return true
+}
+
+// oauthRedirectWithCSRF appends the CSRF token to the redirect target so the
+// frontend can pick it up from the URL and store it in localStorage. Without
+// this, OAuth redirect-based logins (auto-register, existing identity) leave
+// the frontend without a CSRF token — every subsequent mutation returns 403.
+func oauthRedirectWithCSRF(redirectTo string, csrfToken string) string {
+	redirectTo = strings.TrimSpace(redirectTo)
 	if redirectTo == "" {
 		redirectTo = "/"
 	}
-	http.Redirect(w, r, redirectTo, http.StatusFound)
-	return true
+	if csrfToken == "" {
+		return redirectTo
+	}
+	sep := "?"
+	if strings.Contains(redirectTo, "?") {
+		sep = "&"
+	}
+	return redirectTo + sep + "_csrf=" + url.QueryEscape(csrfToken)
 }
 
 func selectOAuthProviderConfig(settings admincontrolcontract.AdminSettingsSecurity, provider userscontract.AuthIdentityProvider, providerKey string) (admincontrolcontract.OAuthProviderConfig, bool) {
