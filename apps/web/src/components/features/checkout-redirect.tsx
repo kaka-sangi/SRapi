@@ -135,20 +135,7 @@ function PendingCheckout({ order }: { order: PaymentOrder }) {
   }
 
   if (shape.kind === "external") {
-    return (
-      <div className="mt-3 flex flex-wrap items-center gap-3">
-        <Button asChild variant="primary" size="sm">
-          <a href={shape.url} target="_blank" rel="noopener noreferrer">
-            <ExternalLink className="size-3.5" />
-            {t("billing.goPay")}
-          </a>
-        </Button>
-        <span className="inline-flex items-center gap-1.5 text-xs text-srapi-text-tertiary">
-          <Loader2 className="size-3.5 animate-spin" aria-hidden />
-          {t("billing.waitingPayment")}
-        </span>
-      </div>
-    );
+    return <ExternalCheckout url={shape.url} autoRedirect={shape.autoRedirect} />;
   }
 
   if (shape.kind === "qr") {
@@ -193,9 +180,42 @@ function PendingCheckout({ order }: { order: PaymentOrder }) {
   );
 }
 
+function ExternalCheckout({ url, autoRedirect }: { url: string; autoRedirect?: boolean }) {
+  const { t } = useLanguage();
+  useEffect(() => {
+    if (autoRedirect) {
+      window.location.href = url;
+    }
+  }, [autoRedirect, url]);
+
+  if (autoRedirect) {
+    return (
+      <div className="mt-3 inline-flex items-center gap-1.5 text-xs text-srapi-text-tertiary">
+        <Loader2 className="size-3.5 animate-spin" aria-hidden />
+        {t("billing.redirectingPayment")}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-3">
+      <Button asChild variant="primary" size="sm">
+        <a href={url} target="_blank" rel="noopener noreferrer">
+          <ExternalLink className="size-3.5" />
+          {t("billing.goPay")}
+        </a>
+      </Button>
+      <span className="inline-flex items-center gap-1.5 text-xs text-srapi-text-tertiary">
+        <Loader2 className="size-3.5 animate-spin" aria-hidden />
+        {t("billing.waitingPayment")}
+      </span>
+    </div>
+  );
+}
+
 type CheckoutShape =
   | { kind: "none" }
-  | { kind: "external"; url: string }
+  | { kind: "external"; url: string; autoRedirect?: boolean }
   | { kind: "qr"; url: string; providerLabel?: string }
   | { kind: "deeplink"; url: string };
 
@@ -230,6 +250,12 @@ function detectCheckoutShape(order: PaymentOrder): CheckoutShape {
       return { kind: "qr", url, providerLabel: "Alipay" };
     }
     return { kind: "external", url };
+  }
+
+  // EasyPay / Linux.do Credit: auto-redirect to the payment page (same-window
+  // form submission) — the return_url brings the user back after payment.
+  if (provider === "linuxdo" || provider === "easypay") {
+    return { kind: "external", url, autoRedirect: true };
   }
 
   // Stripe + everything else with an HTTPS checkout: open the hosted page.

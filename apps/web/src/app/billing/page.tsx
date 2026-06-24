@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { ShoppingCart, CreditCard, Receipt } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { ShoppingCart, CreditCard, Receipt, CheckCircle2 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { AdminListView, type Column } from "@/components/admin/admin-list-view";
 import { SectionHero } from "@/components/visual/section-hero";
@@ -59,9 +60,37 @@ export default function BillingPage() {
 
 function BillingContent() {
   const { t } = useLanguage();
+  const params = useSearchParams();
+  const returnOrderNo = params.get("order_no") || params.get("out_trade_no") || "";
+  const tradeStatus = params.get("trade_status") || "";
+  const paymentReturned = returnOrderNo !== "";
+  const paymentSuccess = tradeStatus === "TRADE_SUCCESS";
+
+  useEffect(() => {
+    if (returnOrderNo) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("order_no");
+      url.searchParams.delete("out_trade_no");
+      url.searchParams.delete("trade_no");
+      url.searchParams.delete("trade_status");
+      url.searchParams.delete("type");
+      url.searchParams.delete("money");
+      url.searchParams.delete("name");
+      url.searchParams.delete("pid");
+      url.searchParams.delete("sign");
+      url.searchParams.delete("sign_type");
+      window.history.replaceState({}, "", url.pathname + (url.search || ""));
+    }
+  }, [returnOrderNo]);
 
   return (
     <>
+      {paymentReturned && paymentSuccess ? (
+        <div className="mx-auto mb-4 flex max-w-2xl items-center gap-2 rounded-xl border border-srapi-success/30 bg-srapi-success/5 px-4 py-3 text-sm text-srapi-success">
+          <CheckCircle2 className="size-4 shrink-0" />
+          {t("billing.paymentSuccess")}
+        </div>
+      ) : null}
       <SectionHero
         eyebrow="Account · Billing"
         title={t("billing.title")}
