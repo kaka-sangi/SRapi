@@ -55,7 +55,7 @@ export const SelectContent = React.forwardRef<
       ref={ref}
       position={position}
       className={cn(
-        "srapi-anim-pop z-50 max-h-72 min-w-[8rem] overflow-hidden rounded-lg border border-srapi-border bg-srapi-card p-1 shadow-md",
+        "srapi-anim-pop z-50 max-h-72 min-w-[8rem] overflow-y-auto overscroll-contain rounded-lg border border-srapi-border bg-srapi-card p-1 shadow-md",
         position === "popper" && "w-[var(--radix-select-trigger-width)]",
         className,
       )}

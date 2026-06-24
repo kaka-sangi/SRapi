@@ -19,7 +19,7 @@ export const PopoverContent = React.forwardRef<
       sideOffset={sideOffset}
       className={cn(
         // Modern soft popover: big radius, hairline border, layered drop shadow.
-        "srapi-anim-pop z-50 max-h-[min(22rem,var(--radix-popover-content-available-height))] overflow-hidden rounded-lg border border-srapi-border bg-srapi-card p-1 text-srapi-text-primary shadow-md",
+        "srapi-anim-pop z-50 max-h-[min(22rem,var(--radix-popover-content-available-height))] overflow-y-auto overscroll-contain rounded-lg border border-srapi-border bg-srapi-card p-1 text-srapi-text-primary shadow-md",
         className,
       )}
       {...props}
