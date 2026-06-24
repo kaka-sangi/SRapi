@@ -1410,7 +1410,9 @@ func (s *Server) handlePaymentWebhook(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	provider := strings.TrimSpace(r.PathValue("provider"))
 	var body apiopenapi.PaymentWebhookRequest
-	if provider == "stripe" || provider == "wechat" {
+
+	switch {
+	case provider == "stripe" || provider == "wechat":
 		raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, s.cfg.Gateway.MaxBodySize))
 		if err != nil {
 			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid payment webhook request", requestID)
@@ -1421,12 +1423,26 @@ func (s *Server) handlePaymentWebhook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		body["raw_body"] = string(raw)
-	} else {
+
+	case provider == "linuxdo" || provider == "easypay":
+		if err := r.ParseForm(); err != nil {
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid payment webhook request", requestID)
+			return
+		}
+		body = make(apiopenapi.PaymentWebhookRequest)
+		for key, values := range r.PostForm {
+			if len(values) > 0 {
+				body[key] = values[0]
+			}
+		}
+
+	default:
 		if err := s.decodeJSONBody(w, r, &body); err != nil {
 			writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid payment webhook request", requestID)
 			return
 		}
 	}
+
 	result, err := s.runtime.payments.HandleWebhook(r.Context(), paymentcontract.WebhookRequest{
 		Provider: provider,
 		Headers:  singleValueHeaders(r.Header),
@@ -1436,7 +1452,7 @@ func (s *Server) handlePaymentWebhook(w http.ResponseWriter, r *http.Request) {
 		writePaymentServiceError(w, err, requestID)
 		return
 	}
-	if provider == "alipay" {
+	if provider == "alipay" || provider == "linuxdo" || provider == "easypay" {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("success"))

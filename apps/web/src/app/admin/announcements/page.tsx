@@ -87,7 +87,7 @@ function AnnouncementsContent() {
   const [readsTarget, setReadsTarget] = useState<Announcement | null>(null);
   const isNew = formTarget === "new";
 
-  const enumOptions = (values: readonly string[]) => values.map((v) => ({ value: v, label: v }));
+  const enumOptions = (values: readonly string[]) => values.map((v) => ({ value: v, label: t(`common.${v}`) }));
   const fields: FieldConfig<AnnouncementFormState>[] = [
     { name: "title", label: t("adminAnnouncements.headline") },
     { name: "content", label: t("adminAnnouncements.content"), type: "textarea" },

@@ -216,7 +216,7 @@ function ProxiesContent() {
       name: "type",
       label: t("adminProxies.protocol"),
       type: "select",
-      options: enumOptions(PROXY_TYPES),
+      options: enumOptions(PROXY_TYPES, t),
     },
     {
       name: "url",
@@ -242,7 +242,7 @@ function ProxiesContent() {
       name: "status",
       label: t("adminCommon.status"),
       type: "select",
-      options: enumOptions(PROXY_STATUSES),
+      options: enumOptions(PROXY_STATUSES, t),
       advanced: true,
     },
     {

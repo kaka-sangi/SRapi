@@ -1054,13 +1054,7 @@ func (s *Service) normalizeWebhook(ctx context.Context, provider string, req con
 		return s.normalizeWechatWebhook(ctx, req)
 	}
 	if provider == "linuxdo" || provider == "easypay" {
-		return normalizedWebhook{
-			OrderNo:        payloadString(req.Payload, "out_trade_no", "order_no"),
-			TransactionID:  payloadString(req.Payload, "trade_no", "transaction_id"),
-			Status:         normalizeProviderStatus(payloadString(req.Payload, "trade_status", "status")),
-			IdempotencyKey: payloadString(req.Payload, "idempotency_key", "event_id"),
-			Payload:        req.Payload,
-		}, nil
+		return s.normalizeEpayWebhook(ctx, req)
 	}
 	return normalizedWebhook{
 		OrderNo:        payloadString(req.Payload, "order_no"),
@@ -1665,7 +1659,7 @@ func canonicalPayload(payload map[string]any) string {
 	keys := make([]string, 0, len(payload))
 	for key := range payload {
 		normalized := strings.ToLower(strings.TrimSpace(key))
-		if normalized == "" || normalized == "signature" || normalized == "sign" {
+		if normalized == "" || normalized == "signature" || normalized == "sign" || normalized == "sign_type" {
 			continue
 		}
 		keys = append(keys, key)
@@ -1679,12 +1673,15 @@ func canonicalPayload(payload map[string]any) string {
 }
 
 func verifyWebhookOrder(order contract.PaymentOrder, payload map[string]any) error {
-	amount, ok := normalizeMoney(payloadString(payload, "amount", "money"))
-	if !ok || amount != payableAmount(order) {
-		return ErrOrderMismatch
+	amountStr := payloadString(payload, "amount", "money")
+	if amountStr != "" {
+		amount, ok := normalizeMoney(amountStr)
+		if !ok || amount != payableAmount(order) {
+			return ErrOrderMismatch
+		}
 	}
 	currency := normalizeCurrency(payloadString(payload, "currency"))
-	if currency != order.Currency {
+	if currency != "" && currency != order.Currency {
 		return ErrOrderMismatch
 	}
 	return nil

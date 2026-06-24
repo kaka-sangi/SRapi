@@ -194,7 +194,7 @@ export function PlansPanel() {
       name: "status",
       label: t("adminCommon.status"),
       type: "select",
-      options: enumOptions(SUBSCRIPTION_PLAN_STATUSES),
+      options: enumOptions(SUBSCRIPTION_PLAN_STATUSES, t),
     },
   ];
 

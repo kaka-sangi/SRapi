@@ -1,6 +1,7 @@
 package entstore
 
 import (
+	"context"
 	"errors"
 
 	"github.com/srapi/srapi/apps/api/ent"
@@ -283,4 +284,14 @@ func New(client *ent.Client) (Stores, error) {
 		BackupSnapshots:    backupSnapshots,
 		UsageBilling:       usageBilling,
 	}, nil
+}
+
+// SeedDefaults populates first-boot default data (error passthrough rules, etc.)
+// when their stores are empty. Safe to call on every boot — existing data is never
+// overwritten.
+func (s Stores) SeedDefaults(ctx context.Context) (int, error) {
+	if s.ErrorPassthrough == nil {
+		return 0, nil
+	}
+	return errorpassthroughcontract.SeedDefaultRules(ctx, s.ErrorPassthrough)
 }

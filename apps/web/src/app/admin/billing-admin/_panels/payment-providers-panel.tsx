@@ -199,7 +199,7 @@ export function PaymentProvidersPanel() {
       name: "status",
       label: t("adminCommon.status"),
       type: "select",
-      options: enumOptions(PAYMENT_PROVIDER_STATUSES),
+      options: enumOptions(PAYMENT_PROVIDER_STATUSES, t),
     },
     {
       name: "supportedMethodsText",

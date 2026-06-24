@@ -31,9 +31,15 @@ import { useToast } from "@/context/ToastContext";
 import { cn } from "@/lib/cn";
 import { adminErrorMessage } from "@/lib/admin-api";
 
-/** Map an enum string array (e.g. PROXY_TYPES) into select options. */
-export function enumOptions(values: readonly string[]): { value: string; label: string }[] {
-  return values.map((value) => ({ value, label: value }));
+/** Map an enum string array into select options with i18n labels via `common.<value>` keys. */
+export function enumOptions(
+  values: readonly string[],
+  t?: (key: string) => string,
+): { value: string; label: string }[] {
+  return values.map((value) => ({
+    value,
+    label: t ? t(`common.${value}`) : value,
+  }));
 }
 
 type FieldType =

@@ -203,14 +203,14 @@ function UsersContent() {
     { name: "name", label: t("adminUsers.name"), required: true },
     { name: "password", label: t("adminUsers.password"), type: "password", required: true },
     { name: "rolesCsv", label: t("adminUsers.roles"), placeholder: "user, admin" },
-    { name: "status", label: t("adminCommon.status"), type: "select", options: enumOptions(USER_STATUSES) },
+    { name: "status", label: t("adminCommon.status"), type: "select", options: enumOptions(USER_STATUSES, t) },
     { name: "rpmLimit", label: t("adminUsers.rpmLimit"), type: "number", placeholder: t("adminUsers.unlimited") },
   ];
 
   const editFields: FieldConfig<UserEditFormState>[] = [
     { name: "name", label: t("adminUsers.name") },
     { name: "rolesCsv", label: t("adminUsers.roles"), placeholder: "user, admin" },
-    { name: "status", label: t("adminCommon.status"), type: "select", options: enumOptions(USER_STATUSES) },
+    { name: "status", label: t("adminCommon.status"), type: "select", options: enumOptions(USER_STATUSES, t) },
     { name: "rpmLimit", label: t("adminUsers.rpmLimit"), type: "number", placeholder: t("adminUsers.unlimited") },
   ];
 
@@ -224,7 +224,7 @@ function UsersContent() {
         return undefined;
       },
     },
-    { name: "operation", label: t("adminUsers.operation"), type: "select", options: enumOptions(BALANCE_OPERATIONS) },
+    { name: "operation", label: t("adminUsers.operation"), type: "select", options: enumOptions(BALANCE_OPERATIONS, t) },
     { name: "currency", label: t("adminCommon.currency") },
     { name: "note", label: t("adminUsers.note"), type: "textarea" },
   ];

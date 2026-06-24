@@ -407,7 +407,8 @@ function OAuthProviderConfigsEditor({
       authorize_url: "https://connect.linux.do/oauth2/authorize",
       token_url: "https://connect.linux.do/oauth2/token",
       userinfo_url: "https://connect.linux.do/api/user",
-      scopes: ["openid", "profile", "email"],
+      token_auth_method: "client_secret_basic",
+      scopes: ["user"],
     },
   };
 

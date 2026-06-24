@@ -22,7 +22,9 @@ import (
 )
 
 const (
-	oauthTokenAuthMethodNone        = "none"
+	oauthTokenAuthMethodNone             = "none"
+	oauthTokenAuthMethodClientSecretPost = "client_secret_post"
+	oauthTokenAuthMethodClientSecretBasic = "client_secret_basic"
 	oauthProviderHTTPTimeout        = 10 * time.Second
 	oauthProviderBodyLimit          = 1 << 20
 	pendingOAuthActionCreateAccount = "create_account"
@@ -955,7 +957,10 @@ func oauthProviderEnabled(enabled []string, provider userscontract.AuthIdentityP
 }
 
 func callbackOAuthProviderConfigReady(config admincontrolcontract.OAuthProviderConfig) bool {
-	if strings.ToLower(strings.TrimSpace(config.TokenAuthMethod)) != oauthTokenAuthMethodNone {
+	method := strings.ToLower(strings.TrimSpace(config.TokenAuthMethod))
+	switch method {
+	case oauthTokenAuthMethodNone, oauthTokenAuthMethodClientSecretPost, oauthTokenAuthMethodClientSecretBasic:
+	default:
 		return false
 	}
 	return validOAuthBackchannelURL(config.TokenURL) && validOAuthBackchannelURL(config.UserInfoURL)
@@ -1007,17 +1012,31 @@ func exchangeOAuthAuthorizationCode(ctx context.Context, client *http.Client, co
 	form.Set("redirect_uri", flow.RedirectURI)
 	form.Set("client_id", flow.ClientID)
 	form.Set("code_verifier", flow.CodeVerifier)
-	// Confidential clients additionally authenticate with a client_secret
-	// (client_secret_post). PKCE and the secret coexist; public clients omit it.
-	if secret := strings.TrimSpace(clientSecret); secret != "" {
-		form.Set("client_secret", secret)
+
+	method := strings.ToLower(strings.TrimSpace(config.TokenAuthMethod))
+	secret := strings.TrimSpace(clientSecret)
+
+	switch method {
+	case "", oauthTokenAuthMethodClientSecretPost:
+		if secret != "" {
+			form.Set("client_secret", secret)
+		}
+	case oauthTokenAuthMethodClientSecretBasic:
+		// secret sent via Authorization header below
+	case oauthTokenAuthMethodNone:
+		// public client — no secret
 	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimSpace(config.TokenURL), strings.NewReader(form.Encode()))
 	if err != nil {
 		return "", "", err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
+
+	if method == oauthTokenAuthMethodClientSecretBasic && secret != "" {
+		req.SetBasicAuth(flow.ClientID, secret)
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", "", err

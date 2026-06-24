@@ -148,7 +148,7 @@ function ModelsContent() {
       hint: t("adminModels.capabilitiesHint"),
     },
     { name: "qualityTier", label: t("adminModels.qualityTier"), help: t("adminModels.qualityTierHelp"), placeholder: "premium, standard", advanced: true },
-    { name: "status", label: t("adminCommon.status"), type: "select", options: enumOptions(MODEL_STATUSES) },
+    { name: "status", label: t("adminCommon.status"), type: "select", options: enumOptions(MODEL_STATUSES, t) },
   ];
 
   const createFields: FieldConfig<ModelFormState>[] = [
@@ -172,7 +172,7 @@ function ModelsContent() {
       placeholder: "gpt-4o",
       suggestions: PRESET_MODEL_NAMES,
     },
-    { name: "status", label: t("adminCommon.status"), type: "select", options: enumOptions(MODEL_STATUSES) },
+    { name: "status", label: t("adminCommon.status"), type: "select", options: enumOptions(MODEL_STATUSES, t) },
     {
       name: "strategyHint",
       label: t("adminModels.strategyHintLabel"),
@@ -204,7 +204,7 @@ function ModelsContent() {
       placeholder: "gpt-4o-2024-08-06",
       suggestions: PRESET_MODEL_NAMES,
     },
-    { name: "status", label: t("adminCommon.status"), type: "select", options: enumOptions(MODEL_STATUSES) },
+    { name: "status", label: t("adminCommon.status"), type: "select", options: enumOptions(MODEL_STATUSES, t) },
     {
       name: "capabilities",
       label: t("adminModels.capabilityOverride"),
@@ -402,7 +402,7 @@ function ModelsContent() {
               size="sm"
               options={[
                 { value: "__all__", label: t("common.all") },
-                ...enumOptions(MODEL_STATUSES).map((opt) => ({
+                ...enumOptions(MODEL_STATUSES, t).map((opt) => ({
                   value: opt.value,
                   label: opt.label,
                 })),

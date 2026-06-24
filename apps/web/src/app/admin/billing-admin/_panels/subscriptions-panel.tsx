@@ -131,7 +131,7 @@ export function SubscriptionsPanel() {
       name: "status",
       label: t("adminCommon.status"),
       type: "select",
-      options: enumOptions(USER_SUBSCRIPTION_STATUSES),
+      options: enumOptions(USER_SUBSCRIPTION_STATUSES, t),
     },
     { name: "startsAtLocal", label: t("adminCommon.startsAt"), type: "datetime" },
     { name: "expiresAtLocal", label: t("adminCommon.expiresAt"), type: "datetime" },

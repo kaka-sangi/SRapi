@@ -230,7 +230,7 @@ function RedeemContent() {
       name: "type",
       label: t("adminCommon.type"),
       type: "select",
-      options: enumOptions(REDEEM_CODE_TYPES),
+      options: enumOptions(REDEEM_CODE_TYPES, t),
     },
     { name: "value", label: t("adminPromos.value") },
     { name: "currency", label: t("adminCommon.currency") },

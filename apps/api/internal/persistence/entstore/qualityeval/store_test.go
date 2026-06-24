@@ -13,6 +13,10 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+type fixedClock struct{ t time.Time }
+
+func (c fixedClock) Now() time.Time { return c.t }
+
 func TestStorePersistsSamplesAndAggregatesEvaluations(t *testing.T) {
 	client := enttest.Open(t, dialect.SQLite, "file:"+t.TempDir()+"/quality-eval.db?_fk=1")
 	defer client.Close()
@@ -21,11 +25,11 @@ func TestStorePersistsSamplesAndAggregatesEvaluations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new quality eval store: %v", err)
 	}
-	svc, err := qualityservice.New(store, "quality_eval_master_key_32_bytes_min", nil)
+	now := time.Date(2026, 5, 25, 2, 0, 0, 0, time.UTC)
+	svc, err := qualityservice.New(store, "quality_eval_master_key_32_bytes_min", fixedClock{t: now})
 	if err != nil {
 		t.Fatalf("new quality service: %v", err)
 	}
-	now := time.Date(2026, 5, 25, 2, 0, 0, 0, time.UTC)
 	sample, created, err := svc.CaptureSample(t.Context(), qualitycontract.CaptureSampleRequest{
 		FeedbackID:      1,
 		RequestID:       "req_quality_store",

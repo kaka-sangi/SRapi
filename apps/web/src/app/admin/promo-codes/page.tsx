@@ -76,7 +76,7 @@ function PromoContent() {
       name: "discountType",
       label: t("adminPromos.discountType"),
       type: "select",
-      options: enumOptions(PROMO_DISCOUNT_TYPES),
+      options: enumOptions(PROMO_DISCOUNT_TYPES, t),
     },
     { name: "discountValue", label: t("adminPromos.value") },
     { name: "currency", label: t("adminCommon.currency") },
@@ -87,7 +87,7 @@ function PromoContent() {
       name: "status",
       label: t("adminCommon.status"),
       type: "select",
-      options: enumOptions(PROMO_CODE_STATUSES),
+      options: enumOptions(PROMO_CODE_STATUSES, t),
     },
     { name: "startsAtLocal", label: t("adminCommon.startsAt"), type: "datetime" },
     { name: "expiresAtLocal", label: t("adminCommon.expiresAt"), type: "datetime" },
@@ -276,7 +276,7 @@ function PromoContent() {
               size="sm"
               options={[
                 { value: "all", label: t("adminCommon.allStatuses") },
-                ...enumOptions(PROMO_CODE_STATUSES).map((o) => ({
+                ...enumOptions(PROMO_CODE_STATUSES, t).map((o) => ({
                   value: o.value,
                   label: statusLabel(t, o.value as PromoCode["status"]),
                 })),

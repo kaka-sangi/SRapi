@@ -149,7 +149,7 @@ function ProvidersContent() {
       name: "adapterType",
       label: t("adminProviders.adapterType"),
       type: "select",
-      options: enumOptions(PROVIDER_ADAPTER_TYPES),
+      options: enumOptions(PROVIDER_ADAPTER_TYPES, t),
       hint: t("adminProviders.adapterHint"),
     },
     {
@@ -157,13 +157,13 @@ function ProvidersContent() {
       label: t("adminProviders.protocol"),
       help: t("adminProviders.protocolHelp"),
       type: "select",
-      options: enumOptions(PROVIDER_PROTOCOLS),
+      options: enumOptions(PROVIDER_PROTOCOLS, t),
     },
     {
       name: "status",
       label: t("adminCommon.status"),
       type: "select",
-      options: enumOptions(RESOURCE_STATUSES),
+      options: enumOptions(RESOURCE_STATUSES, t),
     },
     {
       name: "chatCompletionsCapability",
@@ -408,7 +408,7 @@ function ProvidersContent() {
               size="sm"
               options={[
                 { value: "__all__", label: t("common.all") },
-                ...enumOptions(RESOURCE_STATUSES).map((opt) => ({
+                ...enumOptions(RESOURCE_STATUSES, t).map((opt) => ({
                   value: opt.value,
                   label: opt.label,
                 })),

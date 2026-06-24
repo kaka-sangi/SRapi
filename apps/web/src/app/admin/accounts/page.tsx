@@ -1350,7 +1350,7 @@ function AccountsContent() {
         size="sm"
         options={[
           { value: "__all__", label: t("common.all") },
-          ...enumOptions(ACCOUNT_STATUSES).map((opt) => ({
+          ...enumOptions(ACCOUNT_STATUSES, t).map((opt) => ({
             value: opt.value,
             label: opt.label,
           })),
