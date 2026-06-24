@@ -15,7 +15,9 @@ import (
 const (
 	settingsKeyAdminSettings = "admin_control.admin_settings"
 
-	oauthTokenAuthMethodNone = "none"
+	oauthTokenAuthMethodNone              = "none"
+	oauthTokenAuthMethodClientSecretPost  = "client_secret_post"
+	oauthTokenAuthMethodClientSecretBasic = "client_secret_basic"
 
 	// adminSettingsCacheTTL bounds how long a cached admin-settings read may be
 	// served. The gateway consults these settings several times per request
@@ -616,13 +618,14 @@ func normalizeOAuthProvider(provider string) string {
 
 func normalizeOAuthTokenAuthMethod(value string) string {
 	value = strings.ToLower(strings.TrimSpace(value))
-	if value == "" {
+	switch value {
+	case "", oauthTokenAuthMethodNone:
 		return oauthTokenAuthMethodNone
+	case oauthTokenAuthMethodClientSecretPost, oauthTokenAuthMethodClientSecretBasic:
+		return value
+	default:
+		return ""
 	}
-	if value == oauthTokenAuthMethodNone {
-		return oauthTokenAuthMethodNone
-	}
-	return ""
 }
 
 func validOAuthAuthorizeURL(value string) bool {
