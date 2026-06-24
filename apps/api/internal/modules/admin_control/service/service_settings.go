@@ -468,16 +468,17 @@ func normalizeOAuthProviderConfigs(values []admincontrol.OAuthProviderConfig) ([
 		}
 		seen[key] = struct{}{}
 		out = append(out, admincontrol.OAuthProviderConfig{
-			Provider:        provider,
-			ProviderKey:     providerKey,
-			DisplayName:     displayName,
-			ClientID:        clientID,
-			AuthorizeURL:    authorizeURL,
-			TokenURL:        tokenURL,
-			UserInfoURL:     userInfoURL,
-			TokenAuthMethod: tokenAuthMethod,
-			RedirectURI:     redirectURI,
-			Scopes:          normalizeOAuthScopes(value.Scopes),
+			Provider:               provider,
+			ProviderKey:            providerKey,
+			DisplayName:            displayName,
+			ClientID:               clientID,
+			ClientSecretCiphertext: value.ClientSecretCiphertext,
+			AuthorizeURL:           authorizeURL,
+			TokenURL:               tokenURL,
+			UserInfoURL:            userInfoURL,
+			TokenAuthMethod:        tokenAuthMethod,
+			RedirectURI:            redirectURI,
+			Scopes:                 normalizeOAuthScopes(value.Scopes),
 		})
 	}
 	return out, nil
