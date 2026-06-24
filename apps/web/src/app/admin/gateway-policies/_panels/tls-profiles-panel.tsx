@@ -253,7 +253,7 @@ export function TlsProfilesPanel() {
                 {
                   title: t("adminTlsProfiles.userAgent"),
                   rows: [
-                    { label: "UA", value: p.user_agent || "—", mono: true, tone: p.user_agent ? "default" : "muted" },
+                    { label: t("adminTlsProfiles.ua"), value: p.user_agent || "—", mono: true, tone: p.user_agent ? "default" : "muted" },
                   ],
                 },
                 {

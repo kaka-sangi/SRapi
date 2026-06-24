@@ -301,9 +301,9 @@ export function PaymentProvidersPanel() {
             title={t("adminPayments.feeHeader")}
             primary={`${(fee * 100).toFixed(3)}%`}
             rows={[
-              { label: "Decimal", value: fee.toFixed(5) },
-              { label: "Per 1k", value: `${perThousand.toFixed(2)}` },
-              { label: "On $100", value: `$${(fee * 100).toFixed(2)}` },
+              { label: t("adminPayments.decimal"), value: fee.toFixed(5) },
+              { label: t("adminPayments.per1k"), value: `${perThousand.toFixed(2)}` },
+              { label: t("adminPayments.on100"), value: `$${(fee * 100).toFixed(2)}` },
             ]}
           >
             <span className="text-xs tabular text-srapi-text-tertiary">

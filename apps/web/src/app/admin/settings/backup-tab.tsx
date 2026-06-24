@@ -363,8 +363,8 @@ function BackupRow({
             title={t("adminSettings.snapshotStarted")}
             primary={startedAt.toLocaleString()}
             rows={[
-              { label: "ISO", value: startedAt.toISOString() },
-              { label: "Kind", value: kindLabel },
+              { label: t("adminBackup.iso"), value: startedAt.toISOString() },
+              { label: t("adminBackup.kind"), value: kindLabel },
             ]}
           >
             <span className="cursor-help">{startedAt.toLocaleString()}</span>
@@ -382,8 +382,8 @@ function BackupRow({
           title={t("adminSettings.snapshotSize")}
           primary={formatBytes(row.size_bytes)}
           rows={[
-            { label: "bytes", value: row.size_bytes ?? 0 },
-            { label: "kind", value: kindLabel },
+            { label: t("adminBackup.bytes"), value: row.size_bytes ?? 0 },
+            { label: t("adminBackup.kind"), value: kindLabel },
           ]}
         >
           <span className="cursor-help">{formatBytes(row.size_bytes)}</span>

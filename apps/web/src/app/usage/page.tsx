@@ -73,7 +73,7 @@ function UsageContent() {
         metrics={
           hasLogs
             ? [
-                { label: "Requests", value: usage.data?.length ?? 0 },
+                { label: t("usage.requests"), value: usage.data?.length ?? 0 },
               ]
             : undefined
         }

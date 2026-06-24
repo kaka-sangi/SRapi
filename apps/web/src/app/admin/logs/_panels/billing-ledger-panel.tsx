@@ -286,7 +286,7 @@ export function BillingLedgerPanel() {
                 rows: r.reference_type
                   ? [
                       { label: t("adminBillingLedger.reference"), value: r.reference_type, mono: true },
-                      { label: "ID", value: r.reference_id ? `#${r.reference_id}` : "—", mono: true, tone: "muted" },
+                      { label: t("adminBillingLedger.referenceId"), value: r.reference_id ? `#${r.reference_id}` : "—", mono: true, tone: "muted" },
                     ]
                   : [{ label: t("adminBillingLedger.reference"), value: "—", tone: "muted" }],
               },

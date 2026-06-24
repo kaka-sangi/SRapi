@@ -162,13 +162,13 @@ function PromoContent() {
               { label: t("adminPromo.used"), value: String(used) },
               ...(max > 0
                 ? [
-                    { label: "Cap", value: String(max) },
-                    { label: "Remaining", value: String(remaining ?? 0), tone: "muted" as const },
-                    { label: "Utilization", value: `${pct}%` },
+                    { label: t("adminPromo.cap"), value: String(max) },
+                    { label: t("adminPromo.remaining"), value: String(remaining ?? 0), tone: "muted" as const },
+                    { label: t("adminPromo.utilization"), value: `${pct}%` },
                   ]
-                : [{ label: "Cap", value: "Unlimited", tone: "muted" as const }]),
+                : [{ label: t("adminPromo.cap"), value: t("adminPromo.unlimited"), tone: "muted" as const }]),
               ...(p.per_user_limit
-                ? [{ label: "Per user", value: String(p.per_user_limit), tone: "muted" as const }]
+                ? [{ label: t("adminPromo.perUser"), value: String(p.per_user_limit), tone: "muted" as const }]
                 : []),
             ]}
           >

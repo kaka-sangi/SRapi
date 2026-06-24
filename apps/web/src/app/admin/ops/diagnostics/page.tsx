@@ -184,15 +184,15 @@ function DiagnosticsContent() {
                           title={t("diagnostics.successRate")}
                           primary={`${Math.round(entry.success_rate * 100)}%`}
                           rows={[
-                            { label: "State", value: entry.state, tone: "muted" },
-                            { label: "Requests", value: String(entry.requests), tone: "muted" },
+                            { label: t("diagnostics.state"), value: entry.state, tone: "muted" },
+                            { label: t("diagnostics.requestCount"), value: String(entry.requests), tone: "muted" },
                             {
-                              label: "Failures",
+                              label: t("diagnostics.failures"),
                               value: String(entry.total_failures),
                               tone: entry.total_failures > 0 ? "error" : "muted",
                             },
                             {
-                              label: "Consecutive failures",
+                              label: t("diagnostics.consecutiveFailures"),
                               value: String(entry.consecutive_failures),
                               tone: entry.consecutive_failures > 0 ? "warning" : "muted",
                             },

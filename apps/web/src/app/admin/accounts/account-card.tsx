@@ -305,7 +305,7 @@ function AccountCard({
                 <DataTooltip
                   title={t("adminAccounts.identityLabel") ?? "Identity"}
                   primary={identity.primary}
-                  rows={identity.secondary.map((v) => ({ label: "Alt", value: v, tone: "muted" as const }))}
+                  rows={identity.secondary.map((v) => ({ label: t("adminAccounts.altIdentity"), value: v, tone: "muted" as const }))}
                 >
                   <span className="metric-tertiary max-w-[10rem] cursor-help truncate text-[11px] underline decoration-srapi-border-strong decoration-dotted underline-offset-2">
                     {identity.primary}
@@ -334,9 +334,9 @@ function AccountCard({
           rows={
             health
               ? [
-                  { label: "Circuit", value: health.circuit_state, tone: health.circuit_state === "open" ? "error" : health.circuit_state === "half-open" ? "warning" : "success" },
+                  { label: t("adminAccounts.circuit"), value: health.circuit_state, tone: health.circuit_state === "open" ? "error" : health.circuit_state === "half-open" ? "warning" : "success" },
                   { label: "p50", value: `${Math.round(health.latency_p50_ms ?? 0)} ms` },
-                  ...(health.error_class ? [{ label: "Last error", value: health.error_class, tone: "error" as const }] : []),
+                  ...(health.error_class ? [{ label: t("adminAccounts.lastError"), value: health.error_class, tone: "error" as const }] : []),
                 ]
               : undefined
           }
@@ -356,7 +356,7 @@ function AccountCard({
           primary={health ? `${Math.round((health.quota_remaining_ratio ?? 0) * 100)}%` : "—"}
           rows={
             health?.quota_exhausted
-              ? [{ label: "Status", value: "Exhausted", tone: "error" as const }]
+              ? [{ label: t("adminAccounts.quotaStatus"), value: t("adminAccounts.quotaExhausted"), tone: "error" as const }]
               : undefined
           }
           footer={(health?.quota_windows ?? []).length > 0 ? `${(health!.quota_windows ?? []).length} window(s)` : undefined}
@@ -377,9 +377,9 @@ function AccountCard({
           rows={
             hasTodayUsage && today
               ? [
-                  { label: "Tokens", value: formatCompactNumber(todayTokens) },
-                  { label: "Cost", value: formatMoney(today.cost, today.currency) },
-                  { label: "Success", value: formatPercent(today.success_rate), tone: today.success_rate >= 0.95 ? "success" : today.success_rate >= 0.8 ? "warning" : "error" },
+                  { label: t("adminAccounts.tokens"), value: formatCompactNumber(todayTokens) },
+                  { label: t("adminAccounts.cost"), value: formatMoney(today.cost, today.currency) },
+                  { label: t("adminAccounts.successRate"), value: formatPercent(today.success_rate), tone: today.success_rate >= 0.95 ? "success" : today.success_rate >= 0.8 ? "warning" : "error" },
                 ]
               : undefined
           }

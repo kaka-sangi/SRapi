@@ -94,16 +94,17 @@ function moneyTooltipRows(
   value: string | number | null | undefined,
   currency: string,
   currencyLabel = "Currency",
+  t?: (key: string, vars?: Record<string, string | number>) => string,
 ): DataTooltipRow[] {
   const rows: DataTooltipRow[] = [];
   const numeric = typeof value === "number" ? value : Number(value);
   rows.push({ label: currencyLabel, value: currency.toUpperCase() });
   if (Number.isFinite(numeric)) {
     const decimals = String(value).split(".")[1]?.length ?? 0;
-    rows.push({ label: "Precision", value: `${decimals} dp` });
+    rows.push({ label: t?.("adminOrders.precision") ?? "Precision", value: `${decimals} dp` });
     const fx = FX_TO_USD[currency.toUpperCase()];
     if (fx !== undefined && currency.toUpperCase() !== "USD") {
-      rows.push({ label: "≈ USD", value: formatMoney(numeric * fx, "USD") });
+      rows.push({ label: t?.("adminOrders.approxUsd") ?? "≈ USD", value: formatMoney(numeric * fx, "USD") });
     }
   }
   return rows;
@@ -208,13 +209,13 @@ function OrdersContent() {
           title={t("adminOrders.amount")}
           primary={formatMoney(o.amount, o.currency)}
           rows={[
-            ...moneyTooltipRows(o.amount, o.currency, t("adminCommon.currency")),
-            { label: "Original", value: formatMoney(o.original_amount, o.currency), tone: "muted" },
+            ...moneyTooltipRows(o.amount, o.currency, t("adminCommon.currency"), t),
+            { label: t("adminOrders.original"), value: formatMoney(o.original_amount, o.currency), tone: "muted" },
             ...(Number(o.discount_amount) > 0
-              ? [{ label: "Discount", value: `-${formatMoney(o.discount_amount, o.currency)}`, tone: "success" as const }]
+              ? [{ label: t("adminOrders.discount"), value: `-${formatMoney(o.discount_amount, o.currency)}`, tone: "success" as const }]
               : []),
             ...(Number(o.fee_amount) > 0
-              ? [{ label: "Fee", value: formatMoney(o.fee_amount, o.currency), tone: "muted" as const }]
+              ? [{ label: t("adminOrders.fee"), value: formatMoney(o.fee_amount, o.currency), tone: "muted" as const }]
               : []),
           ]}
           footer={o.order_no}
@@ -383,21 +384,21 @@ function OrderExpandDetail({
           title: t("adminOrders.providerSection") || "Payment provider",
           rows: [
             { label: t("adminPayments.name"), value: providerName || "—" },
-            { label: "Method", value: providerMethod || "—", mono: true },
+            { label: t("adminOrders.method"), value: providerMethod || "—", mono: true },
             {
-              label: "Provider txn",
+              label: t("adminOrders.providerTxn"),
               value: order.provider_transaction_id || "—",
               mono: true,
             },
-            { label: "Instance", value: order.provider_instance_id, mono: true },
+            { label: t("adminOrders.instance"), value: order.provider_instance_id, mono: true },
           ],
         },
         {
           title: t("adminOrders.userSection") || "User",
           rows: [
-            { label: "User", value: userEmail || `#${order.user_id}` },
-            { label: "Product", value: order.product_type, mono: true },
-            { label: "Product id", value: order.product_id || "—", mono: true },
+            { label: t("adminOrders.user"), value: userEmail || `#${order.user_id}` },
+            { label: t("adminOrders.product"), value: order.product_type, mono: true },
+            { label: t("adminOrders.productId"), value: order.product_id || "—", mono: true },
           ],
         },
         {
@@ -405,13 +406,13 @@ function OrderExpandDetail({
           rows: [
             { label: t("adminCommon.created"), value: formatDateTime(order.created_at) },
             ...(order.paid_at
-              ? [{ label: "Paid", value: formatDateTime(order.paid_at), tone: "success" as const }]
+              ? [{ label: t("adminOrders.paid"), value: formatDateTime(order.paid_at), tone: "success" as const }]
               : []),
             ...(order.closed_at
-              ? [{ label: "Closed", value: formatDateTime(order.closed_at), tone: "muted" as const }]
+              ? [{ label: t("adminOrders.closed"), value: formatDateTime(order.closed_at), tone: "muted" as const }]
               : []),
             ...(order.expires_at
-              ? [{ label: "Expires", value: formatDateTime(order.expires_at), tone: "muted" as const }]
+              ? [{ label: t("adminOrders.expires"), value: formatDateTime(order.expires_at), tone: "muted" as const }]
               : []),
           ],
         },
