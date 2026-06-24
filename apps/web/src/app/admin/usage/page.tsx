@@ -112,17 +112,6 @@ const DISTRIBUTION_DIMENSIONS = [
 ] as const;
 type DistributionDimension = (typeof DISTRIBUTION_DIMENSIONS)[number];
 
-const DISTRIBUTION_DIMENSION_FALLBACK: Record<DistributionDimension, string> = {
-  model: "Model",
-  requested_model: "Requested model",
-  upstream_model: "Upstream model",
-  account: "Account",
-  provider: "Provider",
-  api_key: "API key",
-  source_endpoint: "Endpoint",
-  billing_mode: "Billing mode",
-  user: "User",
-};
 
 const DISTRIBUTION_METRICS = ["requests", "tokens", "cost"] as const;
 
@@ -550,7 +539,7 @@ function UsageContent() {
       render: (u) => (
         <QuietBadge
           status={u.usage_estimated ? "limited" : "active"}
-          label={u.usage_estimated ? "Estimated" : "Exact"}
+          label={u.usage_estimated ? t("adminUsage.estimated") : t("adminUsage.exact")}
         />
       ),
     },
@@ -573,7 +562,7 @@ function UsageContent() {
         title={t("adminUsage.title")}
         description={t("adminUsage.subtitle")}
         metrics={[
-          { label: "本月请求", value: formatInteger(monthRequests) },
+          { label: t("adminUsage.thisMonthRequests"), value: formatInteger(monthRequests) },
         ]}
         actions={
           <div className="flex items-center gap-3">
@@ -797,13 +786,6 @@ function UsageContent() {
 
 function UsageCharts() {
   const { t } = useLanguage();
-  // The shared message catalog has no keys for the new usage charts yet; fall
-  // back to a readable English string so they never render as a raw dotted key.
-  const tWithFallback = (key: string, fallback: string) => {
-    const value = t(key);
-    return value === key ? fallback : value;
-  };
-
   const [dimension, setDimension] = useState<TrendDimension>("model");
   const [bucket, setBucket] = useState<TrendBucket>("day");
   const [metric, setMetric] = useState<UsageTrendMetric>("tokens");
@@ -826,10 +808,10 @@ function UsageCharts() {
           loading={trends.isLoading}
           metric={metric}
           onMetricChange={setMetric}
-          title={tWithFallback("adminUsage.trendTitle", "Usage trend")}
+          title={t("adminUsage.trendTitle")}
           metricTokensLabel={t("usage.tokens")}
           metricCostLabel={t("adminUsage.cost")}
-          emptyLabel={tWithFallback("adminUsage.trendEmpty", "No usage in window")}
+          emptyLabel={t("adminUsage.trendEmpty")}
           controls={
             <>
               <SegmentedControl
@@ -847,7 +829,7 @@ function UsageCharts() {
                 onChange={(v) => setBucket(v as TrendBucket)}
                 options={TREND_BUCKETS.map((b) => ({
                   value: b,
-                  label: tWithFallback(`adminUsage.bucket.${b}`, b === "day" ? "Day" : "Hour"),
+                  label: t(`adminUsage.bucket.${b}`),
                 }))}
               />
             </>
@@ -856,18 +838,18 @@ function UsageCharts() {
       <UsageErrorDistributionChart
           items={errorDistribution.data ?? []}
           loading={errorDistribution.isLoading}
-          title={tWithFallback("adminUsage.errorDistributionTitle", "Error distribution")}
-          emptyLabel={tWithFallback("adminUsage.errorDistributionEmpty", "No errors in window")}
-          totalLabel={tWithFallback("adminUsage.errorsTotal", "errors")}
-          otherLabel={tWithFallback("adminUsage.errorsOther", "Other")}
+          title={t("adminUsage.errorDistributionTitle")}
+          emptyLabel={t("adminUsage.errorDistributionEmpty")}
+          totalLabel={t("adminUsage.errorsTotal")}
+          otherLabel={t("adminUsage.errorsOther")}
         />
       <div className="lg:col-span-2">
       <UsageDistributionChart
         buckets={distribution.data?.buckets ?? []}
         metric={distMetric}
         loading={distribution.isLoading}
-        title={tWithFallback("adminUsage.distributionTitle", "Usage distribution")}
-        emptyLabel={tWithFallback("adminUsage.distributionEmpty", "No usage in window")}
+        title={t("adminUsage.distributionTitle")}
+        emptyLabel={t("adminUsage.distributionEmpty")}
         controls={
           <>
             <Select
@@ -880,7 +862,7 @@ function UsageCharts() {
               <SelectContent>
                 {DISTRIBUTION_DIMENSIONS.map((dim) => (
                   <SelectItem key={dim} value={dim} className="text-xs">
-                    {tWithFallback(`adminUsage.dimension.${dim}`, DISTRIBUTION_DIMENSION_FALLBACK[dim])}
+                    {t(`adminUsage.dimension.${dim}`)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -893,7 +875,7 @@ function UsageCharts() {
                 value: m,
                 label:
                   m === "requests"
-                    ? tWithFallback("adminUsage.metric.requests", "Requests")
+                    ? t("adminUsage.metric.requests")
                     : m === "tokens"
                       ? t("usage.tokens")
                       : t("adminUsage.cost"),

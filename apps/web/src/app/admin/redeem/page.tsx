@@ -262,7 +262,7 @@ function RedeemContent() {
             title={t("adminPromos.value")}
             primary={formatMoney(c.value, c.currency)}
             rows={[
-              { label: "Currency", value: (c.currency || "USD").toUpperCase() },
+              { label: t("adminCommon.currency"), value: (c.currency || "USD").toUpperCase() },
               { label: "Precision", value: `${decimals} dp` },
               ...(c.currency && c.currency.toUpperCase() !== "USD" && Number.isFinite(numeric)
                 ? [

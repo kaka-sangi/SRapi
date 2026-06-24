@@ -93,10 +93,11 @@ const FX_TO_USD: Record<string, number> = {
 function moneyTooltipRows(
   value: string | number | null | undefined,
   currency: string,
+  currencyLabel = "Currency",
 ): DataTooltipRow[] {
   const rows: DataTooltipRow[] = [];
   const numeric = typeof value === "number" ? value : Number(value);
-  rows.push({ label: "Currency", value: currency.toUpperCase() });
+  rows.push({ label: currencyLabel, value: currency.toUpperCase() });
   if (Number.isFinite(numeric)) {
     const decimals = String(value).split(".")[1]?.length ?? 0;
     rows.push({ label: "Precision", value: `${decimals} dp` });
@@ -207,7 +208,7 @@ function OrdersContent() {
           title={t("adminOrders.amount")}
           primary={formatMoney(o.amount, o.currency)}
           rows={[
-            ...moneyTooltipRows(o.amount, o.currency),
+            ...moneyTooltipRows(o.amount, o.currency, t("adminCommon.currency")),
             { label: "Original", value: formatMoney(o.original_amount, o.currency), tone: "muted" },
             ...(Number(o.discount_amount) > 0
               ? [{ label: "Discount", value: `-${formatMoney(o.discount_amount, o.currency)}`, tone: "success" as const }]

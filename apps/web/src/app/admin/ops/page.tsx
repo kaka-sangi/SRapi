@@ -156,12 +156,6 @@ function alertSilenceMatcherLabel(silence: OpsAlertSilence, fallback: string): s
 
 function OpsOverviewContent() {
   const { t } = useLanguage();
-  // The shared message catalog has no keys for the new ops charts yet; fall back
-  // to a readable English string so they never render as a raw dotted key.
-  const tWithFallback = (key: string, fallback: string) => {
-    const value = t(key);
-    return value === key ? fallback : value;
-  };
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -296,21 +290,21 @@ function OpsOverviewContent() {
         <OpsLatencyHistogramChart
           buckets={latencyHistogram.data?.buckets ?? []}
           loading={latencyHistogram.isLoading}
-          title={tWithFallback("adminOps.latencyHistogram", "Latency histogram")}
-          emptyLabel={tWithFallback("adminOps.latencyHistogramEmpty", "No latency samples yet")}
+          title={t("adminOps.latencyHistogram")}
+          emptyLabel={t("adminOps.latencyHistogramEmpty")}
           requestsLabel={t("adminOps.throughput")}
         />
         <OpsErrorDistributionChart
           items={errorDistribution.data?.items ?? []}
           loading={errorDistribution.isLoading}
-          title={tWithFallback("adminOps.errorDistribution", "Error distribution")}
-          emptyLabel={tWithFallback("adminOps.errorDistributionEmpty", "No errors in window")}
-          totalLabel={tWithFallback("adminOps.errorsTotal", "errors")}
+          title={t("adminOps.errorDistribution")}
+          emptyLabel={t("adminOps.errorDistributionEmpty")}
+          totalLabel={t("adminOps.errorsTotal")}
           ownerLabels={{
-            provider: tWithFallback("adminOps.owner.provider", "Provider"),
-            client: tWithFallback("adminOps.owner.client", "Client"),
-            platform: tWithFallback("adminOps.owner.platform", "Platform"),
-            other: tWithFallback("adminOps.owner.other", "Other"),
+            provider: t("adminOps.owner.provider"),
+            client: t("adminOps.owner.client"),
+            platform: t("adminOps.owner.platform"),
+            other: t("adminOps.owner.other"),
           }}
           investigationHref={(item) =>
             adminErrorInvestigationHref({ error_class: item.error_class })

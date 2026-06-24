@@ -187,16 +187,16 @@ export function LiveErrorsPanel() {
             general filters because severity is the dominant pivot. */}
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
-            Severity
+            {t("common.severity")}
           </span>
           <SegmentedControl
             value={severityFilter}
             onChange={(v) => setSeverityFilter(v)}
             options={[
-              { value: "all", label: "All" },
+              { value: "all", label: t("common.all") },
               { value: "critical", label: "5xx" },
               { value: "error", label: "4xx" },
-              { value: "warning", label: "Other" },
+              { value: "warning", label: t("common.other") },
             ]}
             size="sm"
             ariaLabel="live error severity filter"
@@ -407,7 +407,7 @@ export function LiveErrorsPanel() {
                             <InlineDetailGrid
                               sections={[
                                 {
-                                  title: "Request",
+                                  title: t("common.request"),
                                   rows: [
                                     { label: "request_id", value: row.request_id || "—", mono: true },
                                     { label: "trace_id", value: row.trace_id || "—", mono: true, tone: "muted" },
@@ -416,7 +416,7 @@ export function LiveErrorsPanel() {
                                   ],
                                 },
                                 {
-                                  title: "Response",
+                                  title: t("common.response"),
                                   rows: [
                                     { label: "status", value: row.status_code || "—", mono: true, tone: row.severity === "critical" ? "error" : row.severity === "error" ? "warning" : "default" },
                                     { label: "class", value: row.error_class || "—", mono: true, tone: "error" },
@@ -426,7 +426,7 @@ export function LiveErrorsPanel() {
                                   ],
                                 },
                                 {
-                                  title: "Routing",
+                                  title: t("common.routing"),
                                   rows: [
                                     { label: "provider", value: identityLabel(row.provider_name, row.provider_id) },
                                     { label: "account", value: identityLabel(row.account_name, row.account_id) },

@@ -126,7 +126,7 @@ function PromoContent() {
                   ]
                 : [
                     { label: "Type", value: "Fixed" },
-                    { label: "Currency", value: (p.currency || "USD").toUpperCase() },
+                    { label: t("adminCommon.currency"), value: (p.currency || "USD").toUpperCase() },
                     { label: "Value", value: formatMoney(p.discount_value, p.currency || "USD") },
                     ...(p.min_order_amount
                       ? [{ label: "Min order", value: formatMoney(p.min_order_amount, p.currency || "USD"), tone: "muted" as const }]

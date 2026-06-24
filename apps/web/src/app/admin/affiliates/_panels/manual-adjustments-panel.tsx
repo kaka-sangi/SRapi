@@ -110,14 +110,14 @@ export function ManualAdjustmentsPanel() {
         const decimals = String(r.amount).split(".")[1]?.length ?? 0;
         return (
           <DataTooltip
-            title={negative ? "Debit" : "Credit"}
+            title={negative ? t("common.debit") : t("common.credit")}
             primary={formatMoney(r.amount, r.currency)}
             rows={[
-              { label: "Currency", value: (r.currency || "USD").toUpperCase() },
+              { label: t("adminCommon.currency"), value: (r.currency || "USD").toUpperCase() },
               { label: "Precision", value: `${decimals} dp` },
               {
-                label: "Direction",
-                value: negative ? "Debit (out)" : "Credit (in)",
+                label: t("common.direction"),
+                value: negative ? t("common.debit") : t("common.credit"),
                 tone: negative ? "error" : "success",
               },
               ...(r.currency &&

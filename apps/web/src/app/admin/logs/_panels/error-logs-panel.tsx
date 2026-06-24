@@ -505,7 +505,7 @@ export function ErrorLogsPanel() {
           <InlineDetailGrid
             sections={[
               {
-                title: "Request",
+                title: t("common.request"),
                 rows: [
                   { label: t("adminErrorLogs.requestId"), value: e.request_id || "—", mono: true },
                   { label: t("adminErrorLogs.sourceEndpoint"), value: e.source_endpoint || "—", mono: true },
@@ -514,7 +514,7 @@ export function ErrorLogsPanel() {
                 ],
               },
               {
-                title: "Response",
+                title: t("common.response"),
                 rows: [
                   { label: t("adminErrorLogs.statusCode"), value: e.status_code ?? "—", mono: true, tone: (e.status_code ?? 0) >= 500 ? "error" : (e.status_code ?? 0) >= 400 ? "warning" : "default" },
                   { label: t("adminErrorLogs.errorClass"), value: e.error_class || "—", mono: true, tone: "error" },
@@ -523,7 +523,7 @@ export function ErrorLogsPanel() {
                 ],
               },
               {
-                title: "Routing",
+                title: t("common.routing"),
                 rows: [
                   { label: t("adminErrorLogs.protocol"), value: `${e.source_protocol ?? e.platform ?? "—"}${e.target_protocol ? ` → ${e.target_protocol}` : ""}`, mono: true },
                   { label: t("adminErrorLogs.errorPhase"), value: e.error_phase || "—" },
@@ -561,13 +561,13 @@ export function ErrorLogsPanel() {
                 «Status» dropdown 9 rows down the toolbar. */}
             <div className="flex items-center gap-3 border-b border-srapi-border/60 bg-srapi-card-muted/40 px-4 py-2">
               <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
-                Severity
+                {t("common.severity")}
               </span>
               <SegmentedControl
                 value={list.filters.status === "5xx" ? "5xx" : list.filters.status === "4xx" ? "4xx" : "all"}
                 onChange={(v) => list.setFilter("status", v === "all" ? undefined : v)}
                 options={[
-                  { value: "all", label: "All" },
+                  { value: "all", label: t("common.all") },
                   { value: "5xx", label: "5xx critical" },
                   { value: "4xx", label: "4xx error" },
                 ]}

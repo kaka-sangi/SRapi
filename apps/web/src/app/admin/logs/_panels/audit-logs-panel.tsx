@@ -197,15 +197,15 @@ export function AuditLogsPanel() {
                 The 「Action」 FilterSelect remains below for verb-level pinpointing. */}
             <div className="flex items-center gap-3 border-b border-srapi-border/60 bg-srapi-card-muted/40 px-4 py-2">
               <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
-                Severity
+                {t("common.severity")}
               </span>
               <SegmentedControl
                 value={severityFilter === "warning" ? "warning" : severityFilter === "info" ? "info" : "all"}
                 onChange={(v) => list.setFilter("severity", v === "all" ? undefined : v)}
                 options={[
-                  { value: "all", label: "All" },
-                  { value: "warning", label: "Destructive" },
-                  { value: "info", label: "Routine" },
+                  { value: "all", label: t("common.all") },
+                  { value: "warning", label: t("adminAudit.destructive") },
+                  { value: "info", label: t("adminAudit.routine") },
                 ]}
                 size="sm"
                 ariaLabel="audit severity filter"

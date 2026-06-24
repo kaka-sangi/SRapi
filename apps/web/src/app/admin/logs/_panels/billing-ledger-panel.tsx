@@ -170,8 +170,8 @@ export function BillingLedgerPanel() {
             title={t(`adminBillingLedger.types.${r.type}`)}
             primary={`${sign}${formatMoney(Math.abs(numericAmount), r.currency)}`}
             rows={[
-              { label: "Direction", value: numericAmount >= 0 ? "credit" : "debit", tone: numericAmount >= 0 ? "success" : "warning" },
-              { label: "Currency", value: r.currency || "—" },
+              { label: t("common.direction"), value: numericAmount >= 0 ? t("common.credit") : t("common.debit"), tone: numericAmount >= 0 ? "success" : "warning" },
+              { label: t("adminCommon.currency"), value: r.currency || "—" },
               { label: t("adminBillingLedger.balanceAfter"), value: formatMoney(r.balance_after, r.currency) },
               { label: t("adminBillingLedger.type"), value: r.type },
             ]}
@@ -198,7 +198,7 @@ export function BillingLedgerPanel() {
             rows={[
               { label: t("adminBillingLedger.amount"), value: formatMoney(r.amount, r.currency), tone: numericAmount >= 0 ? "success" : "warning" },
               { label: "Δ", value: `${numericAmount >= 0 ? "+" : ""}${formatMoney(r.amount, r.currency)}` },
-              { label: "Currency", value: r.currency || "—" },
+              { label: t("adminCommon.currency"), value: r.currency || "—" },
             ]}
           >
             <span className="text-[12px] tabular text-srapi-text-tertiary metric-tertiary">
@@ -278,7 +278,7 @@ export function BillingLedgerPanel() {
                   { label: t("adminBillingLedger.type"), value: t(`adminBillingLedger.types.${r.type}`) },
                   { label: t("adminBillingLedger.amount"), value: formatMoney(r.amount, r.currency), mono: true, tone: ledgerAmountNumber(r.amount) >= 0 ? "success" : "warning" },
                   { label: t("adminBillingLedger.balanceAfter"), value: formatMoney(r.balance_after, r.currency), mono: true },
-                  { label: "Currency", value: r.currency || "—" },
+                  { label: t("adminCommon.currency"), value: r.currency || "—" },
                 ],
               },
               {
@@ -298,16 +298,16 @@ export function BillingLedgerPanel() {
             {/* Severity chip strip — one-glance pivot for credit vs debit feeds. */}
             <div className="flex items-center gap-3 border-b border-srapi-border/60 bg-srapi-card-muted/40 px-4 py-2">
               <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-srapi-text-tertiary">
-                Severity
+                {t("common.severity")}
               </span>
               <SegmentedControl
                 value={severityFilter === "success" ? "success" : severityFilter === "warning" ? "warning" : severityFilter === "info" ? "info" : "all"}
                 onChange={(v) => list.setFilter("severity", v === "all" ? undefined : v)}
                 options={[
-                  { value: "all", label: "All" },
-                  { value: "success", label: "Credits" },
-                  { value: "warning", label: "Charges" },
-                  { value: "info", label: "Adjustments" },
+                  { value: "all", label: t("common.all") },
+                  { value: "success", label: t("adminBillingLedger.credits") },
+                  { value: "warning", label: t("adminBillingLedger.charges") },
+                  { value: "info", label: t("adminBillingLedger.adjustments") },
                 ]}
                 size="sm"
                 ariaLabel="ledger severity filter"

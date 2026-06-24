@@ -114,7 +114,7 @@ export function RulesPanel() {
               ...(fixed > 0
                 ? [{ label: "+ Fixed", value: `${rule.fixed_amount} ${rule.currency}` }]
                 : []),
-              { label: "Currency", value: rule.currency.toUpperCase() },
+              { label: t("adminCommon.currency"), value: rule.currency.toUpperCase() },
               ...(maxRebate > 0
                 ? [
                     {
