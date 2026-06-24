@@ -263,7 +263,7 @@ function RedeemContent() {
             primary={formatMoney(c.value, c.currency)}
             rows={[
               { label: t("adminCommon.currency"), value: (c.currency || "USD").toUpperCase() },
-              { label: "Precision", value: `${decimals} dp` },
+              { label: t("adminRedeem.precision"), value: `${decimals} dp` },
               ...(c.currency && c.currency.toUpperCase() !== "USD" && Number.isFinite(numeric)
                 ? [
                     {
@@ -285,7 +285,7 @@ function RedeemContent() {
                     },
                   ]
                 : []),
-              { label: "Type", value: c.type, tone: "muted" as const },
+              { label: t("adminRedeem.type"), value: c.type, tone: "muted" as const },
             ]}
           >
             <span className="text-sm font-medium tabular text-srapi-text-primary">
@@ -308,8 +308,8 @@ function RedeemContent() {
             title={t("adminPromos.uses")}
             primary={`${used}${max ? ` / ${max}` : ""}`}
             rows={[
-              { label: "Redeemed", value: String(used) },
-              { label: "Cap", value: max > 0 ? String(max) : "Unlimited" },
+              { label: t("adminRedeem.redeemed"), value: String(used) },
+              { label: t("adminRedeem.cap"), value: max > 0 ? String(max) : t("adminRedeem.unlimited") },
               ...(max > 0
                 ? [
                     {

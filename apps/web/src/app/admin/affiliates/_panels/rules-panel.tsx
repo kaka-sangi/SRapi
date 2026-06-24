@@ -112,18 +112,18 @@ export function RulesPanel() {
                 value: Number.isFinite(ratePct) ? `${ratePct.toFixed(3)}%` : rule.rate,
               },
               ...(fixed > 0
-                ? [{ label: "+ Fixed", value: `${rule.fixed_amount} ${rule.currency}` }]
+                ? [{ label: t("adminAffiliate.fixedBonus"), value: `${rule.fixed_amount} ${rule.currency}` }]
                 : []),
               { label: t("adminCommon.currency"), value: rule.currency.toUpperCase() },
               ...(maxRebate > 0
                 ? [
                     {
-                      label: "Max rebate",
+                      label: t("adminAffiliate.maxRebate"),
                       value: `${rule.max_rebate_amount} ${rule.currency}`,
                       tone: "muted" as const,
                     },
                   ]
-                : [{ label: "Max rebate", value: "Uncapped", tone: "muted" as const }]),
+                : [{ label: t("adminAffiliate.maxRebate"), value: t("adminAffiliate.uncapped"), tone: "muted" as const }]),
             ]}
           >
             <span className="text-sm font-medium tabular text-srapi-text-primary">

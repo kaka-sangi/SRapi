@@ -59,7 +59,7 @@ export function WithdrawalsPanel() {
             primary={formatMoney(r.amount, r.currency)}
             rows={[
               { label: t("adminCommon.currency"), value: (r.currency || "USD").toUpperCase() },
-              { label: "Precision", value: `${decimals} dp` },
+              { label: t("adminAffiliate.precision"), value: `${decimals} dp` },
               ...(r.currency &&
               r.currency.toUpperCase() !== "USD" &&
               Number.isFinite(numeric)

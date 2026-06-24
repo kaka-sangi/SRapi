@@ -401,8 +401,8 @@ function UsersContent() {
         title={t("adminUsers.title")}
         description={t("adminUsers.subtitle")}
         metrics={[
-          { label: "总用户", value: formatInteger(totalUsers) },
-          { label: "今日新增", value: `+${formatInteger(newToday)}`, tone: newToday > 0 ? "success" : "default" },
+          { label: t("adminUsers.totalUsers"), value: formatInteger(totalUsers) },
+          { label: t("adminUsers.newToday"), value: `+${formatInteger(newToday)}`, tone: newToday > 0 ? "success" : "default" },
         ]}
         actions={
           <div className="flex items-center gap-3">

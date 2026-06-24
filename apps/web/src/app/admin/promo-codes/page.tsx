@@ -118,18 +118,18 @@ function PromoContent() {
             rows={
               isPercent
                 ? [
-                    { label: "Type", value: "Percent" },
-                    { label: "Value", value: `${p.discount_value}%` },
+                    { label: t("adminPromo.type"), value: t("adminPromo.percent") },
+                    { label: t("adminPromo.value"), value: `${p.discount_value}%` },
                     ...(p.min_order_amount
-                      ? [{ label: "Min order", value: formatMoney(p.min_order_amount, p.currency || "USD"), tone: "muted" as const }]
+                      ? [{ label: t("adminPromo.minOrder"), value: formatMoney(p.min_order_amount, p.currency || "USD"), tone: "muted" as const }]
                       : []),
                   ]
                 : [
-                    { label: "Type", value: "Fixed" },
+                    { label: t("adminPromo.type"), value: t("adminPromo.fixed") },
                     { label: t("adminCommon.currency"), value: (p.currency || "USD").toUpperCase() },
-                    { label: "Value", value: formatMoney(p.discount_value, p.currency || "USD") },
+                    { label: t("adminPromo.value"), value: formatMoney(p.discount_value, p.currency || "USD") },
                     ...(p.min_order_amount
-                      ? [{ label: "Min order", value: formatMoney(p.min_order_amount, p.currency || "USD"), tone: "muted" as const }]
+                      ? [{ label: t("adminPromo.minOrder"), value: formatMoney(p.min_order_amount, p.currency || "USD"), tone: "muted" as const }]
                       : []),
                   ]
             }
@@ -159,7 +159,7 @@ function PromoContent() {
               </span>
             }
             rows={[
-              { label: "Used", value: String(used) },
+              { label: t("adminPromo.used"), value: String(used) },
               ...(max > 0
                 ? [
                     { label: "Cap", value: String(max) },

@@ -79,7 +79,7 @@ function ApiKeysContent() {
         metrics={
           apiKeys.data && apiKeys.data.length > 0
             ? [
-                { label: "Keys", value: apiKeys.data.length },
+                { label: t("apiKeys.count"), value: apiKeys.data.length },
                 {
                   label: t("common.active"),
                   value: apiKeys.data.filter((k) => k.status === "active").length,

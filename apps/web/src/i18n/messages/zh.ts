@@ -634,6 +634,7 @@ export const zh: Messages = {
     onboardingStep3Body: "首个请求会在数秒内出现在 Usage 中，并附带成本与时延归因。",
     emptyTitle: "还没有 API 密钥",
     emptyBody: "新建第一个 API 密钥即可开始发送请求。",
+    count: "密钥数",
   },
   keyUsage: {
     title: "密钥用量查询",
@@ -815,6 +816,8 @@ export const zh: Messages = {
     amount: "金额",
     operation: "操作",
     note: "备注",
+    totalUsers: "总用户",
+    newToday: "今日新增",
   },
   adminUserAttributeValues: {
     title: "自定义属性",
@@ -1916,6 +1919,21 @@ export const zh: Messages = {
     statsDisabled: "已停用",
     statsExpired: "已过期",
   },
+  adminPromo: {
+    type: "类型",
+    value: "面值",
+    percent: "百分比",
+    fixed: "固定金额",
+    minOrder: "最低订单",
+    used: "已使用",
+  },
+  adminRedeem: {
+    precision: "精度",
+    type: "类型",
+    redeemed: "已兑换",
+    cap: "上限",
+    unlimited: "无限制",
+  },
   adminAffiliates: {
     invitesTitle: "邀请记录",
     invitesSubtitle: "谁邀请了谁。",
@@ -1970,6 +1988,12 @@ export const zh: Messages = {
     emptyAdjustmentsBody: "管理员侧的补偿与纠错会显示在这里。",
     emptyTitle: "暂无记录",
     emptyBody: "联盟相关活动会显示在这里。",
+  },
+  adminAffiliate: {
+    precision: "精度",
+    fixedBonus: "+ 固定",
+    maxRebate: "最高返利",
+    uncapped: "不限",
   },
   adminLogs: {
     allTime: "全部时间",

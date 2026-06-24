@@ -644,6 +644,7 @@ export const en = {
     onboardingStep3Body: "First call appears in Usage within seconds, with cost and latency attribution.",
     emptyTitle: "No API keys yet",
     emptyBody: "Create your first API key to start sending requests.",
+    count: "Keys",
   },
   keyUsage: {
     title: "Key usage lookup",
@@ -827,6 +828,8 @@ export const en = {
     amount: "Amount",
     operation: "Operation",
     note: "Note",
+    totalUsers: "Total users",
+    newToday: "New today",
   },
   adminUserAttributeValues: {
     title: "Custom attributes",
@@ -1967,6 +1970,21 @@ export const en = {
     statsDisabled: "Disabled",
     statsExpired: "Expired",
   },
+  adminPromo: {
+    type: "Type",
+    value: "Value",
+    percent: "Percent",
+    fixed: "Fixed",
+    minOrder: "Min order",
+    used: "Used",
+  },
+  adminRedeem: {
+    precision: "Precision",
+    type: "Type",
+    redeemed: "Redeemed",
+    cap: "Cap",
+    unlimited: "Unlimited",
+  },
   adminAffiliates: {
     invitesTitle: "Affiliate invites",
     invitesSubtitle: "Who invited whom.",
@@ -2023,6 +2041,12 @@ export const en = {
     emptyAdjustmentsBody: "Admin-created credits and debits will appear here.",
     emptyTitle: "Nothing here yet",
     emptyBody: "Affiliate activity will appear here.",
+  },
+  adminAffiliate: {
+    precision: "Precision",
+    fixedBonus: "+ Fixed",
+    maxRebate: "Max rebate",
+    uncapped: "Uncapped",
   },
   adminLogs: {
     allTime: "All time",
