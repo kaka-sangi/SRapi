@@ -7,6 +7,7 @@ import { SectionHero } from "@/components/visual/section-hero";
 import { AdminListView, type Column } from "@/components/admin/admin-list-view";
 import { ADMIN_ROUTES } from "@/lib/routes";
 import { PRESET_MODEL_NAMES } from "@/app/admin/quick-setup/presets";
+import { getModelPreset } from "./model-presets";
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { ListToolbar, SearchInput } from "@/components/admin/list-toolbar";
@@ -461,6 +462,21 @@ function ModelsContent() {
           submit={(body) => createMut.mutateAsync(body)}
           successMessage={t("feedback.created")}
           isPending={createMut.isPending}
+          onDraftChange={(fieldName, value, _draft, setDraft) => {
+            if (fieldName === "canonicalName" && typeof value === "string") {
+              const preset = getModelPreset(value.trim());
+              if (preset) {
+                setDraft((prev) => ({
+                  ...prev,
+                  displayName: prev.displayName || preset.displayName,
+                  family: prev.family || preset.family,
+                  contextWindow: prev.contextWindow || String(preset.contextWindow ?? ""),
+                  maxOutputTokens: prev.maxOutputTokens || String(preset.maxOutputTokens ?? ""),
+                  qualityTier: prev.qualityTier || (preset.qualityTier ?? ""),
+                }));
+              }
+            }
+          }}
         />
       ) : formTarget ? (
         <ResourceFormDialog

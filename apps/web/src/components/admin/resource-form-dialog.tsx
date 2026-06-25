@@ -112,6 +112,7 @@ export function ResourceFormDialog<TDraft extends object, TBody>({
   submitLabel,
   successMessage,
   isPending,
+  onDraftChange,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -124,6 +125,7 @@ export function ResourceFormDialog<TDraft extends object, TBody>({
   submitLabel?: string;
   successMessage: string;
   isPending?: boolean;
+  onDraftChange?: (fieldName: string, value: unknown, draft: TDraft, setDraft: React.Dispatch<React.SetStateAction<TDraft>>) => void;
 }) {
   const { t } = useLanguage();
   const { toast } = useToast();
@@ -140,7 +142,11 @@ export function ResourceFormDialog<TDraft extends object, TBody>({
   const advancedFields = fields.filter((f) => f.advanced);
 
   function setField(name: string, value: unknown) {
-    setDraft((prev) => ({ ...prev, [name]: value }) as TDraft);
+    setDraft((prev) => {
+      const next = { ...prev, [name]: value } as TDraft;
+      onDraftChange?.(name, value, next, setDraft);
+      return next;
+    });
     // Clear a field's error the moment the admin edits it — errors should feel
     // responsive, not stick around after the problem is fixed.
     setFieldErrors((prev) => {
