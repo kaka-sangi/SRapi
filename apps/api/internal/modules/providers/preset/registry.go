@@ -233,7 +233,7 @@ func codexCLIPreset() Preset {
 			Platform:            "openai",
 			DefaultBaseURL:      "https://chatgpt.com/backend-api/codex",
 			DefaultMetadata:     map[string]any{"base_url": "https://chatgpt.com/backend-api/codex"},
-			ModelCatalog:        []string{"gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "codex-auto-review", "gpt-5.3-codex", "gpt-5.3-codex-spark", "gpt-5.2", "codex-mini-latest", "gpt-image-2"},
+			ModelCatalog:        []string{"gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "codex-auto-review", "gpt-5.3-codex", "gpt-5.3-codex-spark", "gpt-5.2", "codex-mini-latest"},
 			MetadataHints: map[string]string{
 				"base_url":            "Codex upstream (adapter appends /responses)",
 				"upstream_account_id": "From session JWT (optional)",
@@ -478,7 +478,7 @@ func chatGPTWebPreset() Preset {
 			accountscontract.RuntimeClassWebSessionCookie,
 			accountscontract.RuntimeClassCustomReverseProxy,
 		},
-		Capabilities: openAICapabilities(),
+		Capabilities: chatGPTWebCapabilities(),
 		AccountTemplate: &AccountTemplate{
 			UpstreamClient: "chatgpt_web",
 			DefaultMetadata: map[string]any{
@@ -695,6 +695,14 @@ func openAIPresetSupportsImageVariations(providerKey string) bool {
 	default:
 		return false
 	}
+}
+
+func chatGPTWebCapabilities() map[string]bool {
+	caps := openAICapabilities()
+	caps[capabilitiescontract.KeyImageGenerations] = true
+	caps[capabilitiescontract.KeyImageEdits] = true
+	caps[capabilitiescontract.KeyImageVariations] = true
+	return caps
 }
 
 func anthropicCapabilities() map[string]bool {
