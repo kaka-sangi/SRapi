@@ -108,7 +108,8 @@ func (s *Server) handleImportAdminCodexSession(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	result := s.importCodexSessions(r.Context(), providerID, codexImportDefaultBaseURL(provider), body, entries)
+	upstreamClient := codexImportUpstreamClientForProvider(provider)
+	result := s.importCodexSessions(r.Context(), providerID, codexImportDefaultBaseURL(provider), upstreamClient, body, entries)
 
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.import_codex_session", "provider_account", "bulk", nil, map[string]any{
 		"provider_id":   providerID,
@@ -125,7 +126,7 @@ func (s *Server) handleImportAdminCodexSession(w http.ResponseWriter, r *http.Re
 	})
 }
 
-func (s *Server) importCodexSessions(ctx context.Context, providerID int, defaultBaseURL string, body apiopenapi.CodexSessionImportRequest, entries []codexImportEntry) apiopenapi.CodexSessionImportResult {
+func (s *Server) importCodexSessions(ctx context.Context, providerID int, defaultBaseURL string, upstreamClient string, body apiopenapi.CodexSessionImportRequest, entries []codexImportEntry) apiopenapi.CodexSessionImportResult {
 	result := apiopenapi.CodexSessionImportResult{
 		Total:    len(entries),
 		Items:    make([]apiopenapi.CodexSessionImportItem, 0, len(entries)),
@@ -187,18 +188,18 @@ func (s *Server) importCodexSessions(ctx context.Context, providerID int, defaul
 				})
 				continue
 			}
-			s.applyCodexUpdate(ctx, &result, entry.index, accountName, existingID, credential, metadata, status, body.ProxyId)
+			s.applyCodexUpdate(ctx, &result, entry.index, accountName, existingID, credential, metadata, status, body.ProxyId, upstreamClient)
 			continue
 		}
 
-		s.applyCodexCreate(ctx, &result, entry.index, accountName, providerID, credential, metadata, status, body.ProxyId, groupIDs, existing, item)
+		s.applyCodexCreate(ctx, &result, entry.index, accountName, providerID, credential, metadata, status, body.ProxyId, groupIDs, existing, item, upstreamClient)
 	}
 
 	return result
 }
 
-func (s *Server) applyCodexCreate(ctx context.Context, result *apiopenapi.CodexSessionImportResult, index int, name string, providerID int, credential, metadata map[string]any, status *accountcontract.Status, proxyID *string, groupIDs []int, existing *codexAccountIndex, item *codexImportAccount) {
-	refreshed, err := s.refreshImportCredential(ctx, accountcontract.RuntimeClassOauthRefresh, ptrString(codexImportUpstreamClient), metadata, proxyID, credential)
+func (s *Server) applyCodexCreate(ctx context.Context, result *apiopenapi.CodexSessionImportResult, index int, name string, providerID int, credential, metadata map[string]any, status *accountcontract.Status, proxyID *string, groupIDs []int, existing *codexAccountIndex, item *codexImportAccount, upstreamClient string) {
+	refreshed, err := s.refreshImportCredential(ctx, accountcontract.RuntimeClassOauthRefresh, ptrString(upstreamClient), metadata, proxyID, credential)
 	if err != nil {
 		recordCodexFailure(result, index, name, "oauth refresh failed")
 		return
@@ -211,7 +212,7 @@ func (s *Server) applyCodexCreate(ctx context.Context, result *apiopenapi.CodexS
 		Metadata:       metadata,
 		ProxyID:        proxyID,
 		Status:         status,
-		UpstreamClient: ptrString(codexImportUpstreamClient),
+		UpstreamClient: ptrString(upstreamClient),
 	})
 	if err != nil {
 		recordCodexFailure(result, index, name, "create failed")
@@ -231,8 +232,8 @@ func (s *Server) applyCodexCreate(ctx context.Context, result *apiopenapi.CodexS
 	})
 }
 
-func (s *Server) applyCodexUpdate(ctx context.Context, result *apiopenapi.CodexSessionImportResult, index int, name string, accountID int, credential, metadata map[string]any, status *accountcontract.Status, proxyID *string) {
-	refreshed, err := s.refreshImportCredential(ctx, accountcontract.RuntimeClassOauthRefresh, ptrString(codexImportUpstreamClient), metadata, proxyID, credential)
+func (s *Server) applyCodexUpdate(ctx context.Context, result *apiopenapi.CodexSessionImportResult, index int, name string, accountID int, credential, metadata map[string]any, status *accountcontract.Status, proxyID *string, upstreamClient string) {
+	refreshed, err := s.refreshImportCredential(ctx, accountcontract.RuntimeClassOauthRefresh, ptrString(upstreamClient), metadata, proxyID, credential)
 	if err != nil {
 		recordCodexFailure(result, index, name, "oauth refresh failed")
 		return
@@ -686,6 +687,15 @@ func recordCodexFailure(result *apiopenapi.CodexSessionImportResult, index int, 
 // this seed the codex reverse-proxy adapter rejects every request with "reverse
 // proxy upstream base url missing", so the import would silently create dead
 // accounts.
+func codexImportUpstreamClientForProvider(provider providercontract.Provider) string {
+	if at, ok := provider.ConfigSchema["account_template"].(map[string]any); ok {
+		if uc, ok := at["upstream_client"].(string); ok && strings.TrimSpace(uc) != "" {
+			return strings.TrimSpace(uc)
+		}
+	}
+	return codexImportUpstreamClient
+}
+
 func codexImportDefaultBaseURL(provider providercontract.Provider) string {
 	if bu := mapString(provider.ConfigSchema, "base_url"); bu != "" {
 		return bu

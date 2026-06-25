@@ -209,14 +209,19 @@ export function AccountImportDialog({
       });
       setCodexResult(data);
 
-      // Also import into chatgpt-web provider for image generation.
+      // Create paired chatgpt-web accounts: re-import the same content
+      // into the chatgpt-web provider. The backend resolves upstream_client
+      // and base_url from the provider preset, so the accounts get the
+      // correct chatgpt_web settings.
       if (codexAlsoChatGPTWeb && data.created > 0) {
         const chatgptWebProvider = providerOptions.find(
           (o) => o.adapterType === "reverse-proxy-chatgpt-web",
         );
         if (chatgptWebProvider) {
           try {
-            const webName = codexName.trim() ? codexName.trim().replace(/codex/i, "chatgpt-web") : "chatgpt-web";
+            const webName = codexName.trim()
+              ? codexName.trim().replace(/codex/gi, "chatgpt-web")
+              : "chatgpt-web";
             await codexImportMut.mutateAsync({
               provider_id: chatgptWebProvider.value as Id,
               content: codexContent,
