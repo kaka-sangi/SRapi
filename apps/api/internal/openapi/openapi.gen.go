@@ -47,6 +47,7 @@ const (
 	AccountModelDiscoverySourceGeminiCompatible        AccountModelDiscoverySource = "gemini-compatible"
 	AccountModelDiscoverySourceOpenaiCompatible        AccountModelDiscoverySource = "openai-compatible"
 	AccountModelDiscoverySourceReverseProxyAntigravity AccountModelDiscoverySource = "reverse-proxy-antigravity"
+	AccountModelDiscoverySourceReverseProxyChatgptWeb  AccountModelDiscoverySource = "reverse-proxy-chatgpt-web"
 )
 
 // Valid indicates whether the value is a known member of the AccountModelDiscoverySource enum.
@@ -59,6 +60,8 @@ func (e AccountModelDiscoverySource) Valid() bool {
 	case AccountModelDiscoverySourceOpenaiCompatible:
 		return true
 	case AccountModelDiscoverySourceReverseProxyAntigravity:
+		return true
+	case AccountModelDiscoverySourceReverseProxyChatgptWeb:
 		return true
 	default:
 		return false

@@ -38,6 +38,7 @@ const (
 	modelDiscoveryAnthropic   modelDiscoverySource = "anthropic-compatible"
 	modelDiscoveryGemini      modelDiscoverySource = "gemini-compatible"
 	modelDiscoveryAntigravity modelDiscoverySource = "reverse-proxy-antigravity"
+	modelDiscoveryChatGPTWeb  modelDiscoverySource = "reverse-proxy-chatgpt-web"
 )
 
 type modelDiscoveryHTTPRequest struct {
@@ -140,7 +141,7 @@ func (rt *runtimeState) discoverAccountModels(ctx context.Context, provider prov
 }
 
 func modelDiscoveryRuntimeSupported(source modelDiscoverySource, account accountcontract.ProviderAccount) bool {
-	if source == modelDiscoveryAntigravity {
+	if source == modelDiscoveryAntigravity || source == modelDiscoveryChatGPTWeb {
 		return account.RuntimeClass != accountcontract.RuntimeClassAPIKey
 	}
 	return account.RuntimeClass == accountcontract.RuntimeClassAPIKey
@@ -172,6 +173,9 @@ func modelDiscoveryRequest(source modelDiscoverySource, provider providercontrac
 		}
 		out.Method = http.MethodPost
 		out.Body = body
+		out.ViaReverseProxy = true
+	}
+	if source == modelDiscoveryChatGPTWeb {
 		out.ViaReverseProxy = true
 	}
 	return out, nil
@@ -235,8 +239,11 @@ func (req modelDiscoveryHTTPRequest) modelDiscoveryRequestURL() string {
 }
 
 func modelDiscoverySourceForProvider(provider providercontract.Provider) (modelDiscoverySource, bool) {
-	if strings.EqualFold(strings.TrimSpace(provider.AdapterType), "reverse-proxy-antigravity") {
+	switch strings.ToLower(strings.TrimSpace(provider.AdapterType)) {
+	case "reverse-proxy-antigravity":
 		return modelDiscoveryAntigravity, true
+	case "reverse-proxy-chatgpt-web", "reverse-proxy-codex-cli":
+		return modelDiscoveryChatGPTWeb, true
 	}
 	for _, value := range []string{provider.Protocol, provider.AdapterType} {
 		switch strings.ToLower(strings.TrimSpace(value)) {
@@ -256,16 +263,26 @@ func modelDiscoveryEndpoint(source modelDiscoverySource, provider providercontra
 	if baseURL == "" {
 		return ""
 	}
-	if source == modelDiscoveryAntigravity {
+	switch source {
+	case modelDiscoveryAntigravity:
 		if strings.HasSuffix(baseURL, "/v1internal:fetchAvailableModels") {
 			return baseURL
 		}
 		return strings.TrimRight(baseURL, "/") + "/v1internal:fetchAvailableModels"
+	case modelDiscoveryChatGPTWeb:
+		parsed, err := url.Parse(baseURL)
+		if err != nil {
+			return ""
+		}
+		parsed.Path = "/backend-api/models"
+		parsed.RawQuery = "history_and_training_disabled=false"
+		return parsed.String()
+	default:
+		if strings.HasSuffix(baseURL, "/models") {
+			return baseURL
+		}
+		return strings.TrimRight(baseURL, "/") + "/models"
 	}
-	if strings.HasSuffix(baseURL, "/models") {
-		return baseURL
-	}
-	return strings.TrimRight(baseURL, "/") + "/models"
 }
 
 func validModelDiscoveryEndpoint(rawURL string) bool {
@@ -284,6 +301,8 @@ func upstreamModelDiscoveryBaseURL(source modelDiscoverySource, provider provide
 		keys = append([]string{"gemini_models_url", "gemini_base_url"}, keys...)
 	case modelDiscoveryAntigravity:
 		keys = append([]string{"antigravity_models_url", "antigravity_base_url"}, keys...)
+	case modelDiscoveryChatGPTWeb:
+		keys = append([]string{"chatgpt_models_url"}, keys...)
 	}
 	for _, values := range []map[string]any{account.Metadata, provider.ConfigSchema, provider.Capabilities} {
 		for _, key := range keys {
@@ -425,6 +444,8 @@ func parseDiscoveredModelIDs(source modelDiscoverySource, body []byte, limit int
 		ids, ok = parseGeminiModelIDs(body)
 	case modelDiscoveryAntigravity:
 		ids, ok = parseAntigravityModelIDs(body)
+	case modelDiscoveryChatGPTWeb:
+		ids, ok = parseChatGPTWebModelIDs(body)
 	default:
 		return nil, errModelDiscoveryUnsupported
 	}
@@ -461,6 +482,27 @@ func parseObjectModelIDs(body []byte) ([]string, bool) {
 	}
 	for _, model := range decoded.Models {
 		ids = append(ids, firstNonEmpty(model.ID, model.Name))
+	}
+	return ids, true
+}
+
+func parseChatGPTWebModelIDs(body []byte) ([]string, bool) {
+	var decoded struct {
+		Models []struct {
+			Slug string `json:"slug"`
+		} `json:"models"`
+	}
+	if err := json.Unmarshal(body, &decoded); err != nil {
+		return nil, false
+	}
+	if decoded.Models == nil {
+		return nil, false
+	}
+	ids := make([]string, 0, len(decoded.Models))
+	for _, m := range decoded.Models {
+		if slug := strings.TrimSpace(m.Slug); slug != "" {
+			ids = append(ids, slug)
+		}
 	}
 	return ids, true
 }

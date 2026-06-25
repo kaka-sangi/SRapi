@@ -2190,6 +2190,7 @@ AccountModelDiscovery:
         - anthropic-compatible
         - gemini-compatible
         - reverse-proxy-antigravity
+        - reverse-proxy-chatgpt-web
     endpoint:
       type: string
       format: uri
