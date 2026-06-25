@@ -146,6 +146,13 @@ func (s *Server) importCodexSessions(ctx context.Context, providerID int, defaul
 	}
 	requestStatus := toAccountStatusPtr(body.Status)
 
+	provider, providerErr := s.runtime.providers.FindByID(ctx, providerID)
+	if providerErr == nil {
+		if catalog := codexImportModelCatalog(provider); len(catalog) > 0 {
+			s.quickMapModels(ctx, provider, catalog, nil)
+		}
+	}
+
 	seen := map[string]int{}
 	for _, entry := range entries {
 		item, err := normalizeCodexImportEntry(entry)
@@ -710,6 +717,24 @@ func codexImportDefaultBaseURL(provider providercontract.Provider) string {
 		}
 	}
 	return preset.DefaultBaseURL
+}
+
+func codexImportModelCatalog(provider providercontract.Provider) []string {
+	at, ok := provider.ConfigSchema["account_template"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	raw, ok := at["model_catalog"].([]any)
+	if !ok {
+		return nil
+	}
+	catalog := make([]string, 0, len(raw))
+	for _, item := range raw {
+		if s, ok := item.(string); ok && strings.TrimSpace(s) != "" {
+			catalog = append(catalog, strings.TrimSpace(s))
+		}
+	}
+	return catalog
 }
 
 func setCodexCredentialIfNotEmpty(credential map[string]any, key, value string) {

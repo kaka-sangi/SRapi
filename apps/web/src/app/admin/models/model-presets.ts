@@ -24,7 +24,13 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
   "o4-mini": { displayName: "o4-mini", family: "o-series", contextWindow: 200000, maxOutputTokens: 100000, qualityTier: "standard" },
   "o3": { displayName: "o3", family: "o-series", contextWindow: 200000, maxOutputTokens: 100000, qualityTier: "premium" },
   "o3-pro": { displayName: "o3-pro", family: "o-series", contextWindow: 200000, maxOutputTokens: 100000, qualityTier: "premium" },
+  "gpt-5.4-nano": { displayName: "GPT-5.4 Nano", family: "gpt", contextWindow: 1048576, maxOutputTokens: 8192, qualityTier: "economy" },
+  "gpt-5.2": { displayName: "GPT-5.2", family: "gpt", contextWindow: 1048576, maxOutputTokens: 32768, qualityTier: "standard" },
+  // Codex CLI
   "codex-mini-latest": { displayName: "Codex Mini", family: "codex", contextWindow: 1048576, maxOutputTokens: 65536, qualityTier: "standard" },
+  "codex-auto-review": { displayName: "Codex Auto Review", family: "codex", contextWindow: 1048576, maxOutputTokens: 65536, qualityTier: "standard" },
+  "gpt-5.3-codex": { displayName: "GPT-5.3 Codex", family: "codex", contextWindow: 1048576, maxOutputTokens: 65536, qualityTier: "standard" },
+  "gpt-5.3-codex-spark": { displayName: "GPT-5.3 Codex Spark", family: "codex", contextWindow: 1048576, maxOutputTokens: 32768, qualityTier: "economy" },
   // Gemini
   "gemini-2.5-pro": { displayName: "Gemini 2.5 Pro", family: "gemini", contextWindow: 1048576, maxOutputTokens: 65536, qualityTier: "premium" },
   "gemini-2.5-flash": { displayName: "Gemini 2.5 Flash", family: "gemini", contextWindow: 1048576, maxOutputTokens: 65536, qualityTier: "standard" },

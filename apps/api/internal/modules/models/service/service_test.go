@@ -300,3 +300,74 @@ func TestUpdateStatusOnlyToggle(t *testing.T) {
 		t.Fatalf("capabilities leaked: %+v", updated.Capabilities)
 	}
 }
+
+func TestCreateModelAutoFillsFromPreset(t *testing.T) {
+	store := newMemoryStore()
+	svc, err := New(store, nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	model, err := svc.Create(context.Background(), contract.CreateRequest{
+		CanonicalName: "gpt-5.4",
+		DisplayName:   "GPT-5.4",
+	})
+	if err != nil {
+		t.Fatalf("create model: %v", err)
+	}
+	if model.Family == nil || *model.Family != "gpt" {
+		t.Fatalf("expected family=gpt from preset, got %v", model.Family)
+	}
+	if model.ContextWindow == nil || *model.ContextWindow != 1048576 {
+		t.Fatalf("expected context_window=1048576 from preset, got %v", model.ContextWindow)
+	}
+	if model.MaxOutputTokens == nil || *model.MaxOutputTokens != 32768 {
+		t.Fatalf("expected max_output_tokens=32768 from preset, got %v", model.MaxOutputTokens)
+	}
+	if model.QualityTier == nil || *model.QualityTier != "premium" {
+		t.Fatalf("expected quality_tier=premium from preset, got %v", model.QualityTier)
+	}
+}
+
+func TestCreateModelPresetDoesNotOverrideExplicit(t *testing.T) {
+	store := newMemoryStore()
+	svc, err := New(store, nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	customFamily := "custom-family"
+	model, err := svc.Create(context.Background(), contract.CreateRequest{
+		CanonicalName: "gpt-5.4",
+		DisplayName:   "GPT-5.4",
+		Family:        &customFamily,
+	})
+	if err != nil {
+		t.Fatalf("create model: %v", err)
+	}
+	if model.Family == nil || *model.Family != "custom-family" {
+		t.Fatalf("expected explicit family to be preserved, got %v", model.Family)
+	}
+	if model.ContextWindow == nil || *model.ContextWindow != 1048576 {
+		t.Fatalf("other preset fields should still fill: context_window=%v", model.ContextWindow)
+	}
+}
+
+func TestCreateModelUnknownNameSkipsPreset(t *testing.T) {
+	store := newMemoryStore()
+	svc, err := New(store, nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	model, err := svc.Create(context.Background(), contract.CreateRequest{
+		CanonicalName: "my-custom-model",
+		DisplayName:   "My Custom Model",
+	})
+	if err != nil {
+		t.Fatalf("create model: %v", err)
+	}
+	if model.Family != nil {
+		t.Fatalf("expected nil family for unknown model, got %v", model.Family)
+	}
+	if model.ContextWindow != nil {
+		t.Fatalf("expected nil context_window for unknown model, got %v", model.ContextWindow)
+	}
+}

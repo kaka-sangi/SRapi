@@ -8,6 +8,7 @@ import (
 
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/models/contract"
+	modelpreset "github.com/srapi/srapi/apps/api/internal/modules/models/preset"
 )
 
 type Clock interface {
@@ -41,6 +42,24 @@ func (s *Service) Create(ctx context.Context, req contract.CreateRequest) (contr
 	}
 	if _, err := s.store.FindByCanonicalName(ctx, canonicalName); err == nil {
 		return contract.Model{}, ErrModelExists
+	}
+	if p, ok := modelpreset.Lookup(canonicalName); ok {
+		if req.Family == nil && p.Family != "" {
+			f := p.Family
+			req.Family = &f
+		}
+		if req.ContextWindow == nil && p.ContextWindow > 0 {
+			cw := p.ContextWindow
+			req.ContextWindow = &cw
+		}
+		if req.MaxOutputTokens == nil && p.MaxOutputTokens > 0 {
+			mot := p.MaxOutputTokens
+			req.MaxOutputTokens = &mot
+		}
+		if req.QualityTier == nil && p.QualityTier != "" {
+			qt := p.QualityTier
+			req.QualityTier = &qt
+		}
 	}
 	status := contract.StatusActive
 	if req.Status != nil {
