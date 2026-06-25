@@ -85,6 +85,7 @@ export function AccountImportDialog({
   const [codexContent, setCodexContent] = useState("");
   const [codexName, setCodexName] = useState("");
   const [codexUpdateExisting, setCodexUpdateExisting] = useState(true);
+  const [codexAlsoChatGPTWeb, setCodexAlsoChatGPTWeb] = useState(true);
   const [codexResult, setCodexResult] = useState<CodexSessionImportResult | null>(null);
   const [codexFileNames, setCodexFileNames] = useState<string[]>([]);
   const [oauthProviderId, setOAuthProviderId] = useState<string>(defaultProviderId);
@@ -207,6 +208,28 @@ export function AccountImportDialog({
         update_existing: codexUpdateExisting,
       });
       setCodexResult(data);
+
+      // Also import into chatgpt-web provider for image generation.
+      if (codexAlsoChatGPTWeb && data.created > 0) {
+        const chatgptWebProvider = providerOptions.find(
+          (o) => o.adapterType === "reverse-proxy-chatgpt-web",
+        );
+        if (chatgptWebProvider) {
+          try {
+            const webName = codexName.trim() ? codexName.trim().replace(/codex/i, "chatgpt-web") : "chatgpt-web";
+            await codexImportMut.mutateAsync({
+              provider_id: chatgptWebProvider.value as Id,
+              content: codexContent,
+              name: webName,
+              update_existing: codexUpdateExisting,
+            });
+            toast({ title: t("adminAccounts.chatgptWebCreated"), tone: "success" });
+          } catch {
+            toast({ title: t("adminAccounts.chatgptWebFailed"), tone: "warning" });
+          }
+        }
+      }
+
       toast({
         title: t("codexImport.done"),
         description: t("codexImport.doneSummary", {
@@ -728,6 +751,20 @@ export function AccountImportDialog({
                   id="codex-import-update"
                   checked={codexUpdateExisting}
                   onCheckedChange={setCodexUpdateExisting}
+                  disabled={busy}
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-md border border-srapi-border px-3 py-2">
+                <div>
+                  <Label htmlFor="codex-import-chatgpt-web" className="cursor-pointer">
+                    {t("adminAccounts.alsoCreateChatGPTWeb")}
+                  </Label>
+                  <p className="text-xs text-srapi-text-tertiary">{t("adminAccounts.alsoCreateChatGPTWebHint")}</p>
+                </div>
+                <Switch
+                  id="codex-import-chatgpt-web"
+                  checked={codexAlsoChatGPTWeb}
+                  onCheckedChange={setCodexAlsoChatGPTWeb}
                   disabled={busy}
                 />
               </div>
