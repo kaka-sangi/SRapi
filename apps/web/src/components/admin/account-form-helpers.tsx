@@ -16,6 +16,10 @@ export interface AccountTemplate {
   default_metadata?: Record<string, unknown>;
   model_catalog?: string[];
   metadata_hints?: Record<string, string>;
+  credential_input_type?: string;
+  platform?: string;
+  default_base_url?: string;
+  api_key_placeholder?: string;
 }
 
 /**

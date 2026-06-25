@@ -7,6 +7,7 @@ import { BedrockInput } from "@/components/admin/credential-input/bedrock-input"
 import { VertexInput } from "@/components/admin/credential-input/vertex-input";
 import { QuotaControl } from "@/components/admin/account-config/quota-control";
 import { TempUnschedRules } from "@/components/admin/account-config/temp-unsched-rules";
+import { ModelSelector } from "@/components/admin/account-config/model-selector";
 import {
   AccountOAuthAuthorizeDialog,
   type AccountOAuthFlowMode,
@@ -301,6 +302,8 @@ export function AccountFormDialog({
   }
 
   function deriveAccountCategory(provId: string): string {
+    const tmpl = getProviderTemplate(providerOptions, provId);
+    if (tmpl?.credential_input_type) return tmpl.credential_input_type;
     const p = providerOptions.find((o) => o.value === provId);
     if (!p) return "apikey";
     const name = p.label?.toLowerCase() ?? "";
@@ -474,6 +477,8 @@ export function AccountFormDialog({
   }, [quickPlatforms]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function platformDefaultBaseUrl(provId: string): string {
+    const tmpl = getProviderTemplate(providerOptions, provId);
+    if (tmpl?.default_base_url) return tmpl.default_base_url;
     const p = providerOptions.find((o) => o.value === provId);
     if (!p) return "";
     const at = p.adapterType?.toLowerCase() ?? "";
@@ -1150,51 +1155,14 @@ export function AccountFormDialog({
                       />
                     </div>
                   </div>
-                  <div>
-                    <Label>{t("adminAccounts.supportedModels")}</Label>
-                    <p className="mt-1 text-[11px] text-srapi-text-tertiary">
-                      {t("adminAccounts.supportedModelsHint")}
-                    </p>
-                    <div className="mt-1.5">
-                      <TagInput
-                        value={supportedModels}
-                        onChange={(next) => updateStringListKey(supportedModelsKey, next)}
-                        disabled={busy}
-                        placeholder={t("adminAccounts.supportedModelsPlaceholder")}
-                      />
-                    </div>
-                    {template?.model_catalog?.length ? (
-                      <div className="mt-1.5 flex flex-wrap gap-1">
-                        {template.model_catalog
-                          .filter((m) => !supportedModels.includes(m))
-                          .map((m) => (
-                            <button
-                              key={m}
-                              type="button"
-                              className="rounded-full border border-srapi-border px-2.5 py-0.5 text-[11px] font-medium text-srapi-text-secondary transition-colors hover:border-srapi-border-strong hover:bg-srapi-card-muted hover:text-srapi-text-primary"
-                              disabled={busy}
-                              onClick={() => updateStringListKey(supportedModelsKey, [...supportedModels, m])}
-                            >
-                              + {m}
-                            </button>
-                          ))}
-                      </div>
-                    ) : null}
-                  </div>
-                  <div>
-                    <Label>{t("adminAccounts.excludedModels")}</Label>
-                    <p className="mt-1 text-[11px] text-srapi-text-tertiary">
-                      {t("adminAccounts.excludedModelsHint")}
-                    </p>
-                    <div className="mt-1.5">
-                      <TagInput
-                        value={excludedModels}
-                        onChange={(next) => updateStringListKey(excludedModelsKey, next)}
-                        disabled={busy}
-                        placeholder={t("adminAccounts.excludedModelsPlaceholder")}
-                      />
-                    </div>
-                  </div>
+                  <ModelSelector
+                    supportedModels={supportedModels}
+                    excludedModels={excludedModels}
+                    modelCatalog={template?.model_catalog}
+                    onSupportedChange={(next) => updateStringListKey(supportedModelsKey, next)}
+                    onExcludedChange={(next) => updateStringListKey(excludedModelsKey, next)}
+                    disabled={busy}
+                  />
                 </div>
               ) : null}
             </div>

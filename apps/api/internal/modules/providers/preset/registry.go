@@ -39,6 +39,16 @@ type AccountTemplate struct {
 	DefaultMetadata map[string]any    `json:"default_metadata,omitempty"`
 	ModelCatalog    []string          `json:"model_catalog,omitempty"`
 	MetadataHints   map[string]string `json:"metadata_hints,omitempty"`
+	// CredentialInputType tells the frontend which credential component to render:
+	// "api_key" (default), "oauth", "bedrock", "vertex".
+	CredentialInputType string `json:"credential_input_type,omitempty"`
+	// Platform is the provider family for fast UI grouping:
+	// "anthropic", "openai", "gemini", "antigravity".
+	Platform string `json:"platform,omitempty"`
+	// DefaultBaseURL is the provider's canonical API endpoint.
+	DefaultBaseURL string `json:"default_base_url,omitempty"`
+	// ApiKeyPlaceholder is the hint for the API key input field.
+	ApiKeyPlaceholder string `json:"api_key_placeholder,omitempty"`
 }
 
 // OAuthConfig carries non-secret OAuth defaults for interactive upstream-account
@@ -218,9 +228,12 @@ func codexCLIPreset() Preset {
 		},
 		Capabilities: codexCLICapabilities(),
 		AccountTemplate: &AccountTemplate{
-			UpstreamClient:  "codex_cli",
-			DefaultMetadata: map[string]any{"base_url": "https://chatgpt.com/backend-api/codex"},
-			ModelCatalog:    []string{"gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "codex-auto-review", "gpt-5.3-codex", "gpt-5.3-codex-spark", "gpt-5.2", "codex-mini-latest"},
+			UpstreamClient:      "codex_cli",
+			CredentialInputType: "oauth",
+			Platform:            "openai",
+			DefaultBaseURL:      "https://chatgpt.com/backend-api/codex",
+			DefaultMetadata:     map[string]any{"base_url": "https://chatgpt.com/backend-api/codex"},
+			ModelCatalog:        []string{"gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "codex-auto-review", "gpt-5.3-codex", "gpt-5.3-codex-spark", "gpt-5.2", "codex-mini-latest"},
 			MetadataHints: map[string]string{
 				"base_url":            "Codex upstream (adapter appends /responses)",
 				"upstream_account_id": "From session JWT (optional)",
@@ -316,6 +329,9 @@ func vertexPreset() Preset {
 		},
 		Capabilities: geminiCapabilities(),
 		AccountTemplate: &AccountTemplate{
+			CredentialInputType: "vertex",
+			Platform:            "gemini",
+			DefaultBaseURL:      "https://us-central1-aiplatform.googleapis.com/v1",
 			DefaultMetadata: map[string]any{
 				"region":     "us-central1",
 				"project_id": "",
@@ -520,6 +536,9 @@ func bedrockPreset() Preset {
 		},
 		Capabilities: anthropicCapabilities(),
 		AccountTemplate: &AccountTemplate{
+			CredentialInputType: "bedrock",
+			Platform:            "anthropic",
+			DefaultBaseURL:      "https://bedrock-runtime.us-east-1.amazonaws.com",
 			DefaultMetadata: map[string]any{
 				"model_mapping":    bedrockDefaultModelMapping(),
 				"supported_models": bedrockDefaultSupportedModels(),
