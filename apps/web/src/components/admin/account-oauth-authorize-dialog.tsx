@@ -121,7 +121,10 @@ export function AccountOAuthAuthorizeDialog({
   // fresh (config inputs are intentionally preserved between opens).
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (!open) resetAll();
+    if (!open) {
+      resetAll();
+      prefillKey.current = "";
+    }
   }, [open, resetAll]);
 
   useEffect(() => () => stopPolling(), [stopPolling]);
