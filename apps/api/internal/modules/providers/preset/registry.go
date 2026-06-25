@@ -233,7 +233,7 @@ func codexCLIPreset() Preset {
 			Platform:            "openai",
 			DefaultBaseURL:      "https://chatgpt.com/backend-api/codex",
 			DefaultMetadata:     map[string]any{"base_url": "https://chatgpt.com/backend-api/codex"},
-			ModelCatalog:        []string{"gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "codex-auto-review", "gpt-5.3-codex", "gpt-5.3-codex-spark", "gpt-5.2", "codex-mini-latest"},
+			ModelCatalog:        []string{"gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "codex-auto-review", "gpt-5.3-codex", "gpt-5.3-codex-spark", "gpt-5.2", "codex-mini-latest", "gpt-image-2"},
 			MetadataHints: map[string]string{
 				"base_url":            "Codex upstream (adapter appends /responses)",
 				"upstream_account_id": "From session JWT (optional)",
@@ -484,7 +484,7 @@ func chatGPTWebPreset() Preset {
 			DefaultMetadata: map[string]any{
 				"base_url": "https://chatgpt.com",
 			},
-			ModelCatalog: []string{"gpt-5.5", "gpt-5.4", "gpt-5.4-mini"},
+			ModelCatalog: []string{"gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-image-2"},
 			MetadataHints: map[string]string{
 				"chatgpt_requirements_token": "OpenAI Sentinel chat requirements token, or enable requirements_auto",
 				"user_agent":                 "Browser user agent for ChatGPT web requests",

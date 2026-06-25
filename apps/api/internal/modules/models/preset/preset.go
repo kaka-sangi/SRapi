@@ -84,6 +84,11 @@ var registry = map[string]ModelPreset{
 	"o3":           {DisplayName: "o3", Family: "o-series", ContextWindow: 200000, MaxOutputTokens: 100000, QualityTier: "premium", Capabilities: capsOpenAI},
 	"o3-pro":       {DisplayName: "o3-pro", Family: "o-series", ContextWindow: 200000, MaxOutputTokens: 100000, QualityTier: "premium", Capabilities: capsOpenAI},
 
+	// Image
+	"gpt-image-2": {DisplayName: "GPT Image 2", Family: "gpt-image", QualityTier: "standard", Capabilities: []cap.Descriptor{
+		cap1(cap.KeyImageGenerations), cap1(cap.KeyImageEdits), cap1(cap.KeyImageVariations),
+	}},
+
 	// Codex CLI — source: developers.openai.com/codex/models
 	"codex-mini-latest":   {DisplayName: "Codex Mini", Family: "codex", ContextWindow: 1000000, MaxOutputTokens: 128000, QualityTier: "standard", Capabilities: capsCodex},
 	"codex-auto-review":   {DisplayName: "Codex Auto Review", Family: "codex", ContextWindow: 1000000, MaxOutputTokens: 128000, QualityTier: "standard", Capabilities: capsCodex},

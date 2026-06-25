@@ -26,6 +26,8 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
   "o4-mini": { displayName: "o4-mini", family: "o-series", contextWindow: 200000, maxOutputTokens: 100000, qualityTier: "standard" },
   "o3": { displayName: "o3", family: "o-series", contextWindow: 200000, maxOutputTokens: 100000, qualityTier: "premium" },
   "o3-pro": { displayName: "o3-pro", family: "o-series", contextWindow: 200000, maxOutputTokens: 100000, qualityTier: "premium" },
+  // Image
+  "gpt-image-2": { displayName: "GPT Image 2", family: "gpt-image", qualityTier: "standard" },
   // Codex CLI — source: developers.openai.com/codex/models
   "codex-mini-latest": { displayName: "Codex Mini", family: "codex", contextWindow: 1000000, maxOutputTokens: 128000, qualityTier: "standard" },
   "codex-auto-review": { displayName: "Codex Auto Review", family: "codex", contextWindow: 1000000, maxOutputTokens: 128000, qualityTier: "standard" },
