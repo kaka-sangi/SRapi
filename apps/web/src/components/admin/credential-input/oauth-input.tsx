@@ -31,7 +31,11 @@ export function OAuthInput({ platform, disabled, onAuthorize, onCredential }: OA
             { value: "oauth", label: t("adminAccounts.oauthAuthorize") },
             { value: "refresh-token", label: "Refresh Token" },
           ]
-        : [{ value: "oauth", label: t("adminAccounts.oauthAuthorize") }];
+        : platform === "gemini"
+          ? [
+              { value: "oauth", label: t("adminAccounts.oauthAuthorize") },
+            ]
+          : [{ value: "oauth", label: t("adminAccounts.oauthAuthorize") }];
 
   const [method, setMethod] = useState<OAuthSubMethod>("oauth");
   const [tokenInput, setTokenInput] = useState("");

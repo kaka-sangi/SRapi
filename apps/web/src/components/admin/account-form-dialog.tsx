@@ -8,6 +8,8 @@ import { VertexInput } from "@/components/admin/credential-input/vertex-input";
 import { QuotaControl } from "@/components/admin/account-config/quota-control";
 import { TempUnschedRules } from "@/components/admin/account-config/temp-unsched-rules";
 import { ModelSelector } from "@/components/admin/account-config/model-selector";
+import { PoolMode } from "@/components/admin/account-config/pool-mode";
+import { AllowedClients } from "@/components/admin/account-config/allowed-clients";
 import {
   AccountOAuthAuthorizeDialog,
   type AccountOAuthFlowMode,
@@ -1060,7 +1062,9 @@ export function AccountFormDialog({
 
                   {/* Quota control + Temp unsched rules */}
                   <QuotaControl extra={extraJson} onExtraChange={setExtraJson} disabled={busy} />
+                  <PoolMode extra={extraJson} onExtraChange={setExtraJson} disabled={busy} />
                   <TempUnschedRules extra={extraJson} onExtraChange={setExtraJson} disabled={busy} />
+                  <AllowedClients metadata={metadata} onMetadataChange={setMetadata} disabled={busy} />
 
                   <div>
                     <div className="flex items-center gap-2">
