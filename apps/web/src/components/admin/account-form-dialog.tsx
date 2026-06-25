@@ -898,21 +898,29 @@ export function AccountFormDialog({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>{t("adminAccounts.groupSelect")}</Label>
-                  <Select
-                    value={selectedGroupIds[0] ?? "__none__"}
-                    onValueChange={(v) => setSelectedGroupIds(v === "__none__" ? [] : [v])}
-                    disabled={busy}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={t("adminAccounts.groupSelectPlaceholder")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">{t("adminAccounts.noGroup")}</SelectItem>
+                  <p className="mt-0.5 text-[10px] text-srapi-text-tertiary">{t("adminAccounts.groupSelectHint")}</p>
+                  {(groupsQuery.data?.data ?? []).length > 0 ? (
+                    <div className="mt-1.5 max-h-28 space-y-1 overflow-y-auto rounded-md border border-srapi-border p-2">
                       {(groupsQuery.data?.data ?? []).map((g) => (
-                        <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                        <label key={g.id} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedGroupIds.includes(g.id)}
+                            disabled={busy}
+                            onChange={(e) => {
+                              setSelectedGroupIds((prev) =>
+                                e.target.checked ? [...prev, g.id] : prev.filter((id) => id !== g.id),
+                              );
+                            }}
+                            className="rounded text-srapi-primary"
+                          />
+                          <span className="text-sm truncate">{g.name}</span>
+                        </label>
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </div>
+                  ) : (
+                    <p className="mt-1.5 text-[11px] text-srapi-text-tertiary">{t("adminAccounts.noGroup")}</p>
+                  )}
                 </div>
                 <div>
                   <Label>{t("adminAccounts.proxySelect")}</Label>
