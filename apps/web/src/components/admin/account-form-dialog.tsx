@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Eye, EyeOff, KeyRound, Sparkles, Zap } from "lucide-react";
+import { OAuthInput } from "@/components/admin/credential-input/oauth-input";
+import { BedrockInput } from "@/components/admin/credential-input/bedrock-input";
+import { VertexInput } from "@/components/admin/credential-input/vertex-input";
 import {
   AccountOAuthAuthorizeDialog,
   type AccountOAuthFlowMode,
@@ -153,7 +156,7 @@ export function AccountFormDialog({
     return m;
   });
   const [platformChoice, setPlatformChoice] = useState("anthropic");
-  const [accountCategory, setAccountCategory] = useState("oauth");
+  const [accountCategory, setAccountCategory] = useState("apikey");
   const [showAllProviders, setShowAllProviders] = useState(false);
   const [addMethod, setAddMethod] = useState<"oauth" | "setup-token" | "refresh-token">("oauth");
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>(initial.groupIds as string[]);
@@ -294,7 +297,18 @@ export function AccountFormDialog({
     setQuickOAuthToken("");
   }
 
+  function deriveAccountCategory(provId: string): string {
+    const p = providerOptions.find((o) => o.value === provId);
+    if (!p) return "apikey";
+    const name = p.label?.toLowerCase() ?? "";
+    const at = p.adapterType?.toLowerCase() ?? "";
+    if (name.includes("bedrock") || at.includes("bedrock")) return "bedrock";
+    if (name.includes("vertex") || at.includes("vertex")) return "vertex";
+    return "apikey";
+  }
+
   function changeProvider(id: string) {
+    setAccountCategory(deriveAccountCategory(id));
     const previousTemplate = getProviderTemplate(providerOptions, providerId);
     const previousBaseUrl =
       typeof previousTemplate?.default_metadata?.base_url === "string"
@@ -715,114 +729,35 @@ export function AccountFormDialog({
               hint={mode === "create" ? defaultName : undefined}
             />
 
-            {/* ── Section: Credentials (platform-aware) ── */}
+            {/* ── Section: Credentials (component-based) ── */}
             <div className="space-y-4 border-t border-srapi-border pt-4">
 
-            {/* OAuth flow: platform-specific input methods */}
+            {/* Credential input: render based on type */}
             {runtimeClass === "oauth_refresh" && mode === "create" ? (
-              <div className="space-y-4">
-                {/* Anthropic OAuth: "OAuth 授权" or "Setup Token" */}
-                {platformChoice === "anthropic" ? (
-                  <>
-                    <div>
-                      <Label>{t("adminAccounts.addMethod")}</Label>
-                      <div className="mt-2 flex gap-4">
-                        <label className="flex cursor-pointer items-center gap-2">
-                          <input type="radio" name="add-method" value="oauth" checked={addMethod === "oauth"} onChange={() => setAddMethod("oauth")} className="text-srapi-primary" />
-                          <span className="text-sm">{t("adminAccounts.oauthAuthorize")}</span>
-                        </label>
-                        <label className="flex cursor-pointer items-center gap-2">
-                          <input type="radio" name="add-method" value="setup-token" checked={addMethod === "setup-token"} onChange={() => setAddMethod("setup-token")} className="text-srapi-primary" />
-                          <span className="text-sm">{t("adminAccounts.setupToken")}</span>
-                        </label>
-                      </div>
-                    </div>
-                    {addMethod === "oauth" ? (
-                      <div className="rounded-lg border border-srapi-primary/20 bg-srapi-primary/5 p-4">
-                        <Button type="button" variant="outline" disabled={busy} onClick={() => setOauthWizardOpen(true)} className="w-full">
-                          <KeyRound className="size-3.5" />
-                          {t("accountOAuth.authorizeAccount")}
-                        </Button>
-                        <p className="mt-2 text-center text-[11px] text-srapi-text-tertiary">{t("adminAccounts.oauthAuthorizeHint")}</p>
-                      </div>
-                    ) : (
-                      <div>
-                        <Label htmlFor="setup-token-input">{t("adminAccounts.setupTokenLabel")}</Label>
-                        <Input
-                          id="setup-token-input"
-                          type="password"
-                          className="mt-1.5 font-mono"
-                          placeholder={t("adminAccounts.setupTokenPlaceholder")}
-                          value={credInput}
-                          disabled={busy}
-                          autoComplete="new-password"
-                          data-lpignore="true"
-                          onChange={(e) => setCredInput(e.target.value)}
-                        />
-                        <p className="mt-1 text-[11px] text-srapi-text-tertiary">{t("adminAccounts.setupTokenHint")}</p>
-                      </div>
-                    )}
-                  </>
-                ) : platformChoice === "openai" ? (
-                  /* OpenAI OAuth: "OAuth 授权" or "Refresh Token" */
-                  <>
-                    <div>
-                      <Label>{t("adminAccounts.addMethod")}</Label>
-                      <div className="mt-2 flex gap-4">
-                        <label className="flex cursor-pointer items-center gap-2">
-                          <input type="radio" name="add-method" value="oauth" checked={addMethod === "oauth"} onChange={() => setAddMethod("oauth")} className="text-srapi-primary" />
-                          <span className="text-sm">{t("adminAccounts.oauthAuthorize")}</span>
-                        </label>
-                        <label className="flex cursor-pointer items-center gap-2">
-                          <input type="radio" name="add-method" value="refresh-token" checked={addMethod === "refresh-token"} onChange={() => setAddMethod("refresh-token")} className="text-srapi-primary" />
-                          <span className="text-sm">Refresh Token</span>
-                        </label>
-                      </div>
-                    </div>
-                    {addMethod === "oauth" ? (
-                      <div className="rounded-lg border border-srapi-primary/20 bg-srapi-primary/5 p-4">
-                        <Button type="button" variant="outline" disabled={busy} onClick={() => setOauthWizardOpen(true)} className="w-full">
-                          <KeyRound className="size-3.5" />
-                          {t("accountOAuth.authorizeAccount")}
-                        </Button>
-                        <p className="mt-2 text-center text-[11px] text-srapi-text-tertiary">{t("adminAccounts.oauthAuthorizeHint")}</p>
-                      </div>
-                    ) : (
-                      <div>
-                        <Label htmlFor="refresh-token-input">Refresh Token</Label>
-                        <Textarea
-                          id="refresh-token-input"
-                          spellCheck={false}
-                          className="mt-1.5 min-h-20 font-mono text-xs"
-                          placeholder={t("adminAccounts.refreshTokenPlaceholder")}
-                          value={quickOAuthToken}
-                          disabled={busy}
-                          autoComplete="off"
-                          data-lpignore="true"
-                          onPaste={(e) => { const text = e.clipboardData.getData("text"); if (applyQuickOAuthToken(text)) e.preventDefault(); }}
-                          onChange={(e) => setQuickOAuthToken(e.target.value)}
-                        />
-                        <div className="mt-2 flex justify-end">
-                          <Button type="button" variant="outline" size="sm" disabled={busy || !quickOAuthToken.trim()} onClick={() => applyQuickOAuthToken(quickOAuthToken)}>
-                            <Sparkles className="size-3.5" />
-                            {t("accountOAuth.quickPasteApply")}
-                          </Button>
-                        </div>
-                        <p className="mt-1 text-[11px] text-srapi-text-tertiary">{t("adminAccounts.refreshTokenHint")}</p>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  /* Other platforms OAuth: just the authorize button */
-                  <div className="rounded-lg border border-srapi-primary/20 bg-srapi-primary/5 p-4">
-                    <Button type="button" variant="outline" disabled={busy} onClick={() => setOauthWizardOpen(true)} className="w-full">
-                      <KeyRound className="size-3.5" />
-                      {t("accountOAuth.authorizeAccount")}
-                    </Button>
-                    <p className="mt-2 text-center text-[11px] text-srapi-text-tertiary">{t("adminAccounts.oauthAuthorizeHint")}</p>
-                  </div>
-                )}
-              </div>
+              <OAuthInput
+                platform={platformChoice}
+                disabled={busy}
+                onAuthorize={() => setOauthWizardOpen(true)}
+                onCredential={(cred, rcOverride) => {
+                  if (rcOverride) {
+                    setCredInput(JSON.stringify(cred));
+                    setAddMethod(rcOverride === "cli_client_token" ? "setup-token" : "refresh-token");
+                  } else {
+                    setQuickOAuthToken(cred.refresh_token as string ?? "");
+                    applyQuickOAuthToken(cred.refresh_token as string ?? "");
+                  }
+                }}
+              />
+            ) : accountCategory === "bedrock" ? (
+              <BedrockInput
+                disabled={busy}
+                onCredential={(cred) => setCredInput(JSON.stringify(cred))}
+              />
+            ) : accountCategory === "vertex" || runtimeClass === "service_account_json" ? (
+              <VertexInput
+                disabled={busy}
+                onCredential={(cred) => setCredInput(JSON.stringify(cred))}
+              />
             ) : (
             /* Non-OAuth: API Key / Service Account / generic credential */
             <div>
