@@ -64,6 +64,7 @@ type chatGPTWebConversationRequest struct {
 	VariantPurpose             string                  `json:"variant_purpose"`
 	WebsocketRequestID         string                  `json:"websocket_request_id"`
 	ClientContextualInfo       chatGPTWebClientContext `json:"client_contextual_info"`
+	ThinkingEffort             string                  `json:"thinking_effort,omitempty"`
 }
 
 type chatGPTWebMessage struct {
@@ -470,6 +471,7 @@ func chatGPTWebConversationPayload(req contract.ConversationRequest) chatGPTWebC
 		VariantPurpose:             "comparison_implicit",
 		WebsocketRequestID:         chatGPTWebSettingOrStableID(req, "websocket", "chatgpt_websocket_request_id", "websocket_request_id"),
 		ClientContextualInfo:       chatGPTWebClientContextInfo(req),
+		ThinkingEffort:             chatGPTWebThinkingEffort(req),
 	}
 }
 
@@ -1067,6 +1069,21 @@ func chatGPTWebOrigin(baseURL string) string {
 		return strings.TrimRight(baseURL, "/")
 	}
 	return parsed.Scheme + "://" + parsed.Host
+}
+
+func chatGPTWebThinkingEffort(req contract.ConversationRequest) string {
+	if len(req.Reasoning) == 0 {
+		return ""
+	}
+	effort, _ := req.Reasoning["effort"].(string)
+	switch strings.ToLower(strings.TrimSpace(effort)) {
+	case "low", "medium", "high":
+		return strings.ToLower(strings.TrimSpace(effort))
+	case "xhigh", "extended":
+		return "extended"
+	default:
+		return ""
+	}
 }
 
 func chatGPTWebClientContextInfo(req contract.ConversationRequest) chatGPTWebClientContext {
