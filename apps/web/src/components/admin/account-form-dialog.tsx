@@ -5,6 +5,8 @@ import { ChevronDown, Eye, EyeOff, KeyRound, Sparkles, Zap } from "lucide-react"
 import { OAuthInput } from "@/components/admin/credential-input/oauth-input";
 import { BedrockInput } from "@/components/admin/credential-input/bedrock-input";
 import { VertexInput } from "@/components/admin/credential-input/vertex-input";
+import { QuotaControl } from "@/components/admin/account-config/quota-control";
+import { TempUnschedRules } from "@/components/admin/account-config/temp-unsched-rules";
 import {
   AccountOAuthAuthorizeDialog,
   type AccountOAuthFlowMode,
@@ -166,6 +168,7 @@ export function AccountFormDialog({
   const [rateMultiplier, setRateMultiplier] = useState(initial.rateMultiplier);
   const [expiresAt, setExpiresAt] = useState(initial.expiresAt);
   const [autoPauseOnExpired, setAutoPauseOnExpired] = useState(initial.autoPauseOnExpired);
+  const [extraJson, setExtraJson] = useState<Record<string, unknown>>({});
   const [createAnother, setCreateAnother] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [credVisible, setCredVisible] = useState(false);
@@ -545,6 +548,9 @@ export function AccountFormDialog({
     try {
       body =
         mode === "create" ? buildCreateAccountBody(formState) : buildUpdateAccountBody(formState);
+      if (Object.keys(extraJson).length > 0) {
+        (body as Record<string, unknown>).extra = extraJson;
+      }
     } catch (err) {
       setError(adminErrorMessage(err));
       return;
@@ -1046,6 +1052,11 @@ export function AccountFormDialog({
                       onChange={(e) => setExpiresAt(e.target.value)}
                     />
                   </div>
+
+                  {/* Quota control + Temp unsched rules */}
+                  <QuotaControl extra={extraJson} onExtraChange={setExtraJson} disabled={busy} />
+                  <TempUnschedRules extra={extraJson} onExtraChange={setExtraJson} disabled={busy} />
+
                   <div>
                     <div className="flex items-center gap-2">
                       <Switch
