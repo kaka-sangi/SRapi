@@ -10,6 +10,7 @@ export function useAdminProviders(params?: P<typeof adminApi.listProviders>) {
   return useQuery({
     queryKey: queryKeys.admin.providers(params),
     queryFn: () => adminApi.listProviders(params),
+    staleTime: 60_000,
   });
 }
 

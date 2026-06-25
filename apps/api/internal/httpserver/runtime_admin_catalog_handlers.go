@@ -946,9 +946,21 @@ func (s *Server) handleListAdminAccounts(w http.ResponseWriter, r *http.Request)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list accounts", requestID)
 		return
 	}
+	// Batch-load group IDs in one query instead of N+1.
+	accountIDs := make([]int, 0, len(result.Items))
+	for _, a := range result.Items {
+		accountIDs = append(accountIDs, a.ID)
+	}
+	groupsByAccount, _ := s.runtime.accounts.ListGroupIDsByAccounts(r.Context(), accountIDs)
 	data := make([]apiopenapi.ProviderAccount, 0, len(result.Items))
 	for _, account := range result.Items {
-		data = append(data, s.apiAccount(r.Context(), account))
+		out := toAPIAccount(account)
+		if ids, ok := groupsByAccount[account.ID]; ok {
+			out.GroupIds = apiIDs(ids)
+		} else {
+			out.GroupIds = []apiopenapi.Id{}
+		}
+		data = append(data, out)
 	}
 	var pg apiopenapi.Pagination
 	if pageSize == 0 {
@@ -959,6 +971,7 @@ func (s *Server) handleListAdminAccounts(w http.ResponseWriter, r *http.Request)
 	} else {
 		pg = paginationFromTotal(result.Total, page, pageSize)
 	}
+	w.Header().Set("Cache-Control", "private, max-age=5")
 	writeJSONAny(w, http.StatusOK, apiopenapi.ProviderAccountListResponse{
 		Data:       data,
 		Pagination: pg,

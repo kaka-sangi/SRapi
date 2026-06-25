@@ -9,6 +9,7 @@ export function useAdminModels(params?: P<typeof adminApi.listModels>) {
   return useQuery({
     queryKey: queryKeys.admin.models(params),
     queryFn: () => adminApi.listModels(params),
+    staleTime: 30_000,
   });
 }
 

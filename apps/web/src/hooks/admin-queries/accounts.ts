@@ -14,6 +14,7 @@ export function useAdminAccounts(params?: P<typeof adminApi.listAccounts>) {
   return useQuery({
     queryKey: queryKeys.admin.accounts(params),
     queryFn: () => adminApi.listAccounts(params),
+    staleTime: 15_000,
   });
 }
 
@@ -135,6 +136,7 @@ export function useAdminGroups() {
   return useQuery({
     queryKey: queryKeys.admin.accountGroups(),
     queryFn: () => adminApi.listAccountGroups(),
+    staleTime: 30_000,
   });
 }
 
@@ -153,6 +155,7 @@ export function useAdminProxies(params?: P<typeof adminApi.listProxies>) {
   return useQuery({
     queryKey: queryKeys.admin.proxies(params),
     queryFn: () => adminApi.listProxies(params),
+    staleTime: 30_000,
   });
 }
 
