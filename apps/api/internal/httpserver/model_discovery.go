@@ -186,9 +186,6 @@ func (rt *runtimeState) executeModelDiscoveryRequest(ctx context.Context, accoun
 		if err := rt.materializeProviderProxy(ctx, &account); err != nil {
 			return nil, errModelDiscoveryUpstream
 		}
-		// Refresh an expired OAuth/reverse-proxy token before dispatch, mirroring
-		// the gateway/quota-fetch/websocket paths — otherwise discovery fails on
-		// accounts whose access token has expired.
 		if refreshed, ok, err := rt.refreshReverseProxyCredential(ctx, account, credential); err != nil {
 			return nil, errModelDiscoveryUpstream
 		} else if ok {
@@ -318,11 +315,18 @@ func modelDiscoveryHeaders(source modelDiscoverySource, provider providercontrac
 	headers := http.Header{
 		"Accept": {"application/json"},
 	}
-	if source == modelDiscoveryAntigravity || source == modelDiscoveryChatGPTWeb {
+	if source == modelDiscoveryAntigravity {
 		if mapString(credential, "access_token") == "" {
 			return nil, errModelDiscoveryAuth
 		}
 		headers.Set("Content-Type", "application/json")
+		return headers, nil
+	}
+	if source == modelDiscoveryChatGPTWeb {
+		if mapString(credential, "access_token") == "" {
+			return nil, errModelDiscoveryAuth
+		}
+		chatGPTWebModelDiscoveryHeaders(headers, provider, account)
 		return headers, nil
 	}
 	apiKey := modelDiscoveryAPIKey(source, credential)
@@ -596,4 +600,31 @@ func normalizeDiscoveredModelID(value string) string {
 	id = strings.TrimPrefix(id, "models/")
 	id = strings.TrimSpace(id)
 	return id
+}
+
+func chatGPTWebModelDiscoveryHeaders(headers http.Header, provider providercontract.Provider, account accountcontract.ProviderAccount) {
+	baseURL := mapString(account.Metadata, "base_url")
+	if baseURL == "" {
+		baseURL = "https://chatgpt.com"
+	}
+	origin := strings.TrimRight(baseURL, "/")
+	path := "/backend-api/models"
+
+	headers.Set("Accept", "application/json")
+	headers.Set("Content-Type", "application/json")
+	headers.Set("Origin", origin)
+	headers.Set("Referer", origin+"/")
+	headers.Set("Cache-Control", "no-cache")
+	headers.Set("Pragma", "no-cache")
+	headers.Set("Sec-Ch-Ua", firstNonEmpty(mapString(account.Metadata, "sec_ch_ua"), `"Microsoft Edge";v="143", "Chromium";v="143", "Not A(Brand";v="24"`))
+	headers.Set("Sec-Ch-Ua-Mobile", firstNonEmpty(mapString(account.Metadata, "sec_ch_ua_mobile"), "?0"))
+	headers.Set("Sec-Ch-Ua-Platform", firstNonEmpty(mapString(account.Metadata, "sec_ch_ua_platform"), `"Windows"`))
+	headers.Set("Sec-Fetch-Dest", "empty")
+	headers.Set("Sec-Fetch-Mode", "cors")
+	headers.Set("Sec-Fetch-Site", "same-origin")
+	headers.Set("X-OpenAI-Target-Path", path)
+	headers.Set("X-OpenAI-Target-Route", path)
+	if accountID := firstNonEmpty(mapString(account.Metadata, "chatgpt_account_id"), mapString(account.Metadata, "upstream_account_id")); accountID != "" {
+		headers.Set("ChatGPT-Account-ID", accountID)
+	}
 }
