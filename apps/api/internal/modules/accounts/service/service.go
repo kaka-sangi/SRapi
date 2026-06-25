@@ -145,14 +145,42 @@ func (s *Service) Create(ctx context.Context, req contract.CreateRequest) (contr
 		return contract.ProviderAccount{}, err
 	}
 
-	// Bind to groups at creation time (sub2api style).
+	// Mixed channel check + group binding.
+	platform := strings.TrimSpace(req.Platform)
 	for _, groupID := range req.GroupIDs {
-		if groupID > 0 {
-			_, _ = s.store.AddAccountToGroup(ctx, stored.ID, groupID)
+		if groupID <= 0 {
+			continue
 		}
+		if platform != "" && !req.SkipMixedChannelCheck {
+			if conflict := s.checkMixedChannel(ctx, groupID, platform); conflict != "" {
+				return contract.ProviderAccount{}, &MixedChannelError{
+					GroupID:         groupID,
+					AccountPlatform: platform,
+					ExistingPlatform: conflict,
+				}
+			}
+		}
+		_, _ = s.store.AddAccountToGroup(ctx, stored.ID, groupID)
 	}
 
 	return stored, nil
+}
+
+func (s *Service) checkMixedChannel(ctx context.Context, groupID int, platform string) string {
+	members, err := s.store.ListGroupMembers(ctx, groupID)
+	if err != nil || len(members) == 0 {
+		return ""
+	}
+	for _, member := range members {
+		account, err := s.store.FindByID(ctx, member.AccountID)
+		if err != nil {
+			continue
+		}
+		if account.Platform != "" && account.Platform != platform {
+			return account.Platform
+		}
+	}
+	return ""
 }
 
 func cloneIntPtr(v *int) *int {

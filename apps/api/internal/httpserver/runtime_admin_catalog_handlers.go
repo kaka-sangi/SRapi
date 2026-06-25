@@ -1212,7 +1212,13 @@ func (s *Server) handleCreateAdminAccount(w http.ResponseWriter, r *http.Request
 		AutoPauseOnExpired: body.AutoPauseOnExpired,
 	})
 	if err != nil {
+		var mixedErr *accountservice.MixedChannelError
 		switch {
+		case errors.As(err, &mixedErr):
+			writeJSONAny(w, http.StatusConflict, map[string]any{
+				"error":   "mixed_channel_warning",
+				"message": mixedErr.Error(),
+			})
 		case errors.Is(err, accountservice.ErrCredentialMissing), errors.Is(err, accountservice.ErrInvalidInput):
 			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account request", requestID)
 		default:

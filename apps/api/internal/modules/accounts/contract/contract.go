@@ -711,9 +711,10 @@ type CreateRequest struct {
 	Concurrency        *int
 	RateMultiplier     *float64
 	LoadFactor         *int
-	GroupIDs           []int
-	ExpiresAt          *time.Time
-	AutoPauseOnExpired *bool
+	GroupIDs               []int
+	ExpiresAt              *time.Time
+	AutoPauseOnExpired     *bool
+	SkipMixedChannelCheck  bool
 }
 
 type UpdateRequest struct {

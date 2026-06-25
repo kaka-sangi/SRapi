@@ -985,6 +985,7 @@ export const en = {
     "vertex.dropHint": "Drop service account JSON file here",
     "vertex.browse": "or click to browse",
     "vertex.location": "Location",
+    mixedChannelWarning: "Mixed platform warning: this group already contains accounts from a different platform.",
     groupSelect: "Account groups",
     groupSelectHint: "Which groups can schedule this account. The group used per request is determined by the API key, not the account.",
     groupSelectPlaceholder: "Select groups",

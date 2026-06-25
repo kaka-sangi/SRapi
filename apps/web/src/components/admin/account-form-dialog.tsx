@@ -163,7 +163,15 @@ export function AccountFormDialog({
     return m;
   });
   const [platformChoice, setPlatformChoice] = useState("anthropic");
-  const [accountCategory, setAccountCategory] = useState("apikey");
+  const [accountCategory, setAccountCategory] = useState(() => {
+    if (mode === "edit" && target) {
+      const rt = target.runtime_class;
+      if (rt === "service_account_json") return "vertex";
+      const name = target.name?.toLowerCase() ?? "";
+      if (name.includes("bedrock")) return "bedrock";
+    }
+    return "apikey";
+  });
   const [showAllProviders, setShowAllProviders] = useState(false);
   const [addMethod, setAddMethod] = useState<"oauth" | "setup-token" | "refresh-token">("oauth");
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>(initial.groupIds as string[]);
@@ -576,8 +584,14 @@ export function AccountFormDialog({
         return;
       }
       onOpenChange(false);
-    } catch (err) {
-      setError(adminErrorMessage(err));
+    } catch (err: unknown) {
+      const errObj = err as Record<string, unknown> | undefined;
+      if (errObj && typeof errObj === "object" && "status" in errObj && errObj.status === 409) {
+        const msg = (errObj as { message?: string }).message ?? (errObj as { error?: string }).error ?? "";
+        setError(t("adminAccounts.mixedChannelWarning") + (msg ? `\n${msg}` : ""));
+      } else {
+        setError(adminErrorMessage(err));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -748,7 +762,7 @@ export function AccountFormDialog({
             <div className="space-y-4 border-t border-srapi-border pt-4">
 
             {/* Credential input: render based on type */}
-            {runtimeClass === "oauth_refresh" && mode === "create" ? (
+            {runtimeClass === "oauth_refresh" ? (
               <OAuthInput
                 platform={platformChoice}
                 disabled={busy}

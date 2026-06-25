@@ -972,6 +972,7 @@ export const zh: Messages = {
     "vertex.dropHint": "拖拽 Service Account JSON 文件到此处",
     "vertex.browse": "或点击选择文件",
     "vertex.location": "位置",
+    mixedChannelWarning: "混合平台警告：该分组已包含不同平台的账号。",
     groupSelect: "账号组",
     groupSelectHint: "哪些分组可以调度此账号。每次请求使用哪个分组由 API Key 决定，不是由账号决定。",
     groupSelectPlaceholder: "选择账号组",
