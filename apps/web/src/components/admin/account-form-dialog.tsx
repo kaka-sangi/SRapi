@@ -208,7 +208,7 @@ export function AccountFormDialog({
   // RFC 8628 device flow.
   const oauthFlowMode: AccountOAuthFlowMode | null =
     runtimeClass === "oauth_refresh"
-      ? (platformChoice === "openai" ? "device_code" : "authorization_code")
+      ? "authorization_code"
       : runtimeClass === "oauth_device_code"
         ? "device_code"
         : null;

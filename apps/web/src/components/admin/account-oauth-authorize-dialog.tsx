@@ -265,7 +265,7 @@ export function AccountOAuthAuthorizeDialog({
   }
 
   const isAuthCode = mode === "authorization_code";
-  const effectiveRedirectUri = redirectUri.trim() || `${window.location.origin}/api/v1/oauth/callback`;
+  const effectiveRedirectUri = redirectUri.trim() || undefined;
   const configReady =
     clientId.trim() !== "" &&
     (isAuthCode
