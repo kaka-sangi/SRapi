@@ -174,6 +174,7 @@ export function AccountFormDialog({
   });
   const [showAllProviders, setShowAllProviders] = useState(false);
   const [addMethod, setAddMethod] = useState<"oauth" | "setup-token" | "refresh-token">("oauth");
+  const [alsoCreateChatGPTWeb, setAlsoCreateChatGPTWeb] = useState(true);
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>(initial.groupIds as string[]);
   const [selectedProxyId, setSelectedProxyId] = useState(initial.proxyId);
   const [notes, setNotes] = useState(initial.notes);
@@ -575,6 +576,29 @@ export function AccountFormDialog({
     setSubmitting(true);
     try {
       await submit(body);
+
+      // If OpenAI OAuth + "also create ChatGPT Web", duplicate the account for chatgpt-web provider.
+      if (mode === "create" && platformChoice === "openai" && alsoCreateChatGPTWeb && runtimeClass === "oauth_refresh") {
+        const chatgptWebProvider = providerOptions.find(
+          (o) => o.adapterType === "reverse-proxy-chatgpt-web",
+        );
+        if (chatgptWebProvider) {
+          try {
+            const webBody = {
+              ...(body as Record<string, unknown>),
+              provider_id: chatgptWebProvider.value,
+              name: ((body as Record<string, unknown>).name as string ?? "").replace(/codex-cli/i, "chatgpt-web") || "chatgpt-web-1",
+              upstream_client: "chatgpt_web",
+              metadata: { base_url: "https://chatgpt.com" },
+            };
+            await submit(webBody as Parameters<typeof submit>[0]);
+            toast({ title: t("adminAccounts.chatgptWebCreated"), tone: "success" });
+          } catch {
+            toast({ title: t("adminAccounts.chatgptWebFailed"), tone: "warning" });
+          }
+        }
+      }
+
       toast({
         title: t(mode === "create" ? "feedback.created" : "feedback.updated"),
         tone: "success",
@@ -776,6 +800,8 @@ export function AccountFormDialog({
                     applyQuickOAuthToken(cred.refresh_token as string ?? "");
                   }
                 }}
+                alsoCreateChatGPTWeb={alsoCreateChatGPTWeb}
+                onAlsoCreateChatGPTWebChange={setAlsoCreateChatGPTWeb}
               />
             ) : accountCategory === "bedrock" ? (
               <BedrockInput

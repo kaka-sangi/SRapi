@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { useLanguage } from "@/context/LanguageContext";
 
 export type OAuthSubMethod = "oauth" | "setup-token" | "refresh-token";
@@ -15,9 +16,11 @@ interface OAuthInputProps {
   disabled?: boolean;
   onAuthorize: () => void;
   onCredential: (cred: Record<string, unknown>, runtimeClassOverride?: string) => void;
+  alsoCreateChatGPTWeb?: boolean;
+  onAlsoCreateChatGPTWebChange?: (value: boolean) => void;
 }
 
-export function OAuthInput({ platform, disabled, onAuthorize, onCredential }: OAuthInputProps) {
+export function OAuthInput({ platform, disabled, onAuthorize, onCredential, alsoCreateChatGPTWeb, onAlsoCreateChatGPTWebChange }: OAuthInputProps) {
   const { t } = useLanguage();
 
   const subMethods: { value: OAuthSubMethod; label: string }[] =
@@ -138,6 +141,16 @@ export function OAuthInput({ platform, disabled, onAuthorize, onCredential }: OA
           </p>
         </div>
       )}
+
+      {platform === "openai" && onAlsoCreateChatGPTWebChange ? (
+        <div className="flex items-center justify-between rounded-lg border border-srapi-border bg-srapi-card-muted/40 p-3">
+          <div>
+            <span className="text-sm font-medium text-srapi-text-primary">{t("adminAccounts.alsoCreateChatGPTWeb")}</span>
+            <p className="text-[11px] text-srapi-text-tertiary">{t("adminAccounts.alsoCreateChatGPTWebHint")}</p>
+          </div>
+          <Switch checked={alsoCreateChatGPTWeb ?? false} onCheckedChange={onAlsoCreateChatGPTWebChange} disabled={disabled} />
+        </div>
+      ) : null}
     </div>
   );
 }
