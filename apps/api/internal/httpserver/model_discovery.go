@@ -318,7 +318,7 @@ func modelDiscoveryHeaders(source modelDiscoverySource, provider providercontrac
 	headers := http.Header{
 		"Accept": {"application/json"},
 	}
-	if source == modelDiscoveryAntigravity {
+	if source == modelDiscoveryAntigravity || source == modelDiscoveryChatGPTWeb {
 		if mapString(credential, "access_token") == "" {
 			return nil, errModelDiscoveryAuth
 		}
