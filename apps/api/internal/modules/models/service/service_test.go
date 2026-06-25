@@ -317,11 +317,11 @@ func TestCreateModelAutoFillsFromPreset(t *testing.T) {
 	if model.Family == nil || *model.Family != "gpt" {
 		t.Fatalf("expected family=gpt from preset, got %v", model.Family)
 	}
-	if model.ContextWindow == nil || *model.ContextWindow != 1048576 {
-		t.Fatalf("expected context_window=1048576 from preset, got %v", model.ContextWindow)
+	if model.ContextWindow == nil || *model.ContextWindow != 1000000 {
+		t.Fatalf("expected context_window=1000000 from preset, got %v", model.ContextWindow)
 	}
-	if model.MaxOutputTokens == nil || *model.MaxOutputTokens != 32768 {
-		t.Fatalf("expected max_output_tokens=32768 from preset, got %v", model.MaxOutputTokens)
+	if model.MaxOutputTokens == nil || *model.MaxOutputTokens != 128000 {
+		t.Fatalf("expected max_output_tokens=128000 from preset, got %v", model.MaxOutputTokens)
 	}
 	if model.QualityTier == nil || *model.QualityTier != "premium" {
 		t.Fatalf("expected quality_tier=premium from preset, got %v", model.QualityTier)
@@ -346,7 +346,7 @@ func TestCreateModelPresetDoesNotOverrideExplicit(t *testing.T) {
 	if model.Family == nil || *model.Family != "custom-family" {
 		t.Fatalf("expected explicit family to be preserved, got %v", model.Family)
 	}
-	if model.ContextWindow == nil || *model.ContextWindow != 1048576 {
+	if model.ContextWindow == nil || *model.ContextWindow != 1000000 {
 		t.Fatalf("other preset fields should still fill: context_window=%v", model.ContextWindow)
 	}
 }

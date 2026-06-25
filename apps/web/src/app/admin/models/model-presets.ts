@@ -7,31 +7,31 @@ export interface ModelPreset {
 }
 
 export const MODEL_PRESETS: Record<string, ModelPreset> = {
-  // Anthropic
-  "claude-fable-5": { displayName: "Claude Fable 5", family: "claude", contextWindow: 1048576, maxOutputTokens: 65536, qualityTier: "premium" },
-  "claude-opus-4-8": { displayName: "Claude Opus 4.8", family: "claude", contextWindow: 1048576, maxOutputTokens: 32768, qualityTier: "premium" },
-  "claude-opus-4-7": { displayName: "Claude Opus 4.7", family: "claude", contextWindow: 1048576, maxOutputTokens: 32768, qualityTier: "premium" },
-  "claude-opus-4-6": { displayName: "Claude Opus 4.6", family: "claude", contextWindow: 1048576, maxOutputTokens: 32768, qualityTier: "premium" },
-  "claude-sonnet-4-6": { displayName: "Claude Sonnet 4.6", family: "claude", contextWindow: 1048576, maxOutputTokens: 65536, qualityTier: "standard" },
-  "claude-haiku-4-5": { displayName: "Claude Haiku 4.5", family: "claude", contextWindow: 1048576, maxOutputTokens: 8192, qualityTier: "economy" },
-  // OpenAI
-  "gpt-5.5": { displayName: "GPT-5.5", family: "gpt", contextWindow: 1048576, maxOutputTokens: 65536, qualityTier: "premium" },
-  "gpt-5.4": { displayName: "GPT-5.4", family: "gpt", contextWindow: 1048576, maxOutputTokens: 32768, qualityTier: "premium" },
-  "gpt-5.4-mini": { displayName: "GPT-5.4 Mini", family: "gpt", contextWindow: 1048576, maxOutputTokens: 16384, qualityTier: "economy" },
-  "gpt-4.1": { displayName: "GPT-4.1", family: "gpt", contextWindow: 1047576, maxOutputTokens: 32768, qualityTier: "standard" },
-  "gpt-4.1-mini": { displayName: "GPT-4.1 Mini", family: "gpt", contextWindow: 1047576, maxOutputTokens: 16384, qualityTier: "economy" },
-  "gpt-4.1-nano": { displayName: "GPT-4.1 Nano", family: "gpt", contextWindow: 1047576, maxOutputTokens: 16384, qualityTier: "economy" },
+  // Anthropic — source: platform.claude.com/docs/en/about-claude/models/overview
+  "claude-fable-5": { displayName: "Claude Fable 5", family: "claude", contextWindow: 1000000, maxOutputTokens: 128000, qualityTier: "premium" },
+  "claude-opus-4-8": { displayName: "Claude Opus 4.8", family: "claude", contextWindow: 1000000, maxOutputTokens: 128000, qualityTier: "premium" },
+  "claude-opus-4-7": { displayName: "Claude Opus 4.7", family: "claude", contextWindow: 1000000, maxOutputTokens: 128000, qualityTier: "premium" },
+  "claude-opus-4-6": { displayName: "Claude Opus 4.6", family: "claude", contextWindow: 1000000, maxOutputTokens: 32768, qualityTier: "premium" },
+  "claude-sonnet-4-6": { displayName: "Claude Sonnet 4.6", family: "claude", contextWindow: 1000000, maxOutputTokens: 64000, qualityTier: "standard" },
+  "claude-haiku-4-5": { displayName: "Claude Haiku 4.5", family: "claude", contextWindow: 200000, maxOutputTokens: 8192, qualityTier: "economy" },
+  // OpenAI — source: developers.openai.com/api/docs/models
+  "gpt-5.5": { displayName: "GPT-5.5", family: "gpt", contextWindow: 1050000, maxOutputTokens: 128000, qualityTier: "premium" },
+  "gpt-5.4": { displayName: "GPT-5.4", family: "gpt", contextWindow: 1000000, maxOutputTokens: 128000, qualityTier: "premium" },
+  "gpt-5.4-mini": { displayName: "GPT-5.4 Mini", family: "gpt", contextWindow: 1000000, maxOutputTokens: 128000, qualityTier: "economy" },
+  "gpt-5.4-nano": { displayName: "GPT-5.4 Nano", family: "gpt", contextWindow: 1000000, maxOutputTokens: 128000, qualityTier: "economy" },
+  "gpt-5.2": { displayName: "GPT-5.2", family: "gpt", contextWindow: 400000, maxOutputTokens: 128000, qualityTier: "standard" },
+  "gpt-4.1": { displayName: "GPT-4.1", family: "gpt", contextWindow: 1000000, maxOutputTokens: 32000, qualityTier: "standard" },
+  "gpt-4.1-mini": { displayName: "GPT-4.1 Mini", family: "gpt", contextWindow: 1000000, maxOutputTokens: 32000, qualityTier: "economy" },
+  "gpt-4.1-nano": { displayName: "GPT-4.1 Nano", family: "gpt", contextWindow: 1000000, maxOutputTokens: 32000, qualityTier: "economy" },
   "o4-mini": { displayName: "o4-mini", family: "o-series", contextWindow: 200000, maxOutputTokens: 100000, qualityTier: "standard" },
   "o3": { displayName: "o3", family: "o-series", contextWindow: 200000, maxOutputTokens: 100000, qualityTier: "premium" },
   "o3-pro": { displayName: "o3-pro", family: "o-series", contextWindow: 200000, maxOutputTokens: 100000, qualityTier: "premium" },
-  "gpt-5.4-nano": { displayName: "GPT-5.4 Nano", family: "gpt", contextWindow: 1048576, maxOutputTokens: 8192, qualityTier: "economy" },
-  "gpt-5.2": { displayName: "GPT-5.2", family: "gpt", contextWindow: 1048576, maxOutputTokens: 32768, qualityTier: "standard" },
-  // Codex CLI
-  "codex-mini-latest": { displayName: "Codex Mini", family: "codex", contextWindow: 1048576, maxOutputTokens: 65536, qualityTier: "standard" },
-  "codex-auto-review": { displayName: "Codex Auto Review", family: "codex", contextWindow: 1048576, maxOutputTokens: 65536, qualityTier: "standard" },
-  "gpt-5.3-codex": { displayName: "GPT-5.3 Codex", family: "codex", contextWindow: 1048576, maxOutputTokens: 65536, qualityTier: "standard" },
-  "gpt-5.3-codex-spark": { displayName: "GPT-5.3 Codex Spark", family: "codex", contextWindow: 1048576, maxOutputTokens: 32768, qualityTier: "economy" },
-  // Gemini
+  // Codex CLI — source: developers.openai.com/codex/models
+  "codex-mini-latest": { displayName: "Codex Mini", family: "codex", contextWindow: 1000000, maxOutputTokens: 128000, qualityTier: "standard" },
+  "codex-auto-review": { displayName: "Codex Auto Review", family: "codex", contextWindow: 1000000, maxOutputTokens: 128000, qualityTier: "standard" },
+  "gpt-5.3-codex": { displayName: "GPT-5.3 Codex", family: "codex", contextWindow: 400000, maxOutputTokens: 128000, qualityTier: "standard" },
+  "gpt-5.3-codex-spark": { displayName: "GPT-5.3 Codex Spark", family: "codex", contextWindow: 128000, maxOutputTokens: 128000, qualityTier: "economy" },
+  // Gemini — source: ai.google.dev/gemini-api/docs/models
   "gemini-2.5-pro": { displayName: "Gemini 2.5 Pro", family: "gemini", contextWindow: 1048576, maxOutputTokens: 65536, qualityTier: "premium" },
   "gemini-2.5-flash": { displayName: "Gemini 2.5 Flash", family: "gemini", contextWindow: 1048576, maxOutputTokens: 65536, qualityTier: "standard" },
   "gemini-2.0-flash": { displayName: "Gemini 2.0 Flash", family: "gemini", contextWindow: 1048576, maxOutputTokens: 8192, qualityTier: "economy" },

@@ -60,6 +60,9 @@ func (s *Service) Create(ctx context.Context, req contract.CreateRequest) (contr
 			qt := p.QualityTier
 			req.QualityTier = &qt
 		}
+		if len(req.Capabilities) == 0 && len(p.Capabilities) > 0 {
+			req.Capabilities = append(req.Capabilities, p.Capabilities...)
+		}
 	}
 	status := contract.StatusActive
 	if req.Status != nil {

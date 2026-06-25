@@ -1,6 +1,10 @@
 package preset
 
-import "strings"
+import (
+	"strings"
+
+	cap "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
+)
 
 type ModelPreset struct {
 	DisplayName     string
@@ -8,6 +12,7 @@ type ModelPreset struct {
 	ContextWindow   int
 	MaxOutputTokens int
 	QualityTier     string
+	Capabilities    []cap.Descriptor
 }
 
 // Lookup returns the preset for the given canonical model name, if known.
@@ -17,43 +22,90 @@ func Lookup(canonicalName string) (ModelPreset, bool) {
 	return p, ok
 }
 
+func cap1(key string) cap.Descriptor {
+	return cap.Descriptor{Key: key, Level: cap.DescriptorLevelRequired, Status: cap.DescriptorStatusStable, Version: "v1"}
+}
+
+var (
+	capsOpenAI = []cap.Descriptor{
+		cap1(cap.KeyTextInput), cap1(cap.KeyTextOutput), cap1(cap.KeyStreaming),
+		cap1(cap.KeyToolCalling), cap1(cap.KeyParallelToolCalls),
+		cap1(cap.KeyVisionInput), cap1(cap.KeyJSONMode), cap1(cap.KeyStructuredOutput),
+		cap1(cap.KeyPromptCache), cap1(cap.KeyUsageInStream),
+		cap1(cap.KeyChatCompletions), cap1(cap.KeyResponses),
+	}
+	capsOpenAIReasoning = []cap.Descriptor{
+		cap1(cap.KeyTextInput), cap1(cap.KeyTextOutput), cap1(cap.KeyStreaming),
+		cap1(cap.KeyToolCalling), cap1(cap.KeyVisionInput),
+		cap1(cap.KeyStructuredOutput), cap1(cap.KeyReasoningControl),
+		cap1(cap.KeyPromptCache), cap1(cap.KeyUsageInStream),
+		cap1(cap.KeyChatCompletions), cap1(cap.KeyResponses),
+	}
+	capsCodex = []cap.Descriptor{
+		cap1(cap.KeyTextInput), cap1(cap.KeyTextOutput), cap1(cap.KeyStreaming),
+		cap1(cap.KeyToolCalling), cap1(cap.KeyReasoningControl),
+		cap1(cap.KeyResponses), cap1(cap.KeyResponsesWebSocket), cap1(cap.KeyResponsesCompact),
+	}
+	capsClaude = []cap.Descriptor{
+		cap1(cap.KeyTextInput), cap1(cap.KeyTextOutput), cap1(cap.KeyStreaming),
+		cap1(cap.KeyToolCalling), cap1(cap.KeyVisionInput),
+		cap1(cap.KeyJSONMode), cap1(cap.KeyPromptCache),
+		cap1(cap.KeyUsageInStream), cap1(cap.KeyMessages),
+		cap1(cap.KeyAnthropicCountTokens), cap1(cap.KeyTokenCounting),
+	}
+	capsClaudeReasoning = []cap.Descriptor{
+		cap1(cap.KeyTextInput), cap1(cap.KeyTextOutput), cap1(cap.KeyStreaming),
+		cap1(cap.KeyToolCalling), cap1(cap.KeyVisionInput),
+		cap1(cap.KeyJSONMode), cap1(cap.KeyReasoningControl), cap1(cap.KeyPromptCache),
+		cap1(cap.KeyUsageInStream), cap1(cap.KeyMessages),
+		cap1(cap.KeyAnthropicCountTokens), cap1(cap.KeyTokenCounting),
+	}
+	capsGemini = []cap.Descriptor{
+		cap1(cap.KeyTextInput), cap1(cap.KeyTextOutput), cap1(cap.KeyStreaming),
+		cap1(cap.KeyToolCalling), cap1(cap.KeyVisionInput),
+		cap1(cap.KeyJSONMode), cap1(cap.KeyStructuredOutput),
+		cap1(cap.KeyContextCache), cap1(cap.KeyUsageInStream),
+		cap1(cap.KeyGeminiGenerateContent), cap1(cap.KeyGeminiCountTokens), cap1(cap.KeyTokenCounting),
+	}
+)
+
 var registry = map[string]ModelPreset{
-	// Anthropic
-	"claude-fable-5":    {DisplayName: "Claude Fable 5", Family: "claude", ContextWindow: 1048576, MaxOutputTokens: 65536, QualityTier: "premium"},
-	"claude-opus-4-8":   {DisplayName: "Claude Opus 4.8", Family: "claude", ContextWindow: 1048576, MaxOutputTokens: 32768, QualityTier: "premium"},
-	"claude-opus-4-7":   {DisplayName: "Claude Opus 4.7", Family: "claude", ContextWindow: 1048576, MaxOutputTokens: 32768, QualityTier: "premium"},
-	"claude-opus-4-6":   {DisplayName: "Claude Opus 4.6", Family: "claude", ContextWindow: 1048576, MaxOutputTokens: 32768, QualityTier: "premium"},
-	"claude-sonnet-4-6": {DisplayName: "Claude Sonnet 4.6", Family: "claude", ContextWindow: 1048576, MaxOutputTokens: 65536, QualityTier: "standard"},
-	"claude-haiku-4-5":  {DisplayName: "Claude Haiku 4.5", Family: "claude", ContextWindow: 1048576, MaxOutputTokens: 8192, QualityTier: "economy"},
+	// Anthropic — source: platform.claude.com/docs/en/about-claude/models/overview
+	"claude-fable-5":    {DisplayName: "Claude Fable 5", Family: "claude", ContextWindow: 1000000, MaxOutputTokens: 128000, QualityTier: "premium", Capabilities: capsClaudeReasoning},
+	"claude-opus-4-8":   {DisplayName: "Claude Opus 4.8", Family: "claude", ContextWindow: 1000000, MaxOutputTokens: 128000, QualityTier: "premium", Capabilities: capsClaudeReasoning},
+	"claude-opus-4-7":   {DisplayName: "Claude Opus 4.7", Family: "claude", ContextWindow: 1000000, MaxOutputTokens: 128000, QualityTier: "premium", Capabilities: capsClaudeReasoning},
+	"claude-opus-4-6":   {DisplayName: "Claude Opus 4.6", Family: "claude", ContextWindow: 1000000, MaxOutputTokens: 32768, QualityTier: "premium", Capabilities: capsClaudeReasoning},
+	"claude-sonnet-4-6": {DisplayName: "Claude Sonnet 4.6", Family: "claude", ContextWindow: 1000000, MaxOutputTokens: 64000, QualityTier: "standard", Capabilities: capsClaudeReasoning},
+	"claude-haiku-4-5":  {DisplayName: "Claude Haiku 4.5", Family: "claude", ContextWindow: 200000, MaxOutputTokens: 8192, QualityTier: "economy", Capabilities: capsClaude},
 
-	// OpenAI
-	"gpt-5.5":      {DisplayName: "GPT-5.5", Family: "gpt", ContextWindow: 1048576, MaxOutputTokens: 65536, QualityTier: "premium"},
-	"gpt-5.4":      {DisplayName: "GPT-5.4", Family: "gpt", ContextWindow: 1048576, MaxOutputTokens: 32768, QualityTier: "premium"},
-	"gpt-5.4-mini": {DisplayName: "GPT-5.4 Mini", Family: "gpt", ContextWindow: 1048576, MaxOutputTokens: 16384, QualityTier: "economy"},
-	"gpt-5.4-nano": {DisplayName: "GPT-5.4 Nano", Family: "gpt", ContextWindow: 1048576, MaxOutputTokens: 8192, QualityTier: "economy"},
-	"gpt-5.2":      {DisplayName: "GPT-5.2", Family: "gpt", ContextWindow: 1048576, MaxOutputTokens: 32768, QualityTier: "standard"},
-	"gpt-4.1":      {DisplayName: "GPT-4.1", Family: "gpt", ContextWindow: 1047576, MaxOutputTokens: 32768, QualityTier: "standard"},
-	"gpt-4.1-mini": {DisplayName: "GPT-4.1 Mini", Family: "gpt", ContextWindow: 1047576, MaxOutputTokens: 16384, QualityTier: "economy"},
-	"gpt-4.1-nano": {DisplayName: "GPT-4.1 Nano", Family: "gpt", ContextWindow: 1047576, MaxOutputTokens: 16384, QualityTier: "economy"},
-	"o4-mini":      {DisplayName: "o4-mini", Family: "o-series", ContextWindow: 200000, MaxOutputTokens: 100000, QualityTier: "standard"},
-	"o3":           {DisplayName: "o3", Family: "o-series", ContextWindow: 200000, MaxOutputTokens: 100000, QualityTier: "premium"},
-	"o3-pro":       {DisplayName: "o3-pro", Family: "o-series", ContextWindow: 200000, MaxOutputTokens: 100000, QualityTier: "premium"},
+	// OpenAI — source: developers.openai.com/api/docs/models
+	"gpt-5.5":      {DisplayName: "GPT-5.5", Family: "gpt", ContextWindow: 1050000, MaxOutputTokens: 128000, QualityTier: "premium", Capabilities: capsOpenAI},
+	"gpt-5.4":      {DisplayName: "GPT-5.4", Family: "gpt", ContextWindow: 1000000, MaxOutputTokens: 128000, QualityTier: "premium", Capabilities: capsOpenAI},
+	"gpt-5.4-mini": {DisplayName: "GPT-5.4 Mini", Family: "gpt", ContextWindow: 1000000, MaxOutputTokens: 128000, QualityTier: "economy", Capabilities: capsOpenAI},
+	"gpt-5.4-nano": {DisplayName: "GPT-5.4 Nano", Family: "gpt", ContextWindow: 1000000, MaxOutputTokens: 128000, QualityTier: "economy", Capabilities: capsOpenAI},
+	"gpt-5.2":      {DisplayName: "GPT-5.2", Family: "gpt", ContextWindow: 400000, MaxOutputTokens: 128000, QualityTier: "standard", Capabilities: capsOpenAI},
+	"gpt-4.1":      {DisplayName: "GPT-4.1", Family: "gpt", ContextWindow: 1000000, MaxOutputTokens: 32000, QualityTier: "standard", Capabilities: capsOpenAI},
+	"gpt-4.1-mini": {DisplayName: "GPT-4.1 Mini", Family: "gpt", ContextWindow: 1000000, MaxOutputTokens: 32000, QualityTier: "economy", Capabilities: capsOpenAI},
+	"gpt-4.1-nano": {DisplayName: "GPT-4.1 Nano", Family: "gpt", ContextWindow: 1000000, MaxOutputTokens: 32000, QualityTier: "economy", Capabilities: capsOpenAI},
+	"o4-mini":      {DisplayName: "o4-mini", Family: "o-series", ContextWindow: 200000, MaxOutputTokens: 100000, QualityTier: "standard", Capabilities: capsOpenAIReasoning},
+	"o3":           {DisplayName: "o3", Family: "o-series", ContextWindow: 200000, MaxOutputTokens: 100000, QualityTier: "premium", Capabilities: capsOpenAIReasoning},
+	"o3-pro":       {DisplayName: "o3-pro", Family: "o-series", ContextWindow: 200000, MaxOutputTokens: 100000, QualityTier: "premium", Capabilities: capsOpenAIReasoning},
 
-	// Codex CLI
-	"codex-mini-latest":   {DisplayName: "Codex Mini", Family: "codex", ContextWindow: 1048576, MaxOutputTokens: 65536, QualityTier: "standard"},
-	"codex-auto-review":   {DisplayName: "Codex Auto Review", Family: "codex", ContextWindow: 1048576, MaxOutputTokens: 65536, QualityTier: "standard"},
-	"gpt-5.3-codex":       {DisplayName: "GPT-5.3 Codex", Family: "codex", ContextWindow: 1048576, MaxOutputTokens: 65536, QualityTier: "standard"},
-	"gpt-5.3-codex-spark": {DisplayName: "GPT-5.3 Codex Spark", Family: "codex", ContextWindow: 1048576, MaxOutputTokens: 32768, QualityTier: "economy"},
+	// Codex CLI — source: developers.openai.com/codex/models
+	"codex-mini-latest":   {DisplayName: "Codex Mini", Family: "codex", ContextWindow: 1000000, MaxOutputTokens: 128000, QualityTier: "standard", Capabilities: capsCodex},
+	"codex-auto-review":   {DisplayName: "Codex Auto Review", Family: "codex", ContextWindow: 1000000, MaxOutputTokens: 128000, QualityTier: "standard", Capabilities: capsCodex},
+	"gpt-5.3-codex":       {DisplayName: "GPT-5.3 Codex", Family: "codex", ContextWindow: 400000, MaxOutputTokens: 128000, QualityTier: "standard", Capabilities: capsCodex},
+	"gpt-5.3-codex-spark": {DisplayName: "GPT-5.3 Codex Spark", Family: "codex", ContextWindow: 128000, MaxOutputTokens: 128000, QualityTier: "economy", Capabilities: capsCodex},
 
-	// Gemini
-	"gemini-2.5-pro":   {DisplayName: "Gemini 2.5 Pro", Family: "gemini", ContextWindow: 1048576, MaxOutputTokens: 65536, QualityTier: "premium"},
-	"gemini-2.5-flash": {DisplayName: "Gemini 2.5 Flash", Family: "gemini", ContextWindow: 1048576, MaxOutputTokens: 65536, QualityTier: "standard"},
-	"gemini-2.0-flash": {DisplayName: "Gemini 2.0 Flash", Family: "gemini", ContextWindow: 1048576, MaxOutputTokens: 8192, QualityTier: "economy"},
+	// Gemini — source: ai.google.dev/gemini-api/docs/models
+	"gemini-2.5-pro":   {DisplayName: "Gemini 2.5 Pro", Family: "gemini", ContextWindow: 1048576, MaxOutputTokens: 65536, QualityTier: "premium", Capabilities: capsGemini},
+	"gemini-2.5-flash": {DisplayName: "Gemini 2.5 Flash", Family: "gemini", ContextWindow: 1048576, MaxOutputTokens: 65536, QualityTier: "standard", Capabilities: capsGemini},
+	"gemini-2.0-flash": {DisplayName: "Gemini 2.0 Flash", Family: "gemini", ContextWindow: 1048576, MaxOutputTokens: 8192, QualityTier: "economy", Capabilities: capsGemini},
 
 	// DeepSeek
-	"deepseek-r1":       {DisplayName: "DeepSeek R1", Family: "deepseek", ContextWindow: 65536, MaxOutputTokens: 8192, QualityTier: "standard"},
-	"deepseek-v3-0324":  {DisplayName: "DeepSeek V3", Family: "deepseek", ContextWindow: 65536, MaxOutputTokens: 8192, QualityTier: "standard"},
-	"deepseek-chat":     {DisplayName: "DeepSeek Chat", Family: "deepseek", ContextWindow: 65536, MaxOutputTokens: 8192, QualityTier: "economy"},
+	"deepseek-r1":      {DisplayName: "DeepSeek R1", Family: "deepseek", ContextWindow: 65536, MaxOutputTokens: 8192, QualityTier: "standard"},
+	"deepseek-v3-0324": {DisplayName: "DeepSeek V3", Family: "deepseek", ContextWindow: 65536, MaxOutputTokens: 8192, QualityTier: "standard"},
+	"deepseek-chat":    {DisplayName: "DeepSeek Chat", Family: "deepseek", ContextWindow: 65536, MaxOutputTokens: 8192, QualityTier: "economy"},
 
 	// Grok
 	"grok-3":      {DisplayName: "Grok 3", Family: "grok", ContextWindow: 131072, MaxOutputTokens: 16384, QualityTier: "premium"},
