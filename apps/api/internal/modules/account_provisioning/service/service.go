@@ -571,7 +571,10 @@ func normalizeAuthCodeConfig(config contract.ProviderOAuthConfig) (contract.Prov
 	config.AuthorizeURL = strings.TrimSpace(config.AuthorizeURL)
 	config.TokenURL = strings.TrimSpace(config.TokenURL)
 	config.RedirectURI = strings.TrimSpace(config.RedirectURI)
-	if config.ClientID == "" || !validAuthorizeURL(config.AuthorizeURL) || !validBackchannelURL(config.TokenURL) || !validRedirectURI(config.RedirectURI) {
+	if config.ClientID == "" || !validAuthorizeURL(config.AuthorizeURL) || !validBackchannelURL(config.TokenURL) {
+		return contract.ProviderOAuthConfig{}, ErrInvalidInput
+	}
+	if config.RedirectURI != "" && !validRedirectURI(config.RedirectURI) {
 		return contract.ProviderOAuthConfig{}, ErrInvalidInput
 	}
 	config.Scopes = normalizeScopes(config.Scopes)
@@ -598,7 +601,9 @@ func buildAuthorizationURL(config contract.ProviderOAuthConfig, state, codeVerif
 	values := parsed.Query()
 	values.Set("response_type", "code")
 	values.Set("client_id", config.ClientID)
-	values.Set("redirect_uri", config.RedirectURI)
+	if config.RedirectURI != "" {
+		values.Set("redirect_uri", config.RedirectURI)
+	}
 	values.Set("state", state)
 	if len(config.Scopes) > 0 {
 		values.Set("scope", strings.Join(config.Scopes, " "))
