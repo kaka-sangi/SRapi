@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Eye, EyeOff, KeyRound, Sparkles, Zap } from "lucide-react";
 import {
   AccountOAuthAuthorizeDialog,
@@ -24,7 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { FloatingInput } from "@/components/ui/floating-input";
 import { Kbd } from "@/components/ui/kbd";
-import { useTlsProfiles, useTestAccount } from "@/hooks/admin-queries";
+import { useTlsProfiles, useTestAccount, useAdminGroups, useAdminProxies } from "@/hooks/admin-queries";
 import {
   Select,
   SelectTrigger,
@@ -94,17 +94,22 @@ export function AccountFormDialog({
   const { toast } = useToast();
   const tlsProfiles = useTlsProfiles();
   const testMut = useTestAccount();
+  const groupsQuery = useAdminGroups();
+  const proxiesQuery = useAdminProxies();
 
   const initial =
     mode === "edit" && target ? accountFormFromAccount(target) : emptyAccountForm(defaultProviderId);
 
   // Map provider id to its accepted auth methods. If the backend omits the
   // allowlist, expose the canonical runtime set.
+  const HIDDEN_RUNTIME_CLASSES: RuntimeClass[] = ["custom_reverse_proxy", "web_session_cookie", "oauth_device_code", "cli_client_token"];
+
   const allowedFor = useCallback(
     (id: string): RuntimeClass[] => {
       const match = providerOptions.find((opt) => opt.value === id);
       const methods = match?.authMethods;
-      return methods && methods.length > 0 ? methods : ACCOUNT_RUNTIME_CLASSES;
+      const list = methods && methods.length > 0 ? methods : ACCOUNT_RUNTIME_CLASSES;
+      return list.filter((rc) => !HIDDEN_RUNTIME_CLASSES.includes(rc));
     },
     [providerOptions],
   );
@@ -147,6 +152,17 @@ export function AccountFormDialog({
     delete m.base_url;
     return m;
   });
+  const [platformChoice, setPlatformChoice] = useState("anthropic");
+  const [accountCategory, setAccountCategory] = useState("oauth");
+  const [showAllProviders, setShowAllProviders] = useState(false);
+  const [addMethod, setAddMethod] = useState<"oauth" | "setup-token" | "refresh-token">("oauth");
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>(initial.groupIds as string[]);
+  const [selectedProxyId, setSelectedProxyId] = useState(initial.proxyId);
+  const [notes, setNotes] = useState(initial.notes);
+  const [concurrency, setConcurrency] = useState(initial.concurrency);
+  const [rateMultiplier, setRateMultiplier] = useState(initial.rateMultiplier);
+  const [expiresAt, setExpiresAt] = useState(initial.expiresAt);
+  const [autoPauseOnExpired, setAutoPauseOnExpired] = useState(initial.autoPauseOnExpired);
   const [createAnother, setCreateAnother] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [credVisible, setCredVisible] = useState(false);
@@ -294,10 +310,11 @@ export function AccountFormDialog({
     const template = getProviderTemplate(providerOptions, id);
     if (template && mode === "create") {
       if (template.upstream_client) setUpstreamClient(template.upstream_client);
-      const nextBaseUrl =
+      const templateBaseUrl =
         typeof template.default_metadata?.base_url === "string"
           ? (template.default_metadata.base_url as string)
           : "";
+      const nextBaseUrl = templateBaseUrl || platformDefaultBaseUrl(id);
       setBaseUrl((prev) => (!prev || prev === previousBaseUrl ? nextBaseUrl : prev));
       if (template.default_metadata) {
         const dm = { ...template.default_metadata };
@@ -310,7 +327,6 @@ export function AccountFormDialog({
           return next;
         });
       }
-      setAdvancedOpen(true);
     }
   }
 
@@ -400,6 +416,73 @@ export function AccountFormDialog({
     );
   }
 
+  // ── Quick platform shortcuts (built from actual providers) ──
+
+  const quickPlatforms = useMemo(() => {
+    type QuickPlatform = { key: string; label: string; defaultProviderId: string | null; defaultRuntimeClass?: RuntimeClass; defaultUpstreamClient?: string };
+    const shortcuts: QuickPlatform[] = [];
+    const findByAdapter = (adapter: string) => providerOptions.find((o) => o.adapterType === adapter);
+    const findByName = (name: string) => providerOptions.find((o) => o.label.toLowerCase().includes(name));
+
+    const anthropic = findByName("anthropic") ?? findByAdapter("anthropic-compatible");
+    if (anthropic) shortcuts.push({ key: "anthropic", label: "Anthropic", defaultProviderId: anthropic.value });
+
+    const codex = findByAdapter("reverse-proxy-codex-cli");
+    if (codex) {
+      shortcuts.push({ key: "openai", label: "OpenAI", defaultProviderId: codex.value, defaultRuntimeClass: "oauth_refresh", defaultUpstreamClient: "codex_cli" });
+    } else {
+      const openai = findByName("openai") ?? findByAdapter("openai-compatible");
+      if (openai) shortcuts.push({ key: "openai", label: "OpenAI", defaultProviderId: openai.value });
+    }
+
+    const gemini = findByAdapter("gemini-compatible");
+    if (gemini) shortcuts.push({ key: "gemini", label: "Gemini", defaultProviderId: gemini.value });
+
+    const ag = findByAdapter("reverse-proxy-antigravity");
+    if (ag) shortcuts.push({ key: "antigravity", label: "Antigravity", defaultProviderId: ag.value, defaultRuntimeClass: "oauth_refresh", defaultUpstreamClient: "antigravity" });
+
+    return shortcuts;
+  }, [providerOptions]);
+
+  const initialApplied = useRef(false);
+  useEffect(() => {
+    if (mode !== "create" || initialApplied.current || quickPlatforms.length === 0) return;
+    initialApplied.current = true;
+    const qp = quickPlatforms.find((p) => p.key === platformChoice) ?? quickPlatforms[0];
+    if (qp?.defaultProviderId && qp.defaultProviderId !== providerId) {
+      changeProvider(qp.defaultProviderId);
+      if (qp.defaultRuntimeClass) changeRuntime(qp.defaultRuntimeClass);
+      if (qp.defaultUpstreamClient) setUpstreamClient(qp.defaultUpstreamClient);
+    }
+  }, [quickPlatforms]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function platformDefaultBaseUrl(provId: string): string {
+    const p = providerOptions.find((o) => o.value === provId);
+    if (!p) return "";
+    const at = p.adapterType?.toLowerCase() ?? "";
+    const name = p.label?.toLowerCase() ?? "";
+    if (at.includes("anthropic") || name.includes("anthropic")) return "https://api.anthropic.com";
+    if (at.includes("openai") && !at.includes("codex") && !at.includes("chatgpt")) return "https://api.openai.com/v1";
+    if (at.includes("gemini") || name.includes("gemini")) return "https://generativelanguage.googleapis.com";
+    if (name.includes("deepseek")) return "https://api.deepseek.com";
+    if (name.includes("groq")) return "https://api.groq.com/openai/v1";
+    if (name.includes("mistral")) return "https://api.mistral.ai/v1";
+    return "";
+  }
+
+  function runtimeClassIcon(rc: RuntimeClass): string {
+    switch (rc) {
+      case "api_key": return "🔑";
+      case "oauth_refresh": return "🔐";
+      case "oauth_device_code": return "📱";
+      case "web_session_cookie": return "🍪";
+      case "cli_client_token": return "⌨";
+      case "custom_reverse_proxy": return "🔄";
+      case "service_account_json": return "☁";
+      default: return "•";
+    }
+  }
+
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
@@ -409,22 +492,40 @@ export function AccountFormDialog({
     }
     const finalMetadata = { ...metadata };
     if (baseUrl.trim()) finalMetadata.base_url = baseUrl.trim();
-    const credentialSeed = credentialNameSeed(runtimeClass, credInput, credFields);
+
+    // Determine effective runtime class and credential based on addMethod.
+    let effectiveRuntimeClass = runtimeClass;
+    let effectiveCredential: string;
+    if (runtimeClass === "oauth_refresh" && addMethod === "setup-token") {
+      effectiveRuntimeClass = "cli_client_token" as typeof runtimeClass;
+      effectiveCredential = JSON.stringify({ cli_client_token: credInput.trim() });
+    } else if (runtimeClass === "oauth_refresh" && addMethod === "refresh-token" && quickOAuthToken.trim()) {
+      effectiveCredential = JSON.stringify({ refresh_token: quickOAuthToken.trim() });
+    } else {
+      effectiveCredential = buildCredentialJson(effectiveRuntimeClass, credInput, credFields);
+    }
+
+    const credentialSeed = credentialNameSeed(effectiveRuntimeClass, credInput, credFields);
     const finalName =
       name.trim() || (mode === "create" ? buildDefaultAccountName(providerLabel, credentialSeed) : "");
     const formState: AdminAccountFormState = {
       providerId,
       name: finalName,
-      runtimeClass,
+      runtimeClass: effectiveRuntimeClass,
       upstreamClient,
-      credential: buildCredentialJson(runtimeClass, credInput, credFields),
-      proxyId: "",
+      credential: effectiveCredential,
+      proxyId: selectedProxyId,
       status,
       riskLevel,
       priority,
       weight,
       metadata: finalMetadata,
-      groupIds: [],
+      groupIds: selectedGroupIds,
+      notes,
+      concurrency,
+      rateMultiplier,
+      expiresAt,
+      autoPauseOnExpired,
     };
     let body;
     try {
@@ -491,35 +592,117 @@ export function AccountFormDialog({
           </DialogHeader>
 
           <div className="mt-4 min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain pr-1">
-            {/* ── Section: Identity ── */}
             {mode === "create" ? (
-              <div>
-                <Label htmlFor="account-provider">{t("adminAccounts.provider")}</Label>
-                <Select value={providerId} onValueChange={changeProvider} disabled={busy}>
-                  <SelectTrigger id="account-provider">
-                    <SelectValue placeholder={t("adminAccounts.provider")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {groupedProviders.map((group) => (
-                      <SelectGroup key={group.family ?? "_ungrouped"}>
-                        {group.family ? (
-                          <SelectLabel>{t(`adminAccounts.platform.${group.family}`)}</SelectLabel>
-                        ) : null}
-                        {group.options.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
+              <>
+                {/* ── Quick platform shortcuts + full provider list ── */}
+                <div>
+                  <Label>{t("adminAccounts.platformSelect")}</Label>
+                  <div className="mt-2 flex flex-wrap rounded-lg bg-srapi-card-muted p-1">
+                    {quickPlatforms.map((qp) => (
+                      <button
+                        key={qp.key}
+                        type="button"
+                        disabled={busy}
+                        onClick={() => {
+                          setPlatformChoice(qp.key as typeof platformChoice);
+                          setShowAllProviders(false);
+                          if (qp.defaultProviderId) {
+                            changeProvider(qp.defaultProviderId);
+                            if (qp.defaultRuntimeClass) changeRuntime(qp.defaultRuntimeClass);
+                            if (qp.defaultUpstreamClient) setUpstreamClient(qp.defaultUpstreamClient);
+                          }
+                        }}
+                        className={cn(
+                          "flex flex-1 items-center justify-center gap-1.5 rounded-md px-2.5 py-2 text-sm font-medium transition-all",
+                          platformChoice === qp.key && !showAllProviders
+                            ? "bg-white text-srapi-text-primary shadow-sm dark:bg-srapi-card"
+                            : "text-srapi-text-tertiary hover:text-srapi-text-secondary",
+                        )}
+                      >
+                        {qp.label}
+                      </button>
                     ))}
-                  </SelectContent>
-                </Select>
-                {template ? (
-                  <p className="mt-1.5 text-[11px] text-srapi-text-tertiary">
-                    {t("adminAccounts.templateApplied")}
-                  </p>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => setShowAllProviders(true)}
+                      className={cn(
+                        "flex flex-1 items-center justify-center gap-1 rounded-md px-2.5 py-2 text-sm font-medium transition-all",
+                        showAllProviders
+                          ? "bg-white text-srapi-text-primary shadow-sm dark:bg-srapi-card"
+                          : "text-srapi-text-tertiary hover:text-srapi-text-secondary",
+                      )}
+                    >
+                      {t("adminAccounts.morePlatforms")}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Full provider dropdown (when "更多" is active) */}
+                {showAllProviders ? (
+                  <div>
+                    <Label htmlFor="account-provider">{t("adminAccounts.provider")}</Label>
+                    <Select value={providerId} onValueChange={changeProvider} disabled={busy}>
+                      <SelectTrigger id="account-provider">
+                        <SelectValue placeholder={t("adminAccounts.provider")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {groupedProviders.map((group) => (
+                          <SelectGroup key={group.family ?? "_ungrouped"}>
+                            {group.family ? (
+                              <SelectLabel>{t(`adminAccounts.platform.${group.family}`)}</SelectLabel>
+                            ) : null}
+                            {group.options.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 ) : null}
-              </div>
+
+                {/* Auth type cards — filtered to selected provider's allowed methods */}
+                {runtimeClassOptions.length > 1 ? (
+                  <div>
+                    <Label>{t("adminAccounts.authType")}</Label>
+                    <div className="mt-2 grid grid-cols-2 gap-2.5">
+                      {runtimeClassOptions.map((rc) => (
+                        <button
+                          key={rc}
+                          type="button"
+                          disabled={busy}
+                          onClick={() => changeRuntime(rc)}
+                          className={cn(
+                            "flex items-center gap-3 rounded-lg border-2 p-2.5 text-left transition-all",
+                            runtimeClass === rc
+                              ? "border-srapi-primary bg-srapi-primary/5"
+                              : "border-srapi-border hover:border-srapi-primary/40",
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "flex size-7 shrink-0 items-center justify-center rounded-md text-xs",
+                              runtimeClass === rc
+                                ? "bg-srapi-primary text-white"
+                                : "bg-srapi-card-muted text-srapi-text-tertiary",
+                            )}
+                          >
+                            {runtimeClassIcon(rc)}
+                          </div>
+                          <div>
+                            <span className="block text-sm font-medium text-srapi-text-primary">
+                              {t(`adminAccounts.runtime.${rc}`)}
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </>
             ) : null}
 
             <FloatingInput
@@ -532,91 +715,119 @@ export function AccountFormDialog({
               hint={mode === "create" ? defaultName : undefined}
             />
 
-            {/* ── Section: Authentication ── */}
+            {/* ── Section: Credentials (platform-aware) ── */}
             <div className="space-y-4 border-t border-srapi-border pt-4">
-              <div>
-                <Label htmlFor="account-runtime">{t("adminAccounts.authType")}</Label>
-                <Select
-                  value={runtimeClass}
-                  onValueChange={(v) => changeRuntime(v as RuntimeClass)}
-                  disabled={busy}
-                >
-                  <SelectTrigger id="account-runtime">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {runtimeClassOptions.map((rc) => (
-                      <SelectItem key={rc} value={rc}>
-                        {t(`adminAccounts.runtime.${rc}`)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
 
-            <div>
-              {spec.kind === "fields" ? (
-                <>
-                  <div className="flex items-center justify-between gap-2">
-                    <Label className="mb-0">{credLabel}</Label>
-                    {oauthFlowMode ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={busy}
-                        onClick={() => setOauthWizardOpen(true)}
-                      >
-                        <KeyRound className="size-3.5" />
-                        {t("accountOAuth.authorizeAccount")}
-                      </Button>
-                    ) : null}
-                  </div>
-                  {oauthFlowMode ? (
-                    <p className="mt-1 text-[11px] text-srapi-text-tertiary">
-                      {t("accountOAuth.authorizeAccountHint")}
-                    </p>
-                  ) : null}
-                  {runtimeClass === "oauth_refresh" ? (
-                    <div className="mt-3 rounded-lg border border-srapi-border bg-srapi-card-muted/60 p-3">
-                      <Label htmlFor="oauth-token-quick-paste" className="text-xs">
-                        {t("accountOAuth.quickPasteLabel")}
-                      </Label>
-                      <div className="mt-1.5 flex flex-col gap-2 sm:flex-row">
+            {/* OAuth flow: platform-specific input methods */}
+            {runtimeClass === "oauth_refresh" && mode === "create" ? (
+              <div className="space-y-4">
+                {/* Anthropic OAuth: "OAuth 授权" or "Setup Token" */}
+                {platformChoice === "anthropic" ? (
+                  <>
+                    <div>
+                      <Label>{t("adminAccounts.addMethod")}</Label>
+                      <div className="mt-2 flex gap-4">
+                        <label className="flex cursor-pointer items-center gap-2">
+                          <input type="radio" name="add-method" value="oauth" checked={addMethod === "oauth"} onChange={() => setAddMethod("oauth")} className="text-srapi-primary" />
+                          <span className="text-sm">{t("adminAccounts.oauthAuthorize")}</span>
+                        </label>
+                        <label className="flex cursor-pointer items-center gap-2">
+                          <input type="radio" name="add-method" value="setup-token" checked={addMethod === "setup-token"} onChange={() => setAddMethod("setup-token")} className="text-srapi-primary" />
+                          <span className="text-sm">{t("adminAccounts.setupToken")}</span>
+                        </label>
+                      </div>
+                    </div>
+                    {addMethod === "oauth" ? (
+                      <div className="rounded-lg border border-srapi-primary/20 bg-srapi-primary/5 p-4">
+                        <Button type="button" variant="outline" disabled={busy} onClick={() => setOauthWizardOpen(true)} className="w-full">
+                          <KeyRound className="size-3.5" />
+                          {t("accountOAuth.authorizeAccount")}
+                        </Button>
+                        <p className="mt-2 text-center text-[11px] text-srapi-text-tertiary">{t("adminAccounts.oauthAuthorizeHint")}</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <Label htmlFor="setup-token-input">{t("adminAccounts.setupTokenLabel")}</Label>
+                        <Input
+                          id="setup-token-input"
+                          type="password"
+                          className="mt-1.5 font-mono"
+                          placeholder={t("adminAccounts.setupTokenPlaceholder")}
+                          value={credInput}
+                          disabled={busy}
+                          autoComplete="new-password"
+                          data-lpignore="true"
+                          onChange={(e) => setCredInput(e.target.value)}
+                        />
+                        <p className="mt-1 text-[11px] text-srapi-text-tertiary">{t("adminAccounts.setupTokenHint")}</p>
+                      </div>
+                    )}
+                  </>
+                ) : platformChoice === "openai" ? (
+                  /* OpenAI OAuth: "OAuth 授权" or "Refresh Token" */
+                  <>
+                    <div>
+                      <Label>{t("adminAccounts.addMethod")}</Label>
+                      <div className="mt-2 flex gap-4">
+                        <label className="flex cursor-pointer items-center gap-2">
+                          <input type="radio" name="add-method" value="oauth" checked={addMethod === "oauth"} onChange={() => setAddMethod("oauth")} className="text-srapi-primary" />
+                          <span className="text-sm">{t("adminAccounts.oauthAuthorize")}</span>
+                        </label>
+                        <label className="flex cursor-pointer items-center gap-2">
+                          <input type="radio" name="add-method" value="refresh-token" checked={addMethod === "refresh-token"} onChange={() => setAddMethod("refresh-token")} className="text-srapi-primary" />
+                          <span className="text-sm">Refresh Token</span>
+                        </label>
+                      </div>
+                    </div>
+                    {addMethod === "oauth" ? (
+                      <div className="rounded-lg border border-srapi-primary/20 bg-srapi-primary/5 p-4">
+                        <Button type="button" variant="outline" disabled={busy} onClick={() => setOauthWizardOpen(true)} className="w-full">
+                          <KeyRound className="size-3.5" />
+                          {t("accountOAuth.authorizeAccount")}
+                        </Button>
+                        <p className="mt-2 text-center text-[11px] text-srapi-text-tertiary">{t("adminAccounts.oauthAuthorizeHint")}</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <Label htmlFor="refresh-token-input">Refresh Token</Label>
                         <Textarea
-                          id="oauth-token-quick-paste"
+                          id="refresh-token-input"
                           spellCheck={false}
-                          className="min-h-20 flex-1 font-mono text-xs"
+                          className="mt-1.5 min-h-20 font-mono text-xs"
+                          placeholder={t("adminAccounts.refreshTokenPlaceholder")}
                           value={quickOAuthToken}
                           disabled={busy}
                           autoComplete="off"
                           data-lpignore="true"
-                          data-1p-ignore="true"
-                          placeholder={t("accountOAuth.quickPastePlaceholder")}
-                          onPaste={(e) => {
-                            const text = e.clipboardData.getData("text");
-                            if (applyQuickOAuthToken(text)) {
-                              e.preventDefault();
-                            }
-                          }}
+                          onPaste={(e) => { const text = e.clipboardData.getData("text"); if (applyQuickOAuthToken(text)) e.preventDefault(); }}
                           onChange={(e) => setQuickOAuthToken(e.target.value)}
                         />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={busy || !quickOAuthToken.trim()}
-                          onClick={() => applyQuickOAuthToken(quickOAuthToken)}
-                          className="sm:self-end"
-                        >
-                          <Sparkles className="size-3.5" />
-                          {t("accountOAuth.quickPasteApply")}
-                        </Button>
+                        <div className="mt-2 flex justify-end">
+                          <Button type="button" variant="outline" size="sm" disabled={busy || !quickOAuthToken.trim()} onClick={() => applyQuickOAuthToken(quickOAuthToken)}>
+                            <Sparkles className="size-3.5" />
+                            {t("accountOAuth.quickPasteApply")}
+                          </Button>
+                        </div>
+                        <p className="mt-1 text-[11px] text-srapi-text-tertiary">{t("adminAccounts.refreshTokenHint")}</p>
                       </div>
-                      <p className="mt-1.5 text-[11px] text-srapi-text-tertiary">
-                        {t("accountOAuth.quickPasteHint")}
-                      </p>
-                    </div>
-                  ) : null}
+                    )}
+                  </>
+                ) : (
+                  /* Other platforms OAuth: just the authorize button */
+                  <div className="rounded-lg border border-srapi-primary/20 bg-srapi-primary/5 p-4">
+                    <Button type="button" variant="outline" disabled={busy} onClick={() => setOauthWizardOpen(true)} className="w-full">
+                      <KeyRound className="size-3.5" />
+                      {t("accountOAuth.authorizeAccount")}
+                    </Button>
+                    <p className="mt-2 text-center text-[11px] text-srapi-text-tertiary">{t("adminAccounts.oauthAuthorizeHint")}</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+            /* Non-OAuth: API Key / Service Account / generic credential */
+            <div>
+              {spec.kind === "fields" ? (
+                <>
                   <div className="mt-1.5 space-y-3">
                     {(spec.fields ?? []).map((f) => (
                       <div key={f.key}>
@@ -714,9 +925,11 @@ export function AccountFormDialog({
               )}
               <p className="mt-1 text-[11px] text-srapi-text-tertiary">{credHint}</p>
             </div>
+            )}
             </div>
 
-            {/* ── Section: Endpoint ── */}
+            {/* ── Section: Endpoint (only for non-OAuth types) ── */}
+            {runtimeClass !== "oauth_refresh" ? (
             <FloatingInput
               id="account-base-url"
               label={t("adminAccounts.baseUrl")}
@@ -728,6 +941,49 @@ export function AccountFormDialog({
               hint={t("adminAccounts.baseUrlHint")}
               className="[&_input]:font-mono"
             />
+            ) : null}
+
+            {/* ── Group & Proxy selection ── */}
+            {mode === "create" ? (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>{t("adminAccounts.groupSelect")}</Label>
+                  <Select
+                    value={selectedGroupIds[0] ?? "__none__"}
+                    onValueChange={(v) => setSelectedGroupIds(v === "__none__" ? [] : [v])}
+                    disabled={busy}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t("adminAccounts.groupSelectPlaceholder")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">{t("adminAccounts.noGroup")}</SelectItem>
+                      {(groupsQuery.data?.data ?? []).map((g) => (
+                        <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>{t("adminAccounts.proxySelect")}</Label>
+                  <Select
+                    value={selectedProxyId || "__none__"}
+                    onValueChange={(v) => setSelectedProxyId(v === "__none__" ? "" : v)}
+                    disabled={busy}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t("adminAccounts.proxySelectPlaceholder")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">{t("adminAccounts.proxyDirect")}</SelectItem>
+                      {(proxiesQuery.data?.data ?? []).filter((p) => p.status === "active").map((p) => (
+                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            ) : null}
 
             {/* Advanced — everything an admin rarely touches, collapsed by default. */}
             <div className="rounded-lg border border-srapi-border">
@@ -815,6 +1071,46 @@ export function AccountFormDialog({
                     onChange={setUpstreamClient}
                     disabled={busy}
                   />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="account-concurrency">{t("adminAccounts.concurrency")}</Label>
+                      <Input
+                        id="account-concurrency"
+                        type="number"
+                        value={concurrency}
+                        disabled={busy}
+                        onChange={(e) => setConcurrency(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="account-rate-multiplier">{t("adminAccounts.rateMultiplier")}</Label>
+                      <Input
+                        id="account-rate-multiplier"
+                        type="number"
+                        step="0.01"
+                        value={rateMultiplier}
+                        disabled={busy}
+                        onChange={(e) => setRateMultiplier(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <FloatingInput
+                    id="account-notes"
+                    label={t("adminAccounts.notes")}
+                    value={notes}
+                    onChange={setNotes}
+                    disabled={busy}
+                  />
+                  <div>
+                    <Label htmlFor="account-expires-at">{t("adminAccounts.expiresAt")}</Label>
+                    <Input
+                      id="account-expires-at"
+                      type="datetime-local"
+                      value={expiresAt}
+                      disabled={busy}
+                      onChange={(e) => setExpiresAt(e.target.value)}
+                    />
+                  </div>
                   <div>
                     <div className="flex items-center gap-2">
                       <Switch

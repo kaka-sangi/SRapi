@@ -22331,12 +22331,20 @@ components:
         - priority
         - weight
         - group_ids
+        - concurrency
+        - schedulable
         - created_at
       properties:
         id:
           $ref: '#/components/schemas/Id'
         provider_id:
           $ref: '#/components/schemas/Id'
+        platform:
+          type: string
+          description: Provider family denormalized for fast filtering (anthropic, openai, gemini, antigravity).
+        account_type:
+          type: string
+          description: Simplified auth type (apikey, oauth, setup-token, upstream, bedrock, service_account).
         name:
           type: string
         runtime_class:
@@ -22366,11 +22374,52 @@ components:
           items:
             $ref: '#/components/schemas/Id'
           default: []
+        notes:
+          type: string
+          description: Operator-supplied freetext visible on the admin panel.
+        concurrency:
+          type: integer
+          default: 3
+          description: Max concurrent upstream requests for this account.
+        rate_multiplier:
+          type: number
+          default: 1
+          description: Per-account billing multiplier.
+        load_factor:
+          type: integer
+          nullable: true
+          description: Load distribution weight in the scheduler.
+        schedulable:
+          type: boolean
+          default: true
+          description: Direct scheduling flag; false skips without status change.
+        error_message:
+          type: string
+          description: Last error details for operator troubleshooting.
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When this account last served a request.
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Account-level expiry (NOT OAuth token expiry).
+        auto_pause_on_expired:
+          type: boolean
+          default: true
+          description: Pause scheduling when expires_at is reached.
         metadata:
           allOf:
             - $ref: '#/components/schemas/JsonObject'
           description: |
-            Free-form per-account configuration. Recognized convention keys (no schema migration; read at scheduling time): `base_url` (override the upstream base URL); `supported_models` (string array — exact-match inclusion whitelist of upstream model names this account may serve; absent = serve all); `excluded_models` (string array of `*` wildcard patterns — exclude any catalog or upstream model name matching a pattern; takes precedence over `supported_models` and hides the model from `/v1/models` when every serving account excludes it); `model_mapping` (object mapping a canonical catalog model name to a per-account upstream model name override).
+            Operational state metadata. Convention keys: `base_url`, `supported_models`, `excluded_models`, `model_mapping`.
+        extra:
+          allOf:
+            - $ref: '#/components/schemas/JsonObject'
+          description: |
+            Per-account config separate from operational metadata.
         token_expires_at:
           type: string
           format: date-time
@@ -22448,6 +22497,34 @@ components:
           default: normal
         metadata:
           $ref: '#/components/schemas/JsonObject'
+        extra:
+          $ref: '#/components/schemas/JsonObject'
+        notes:
+          type: string
+          description: Operator-supplied freetext.
+        concurrency:
+          type: integer
+          default: 3
+          description: Max concurrent upstream requests.
+        rate_multiplier:
+          type: number
+          default: 1
+        load_factor:
+          type: integer
+          nullable: true
+        group_ids:
+          type: array
+          items:
+            type: integer
+          description: Bind to these account groups at creation time.
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Account-level expiry timestamp.
+        auto_pause_on_expired:
+          type: boolean
+          default: true
     BatchCreateProviderAccountsRequest:
       type: object
       required:
@@ -23149,6 +23226,25 @@ components:
             - high
         metadata:
           $ref: '#/components/schemas/JsonObject'
+        extra:
+          $ref: '#/components/schemas/JsonObject'
+        notes:
+          type: string
+        concurrency:
+          type: integer
+        rate_multiplier:
+          type: number
+        load_factor:
+          type: integer
+          nullable: true
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        auto_pause_on_expired:
+          type: boolean
+        schedulable:
+          type: boolean
     BindProviderAccountProxyRequest:
       type: object
       required:

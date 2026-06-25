@@ -28,6 +28,8 @@ type ProviderAccount struct {
 	ProviderID int `json:"provider_id,omitempty"`
 	// Name holds the value of the "name" field.
 	Name string `json:"name,omitempty"`
+	// Platform holds the value of the "platform" field.
+	Platform string `json:"platform,omitempty"`
 	// AccountType holds the value of the "account_type" field.
 	AccountType string `json:"account_type,omitempty"`
 	// RuntimeClass holds the value of the "runtime_class" field.
@@ -50,6 +52,42 @@ type ProviderAccount struct {
 	RiskLevel string `json:"risk_level,omitempty"`
 	// MetadataJSON holds the value of the "metadata_json" field.
 	MetadataJSON map[string]interface{} `json:"metadata_json,omitempty"`
+	// Notes holds the value of the "notes" field.
+	Notes string `json:"notes,omitempty"`
+	// Concurrency holds the value of the "concurrency" field.
+	Concurrency int `json:"concurrency,omitempty"`
+	// RateMultiplier holds the value of the "rate_multiplier" field.
+	RateMultiplier float64 `json:"rate_multiplier,omitempty"`
+	// LoadFactor holds the value of the "load_factor" field.
+	LoadFactor *int `json:"load_factor,omitempty"`
+	// Schedulable holds the value of the "schedulable" field.
+	Schedulable bool `json:"schedulable,omitempty"`
+	// ErrorMessage holds the value of the "error_message" field.
+	ErrorMessage string `json:"error_message,omitempty"`
+	// LastUsedAt holds the value of the "last_used_at" field.
+	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
+	// ExpiresAt holds the value of the "expires_at" field.
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	// AutoPauseOnExpired holds the value of the "auto_pause_on_expired" field.
+	AutoPauseOnExpired bool `json:"auto_pause_on_expired,omitempty"`
+	// RateLimitedAt holds the value of the "rate_limited_at" field.
+	RateLimitedAt *time.Time `json:"rate_limited_at,omitempty"`
+	// RateLimitResetAt holds the value of the "rate_limit_reset_at" field.
+	RateLimitResetAt *time.Time `json:"rate_limit_reset_at,omitempty"`
+	// OverloadUntil holds the value of the "overload_until" field.
+	OverloadUntil *time.Time `json:"overload_until,omitempty"`
+	// TempUnschedulableUntil holds the value of the "temp_unschedulable_until" field.
+	TempUnschedulableUntil *time.Time `json:"temp_unschedulable_until,omitempty"`
+	// TempUnschedulableReason holds the value of the "temp_unschedulable_reason" field.
+	TempUnschedulableReason string `json:"temp_unschedulable_reason,omitempty"`
+	// SessionWindowStart holds the value of the "session_window_start" field.
+	SessionWindowStart *time.Time `json:"session_window_start,omitempty"`
+	// SessionWindowEnd holds the value of the "session_window_end" field.
+	SessionWindowEnd *time.Time `json:"session_window_end,omitempty"`
+	// SessionWindowStatus holds the value of the "session_window_status" field.
+	SessionWindowStatus string `json:"session_window_status,omitempty"`
+	// ExtraJSON holds the value of the "extra_json" field.
+	ExtraJSON map[string]interface{} `json:"extra_json,omitempty"`
 	// TokenExpiresAt holds the value of the "token_expires_at" field.
 	TokenExpiresAt *time.Time `json:"token_expires_at,omitempty"`
 	// LastRefreshedAt holds the value of the "last_refreshed_at" field.
@@ -68,15 +106,17 @@ func (*ProviderAccount) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case provideraccount.FieldCredentialCiphertext, provideraccount.FieldMetadataJSON:
+		case provideraccount.FieldCredentialCiphertext, provideraccount.FieldMetadataJSON, provideraccount.FieldExtraJSON:
 			values[i] = new([]byte)
-		case provideraccount.FieldWeight:
+		case provideraccount.FieldSchedulable, provideraccount.FieldAutoPauseOnExpired:
+			values[i] = new(sql.NullBool)
+		case provideraccount.FieldWeight, provideraccount.FieldRateMultiplier:
 			values[i] = new(sql.NullFloat64)
-		case provideraccount.FieldID, provideraccount.FieldProviderID, provideraccount.FieldCredentialVersion, provideraccount.FieldPriority, provideraccount.FieldRefreshAttempts:
+		case provideraccount.FieldID, provideraccount.FieldProviderID, provideraccount.FieldCredentialVersion, provideraccount.FieldPriority, provideraccount.FieldConcurrency, provideraccount.FieldLoadFactor, provideraccount.FieldRefreshAttempts:
 			values[i] = new(sql.NullInt64)
-		case provideraccount.FieldName, provideraccount.FieldAccountType, provideraccount.FieldRuntimeClass, provideraccount.FieldUpstreamClient, provideraccount.FieldProxyID, provideraccount.FieldStatus, provideraccount.FieldRiskLevel, provideraccount.FieldRefreshLastError:
+		case provideraccount.FieldName, provideraccount.FieldPlatform, provideraccount.FieldAccountType, provideraccount.FieldRuntimeClass, provideraccount.FieldUpstreamClient, provideraccount.FieldProxyID, provideraccount.FieldStatus, provideraccount.FieldRiskLevel, provideraccount.FieldNotes, provideraccount.FieldErrorMessage, provideraccount.FieldTempUnschedulableReason, provideraccount.FieldSessionWindowStatus, provideraccount.FieldRefreshLastError:
 			values[i] = new(sql.NullString)
-		case provideraccount.FieldCreatedAt, provideraccount.FieldUpdatedAt, provideraccount.FieldDeletedAt, provideraccount.FieldTokenExpiresAt, provideraccount.FieldLastRefreshedAt, provideraccount.FieldNeedsReauthAt:
+		case provideraccount.FieldCreatedAt, provideraccount.FieldUpdatedAt, provideraccount.FieldDeletedAt, provideraccount.FieldLastUsedAt, provideraccount.FieldExpiresAt, provideraccount.FieldRateLimitedAt, provideraccount.FieldRateLimitResetAt, provideraccount.FieldOverloadUntil, provideraccount.FieldTempUnschedulableUntil, provideraccount.FieldSessionWindowStart, provideraccount.FieldSessionWindowEnd, provideraccount.FieldTokenExpiresAt, provideraccount.FieldLastRefreshedAt, provideraccount.FieldNeedsReauthAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -129,6 +169,12 @@ func (_m *ProviderAccount) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field name", values[i])
 			} else if value.Valid {
 				_m.Name = value.String
+			}
+		case provideraccount.FieldPlatform:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field platform", values[i])
+			} else if value.Valid {
+				_m.Platform = value.String
 			}
 		case provideraccount.FieldAccountType:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -198,6 +244,125 @@ func (_m *ProviderAccount) assignValues(columns []string, values []any) error {
 			} else if value != nil && len(*value) > 0 {
 				if err := json.Unmarshal(*value, &_m.MetadataJSON); err != nil {
 					return fmt.Errorf("unmarshal field metadata_json: %w", err)
+				}
+			}
+		case provideraccount.FieldNotes:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field notes", values[i])
+			} else if value.Valid {
+				_m.Notes = value.String
+			}
+		case provideraccount.FieldConcurrency:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field concurrency", values[i])
+			} else if value.Valid {
+				_m.Concurrency = int(value.Int64)
+			}
+		case provideraccount.FieldRateMultiplier:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field rate_multiplier", values[i])
+			} else if value.Valid {
+				_m.RateMultiplier = value.Float64
+			}
+		case provideraccount.FieldLoadFactor:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field load_factor", values[i])
+			} else if value.Valid {
+				_m.LoadFactor = new(int)
+				*_m.LoadFactor = int(value.Int64)
+			}
+		case provideraccount.FieldSchedulable:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field schedulable", values[i])
+			} else if value.Valid {
+				_m.Schedulable = value.Bool
+			}
+		case provideraccount.FieldErrorMessage:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field error_message", values[i])
+			} else if value.Valid {
+				_m.ErrorMessage = value.String
+			}
+		case provideraccount.FieldLastUsedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field last_used_at", values[i])
+			} else if value.Valid {
+				_m.LastUsedAt = new(time.Time)
+				*_m.LastUsedAt = value.Time
+			}
+		case provideraccount.FieldExpiresAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field expires_at", values[i])
+			} else if value.Valid {
+				_m.ExpiresAt = new(time.Time)
+				*_m.ExpiresAt = value.Time
+			}
+		case provideraccount.FieldAutoPauseOnExpired:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field auto_pause_on_expired", values[i])
+			} else if value.Valid {
+				_m.AutoPauseOnExpired = value.Bool
+			}
+		case provideraccount.FieldRateLimitedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field rate_limited_at", values[i])
+			} else if value.Valid {
+				_m.RateLimitedAt = new(time.Time)
+				*_m.RateLimitedAt = value.Time
+			}
+		case provideraccount.FieldRateLimitResetAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field rate_limit_reset_at", values[i])
+			} else if value.Valid {
+				_m.RateLimitResetAt = new(time.Time)
+				*_m.RateLimitResetAt = value.Time
+			}
+		case provideraccount.FieldOverloadUntil:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field overload_until", values[i])
+			} else if value.Valid {
+				_m.OverloadUntil = new(time.Time)
+				*_m.OverloadUntil = value.Time
+			}
+		case provideraccount.FieldTempUnschedulableUntil:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field temp_unschedulable_until", values[i])
+			} else if value.Valid {
+				_m.TempUnschedulableUntil = new(time.Time)
+				*_m.TempUnschedulableUntil = value.Time
+			}
+		case provideraccount.FieldTempUnschedulableReason:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field temp_unschedulable_reason", values[i])
+			} else if value.Valid {
+				_m.TempUnschedulableReason = value.String
+			}
+		case provideraccount.FieldSessionWindowStart:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field session_window_start", values[i])
+			} else if value.Valid {
+				_m.SessionWindowStart = new(time.Time)
+				*_m.SessionWindowStart = value.Time
+			}
+		case provideraccount.FieldSessionWindowEnd:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field session_window_end", values[i])
+			} else if value.Valid {
+				_m.SessionWindowEnd = new(time.Time)
+				*_m.SessionWindowEnd = value.Time
+			}
+		case provideraccount.FieldSessionWindowStatus:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field session_window_status", values[i])
+			} else if value.Valid {
+				_m.SessionWindowStatus = value.String
+			}
+		case provideraccount.FieldExtraJSON:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field extra_json", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.ExtraJSON); err != nil {
+					return fmt.Errorf("unmarshal field extra_json: %w", err)
 				}
 			}
 		case provideraccount.FieldTokenExpiresAt:
@@ -286,6 +451,9 @@ func (_m *ProviderAccount) String() string {
 	builder.WriteString("name=")
 	builder.WriteString(_m.Name)
 	builder.WriteString(", ")
+	builder.WriteString("platform=")
+	builder.WriteString(_m.Platform)
+	builder.WriteString(", ")
 	builder.WriteString("account_type=")
 	builder.WriteString(_m.AccountType)
 	builder.WriteString(", ")
@@ -321,6 +489,78 @@ func (_m *ProviderAccount) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("metadata_json=")
 	builder.WriteString(fmt.Sprintf("%v", _m.MetadataJSON))
+	builder.WriteString(", ")
+	builder.WriteString("notes=")
+	builder.WriteString(_m.Notes)
+	builder.WriteString(", ")
+	builder.WriteString("concurrency=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Concurrency))
+	builder.WriteString(", ")
+	builder.WriteString("rate_multiplier=")
+	builder.WriteString(fmt.Sprintf("%v", _m.RateMultiplier))
+	builder.WriteString(", ")
+	if v := _m.LoadFactor; v != nil {
+		builder.WriteString("load_factor=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("schedulable=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Schedulable))
+	builder.WriteString(", ")
+	builder.WriteString("error_message=")
+	builder.WriteString(_m.ErrorMessage)
+	builder.WriteString(", ")
+	if v := _m.LastUsedAt; v != nil {
+		builder.WriteString("last_used_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.ExpiresAt; v != nil {
+		builder.WriteString("expires_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("auto_pause_on_expired=")
+	builder.WriteString(fmt.Sprintf("%v", _m.AutoPauseOnExpired))
+	builder.WriteString(", ")
+	if v := _m.RateLimitedAt; v != nil {
+		builder.WriteString("rate_limited_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.RateLimitResetAt; v != nil {
+		builder.WriteString("rate_limit_reset_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.OverloadUntil; v != nil {
+		builder.WriteString("overload_until=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.TempUnschedulableUntil; v != nil {
+		builder.WriteString("temp_unschedulable_until=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("temp_unschedulable_reason=")
+	builder.WriteString(_m.TempUnschedulableReason)
+	builder.WriteString(", ")
+	if v := _m.SessionWindowStart; v != nil {
+		builder.WriteString("session_window_start=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.SessionWindowEnd; v != nil {
+		builder.WriteString("session_window_end=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("session_window_status=")
+	builder.WriteString(_m.SessionWindowStatus)
+	builder.WriteString(", ")
+	builder.WriteString("extra_json=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ExtraJSON))
 	builder.WriteString(", ")
 	if v := _m.TokenExpiresAt; v != nil {
 		builder.WriteString("token_expires_at=")

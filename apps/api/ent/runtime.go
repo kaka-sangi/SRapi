@@ -1935,40 +1935,76 @@ func init() {
 	provideraccountDescName := provideraccountFields[1].Descriptor()
 	// provideraccount.NameValidator is a validator for the "name" field. It is called by the builders before save.
 	provideraccount.NameValidator = provideraccountDescName.Validators[0].(func(string) error)
+	// provideraccountDescPlatform is the schema descriptor for platform field.
+	provideraccountDescPlatform := provideraccountFields[2].Descriptor()
+	// provideraccount.DefaultPlatform holds the default value on creation for the platform field.
+	provideraccount.DefaultPlatform = provideraccountDescPlatform.Default.(string)
 	// provideraccountDescAccountType is the schema descriptor for account_type field.
-	provideraccountDescAccountType := provideraccountFields[2].Descriptor()
+	provideraccountDescAccountType := provideraccountFields[3].Descriptor()
 	// provideraccount.DefaultAccountType holds the default value on creation for the account_type field.
 	provideraccount.DefaultAccountType = provideraccountDescAccountType.Default.(string)
 	// provideraccountDescRuntimeClass is the schema descriptor for runtime_class field.
-	provideraccountDescRuntimeClass := provideraccountFields[3].Descriptor()
+	provideraccountDescRuntimeClass := provideraccountFields[4].Descriptor()
 	// provideraccount.DefaultRuntimeClass holds the default value on creation for the runtime_class field.
 	provideraccount.DefaultRuntimeClass = provideraccountDescRuntimeClass.Default.(string)
 	// provideraccountDescCredentialVersion is the schema descriptor for credential_version field.
-	provideraccountDescCredentialVersion := provideraccountFields[6].Descriptor()
+	provideraccountDescCredentialVersion := provideraccountFields[7].Descriptor()
 	// provideraccount.DefaultCredentialVersion holds the default value on creation for the credential_version field.
 	provideraccount.DefaultCredentialVersion = provideraccountDescCredentialVersion.Default.(int)
 	// provideraccountDescStatus is the schema descriptor for status field.
-	provideraccountDescStatus := provideraccountFields[8].Descriptor()
+	provideraccountDescStatus := provideraccountFields[9].Descriptor()
 	// provideraccount.DefaultStatus holds the default value on creation for the status field.
 	provideraccount.DefaultStatus = provideraccountDescStatus.Default.(string)
 	// provideraccountDescPriority is the schema descriptor for priority field.
-	provideraccountDescPriority := provideraccountFields[9].Descriptor()
+	provideraccountDescPriority := provideraccountFields[10].Descriptor()
 	// provideraccount.DefaultPriority holds the default value on creation for the priority field.
 	provideraccount.DefaultPriority = provideraccountDescPriority.Default.(int)
 	// provideraccountDescWeight is the schema descriptor for weight field.
-	provideraccountDescWeight := provideraccountFields[10].Descriptor()
+	provideraccountDescWeight := provideraccountFields[11].Descriptor()
 	// provideraccount.DefaultWeight holds the default value on creation for the weight field.
 	provideraccount.DefaultWeight = provideraccountDescWeight.Default.(float64)
 	// provideraccountDescRiskLevel is the schema descriptor for risk_level field.
-	provideraccountDescRiskLevel := provideraccountFields[11].Descriptor()
+	provideraccountDescRiskLevel := provideraccountFields[12].Descriptor()
 	// provideraccount.DefaultRiskLevel holds the default value on creation for the risk_level field.
 	provideraccount.DefaultRiskLevel = provideraccountDescRiskLevel.Default.(string)
+	// provideraccountDescNotes is the schema descriptor for notes field.
+	provideraccountDescNotes := provideraccountFields[14].Descriptor()
+	// provideraccount.DefaultNotes holds the default value on creation for the notes field.
+	provideraccount.DefaultNotes = provideraccountDescNotes.Default.(string)
+	// provideraccountDescConcurrency is the schema descriptor for concurrency field.
+	provideraccountDescConcurrency := provideraccountFields[15].Descriptor()
+	// provideraccount.DefaultConcurrency holds the default value on creation for the concurrency field.
+	provideraccount.DefaultConcurrency = provideraccountDescConcurrency.Default.(int)
+	// provideraccountDescRateMultiplier is the schema descriptor for rate_multiplier field.
+	provideraccountDescRateMultiplier := provideraccountFields[16].Descriptor()
+	// provideraccount.DefaultRateMultiplier holds the default value on creation for the rate_multiplier field.
+	provideraccount.DefaultRateMultiplier = provideraccountDescRateMultiplier.Default.(float64)
+	// provideraccountDescSchedulable is the schema descriptor for schedulable field.
+	provideraccountDescSchedulable := provideraccountFields[18].Descriptor()
+	// provideraccount.DefaultSchedulable holds the default value on creation for the schedulable field.
+	provideraccount.DefaultSchedulable = provideraccountDescSchedulable.Default.(bool)
+	// provideraccountDescErrorMessage is the schema descriptor for error_message field.
+	provideraccountDescErrorMessage := provideraccountFields[19].Descriptor()
+	// provideraccount.DefaultErrorMessage holds the default value on creation for the error_message field.
+	provideraccount.DefaultErrorMessage = provideraccountDescErrorMessage.Default.(string)
+	// provideraccountDescAutoPauseOnExpired is the schema descriptor for auto_pause_on_expired field.
+	provideraccountDescAutoPauseOnExpired := provideraccountFields[22].Descriptor()
+	// provideraccount.DefaultAutoPauseOnExpired holds the default value on creation for the auto_pause_on_expired field.
+	provideraccount.DefaultAutoPauseOnExpired = provideraccountDescAutoPauseOnExpired.Default.(bool)
+	// provideraccountDescTempUnschedulableReason is the schema descriptor for temp_unschedulable_reason field.
+	provideraccountDescTempUnschedulableReason := provideraccountFields[27].Descriptor()
+	// provideraccount.DefaultTempUnschedulableReason holds the default value on creation for the temp_unschedulable_reason field.
+	provideraccount.DefaultTempUnschedulableReason = provideraccountDescTempUnschedulableReason.Default.(string)
+	// provideraccountDescSessionWindowStatus is the schema descriptor for session_window_status field.
+	provideraccountDescSessionWindowStatus := provideraccountFields[30].Descriptor()
+	// provideraccount.DefaultSessionWindowStatus holds the default value on creation for the session_window_status field.
+	provideraccount.DefaultSessionWindowStatus = provideraccountDescSessionWindowStatus.Default.(string)
 	// provideraccountDescRefreshAttempts is the schema descriptor for refresh_attempts field.
-	provideraccountDescRefreshAttempts := provideraccountFields[16].Descriptor()
+	provideraccountDescRefreshAttempts := provideraccountFields[35].Descriptor()
 	// provideraccount.DefaultRefreshAttempts holds the default value on creation for the refresh_attempts field.
 	provideraccount.DefaultRefreshAttempts = provideraccountDescRefreshAttempts.Default.(int)
 	// provideraccountDescRefreshLastError is the schema descriptor for refresh_last_error field.
-	provideraccountDescRefreshLastError := provideraccountFields[17].Descriptor()
+	provideraccountDescRefreshLastError := provideraccountFields[36].Descriptor()
 	// provideraccount.DefaultRefreshLastError holds the default value on creation for the refresh_last_error field.
 	provideraccount.DefaultRefreshLastError = provideraccountDescRefreshLastError.Default.(string)
 	// provideraccount.RefreshLastErrorValidator is a validator for the "refresh_last_error" field. It is called by the builders before save.
@@ -1996,40 +2032,60 @@ func init() {
 	proxyDescType := proxyFields[1].Descriptor()
 	// proxy.TypeValidator is a validator for the "type" field. It is called by the builders before save.
 	proxy.TypeValidator = proxyDescType.Validators[0].(func(string) error)
+	// proxyDescProtocol is the schema descriptor for protocol field.
+	proxyDescProtocol := proxyFields[2].Descriptor()
+	// proxy.DefaultProtocol holds the default value on creation for the protocol field.
+	proxy.DefaultProtocol = proxyDescProtocol.Default.(string)
+	// proxyDescHost is the schema descriptor for host field.
+	proxyDescHost := proxyFields[3].Descriptor()
+	// proxy.DefaultHost holds the default value on creation for the host field.
+	proxy.DefaultHost = proxyDescHost.Default.(string)
+	// proxyDescPort is the schema descriptor for port field.
+	proxyDescPort := proxyFields[4].Descriptor()
+	// proxy.DefaultPort holds the default value on creation for the port field.
+	proxy.DefaultPort = proxyDescPort.Default.(int)
+	// proxyDescUsername is the schema descriptor for username field.
+	proxyDescUsername := proxyFields[5].Descriptor()
+	// proxy.DefaultUsername holds the default value on creation for the username field.
+	proxy.DefaultUsername = proxyDescUsername.Default.(string)
 	// proxyDescURLVersion is the schema descriptor for url_version field.
-	proxyDescURLVersion := proxyFields[3].Descriptor()
+	proxyDescURLVersion := proxyFields[8].Descriptor()
 	// proxy.DefaultURLVersion holds the default value on creation for the url_version field.
 	proxy.DefaultURLVersion = proxyDescURLVersion.Default.(int)
 	// proxyDescStatus is the schema descriptor for status field.
-	proxyDescStatus := proxyFields[4].Descriptor()
+	proxyDescStatus := proxyFields[9].Descriptor()
 	// proxy.DefaultStatus holds the default value on creation for the status field.
 	proxy.DefaultStatus = proxyDescStatus.Default.(string)
 	// proxyDescCountryCode is the schema descriptor for country_code field.
-	proxyDescCountryCode := proxyFields[6].Descriptor()
+	proxyDescCountryCode := proxyFields[11].Descriptor()
 	// proxy.DefaultCountryCode holds the default value on creation for the country_code field.
 	proxy.DefaultCountryCode = proxyDescCountryCode.Default.(string)
 	// proxy.CountryCodeValidator is a validator for the "country_code" field. It is called by the builders before save.
 	proxy.CountryCodeValidator = proxyDescCountryCode.Validators[0].(func(string) error)
 	// proxyDescCountryName is the schema descriptor for country_name field.
-	proxyDescCountryName := proxyFields[7].Descriptor()
+	proxyDescCountryName := proxyFields[12].Descriptor()
 	// proxy.DefaultCountryName holds the default value on creation for the country_name field.
 	proxy.DefaultCountryName = proxyDescCountryName.Default.(string)
 	// proxy.CountryNameValidator is a validator for the "country_name" field. It is called by the builders before save.
 	proxy.CountryNameValidator = proxyDescCountryName.Validators[0].(func(string) error)
 	// proxyDescFallbackMode is the schema descriptor for fallback_mode field.
-	proxyDescFallbackMode := proxyFields[9].Descriptor()
+	proxyDescFallbackMode := proxyFields[14].Descriptor()
 	// proxy.DefaultFallbackMode holds the default value on creation for the fallback_mode field.
 	proxy.DefaultFallbackMode = proxyDescFallbackMode.Default.(string)
+	// proxyDescExpiryWarnDays is the schema descriptor for expiry_warn_days field.
+	proxyDescExpiryWarnDays := proxyFields[16].Descriptor()
+	// proxy.DefaultExpiryWarnDays holds the default value on creation for the expiry_warn_days field.
+	proxy.DefaultExpiryWarnDays = proxyDescExpiryWarnDays.Default.(int)
 	// proxyDescProbeSuccessCount is the schema descriptor for probe_success_count field.
-	proxyDescProbeSuccessCount := proxyFields[12].Descriptor()
+	proxyDescProbeSuccessCount := proxyFields[18].Descriptor()
 	// proxy.DefaultProbeSuccessCount holds the default value on creation for the probe_success_count field.
 	proxy.DefaultProbeSuccessCount = proxyDescProbeSuccessCount.Default.(int)
 	// proxyDescProbeFailureCount is the schema descriptor for probe_failure_count field.
-	proxyDescProbeFailureCount := proxyFields[13].Descriptor()
+	proxyDescProbeFailureCount := proxyFields[19].Descriptor()
 	// proxy.DefaultProbeFailureCount holds the default value on creation for the probe_failure_count field.
 	proxy.DefaultProbeFailureCount = proxyDescProbeFailureCount.Default.(int)
 	// proxyDescLastProbeLatencyMs is the schema descriptor for last_probe_latency_ms field.
-	proxyDescLastProbeLatencyMs := proxyFields[14].Descriptor()
+	proxyDescLastProbeLatencyMs := proxyFields[20].Descriptor()
 	// proxy.DefaultLastProbeLatencyMs holds the default value on creation for the last_probe_latency_ms field.
 	proxy.DefaultLastProbeLatencyMs = proxyDescLastProbeLatencyMs.Default.(int)
 	qualityevalsampleMixin := schema.QualityEvalSample{}.Mixin()

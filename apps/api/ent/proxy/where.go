@@ -64,11 +64,6 @@ func UpdatedAt(v time.Time) predicate.Proxy {
 	return predicate.Proxy(sql.FieldEQ(FieldUpdatedAt, v))
 }
 
-// DeletedAt applies equality check predicate on the "deleted_at" field. It's identical to DeletedAtEQ.
-func DeletedAt(v time.Time) predicate.Proxy {
-	return predicate.Proxy(sql.FieldEQ(FieldDeletedAt, v))
-}
-
 // Name applies equality check predicate on the "name" field. It's identical to NameEQ.
 func Name(v string) predicate.Proxy {
 	return predicate.Proxy(sql.FieldEQ(FieldName, v))
@@ -77,6 +72,31 @@ func Name(v string) predicate.Proxy {
 // Type applies equality check predicate on the "type" field. It's identical to TypeEQ.
 func Type(v string) predicate.Proxy {
 	return predicate.Proxy(sql.FieldEQ(FieldType, v))
+}
+
+// Protocol applies equality check predicate on the "protocol" field. It's identical to ProtocolEQ.
+func Protocol(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldProtocol, v))
+}
+
+// Host applies equality check predicate on the "host" field. It's identical to HostEQ.
+func Host(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldHost, v))
+}
+
+// Port applies equality check predicate on the "port" field. It's identical to PortEQ.
+func Port(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldPort, v))
+}
+
+// Username applies equality check predicate on the "username" field. It's identical to UsernameEQ.
+func Username(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldUsername, v))
+}
+
+// PasswordCiphertext applies equality check predicate on the "password_ciphertext" field. It's identical to PasswordCiphertextEQ.
+func PasswordCiphertext(v []byte) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldPasswordCiphertext, v))
 }
 
 // URLCiphertext applies equality check predicate on the "url_ciphertext" field. It's identical to URLCiphertextEQ.
@@ -117,6 +137,11 @@ func FallbackMode(v string) predicate.Proxy {
 // BackupProxyID applies equality check predicate on the "backup_proxy_id" field. It's identical to BackupProxyIDEQ.
 func BackupProxyID(v int) predicate.Proxy {
 	return predicate.Proxy(sql.FieldEQ(FieldBackupProxyID, v))
+}
+
+// ExpiryWarnDays applies equality check predicate on the "expiry_warn_days" field. It's identical to ExpiryWarnDaysEQ.
+func ExpiryWarnDays(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldExpiryWarnDays, v))
 }
 
 // LastProbedAt applies equality check predicate on the "last_probed_at" field. It's identical to LastProbedAtEQ.
@@ -217,56 +242,6 @@ func UpdatedAtLT(v time.Time) predicate.Proxy {
 // UpdatedAtLTE applies the LTE predicate on the "updated_at" field.
 func UpdatedAtLTE(v time.Time) predicate.Proxy {
 	return predicate.Proxy(sql.FieldLTE(FieldUpdatedAt, v))
-}
-
-// DeletedAtEQ applies the EQ predicate on the "deleted_at" field.
-func DeletedAtEQ(v time.Time) predicate.Proxy {
-	return predicate.Proxy(sql.FieldEQ(FieldDeletedAt, v))
-}
-
-// DeletedAtNEQ applies the NEQ predicate on the "deleted_at" field.
-func DeletedAtNEQ(v time.Time) predicate.Proxy {
-	return predicate.Proxy(sql.FieldNEQ(FieldDeletedAt, v))
-}
-
-// DeletedAtIn applies the In predicate on the "deleted_at" field.
-func DeletedAtIn(vs ...time.Time) predicate.Proxy {
-	return predicate.Proxy(sql.FieldIn(FieldDeletedAt, vs...))
-}
-
-// DeletedAtNotIn applies the NotIn predicate on the "deleted_at" field.
-func DeletedAtNotIn(vs ...time.Time) predicate.Proxy {
-	return predicate.Proxy(sql.FieldNotIn(FieldDeletedAt, vs...))
-}
-
-// DeletedAtGT applies the GT predicate on the "deleted_at" field.
-func DeletedAtGT(v time.Time) predicate.Proxy {
-	return predicate.Proxy(sql.FieldGT(FieldDeletedAt, v))
-}
-
-// DeletedAtGTE applies the GTE predicate on the "deleted_at" field.
-func DeletedAtGTE(v time.Time) predicate.Proxy {
-	return predicate.Proxy(sql.FieldGTE(FieldDeletedAt, v))
-}
-
-// DeletedAtLT applies the LT predicate on the "deleted_at" field.
-func DeletedAtLT(v time.Time) predicate.Proxy {
-	return predicate.Proxy(sql.FieldLT(FieldDeletedAt, v))
-}
-
-// DeletedAtLTE applies the LTE predicate on the "deleted_at" field.
-func DeletedAtLTE(v time.Time) predicate.Proxy {
-	return predicate.Proxy(sql.FieldLTE(FieldDeletedAt, v))
-}
-
-// DeletedAtIsNil applies the IsNil predicate on the "deleted_at" field.
-func DeletedAtIsNil() predicate.Proxy {
-	return predicate.Proxy(sql.FieldIsNull(FieldDeletedAt))
-}
-
-// DeletedAtNotNil applies the NotNil predicate on the "deleted_at" field.
-func DeletedAtNotNil() predicate.Proxy {
-	return predicate.Proxy(sql.FieldNotNull(FieldDeletedAt))
 }
 
 // NameEQ applies the EQ predicate on the "name" field.
@@ -397,6 +372,301 @@ func TypeEqualFold(v string) predicate.Proxy {
 // TypeContainsFold applies the ContainsFold predicate on the "type" field.
 func TypeContainsFold(v string) predicate.Proxy {
 	return predicate.Proxy(sql.FieldContainsFold(FieldType, v))
+}
+
+// ProtocolEQ applies the EQ predicate on the "protocol" field.
+func ProtocolEQ(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldProtocol, v))
+}
+
+// ProtocolNEQ applies the NEQ predicate on the "protocol" field.
+func ProtocolNEQ(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNEQ(FieldProtocol, v))
+}
+
+// ProtocolIn applies the In predicate on the "protocol" field.
+func ProtocolIn(vs ...string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldIn(FieldProtocol, vs...))
+}
+
+// ProtocolNotIn applies the NotIn predicate on the "protocol" field.
+func ProtocolNotIn(vs ...string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNotIn(FieldProtocol, vs...))
+}
+
+// ProtocolGT applies the GT predicate on the "protocol" field.
+func ProtocolGT(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldGT(FieldProtocol, v))
+}
+
+// ProtocolGTE applies the GTE predicate on the "protocol" field.
+func ProtocolGTE(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldGTE(FieldProtocol, v))
+}
+
+// ProtocolLT applies the LT predicate on the "protocol" field.
+func ProtocolLT(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldLT(FieldProtocol, v))
+}
+
+// ProtocolLTE applies the LTE predicate on the "protocol" field.
+func ProtocolLTE(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldLTE(FieldProtocol, v))
+}
+
+// ProtocolContains applies the Contains predicate on the "protocol" field.
+func ProtocolContains(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldContains(FieldProtocol, v))
+}
+
+// ProtocolHasPrefix applies the HasPrefix predicate on the "protocol" field.
+func ProtocolHasPrefix(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldHasPrefix(FieldProtocol, v))
+}
+
+// ProtocolHasSuffix applies the HasSuffix predicate on the "protocol" field.
+func ProtocolHasSuffix(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldHasSuffix(FieldProtocol, v))
+}
+
+// ProtocolEqualFold applies the EqualFold predicate on the "protocol" field.
+func ProtocolEqualFold(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEqualFold(FieldProtocol, v))
+}
+
+// ProtocolContainsFold applies the ContainsFold predicate on the "protocol" field.
+func ProtocolContainsFold(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldContainsFold(FieldProtocol, v))
+}
+
+// HostEQ applies the EQ predicate on the "host" field.
+func HostEQ(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldHost, v))
+}
+
+// HostNEQ applies the NEQ predicate on the "host" field.
+func HostNEQ(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNEQ(FieldHost, v))
+}
+
+// HostIn applies the In predicate on the "host" field.
+func HostIn(vs ...string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldIn(FieldHost, vs...))
+}
+
+// HostNotIn applies the NotIn predicate on the "host" field.
+func HostNotIn(vs ...string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNotIn(FieldHost, vs...))
+}
+
+// HostGT applies the GT predicate on the "host" field.
+func HostGT(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldGT(FieldHost, v))
+}
+
+// HostGTE applies the GTE predicate on the "host" field.
+func HostGTE(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldGTE(FieldHost, v))
+}
+
+// HostLT applies the LT predicate on the "host" field.
+func HostLT(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldLT(FieldHost, v))
+}
+
+// HostLTE applies the LTE predicate on the "host" field.
+func HostLTE(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldLTE(FieldHost, v))
+}
+
+// HostContains applies the Contains predicate on the "host" field.
+func HostContains(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldContains(FieldHost, v))
+}
+
+// HostHasPrefix applies the HasPrefix predicate on the "host" field.
+func HostHasPrefix(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldHasPrefix(FieldHost, v))
+}
+
+// HostHasSuffix applies the HasSuffix predicate on the "host" field.
+func HostHasSuffix(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldHasSuffix(FieldHost, v))
+}
+
+// HostEqualFold applies the EqualFold predicate on the "host" field.
+func HostEqualFold(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEqualFold(FieldHost, v))
+}
+
+// HostContainsFold applies the ContainsFold predicate on the "host" field.
+func HostContainsFold(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldContainsFold(FieldHost, v))
+}
+
+// PortEQ applies the EQ predicate on the "port" field.
+func PortEQ(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldPort, v))
+}
+
+// PortNEQ applies the NEQ predicate on the "port" field.
+func PortNEQ(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNEQ(FieldPort, v))
+}
+
+// PortIn applies the In predicate on the "port" field.
+func PortIn(vs ...int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldIn(FieldPort, vs...))
+}
+
+// PortNotIn applies the NotIn predicate on the "port" field.
+func PortNotIn(vs ...int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNotIn(FieldPort, vs...))
+}
+
+// PortGT applies the GT predicate on the "port" field.
+func PortGT(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldGT(FieldPort, v))
+}
+
+// PortGTE applies the GTE predicate on the "port" field.
+func PortGTE(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldGTE(FieldPort, v))
+}
+
+// PortLT applies the LT predicate on the "port" field.
+func PortLT(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldLT(FieldPort, v))
+}
+
+// PortLTE applies the LTE predicate on the "port" field.
+func PortLTE(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldLTE(FieldPort, v))
+}
+
+// UsernameEQ applies the EQ predicate on the "username" field.
+func UsernameEQ(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldUsername, v))
+}
+
+// UsernameNEQ applies the NEQ predicate on the "username" field.
+func UsernameNEQ(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNEQ(FieldUsername, v))
+}
+
+// UsernameIn applies the In predicate on the "username" field.
+func UsernameIn(vs ...string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldIn(FieldUsername, vs...))
+}
+
+// UsernameNotIn applies the NotIn predicate on the "username" field.
+func UsernameNotIn(vs ...string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNotIn(FieldUsername, vs...))
+}
+
+// UsernameGT applies the GT predicate on the "username" field.
+func UsernameGT(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldGT(FieldUsername, v))
+}
+
+// UsernameGTE applies the GTE predicate on the "username" field.
+func UsernameGTE(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldGTE(FieldUsername, v))
+}
+
+// UsernameLT applies the LT predicate on the "username" field.
+func UsernameLT(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldLT(FieldUsername, v))
+}
+
+// UsernameLTE applies the LTE predicate on the "username" field.
+func UsernameLTE(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldLTE(FieldUsername, v))
+}
+
+// UsernameContains applies the Contains predicate on the "username" field.
+func UsernameContains(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldContains(FieldUsername, v))
+}
+
+// UsernameHasPrefix applies the HasPrefix predicate on the "username" field.
+func UsernameHasPrefix(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldHasPrefix(FieldUsername, v))
+}
+
+// UsernameHasSuffix applies the HasSuffix predicate on the "username" field.
+func UsernameHasSuffix(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldHasSuffix(FieldUsername, v))
+}
+
+// UsernameIsNil applies the IsNil predicate on the "username" field.
+func UsernameIsNil() predicate.Proxy {
+	return predicate.Proxy(sql.FieldIsNull(FieldUsername))
+}
+
+// UsernameNotNil applies the NotNil predicate on the "username" field.
+func UsernameNotNil() predicate.Proxy {
+	return predicate.Proxy(sql.FieldNotNull(FieldUsername))
+}
+
+// UsernameEqualFold applies the EqualFold predicate on the "username" field.
+func UsernameEqualFold(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEqualFold(FieldUsername, v))
+}
+
+// UsernameContainsFold applies the ContainsFold predicate on the "username" field.
+func UsernameContainsFold(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldContainsFold(FieldUsername, v))
+}
+
+// PasswordCiphertextEQ applies the EQ predicate on the "password_ciphertext" field.
+func PasswordCiphertextEQ(v []byte) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldPasswordCiphertext, v))
+}
+
+// PasswordCiphertextNEQ applies the NEQ predicate on the "password_ciphertext" field.
+func PasswordCiphertextNEQ(v []byte) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNEQ(FieldPasswordCiphertext, v))
+}
+
+// PasswordCiphertextIn applies the In predicate on the "password_ciphertext" field.
+func PasswordCiphertextIn(vs ...[]byte) predicate.Proxy {
+	return predicate.Proxy(sql.FieldIn(FieldPasswordCiphertext, vs...))
+}
+
+// PasswordCiphertextNotIn applies the NotIn predicate on the "password_ciphertext" field.
+func PasswordCiphertextNotIn(vs ...[]byte) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNotIn(FieldPasswordCiphertext, vs...))
+}
+
+// PasswordCiphertextGT applies the GT predicate on the "password_ciphertext" field.
+func PasswordCiphertextGT(v []byte) predicate.Proxy {
+	return predicate.Proxy(sql.FieldGT(FieldPasswordCiphertext, v))
+}
+
+// PasswordCiphertextGTE applies the GTE predicate on the "password_ciphertext" field.
+func PasswordCiphertextGTE(v []byte) predicate.Proxy {
+	return predicate.Proxy(sql.FieldGTE(FieldPasswordCiphertext, v))
+}
+
+// PasswordCiphertextLT applies the LT predicate on the "password_ciphertext" field.
+func PasswordCiphertextLT(v []byte) predicate.Proxy {
+	return predicate.Proxy(sql.FieldLT(FieldPasswordCiphertext, v))
+}
+
+// PasswordCiphertextLTE applies the LTE predicate on the "password_ciphertext" field.
+func PasswordCiphertextLTE(v []byte) predicate.Proxy {
+	return predicate.Proxy(sql.FieldLTE(FieldPasswordCiphertext, v))
+}
+
+// PasswordCiphertextIsNil applies the IsNil predicate on the "password_ciphertext" field.
+func PasswordCiphertextIsNil() predicate.Proxy {
+	return predicate.Proxy(sql.FieldIsNull(FieldPasswordCiphertext))
+}
+
+// PasswordCiphertextNotNil applies the NotNil predicate on the "password_ciphertext" field.
+func PasswordCiphertextNotNil() predicate.Proxy {
+	return predicate.Proxy(sql.FieldNotNull(FieldPasswordCiphertext))
 }
 
 // URLCiphertextEQ applies the EQ predicate on the "url_ciphertext" field.
@@ -877,6 +1147,46 @@ func BackupProxyIDIsNil() predicate.Proxy {
 // BackupProxyIDNotNil applies the NotNil predicate on the "backup_proxy_id" field.
 func BackupProxyIDNotNil() predicate.Proxy {
 	return predicate.Proxy(sql.FieldNotNull(FieldBackupProxyID))
+}
+
+// ExpiryWarnDaysEQ applies the EQ predicate on the "expiry_warn_days" field.
+func ExpiryWarnDaysEQ(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldExpiryWarnDays, v))
+}
+
+// ExpiryWarnDaysNEQ applies the NEQ predicate on the "expiry_warn_days" field.
+func ExpiryWarnDaysNEQ(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNEQ(FieldExpiryWarnDays, v))
+}
+
+// ExpiryWarnDaysIn applies the In predicate on the "expiry_warn_days" field.
+func ExpiryWarnDaysIn(vs ...int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldIn(FieldExpiryWarnDays, vs...))
+}
+
+// ExpiryWarnDaysNotIn applies the NotIn predicate on the "expiry_warn_days" field.
+func ExpiryWarnDaysNotIn(vs ...int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNotIn(FieldExpiryWarnDays, vs...))
+}
+
+// ExpiryWarnDaysGT applies the GT predicate on the "expiry_warn_days" field.
+func ExpiryWarnDaysGT(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldGT(FieldExpiryWarnDays, v))
+}
+
+// ExpiryWarnDaysGTE applies the GTE predicate on the "expiry_warn_days" field.
+func ExpiryWarnDaysGTE(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldGTE(FieldExpiryWarnDays, v))
+}
+
+// ExpiryWarnDaysLT applies the LT predicate on the "expiry_warn_days" field.
+func ExpiryWarnDaysLT(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldLT(FieldExpiryWarnDays, v))
+}
+
+// ExpiryWarnDaysLTE applies the LTE predicate on the "expiry_warn_days" field.
+func ExpiryWarnDaysLTE(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldLTE(FieldExpiryWarnDays, v))
 }
 
 // LastProbedAtEQ applies the EQ predicate on the "last_probed_at" field.

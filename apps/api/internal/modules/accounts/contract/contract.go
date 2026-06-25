@@ -96,10 +96,46 @@ const (
 	ProxyFallbackModeProxy ProxyFallbackMode = "proxy"
 )
 
+// AccountType is the sub2api-style simplified auth classification.
+type AccountType string
+
+const (
+	AccountTypeAPIKey          AccountType = "apikey"
+	AccountTypeOAuth           AccountType = "oauth"
+	AccountTypeSetupToken      AccountType = "setup-token"
+	AccountTypeUpstream        AccountType = "upstream"
+	AccountTypeBedrock         AccountType = "bedrock"
+	AccountTypeServiceAccount  AccountType = "service_account"
+)
+
+// RuntimeClassToAccountType maps the detailed runtime class to the simplified
+// sub2api-style account type for display and filtering.
+func RuntimeClassToAccountType(rc RuntimeClass) AccountType {
+	switch rc {
+	case RuntimeClassAPIKey:
+		return AccountTypeAPIKey
+	case RuntimeClassOauthRefresh, RuntimeClassOauthDeviceCode, RuntimeClassWebSessionCookie:
+		return AccountTypeOAuth
+	case RuntimeClassCliClientToken:
+		return AccountTypeSetupToken
+	case RuntimeClassCustomReverseProxy:
+		return AccountTypeUpstream
+	case RuntimeClassServiceAccountJSON:
+		return AccountTypeServiceAccount
+	default:
+		return AccountTypeAPIKey
+	}
+}
+
 type ProviderAccount struct {
 	ID                   int
 	ProviderID           int
 	Name                 string
+	// Platform is the provider family denormalized for fast filtering:
+	// "anthropic", "openai", "gemini", "antigravity".
+	Platform             string
+	// AccountType is the simplified auth classification (sub2api style).
+	AccountType          AccountType
 	RuntimeClass         RuntimeClass
 	UpstreamClient       *string
 	CredentialCiphertext string
@@ -110,60 +146,102 @@ type ProviderAccount struct {
 	Weight               float32
 	RiskLevel            *string
 	Metadata             map[string]any
+	// Notes is operator-supplied freetext.
+	Notes                string
+	// Concurrency is the max concurrent upstream requests.
+	Concurrency          int
+	// RateMultiplier is a per-account billing multiplier.
+	RateMultiplier       float64
+	// LoadFactor controls load distribution weight.
+	LoadFactor           *int
+	// Schedulable is a direct flag; false skips without status change.
+	Schedulable          bool
+	// ErrorMessage captures the last error for troubleshooting.
+	ErrorMessage         string
+	// LastUsedAt tracks when this account last served a request.
+	LastUsedAt           *time.Time
+	// ExpiresAt is account-level expiry (NOT OAuth token expiry).
+	ExpiresAt            *time.Time
+	// AutoPauseOnExpired pauses scheduling when ExpiresAt is reached.
+	AutoPauseOnExpired   bool
+	// RateLimitedAt records when a 429 was last received.
+	RateLimitedAt        *time.Time
+	// RateLimitResetAt records when the rate limit window expires.
+	RateLimitResetAt     *time.Time
+	// OverloadUntil records when a 529/overload window expires.
+	OverloadUntil        *time.Time
+	// TempUnschedulableUntil is a rule-driven exclusion window.
+	TempUnschedulableUntil  *time.Time
+	TempUnschedulableReason string
+	// SessionWindow* track provider session windows.
+	SessionWindowStart   *time.Time
+	SessionWindowEnd     *time.Time
+	SessionWindowStatus  string
+	// Extra holds per-account config (model_mapping, base_url, quotas)
+	// separate from Metadata which is operational state.
+	Extra                map[string]any
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
 	DeletedAt            *time.Time
-	// TokenExpiresAt is snapshotted from the OAuth credential's "expires_at"
-	// after a refresh. The admin list/worker use it to drive the proactive
-	// refresh window without decrypting credential_ciphertext.
-	TokenExpiresAt *time.Time
-	// LastRefreshedAt is the wall-clock time of the most recent successful
-	// OAuth refresh on this account.
-	LastRefreshedAt *time.Time
-	// NeedsReauthAt is set when refresh is hopeless (permanent OAuth error
-	// such as invalid_grant, or refresh_attempts >= 5). While non-nil, the
-	// proactive worker skips this account so the upstream is not hammered.
-	NeedsReauthAt *time.Time
-	// RefreshAttempts counts consecutive refresh failures. Zeroed on success.
-	RefreshAttempts int
-	// RefreshLastError is the most recent refresh error message, truncated
-	// to 500 chars before persistence so operators can see WHY the account
-	// flipped into needs_reauth.
-	RefreshLastError string
+	// --- OAuth refresh fields ---
+	TokenExpiresAt       *time.Time
+	LastRefreshedAt      *time.Time
+	NeedsReauthAt        *time.Time
+	RefreshAttempts      int
+	RefreshLastError     string
 }
 
 type ProxyDefinition struct {
 	ID            int
 	Name          string
 	Type          ProxyType
+	// --- Structured fields (sub2api style) ---
+	Protocol    string
+	Host        string
+	Port        int
+	Username    string
+	PasswordCiphertext string
+	// --- Legacy encrypted URL blob (kept for backward compat) ---
 	URLCiphertext string
 	URLVersion    string
+	// ---
 	Status        ProxyStatus
 	Metadata      map[string]any
-	// CountryCode is the operator-supplied ISO-3166-1 alpha-2 code (e.g. "US",
-	// "CN"). Empty when unset.
-	CountryCode string
-	// CountryName is the localized display name snapshotted at write time so
-	// list views render a stable label even when the frontend locale changes.
-	CountryName string
-	// ExpiresAt is an optional operator-defined lifetime. Expired active
-	// proxies resolve according to FallbackMode instead of being selected as-is.
+	CountryCode   string
+	CountryName   string
 	ExpiresAt     *time.Time
 	FallbackMode  ProxyFallbackMode
 	BackupProxyID *int
-	// LastProbedAt is set by the proxy_probe worker after each pass; nil
-	// before the proxy has ever been probed.
-	LastProbedAt *time.Time
-	// ProbeSuccessCount + ProbeFailureCount are cumulative counters that the
-	// proxy_probe worker resets every ~7 days, giving a rolling-window
-	// availability percentage without a separate snapshot table.
-	ProbeSuccessCount int
-	ProbeFailureCount int
-	// LastProbeLatencyMs records the milliseconds the most recent successful
-	// probe took. 0 when no probe has ever succeeded.
+	ExpiryWarnDays int
+	LastProbedAt   *time.Time
+	ProbeSuccessCount  int
+	ProbeFailureCount  int
 	LastProbeLatencyMs int
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
+}
+
+// URL builds the proxy URL string from structured fields (sub2api style).
+// Falls back to empty string if host is not set.
+func (p ProxyDefinition) URL() string {
+	if p.Host == "" {
+		return ""
+	}
+	protocol := p.Protocol
+	if protocol == "" {
+		protocol = string(p.Type)
+	}
+	if protocol == "" {
+		protocol = "http"
+	}
+	host := p.Host
+	if p.Port > 0 {
+		host = fmt.Sprintf("%s:%d", p.Host, p.Port)
+	}
+	if p.Username != "" {
+		return fmt.Sprintf("%s://%s@%s", protocol, p.Username, host)
+	}
+	return fmt.Sprintf("%s://%s", protocol, host)
 }
 
 // ProbeSuccessPct7d returns the rolling 7-day availability percentage rounded
@@ -469,9 +547,9 @@ type ProxyBatchTestRow struct {
 
 // BatchCreateAccountsDefaults is the shared set of fields applied to every
 // row of a BatchCreateAccounts call unless the per-row item overrides them.
-// Mirrors CreateRequest minus Name + Credential, which are per-row required.
 type BatchCreateAccountsDefaults struct {
 	ProviderID     int
+	Platform       string
 	RuntimeClass   RuntimeClass
 	UpstreamClient *string
 	GroupID        *int
@@ -480,6 +558,9 @@ type BatchCreateAccountsDefaults struct {
 	Weight         *float32
 	RiskLevel      *string
 	Metadata       map[string]any
+	Extra          map[string]any
+	Concurrency    *int
+	RateMultiplier *float64
 }
 
 // BatchAccountItem is one row in a BatchCreateAccounts call. Name + Credential
@@ -614,15 +695,25 @@ type BatchUpdateAccountCredentialResult struct {
 type CreateRequest struct {
 	ProviderID     int
 	Name           string
+	Platform       string
 	RuntimeClass   RuntimeClass
 	Credential     map[string]any
 	Metadata       map[string]any
+	Extra          map[string]any
 	ProxyID        *string
 	Status         *Status
 	Priority       *int
 	Weight         *float32
 	RiskLevel      *string
 	UpstreamClient *string
+	// --- sub2api-style fields ---
+	Notes              *string
+	Concurrency        *int
+	RateMultiplier     *float64
+	LoadFactor         *int
+	GroupIDs           []int
+	ExpiresAt          *time.Time
+	AutoPauseOnExpired *bool
 }
 
 type UpdateRequest struct {
@@ -630,12 +721,22 @@ type UpdateRequest struct {
 	RuntimeClass   *RuntimeClass
 	Credential     *map[string]any
 	Metadata       *map[string]any
+	Extra          *map[string]any
 	ProxyID        **string
 	Status         *Status
 	Priority       *int
 	Weight         *float32
 	RiskLevel      *string
 	UpstreamClient **string
+	// --- sub2api-style fields ---
+	Notes              *string
+	Concurrency        *int
+	RateMultiplier     *float64
+	LoadFactor         **int
+	ExpiresAt          *time.Time
+	ClearExpiresAt     bool
+	AutoPauseOnExpired *bool
+	Schedulable        *bool
 }
 
 type CreateGroupRequest struct {
@@ -661,7 +762,15 @@ type UpdateGroupRequest struct {
 type CreateProxyRequest struct {
 	Name          string
 	Type          ProxyType
+	// URL is the legacy full proxy URL. When set, it takes precedence
+	// over the structured Protocol/Host/Port/Username/Password fields.
 	URL           string
+	// Structured proxy fields (sub2api style).
+	Protocol      string
+	Host          string
+	Port          int
+	Username      string
+	Password      string
 	Status        *ProxyStatus
 	Metadata      map[string]any
 	CountryCode   *string
@@ -669,12 +778,18 @@ type CreateProxyRequest struct {
 	ExpiresAt     *time.Time
 	FallbackMode  *ProxyFallbackMode
 	BackupProxyID *int
+	ExpiryWarnDays *int
 }
 
 type UpdateProxyRequest struct {
 	Name               *string
 	Type               *ProxyType
 	URL                *string
+	Protocol           *string
+	Host               *string
+	Port               *int
+	Username           *string
+	Password           *string
 	Status             *ProxyStatus
 	Metadata           *map[string]any
 	CountryCode        *string
@@ -684,26 +799,42 @@ type UpdateProxyRequest struct {
 	FallbackMode       *ProxyFallbackMode
 	BackupProxyID      *int
 	ClearBackupProxyID bool
+	ExpiryWarnDays     *int
 }
 
 type CreateStoredAccount struct {
 	ProviderID           int
 	Name                 string
+	Platform             string
+	AccountType          AccountType
 	RuntimeClass         RuntimeClass
 	CredentialCiphertext string
 	CredentialVersion    string
 	Metadata             map[string]any
+	Extra                map[string]any
 	ProxyID              *string
 	Status               Status
 	Priority             int
 	Weight               float32
 	RiskLevel            *string
 	UpstreamClient       *string
+	Notes                string
+	Concurrency          int
+	RateMultiplier       float64
+	LoadFactor           *int
+	Schedulable          bool
+	ExpiresAt            *time.Time
+	AutoPauseOnExpired   bool
 }
 
 type CreateStoredProxy struct {
 	Name          string
 	Type          ProxyType
+	Protocol           string
+	Host               string
+	Port               int
+	Username           string
+	PasswordCiphertext string
 	URLCiphertext string
 	URLVersion    string
 	Status        ProxyStatus
@@ -713,6 +844,7 @@ type CreateStoredProxy struct {
 	ExpiresAt     *time.Time
 	FallbackMode  ProxyFallbackMode
 	BackupProxyID *int
+	ExpiryWarnDays int
 }
 
 type CreateStoredAccountGroup struct {
@@ -731,23 +863,15 @@ type CreateStoredAccountGroup struct {
 // stores implementing PageReader push this filtering, ORDER BY id DESC, and
 // LIMIT/OFFSET down to SQL.
 type ListFilter struct {
-	// Status, when non-empty, narrows to that exact account status. When
-	// empty, archived rows are excluded by default (operator-facing list
-	// hides soft-deleted rows); set IncludeArchived to override.
-	Status Status
-	// ProviderID, when non-nil, narrows to that provider id.
-	ProviderID *int
-	// RuntimeClass, when non-empty, narrows to that runtime class.
-	RuntimeClass RuntimeClass
-	// Search, when non-empty, matches a case-insensitive substring on name
-	// or upstream_client. If the value is all-digits, the account id is also
-	// matched as an exact equality so an operator can paste a row id directly.
-	Search string
-	// GroupID, when non-nil and positive, narrows to accounts that are
-	// members of that account group.
-	GroupID *int
-	// IncludeArchived surfaces archived rows even when Status is empty.
+	Status          Status
+	ProviderID      *int
+	Platform        string
+	RuntimeClass    RuntimeClass
+	AccountType     AccountType
+	Search          string
+	GroupID         *int
 	IncludeArchived bool
+	SchedulableOnly bool
 }
 
 // ListPageResult is the typed return of PageReader.ListPage.

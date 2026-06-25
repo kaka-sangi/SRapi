@@ -1542,9 +1542,6 @@ function AccountsContent() {
                   {t("adminAccounts.export")}
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
-                  {t("batchAdd.tab")} / {t("adminAccounts.importAction")}
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setBulkAddOpen(true)}>
                   {t("adminAccounts.bulkAdd")}
                 </Button>
                 <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>

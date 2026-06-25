@@ -827,7 +827,7 @@ func (rt *runtimeState) gatewayCandidates(ctx context.Context, modelID int, forc
 				ModelFamily:           optionalStringValue(model.Family),
 				QualityTier:           optionalStringValue(model.QualityTier),
 				EffectiveCapabilities: effectiveCapabilities(model, mapping, provider, account),
-				Limits:                schedulerRuntimeLimits(account.Metadata),
+				Limits:                schedulerRuntimeLimits(account),
 			})
 		}
 	}
@@ -904,7 +904,7 @@ func (rt *runtimeState) fillCandidateRuntimeStates(ctx context.Context, candidat
 	now := time.Now().UTC()
 	for i := range candidates {
 		account := candidates[i].Account
-		state := schedulerRuntimeState(account.Metadata)
+		state := schedulerRuntimeState(account)
 		if latest, ok := healthByAccount[account.ID]; ok {
 			healthScore := float64(latest.SuccessRate)
 			state.HealthScore = &healthScore

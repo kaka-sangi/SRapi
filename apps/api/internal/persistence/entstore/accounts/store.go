@@ -32,11 +32,12 @@ func New(client *ent.Client) (*Store, error) {
 }
 
 func (s *Store) Create(ctx context.Context, input contract.CreateStoredAccount) (contract.ProviderAccount, error) {
-	created, err := s.client.ProviderAccount.Create().
+	builder := s.client.ProviderAccount.Create().
 		SetProviderID(input.ProviderID).
 		SetName(input.Name).
+		SetPlatform(input.Platform).
+		SetAccountType(string(input.AccountType)).
 		SetRuntimeClass(string(input.RuntimeClass)).
-		SetAccountType(string(input.RuntimeClass)).
 		SetNillableUpstreamClient(input.UpstreamClient).
 		SetCredentialCiphertext([]byte(input.CredentialCiphertext)).
 		SetCredentialVersion(credentialVersionToInt(input.CredentialVersion)).
@@ -46,7 +47,19 @@ func (s *Store) Create(ctx context.Context, input contract.CreateStoredAccount) 
 		SetWeight(float64(input.Weight)).
 		SetNillableRiskLevel(input.RiskLevel).
 		SetMetadataJSON(cloneMap(input.Metadata)).
-		Save(ctx)
+		SetNotes(input.Notes).
+		SetConcurrency(input.Concurrency).
+		SetRateMultiplier(input.RateMultiplier).
+		SetSchedulable(input.Schedulable).
+		SetAutoPauseOnExpired(input.AutoPauseOnExpired).
+		SetExtraJSON(cloneMap(input.Extra))
+	if input.LoadFactor != nil {
+		builder.SetLoadFactor(*input.LoadFactor)
+	}
+	if input.ExpiresAt != nil {
+		builder.SetExpiresAt(*input.ExpiresAt)
+	}
+	created, err := builder.Save(ctx)
 	if err != nil {
 		return contract.ProviderAccount{}, err
 	}
@@ -58,8 +71,9 @@ func (s *Store) Update(ctx context.Context, account contract.ProviderAccount) (c
 		Where(entaccount.DeletedAtIsNil()).
 		SetProviderID(account.ProviderID).
 		SetName(account.Name).
+		SetPlatform(account.Platform).
+		SetAccountType(string(account.AccountType)).
 		SetRuntimeClass(string(account.RuntimeClass)).
-		SetAccountType(string(account.RuntimeClass)).
 		SetNillableUpstreamClient(account.UpstreamClient).
 		SetCredentialCiphertext([]byte(account.CredentialCiphertext)).
 		SetCredentialVersion(credentialVersionToInt(account.CredentialVersion)).
@@ -67,6 +81,15 @@ func (s *Store) Update(ctx context.Context, account contract.ProviderAccount) (c
 		SetPriority(account.Priority).
 		SetWeight(float64(account.Weight)).
 		SetMetadataJSON(cloneMap(account.Metadata)).
+		SetNotes(account.Notes).
+		SetConcurrency(account.Concurrency).
+		SetRateMultiplier(account.RateMultiplier).
+		SetSchedulable(account.Schedulable).
+		SetErrorMessage(account.ErrorMessage).
+		SetAutoPauseOnExpired(account.AutoPauseOnExpired).
+		SetTempUnschedulableReason(account.TempUnschedulableReason).
+		SetSessionWindowStatus(account.SessionWindowStatus).
+		SetExtraJSON(cloneMap(account.Extra)).
 		SetRefreshAttempts(account.RefreshAttempts).
 		SetRefreshLastError(account.RefreshLastError)
 	if account.ProxyID == nil {
@@ -77,21 +100,22 @@ func (s *Store) Update(ctx context.Context, account contract.ProviderAccount) (c
 	if account.RiskLevel != nil {
 		update.SetRiskLevel(*account.RiskLevel)
 	}
-	if account.TokenExpiresAt != nil {
-		update.SetTokenExpiresAt(*account.TokenExpiresAt)
+	if account.LoadFactor != nil {
+		update.SetLoadFactor(*account.LoadFactor)
 	} else {
-		update.ClearTokenExpiresAt()
+		update.ClearLoadFactor()
 	}
-	if account.LastRefreshedAt != nil {
-		update.SetLastRefreshedAt(*account.LastRefreshedAt)
-	} else {
-		update.ClearLastRefreshedAt()
-	}
-	if account.NeedsReauthAt != nil {
-		update.SetNeedsReauthAt(*account.NeedsReauthAt)
-	} else {
-		update.ClearNeedsReauthAt()
-	}
+	setOrClearNillableTime(update, account.TokenExpiresAt, "token_expires_at")
+	setOrClearNillableTime(update, account.LastRefreshedAt, "last_refreshed_at")
+	setOrClearNillableTime(update, account.NeedsReauthAt, "needs_reauth_at")
+	setOrClearNillableTime(update, account.LastUsedAt, "last_used_at")
+	setOrClearNillableTime(update, account.ExpiresAt, "expires_at")
+	setOrClearNillableTime(update, account.RateLimitedAt, "rate_limited_at")
+	setOrClearNillableTime(update, account.RateLimitResetAt, "rate_limit_reset_at")
+	setOrClearNillableTime(update, account.OverloadUntil, "overload_until")
+	setOrClearNillableTime(update, account.TempUnschedulableUntil, "temp_unschedulable_until")
+	setOrClearNillableTime(update, account.SessionWindowStart, "session_window_start")
+	setOrClearNillableTime(update, account.SessionWindowEnd, "session_window_end")
 	if !account.UpdatedAt.IsZero() {
 		update.SetUpdatedAt(account.UpdatedAt)
 	}
@@ -100,6 +124,74 @@ func (s *Store) Update(ctx context.Context, account contract.ProviderAccount) (c
 		return contract.ProviderAccount{}, err
 	}
 	return toAccount(updated), nil
+}
+
+type timeFieldSetter interface {
+	SetTokenExpiresAt(time.Time) *ent.ProviderAccountUpdateOne
+	SetLastRefreshedAt(time.Time) *ent.ProviderAccountUpdateOne
+	SetNeedsReauthAt(time.Time) *ent.ProviderAccountUpdateOne
+	SetLastUsedAt(time.Time) *ent.ProviderAccountUpdateOne
+	SetExpiresAt(time.Time) *ent.ProviderAccountUpdateOne
+	SetRateLimitedAt(time.Time) *ent.ProviderAccountUpdateOne
+	SetRateLimitResetAt(time.Time) *ent.ProviderAccountUpdateOne
+	SetOverloadUntil(time.Time) *ent.ProviderAccountUpdateOne
+	SetTempUnschedulableUntil(time.Time) *ent.ProviderAccountUpdateOne
+	SetSessionWindowStart(time.Time) *ent.ProviderAccountUpdateOne
+	SetSessionWindowEnd(time.Time) *ent.ProviderAccountUpdateOne
+}
+
+func setOrClearNillableTime(update *ent.ProviderAccountUpdateOne, value *time.Time, field string) {
+	if value != nil {
+		switch field {
+		case "token_expires_at":
+			update.SetTokenExpiresAt(*value)
+		case "last_refreshed_at":
+			update.SetLastRefreshedAt(*value)
+		case "needs_reauth_at":
+			update.SetNeedsReauthAt(*value)
+		case "last_used_at":
+			update.SetLastUsedAt(*value)
+		case "expires_at":
+			update.SetExpiresAt(*value)
+		case "rate_limited_at":
+			update.SetRateLimitedAt(*value)
+		case "rate_limit_reset_at":
+			update.SetRateLimitResetAt(*value)
+		case "overload_until":
+			update.SetOverloadUntil(*value)
+		case "temp_unschedulable_until":
+			update.SetTempUnschedulableUntil(*value)
+		case "session_window_start":
+			update.SetSessionWindowStart(*value)
+		case "session_window_end":
+			update.SetSessionWindowEnd(*value)
+		}
+	} else {
+		switch field {
+		case "token_expires_at":
+			update.ClearTokenExpiresAt()
+		case "last_refreshed_at":
+			update.ClearLastRefreshedAt()
+		case "needs_reauth_at":
+			update.ClearNeedsReauthAt()
+		case "last_used_at":
+			update.ClearLastUsedAt()
+		case "expires_at":
+			update.ClearExpiresAt()
+		case "rate_limited_at":
+			update.ClearRateLimitedAt()
+		case "rate_limit_reset_at":
+			update.ClearRateLimitResetAt()
+		case "overload_until":
+			update.ClearOverloadUntil()
+		case "temp_unschedulable_until":
+			update.ClearTempUnschedulableUntil()
+		case "session_window_start":
+			update.ClearSessionWindowStart()
+		case "session_window_end":
+			update.ClearSessionWindowEnd()
+		}
+	}
 }
 
 func (s *Store) FindByID(ctx context.Context, id int) (contract.ProviderAccount, error) {
@@ -175,8 +267,17 @@ func (s *Store) accountPagePredicates(ctx context.Context, filter contract.ListF
 	if filter.ProviderID != nil {
 		preds = append(preds, entaccount.ProviderIDEQ(*filter.ProviderID))
 	}
+	if filter.Platform != "" {
+		preds = append(preds, entaccount.PlatformEQ(filter.Platform))
+	}
 	if filter.RuntimeClass != "" {
 		preds = append(preds, entaccount.RuntimeClassEQ(string(filter.RuntimeClass)))
+	}
+	if filter.AccountType != "" {
+		preds = append(preds, entaccount.AccountTypeEQ(string(filter.AccountType)))
+	}
+	if filter.SchedulableOnly {
+		preds = append(preds, entaccount.SchedulableEQ(true))
 	}
 	if search := strings.TrimSpace(filter.Search); search != "" {
 		searchPreds := []predicate.ProviderAccount{
@@ -296,6 +397,11 @@ func (s *Store) CreateProxy(ctx context.Context, input contract.CreateStoredProx
 	created, err := s.client.Proxy.Create().
 		SetName(input.Name).
 		SetType(string(input.Type)).
+		SetProtocol(input.Protocol).
+		SetHost(input.Host).
+		SetPort(input.Port).
+		SetUsername(input.Username).
+		SetPasswordCiphertext([]byte(input.PasswordCiphertext)).
 		SetURLCiphertext([]byte(input.URLCiphertext)).
 		SetURLVersion(credentialVersionToInt(input.URLVersion)).
 		SetStatus(string(input.Status)).
@@ -305,6 +411,7 @@ func (s *Store) CreateProxy(ctx context.Context, input contract.CreateStoredProx
 		SetNillableExpiresAt(input.ExpiresAt).
 		SetFallbackMode(string(fallbackMode)).
 		SetNillableBackupProxyID(input.BackupProxyID).
+		SetExpiryWarnDays(input.ExpiryWarnDays).
 		Save(ctx)
 	if err != nil {
 		return contract.ProxyDefinition{}, err
@@ -319,6 +426,11 @@ func (s *Store) UpdateProxy(ctx context.Context, proxy contract.ProxyDefinition)
 	update := s.client.Proxy.UpdateOneID(proxy.ID).
 		SetName(proxy.Name).
 		SetType(string(proxy.Type)).
+		SetProtocol(proxy.Protocol).
+		SetHost(proxy.Host).
+		SetPort(proxy.Port).
+		SetUsername(proxy.Username).
+		SetPasswordCiphertext([]byte(proxy.PasswordCiphertext)).
 		SetURLCiphertext([]byte(proxy.URLCiphertext)).
 		SetURLVersion(credentialVersionToInt(proxy.URLVersion)).
 		SetStatus(string(proxy.Status)).
@@ -326,6 +438,7 @@ func (s *Store) UpdateProxy(ctx context.Context, proxy contract.ProxyDefinition)
 		SetCountryCode(proxy.CountryCode).
 		SetCountryName(proxy.CountryName).
 		SetFallbackMode(string(proxy.FallbackMode)).
+		SetExpiryWarnDays(proxy.ExpiryWarnDays).
 		SetProbeSuccessCount(proxy.ProbeSuccessCount).
 		SetProbeFailureCount(proxy.ProbeFailureCount).
 		SetLastProbeLatencyMs(proxy.LastProbeLatencyMs)
@@ -660,27 +773,47 @@ func (s *Store) Delete(ctx context.Context, id int) error {
 
 func toAccount(row *ent.ProviderAccount) contract.ProviderAccount {
 	return contract.ProviderAccount{
-		ID:                   row.ID,
-		ProviderID:           row.ProviderID,
-		Name:                 row.Name,
-		RuntimeClass:         contract.RuntimeClass(row.RuntimeClass),
-		UpstreamClient:       cloneString(row.UpstreamClient),
-		CredentialCiphertext: string(row.CredentialCiphertext),
-		CredentialVersion:    credentialVersionToString(row.CredentialVersion),
-		ProxyID:              cloneString(row.ProxyID),
-		Status:               contract.Status(row.Status),
-		Priority:             row.Priority,
-		Weight:               float32(row.Weight),
-		RiskLevel:            nonEmptyStringPtr(row.RiskLevel),
-		Metadata:             cloneMap(row.MetadataJSON),
-		CreatedAt:            row.CreatedAt,
-		UpdatedAt:            row.UpdatedAt,
-		DeletedAt:            cloneTime(row.DeletedAt),
-		TokenExpiresAt:       cloneTime(row.TokenExpiresAt),
-		LastRefreshedAt:      cloneTime(row.LastRefreshedAt),
-		NeedsReauthAt:        cloneTime(row.NeedsReauthAt),
-		RefreshAttempts:      row.RefreshAttempts,
-		RefreshLastError:     row.RefreshLastError,
+		ID:                      row.ID,
+		ProviderID:              row.ProviderID,
+		Name:                    row.Name,
+		Platform:                row.Platform,
+		AccountType:             contract.AccountType(row.AccountType),
+		RuntimeClass:            contract.RuntimeClass(row.RuntimeClass),
+		UpstreamClient:          cloneString(row.UpstreamClient),
+		CredentialCiphertext:    string(row.CredentialCiphertext),
+		CredentialVersion:       credentialVersionToString(row.CredentialVersion),
+		ProxyID:                 cloneString(row.ProxyID),
+		Status:                  contract.Status(row.Status),
+		Priority:                row.Priority,
+		Weight:                  float32(row.Weight),
+		RiskLevel:               nonEmptyStringPtr(row.RiskLevel),
+		Metadata:                cloneMap(row.MetadataJSON),
+		Notes:                   row.Notes,
+		Concurrency:             row.Concurrency,
+		RateMultiplier:          row.RateMultiplier,
+		LoadFactor:              cloneInt(row.LoadFactor),
+		Schedulable:             row.Schedulable,
+		ErrorMessage:            row.ErrorMessage,
+		LastUsedAt:              cloneTime(row.LastUsedAt),
+		ExpiresAt:               cloneTime(row.ExpiresAt),
+		AutoPauseOnExpired:      row.AutoPauseOnExpired,
+		RateLimitedAt:           cloneTime(row.RateLimitedAt),
+		RateLimitResetAt:        cloneTime(row.RateLimitResetAt),
+		OverloadUntil:           cloneTime(row.OverloadUntil),
+		TempUnschedulableUntil:  cloneTime(row.TempUnschedulableUntil),
+		TempUnschedulableReason: row.TempUnschedulableReason,
+		SessionWindowStart:      cloneTime(row.SessionWindowStart),
+		SessionWindowEnd:        cloneTime(row.SessionWindowEnd),
+		SessionWindowStatus:     row.SessionWindowStatus,
+		Extra:                   cloneMap(row.ExtraJSON),
+		CreatedAt:               row.CreatedAt,
+		UpdatedAt:               row.UpdatedAt,
+		DeletedAt:               cloneTime(row.DeletedAt),
+		TokenExpiresAt:          cloneTime(row.TokenExpiresAt),
+		LastRefreshedAt:         cloneTime(row.LastRefreshedAt),
+		NeedsReauthAt:           cloneTime(row.NeedsReauthAt),
+		RefreshAttempts:         row.RefreshAttempts,
+		RefreshLastError:        row.RefreshLastError,
 	}
 }
 
@@ -689,6 +822,11 @@ func toProxy(row *ent.Proxy) contract.ProxyDefinition {
 		ID:                 row.ID,
 		Name:               row.Name,
 		Type:               contract.ProxyType(row.Type),
+		Protocol:           row.Protocol,
+		Host:               row.Host,
+		Port:               row.Port,
+		Username:           row.Username,
+		PasswordCiphertext: string(row.PasswordCiphertext),
 		URLCiphertext:      string(row.URLCiphertext),
 		URLVersion:         credentialVersionToString(row.URLVersion),
 		Status:             contract.ProxyStatus(row.Status),
@@ -698,6 +836,7 @@ func toProxy(row *ent.Proxy) contract.ProxyDefinition {
 		ExpiresAt:          cloneTime(row.ExpiresAt),
 		FallbackMode:       contract.ProxyFallbackMode(row.FallbackMode),
 		BackupProxyID:      cloneInt(row.BackupProxyID),
+		ExpiryWarnDays:     row.ExpiryWarnDays,
 		LastProbedAt:       cloneTime(row.LastProbedAt),
 		ProbeSuccessCount:  row.ProbeSuccessCount,
 		ProbeFailureCount:  row.ProbeFailureCount,

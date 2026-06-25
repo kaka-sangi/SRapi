@@ -1111,6 +1111,23 @@ func providerTemplateDefaultMetadata(provider providercontract.Provider) map[str
 	return nil
 }
 
+func platformFromProvider(provider providercontract.Provider) string {
+	at := strings.ToLower(strings.TrimSpace(provider.AdapterType))
+	name := strings.ToLower(strings.TrimSpace(provider.Name))
+	switch {
+	case strings.Contains(at, "anthropic") || strings.Contains(name, "anthropic") || strings.Contains(name, "claude"):
+		return "anthropic"
+	case strings.Contains(at, "openai") || strings.Contains(name, "openai") || strings.Contains(at, "codex"):
+		return "openai"
+	case strings.Contains(at, "gemini") || strings.Contains(name, "gemini") || strings.Contains(at, "vertex"):
+		return "gemini"
+	case strings.Contains(at, "antigravity") || strings.Contains(name, "antigravity"):
+		return "antigravity"
+	default:
+		return ""
+	}
+}
+
 func presetForProvider(provider providercontract.Provider) (providerpreset.Preset, bool) {
 	if p, ok := providerpreset.Default().Lookup(provider.Name); ok {
 		return p, true
@@ -1163,18 +1180,36 @@ func (s *Server) handleCreateAdminAccount(w http.ResponseWriter, r *http.Request
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "oauth refresh failed", requestID)
 		return
 	}
+	var groupIDs []int
+	if body.GroupIds != nil {
+		groupIDs = *body.GroupIds
+	}
+	var rateMultiplier *float64
+	if body.RateMultiplier != nil {
+		v := float64(*body.RateMultiplier)
+		rateMultiplier = &v
+	}
 	account, err := s.runtime.accounts.Create(r.Context(), accountcontract.CreateRequest{
-		ProviderID:     providerID,
-		Name:           body.Name,
-		RuntimeClass:   accountcontract.RuntimeClass(body.RuntimeClass),
-		Credential:     credential,
-		Metadata:       metadata,
-		ProxyID:        body.ProxyId,
-		Status:         toAccountStatusPtr(body.Status),
-		Priority:       body.Priority,
-		Weight:         body.Weight,
-		RiskLevel:      stringPtrFromAPI(body.RiskLevel),
-		UpstreamClient: body.UpstreamClient,
+		ProviderID:         providerID,
+		Name:               body.Name,
+		Platform:           platformFromProvider(provider),
+		RuntimeClass:       accountcontract.RuntimeClass(body.RuntimeClass),
+		Credential:         credential,
+		Metadata:           metadata,
+		Extra:              jsonObjectToMap(body.Extra),
+		ProxyID:            body.ProxyId,
+		Status:             toAccountStatusPtr(body.Status),
+		Priority:           body.Priority,
+		Weight:             body.Weight,
+		RiskLevel:          stringPtrFromAPI(body.RiskLevel),
+		UpstreamClient:     body.UpstreamClient,
+		Notes:              body.Notes,
+		Concurrency:        body.Concurrency,
+		RateMultiplier:     rateMultiplier,
+		LoadFactor:         body.LoadFactor,
+		GroupIDs:           groupIDs,
+		ExpiresAt:          body.ExpiresAt,
+		AutoPauseOnExpired: body.AutoPauseOnExpired,
 	})
 	if err != nil {
 		switch {
@@ -1553,17 +1588,30 @@ func (s *Server) handleUpdateAdminAccount(w http.ResponseWriter, r *http.Request
 		}
 		credential = &refreshed
 	}
+	var updateRateMultiplier *float64
+	if body.RateMultiplier != nil {
+		v := float64(*body.RateMultiplier)
+		updateRateMultiplier = &v
+	}
 	account, err := s.runtime.accounts.Update(r.Context(), accountID, accountcontract.UpdateRequest{
-		Name:           body.Name,
-		RuntimeClass:   toAccountRuntimeClassPtr(body.RuntimeClass),
-		Credential:     credential,
-		Metadata:       metadata,
-		ProxyID:        optionalNullableString(body.ProxyId),
-		Status:         toAccountStatusPtr(body.Status),
-		Priority:       body.Priority,
-		Weight:         body.Weight,
-		RiskLevel:      stringPtrFromAPI(body.RiskLevel),
-		UpstreamClient: optionalNullableString(body.UpstreamClient),
+		Name:               body.Name,
+		RuntimeClass:       toAccountRuntimeClassPtr(body.RuntimeClass),
+		Credential:         credential,
+		Metadata:           metadata,
+		Extra:              jsonObjectToMapPtr(body.Extra),
+		ProxyID:            optionalNullableString(body.ProxyId),
+		Status:             toAccountStatusPtr(body.Status),
+		Priority:           body.Priority,
+		Weight:             body.Weight,
+		RiskLevel:          stringPtrFromAPI(body.RiskLevel),
+		UpstreamClient:     optionalNullableString(body.UpstreamClient),
+		Notes:              body.Notes,
+		Concurrency:        body.Concurrency,
+		RateMultiplier:     updateRateMultiplier,
+		LoadFactor:         optionalNullableInt(body.LoadFactor),
+		ExpiresAt:          body.ExpiresAt,
+		AutoPauseOnExpired: body.AutoPauseOnExpired,
+		Schedulable:        body.Schedulable,
 	})
 	if err != nil {
 		switch {

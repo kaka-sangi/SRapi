@@ -100,25 +100,67 @@ func (s *Service) Create(ctx context.Context, req contract.CreateRequest) (contr
 	if err != nil {
 		return contract.ProviderAccount{}, err
 	}
+	concurrency := 3
+	if req.Concurrency != nil && *req.Concurrency > 0 {
+		concurrency = *req.Concurrency
+	}
+	rateMultiplier := 1.0
+	if req.RateMultiplier != nil && *req.RateMultiplier >= 0 {
+		rateMultiplier = *req.RateMultiplier
+	}
+	autoPause := true
+	if req.AutoPauseOnExpired != nil {
+		autoPause = *req.AutoPauseOnExpired
+	}
+	notes := ""
+	if req.Notes != nil {
+		notes = strings.TrimSpace(*req.Notes)
+	}
 
 	stored, err := s.store.Create(ctx, contract.CreateStoredAccount{
 		ProviderID:           req.ProviderID,
 		Name:                 name,
+		Platform:             strings.TrimSpace(req.Platform),
+		AccountType:          contract.RuntimeClassToAccountType(req.RuntimeClass),
 		RuntimeClass:         req.RuntimeClass,
 		CredentialCiphertext: credentialCiphertext,
 		CredentialVersion:    credentialVersionV1,
 		Metadata:             CanonicalizeAccountMetadata(cloneMap(req.Metadata)),
+		Extra:                cloneMap(req.Extra),
 		ProxyID:              proxyID,
 		Status:               status,
 		Priority:             priority,
 		Weight:               weight,
 		RiskLevel:            &riskLevel,
 		UpstreamClient:       req.UpstreamClient,
+		Notes:                notes,
+		Concurrency:          concurrency,
+		RateMultiplier:       rateMultiplier,
+		LoadFactor:           cloneIntPtr(req.LoadFactor),
+		Schedulable:          true,
+		ExpiresAt:            req.ExpiresAt,
+		AutoPauseOnExpired:   autoPause,
 	})
 	if err != nil {
 		return contract.ProviderAccount{}, err
 	}
+
+	// Bind to groups at creation time (sub2api style).
+	for _, groupID := range req.GroupIDs {
+		if groupID > 0 {
+			_, _ = s.store.AddAccountToGroup(ctx, stored.ID, groupID)
+		}
+	}
+
 	return stored, nil
+}
+
+func cloneIntPtr(v *int) *int {
+	if v == nil {
+		return nil
+	}
+	c := *v
+	return &c
 }
 
 // BatchCreateAccountsMaxItems is the hard cap on the number of rows per
@@ -342,32 +384,8 @@ func (s *Service) BatchUpdateConcurrency(ctx context.Context, items []contract.B
 			continue
 		}
 		seen[item.AccountID] = struct{}{}
-		account, err := s.store.FindByID(ctx, item.AccountID)
-		if err != nil {
-			// Idempotent: NotFound is not a failure since the caller's intent
-			// for that id is already moot. Match both the typed sentinel and
-			// the ad-hoc string the memory store still returns (mirrors the
-			// fallback at the batch-delete path above).
-			if errors.Is(err, ErrAccountNotFound) || strings.Contains(err.Error(), "account not found") {
-				results = append(results, row)
-				continue
-			}
-			row.Error = err.Error()
-			results = append(results, row)
-			continue
-		}
-		metadata := cloneMap(account.Metadata)
-		if metadata == nil {
-			metadata = map[string]any{}
-		}
-		// Zero clears the override (mirrors sub2api: a "set 0" call means
-		// "remove the cap"). The scheduler treats absent + zero identically.
-		if item.MaxConcurrency == 0 {
-			delete(metadata, "max_concurrency")
-		} else {
-			metadata["max_concurrency"] = item.MaxConcurrency
-		}
-		if _, err := s.Update(ctx, item.AccountID, contract.UpdateRequest{Metadata: &metadata}); err != nil {
+		concurrency := item.MaxConcurrency
+		if _, err := s.Update(ctx, item.AccountID, contract.UpdateRequest{Concurrency: &concurrency}); err != nil {
 			if errors.Is(err, ErrAccountNotFound) || strings.Contains(err.Error(), "account not found") {
 				results = append(results, row)
 				continue
@@ -1114,6 +1132,42 @@ func (s *Service) Update(ctx context.Context, id int, req contract.UpdateRequest
 	if req.UpstreamClient != nil {
 		account.UpstreamClient = cloneString(*req.UpstreamClient)
 	}
+	if req.Extra != nil {
+		account.Extra = cloneMap(*req.Extra)
+	}
+	if req.Notes != nil {
+		account.Notes = strings.TrimSpace(*req.Notes)
+	}
+	if req.Concurrency != nil {
+		if *req.Concurrency < 0 {
+			return contract.ProviderAccount{}, ErrInvalidInput
+		}
+		account.Concurrency = *req.Concurrency
+	}
+	if req.RateMultiplier != nil {
+		if *req.RateMultiplier < 0 {
+			return contract.ProviderAccount{}, ErrInvalidInput
+		}
+		account.RateMultiplier = *req.RateMultiplier
+	}
+	if req.LoadFactor != nil {
+		account.LoadFactor = *req.LoadFactor
+	}
+	if req.ExpiresAt != nil {
+		account.ExpiresAt = req.ExpiresAt
+	}
+	if req.ClearExpiresAt {
+		account.ExpiresAt = nil
+	}
+	if req.AutoPauseOnExpired != nil {
+		account.AutoPauseOnExpired = *req.AutoPauseOnExpired
+	}
+	if req.Schedulable != nil {
+		account.Schedulable = *req.Schedulable
+	}
+	if req.RuntimeClass != nil {
+		account.AccountType = contract.RuntimeClassToAccountType(account.RuntimeClass)
+	}
 	account.UpdatedAt = s.clock.Now()
 	return s.persistAccount(ctx, account)
 }
@@ -1334,7 +1388,9 @@ func (s *Service) resolveProxyURLByID(ctx context.Context, id int, seen map[int]
 	if err != nil {
 		return nil, err
 	}
-	if proxy.Status != contract.ProxyStatusActive || proxy.URLCiphertext == "" {
+	hasStructured := proxy.Host != ""
+	hasLegacy := proxy.URLCiphertext != ""
+	if proxy.Status != contract.ProxyStatusActive || (!hasStructured && !hasLegacy) {
 		return nil, ErrProxyUnavailable
 	}
 	if proxyExpired(proxy, s.clock.Now()) {
@@ -1349,6 +1405,26 @@ func (s *Service) resolveProxyURLByID(ctx context.Context, id int, seen map[int]
 		default:
 			return nil, ErrProxyUnavailable
 		}
+	}
+	// Prefer structured fields (sub2api style) over encrypted URL blob.
+	if hasStructured {
+		rawURL := proxy.URL()
+		if rawURL == "" {
+			return nil, ErrProxyUnavailable
+		}
+		// If password is encrypted, decrypt and inject into URL.
+		if proxy.PasswordCiphertext != "" {
+			decrypted, err := s.decryptCredential(proxy.PasswordCiphertext)
+			if err == nil {
+				if pw, ok := decrypted["password"].(string); ok && pw != "" {
+					rawURL = buildProxyURL(proxy.Protocol, proxy.Host, proxy.Port, proxy.Username, pw)
+				}
+			}
+		}
+		if err := validateProxyURL(proxy.Type, rawURL); err != nil {
+			return nil, err
+		}
+		return &rawURL, nil
 	}
 	rawURL, err := s.decryptProxyURL(proxy)
 	if err != nil {

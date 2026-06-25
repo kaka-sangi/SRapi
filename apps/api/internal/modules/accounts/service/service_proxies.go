@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,10 +21,43 @@ import (
 func (s *Service) CreateProxy(ctx context.Context, req contract.CreateProxyRequest) (contract.ProxyDefinition, error) {
 	name := strings.TrimSpace(req.Name)
 	proxyType := req.Type
-	rawURL := strings.TrimSpace(req.URL)
-	if name == "" || rawURL == "" || !validProxyType(proxyType) {
+	if name == "" || !validProxyType(proxyType) {
 		return contract.ProxyDefinition{}, ErrInvalidInput
 	}
+
+	// Support both structured fields (sub2api style) and legacy full URL.
+	// Structured fields take precedence when Host is set.
+	var rawURL string
+	var protocol, host, username string
+	var port int
+	var passwordCiphertext string
+
+	if strings.TrimSpace(req.Host) != "" {
+		protocol = strings.TrimSpace(req.Protocol)
+		if protocol == "" {
+			protocol = string(proxyType)
+		}
+		host = strings.TrimSpace(req.Host)
+		port = req.Port
+		username = strings.TrimSpace(req.Username)
+		if strings.TrimSpace(req.Password) != "" {
+			ct, err := s.encryptCredential(map[string]any{"password": req.Password})
+			if err != nil {
+				return contract.ProxyDefinition{}, err
+			}
+			passwordCiphertext = ct
+		}
+		// Build URL from structured fields for backward compat.
+		rawURL = buildProxyURL(protocol, host, port, username, req.Password)
+	} else {
+		rawURL = strings.TrimSpace(req.URL)
+		if rawURL == "" {
+			return contract.ProxyDefinition{}, ErrInvalidInput
+		}
+		// Parse structured fields from URL for dual-write.
+		protocol, host, port, username = parseProxyURL(rawURL)
+	}
+
 	if err := validateProxyURL(proxyType, rawURL); err != nil {
 		return contract.ProxyDefinition{}, err
 	}
@@ -54,19 +88,62 @@ func (s *Service) CreateProxy(ctx context.Context, req contract.CreateProxyReque
 	}
 	countryCode := normalizeCountryCode(req.CountryCode)
 	countryName := normalizeCountryName(req.CountryName)
+	expiryWarnDays := 0
+	if req.ExpiryWarnDays != nil && *req.ExpiryWarnDays > 0 {
+		expiryWarnDays = *req.ExpiryWarnDays
+	}
 	return s.store.CreateProxy(ctx, contract.CreateStoredProxy{
-		Name:          name,
-		Type:          proxyType,
-		URLCiphertext: ciphertext,
-		URLVersion:    credentialVersionV1,
-		Status:        status,
-		Metadata:      cloneMap(req.Metadata),
-		CountryCode:   countryCode,
-		CountryName:   countryName,
-		ExpiresAt:     cloneTime(req.ExpiresAt),
-		FallbackMode:  fallbackMode,
-		BackupProxyID: backupProxyID,
+		Name:               name,
+		Type:               proxyType,
+		Protocol:           protocol,
+		Host:               host,
+		Port:               port,
+		Username:           username,
+		PasswordCiphertext: passwordCiphertext,
+		URLCiphertext:      ciphertext,
+		URLVersion:         credentialVersionV1,
+		Status:             status,
+		Metadata:           cloneMap(req.Metadata),
+		CountryCode:        countryCode,
+		CountryName:        countryName,
+		ExpiresAt:          cloneTime(req.ExpiresAt),
+		FallbackMode:       fallbackMode,
+		BackupProxyID:      backupProxyID,
+		ExpiryWarnDays:     expiryWarnDays,
 	})
+}
+
+func buildProxyURL(protocol, host string, port int, username, password string) string {
+	u := &url.URL{Scheme: protocol}
+	if port > 0 {
+		u.Host = host + ":" + strconv.Itoa(port)
+	} else {
+		u.Host = host
+	}
+	if username != "" {
+		if password != "" {
+			u.User = url.UserPassword(username, password)
+		} else {
+			u.User = url.User(username)
+		}
+	}
+	return u.String()
+}
+
+func parseProxyURL(rawURL string) (protocol, host string, port int, username string) {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return "", "", 0, ""
+	}
+	protocol = parsed.Scheme
+	host = parsed.Hostname()
+	if p := parsed.Port(); p != "" {
+		port, _ = strconv.Atoi(p)
+	}
+	if parsed.User != nil {
+		username = parsed.User.Username()
+	}
+	return
 }
 
 func (s *Service) UpdateProxy(ctx context.Context, id int, req contract.UpdateProxyRequest) (contract.ProxyDefinition, error) {

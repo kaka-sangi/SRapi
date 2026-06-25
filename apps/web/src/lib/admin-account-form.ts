@@ -18,10 +18,6 @@ export const ACCOUNT_RISK_LEVELS: AccountRiskLevel[] = ["normal", "medium", "hig
 export const ACCOUNT_RUNTIME_CLASSES: RuntimeClass[] = [
   "api_key",
   "oauth_refresh",
-  "oauth_device_code",
-  "web_session_cookie",
-  "cli_client_token",
-  "custom_reverse_proxy",
 ];
 
 // Human label for a runtime class (auth method). Use everywhere instead of
@@ -55,6 +51,11 @@ export interface AdminAccountFormState {
   weight: string;
   metadata: Record<string, unknown>;
   groupIds: Id[];
+  notes: string;
+  concurrency: string;
+  rateMultiplier: string;
+  expiresAt: string;
+  autoPauseOnExpired: boolean;
 }
 
 export function emptyAccountForm(defaultProviderId = ""): AdminAccountFormState {
@@ -71,6 +72,11 @@ export function emptyAccountForm(defaultProviderId = ""): AdminAccountFormState 
     weight: "1",
     metadata: {},
     groupIds: [],
+    notes: "",
+    concurrency: "3",
+    rateMultiplier: "1",
+    expiresAt: "",
+    autoPauseOnExpired: true,
   };
 }
 
@@ -88,6 +94,11 @@ export function accountFormFromAccount(account: ProviderAccount): AdminAccountFo
     weight: String(account.weight),
     metadata: (account.metadata ?? {}) as Record<string, unknown>,
     groupIds: account.group_ids,
+    notes: account.notes ?? "",
+    concurrency: String(account.concurrency ?? 3),
+    rateMultiplier: String(account.rate_multiplier ?? 1),
+    expiresAt: account.expires_at ?? "",
+    autoPauseOnExpired: account.auto_pause_on_expired ?? true,
   };
 }
 
@@ -105,7 +116,7 @@ function parseJsonObject(value: string, fieldName: string): Record<string, unkno
 }
 
 export function buildCreateAccountBody(form: AdminAccountFormState): CreateAdminAccountData["body"] {
-  return {
+  const body: CreateAdminAccountData["body"] = {
     provider_id: form.providerId,
     name: form.name.trim(),
     runtime_class: form.runtimeClass,
@@ -117,7 +128,18 @@ export function buildCreateAccountBody(form: AdminAccountFormState): CreateAdmin
     priority: Number(form.priority || 0),
     weight: Number(form.weight || 1),
     metadata: form.metadata,
+    notes: form.notes.trim() || undefined,
+    concurrency: Number(form.concurrency || 3),
+    rate_multiplier: Number(form.rateMultiplier || 1),
+    auto_pause_on_expired: form.autoPauseOnExpired,
   };
+  if (form.expiresAt.trim()) {
+    body.expires_at = form.expiresAt.trim();
+  }
+  if (form.groupIds.length > 0) {
+    body.group_ids = form.groupIds.map((id) => Number(id));
+  }
+  return body;
 }
 
 export function buildUpdateAccountBody(form: AdminAccountFormState): UpdateAdminAccountData["body"] {
@@ -130,6 +152,10 @@ export function buildUpdateAccountBody(form: AdminAccountFormState): UpdateAdmin
     priority: Number(form.priority || 0),
     weight: Number(form.weight || 1),
     metadata: form.metadata,
+    notes: form.notes.trim() || undefined,
+    concurrency: Number(form.concurrency || 3),
+    rate_multiplier: Number(form.rateMultiplier || 1),
+    auto_pause_on_expired: form.autoPauseOnExpired,
   };
 
   if (form.proxyId.trim()) {
@@ -138,6 +164,10 @@ export function buildUpdateAccountBody(form: AdminAccountFormState): UpdateAdmin
 
   if (form.credential.trim()) {
     body.credential = parseJsonObject(form.credential, "Credential");
+  }
+
+  if (form.expiresAt.trim()) {
+    body.expires_at = form.expiresAt.trim();
   }
 
   return body;

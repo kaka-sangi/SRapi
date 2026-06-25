@@ -331,6 +331,8 @@ function providerAccount(overrides: Partial<ProviderAccount> = {}): ProviderAcco
     priority: 0,
     weight: 1,
     group_ids: [],
+    concurrency: 3,
+    schedulable: true,
     created_at: "2026-06-11T00:00:00Z",
     ...overrides,
   };

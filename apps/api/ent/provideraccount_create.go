@@ -74,6 +74,20 @@ func (_c *ProviderAccountCreate) SetName(v string) *ProviderAccountCreate {
 	return _c
 }
 
+// SetPlatform sets the "platform" field.
+func (_c *ProviderAccountCreate) SetPlatform(v string) *ProviderAccountCreate {
+	_c.mutation.SetPlatform(v)
+	return _c
+}
+
+// SetNillablePlatform sets the "platform" field if the given value is not nil.
+func (_c *ProviderAccountCreate) SetNillablePlatform(v *string) *ProviderAccountCreate {
+	if v != nil {
+		_c.SetPlatform(*v)
+	}
+	return _c
+}
+
 // SetAccountType sets the "account_type" field.
 func (_c *ProviderAccountCreate) SetAccountType(v string) *ProviderAccountCreate {
 	_c.mutation.SetAccountType(v)
@@ -212,6 +226,250 @@ func (_c *ProviderAccountCreate) SetMetadataJSON(v map[string]interface{}) *Prov
 	return _c
 }
 
+// SetNotes sets the "notes" field.
+func (_c *ProviderAccountCreate) SetNotes(v string) *ProviderAccountCreate {
+	_c.mutation.SetNotes(v)
+	return _c
+}
+
+// SetNillableNotes sets the "notes" field if the given value is not nil.
+func (_c *ProviderAccountCreate) SetNillableNotes(v *string) *ProviderAccountCreate {
+	if v != nil {
+		_c.SetNotes(*v)
+	}
+	return _c
+}
+
+// SetConcurrency sets the "concurrency" field.
+func (_c *ProviderAccountCreate) SetConcurrency(v int) *ProviderAccountCreate {
+	_c.mutation.SetConcurrency(v)
+	return _c
+}
+
+// SetNillableConcurrency sets the "concurrency" field if the given value is not nil.
+func (_c *ProviderAccountCreate) SetNillableConcurrency(v *int) *ProviderAccountCreate {
+	if v != nil {
+		_c.SetConcurrency(*v)
+	}
+	return _c
+}
+
+// SetRateMultiplier sets the "rate_multiplier" field.
+func (_c *ProviderAccountCreate) SetRateMultiplier(v float64) *ProviderAccountCreate {
+	_c.mutation.SetRateMultiplier(v)
+	return _c
+}
+
+// SetNillableRateMultiplier sets the "rate_multiplier" field if the given value is not nil.
+func (_c *ProviderAccountCreate) SetNillableRateMultiplier(v *float64) *ProviderAccountCreate {
+	if v != nil {
+		_c.SetRateMultiplier(*v)
+	}
+	return _c
+}
+
+// SetLoadFactor sets the "load_factor" field.
+func (_c *ProviderAccountCreate) SetLoadFactor(v int) *ProviderAccountCreate {
+	_c.mutation.SetLoadFactor(v)
+	return _c
+}
+
+// SetNillableLoadFactor sets the "load_factor" field if the given value is not nil.
+func (_c *ProviderAccountCreate) SetNillableLoadFactor(v *int) *ProviderAccountCreate {
+	if v != nil {
+		_c.SetLoadFactor(*v)
+	}
+	return _c
+}
+
+// SetSchedulable sets the "schedulable" field.
+func (_c *ProviderAccountCreate) SetSchedulable(v bool) *ProviderAccountCreate {
+	_c.mutation.SetSchedulable(v)
+	return _c
+}
+
+// SetNillableSchedulable sets the "schedulable" field if the given value is not nil.
+func (_c *ProviderAccountCreate) SetNillableSchedulable(v *bool) *ProviderAccountCreate {
+	if v != nil {
+		_c.SetSchedulable(*v)
+	}
+	return _c
+}
+
+// SetErrorMessage sets the "error_message" field.
+func (_c *ProviderAccountCreate) SetErrorMessage(v string) *ProviderAccountCreate {
+	_c.mutation.SetErrorMessage(v)
+	return _c
+}
+
+// SetNillableErrorMessage sets the "error_message" field if the given value is not nil.
+func (_c *ProviderAccountCreate) SetNillableErrorMessage(v *string) *ProviderAccountCreate {
+	if v != nil {
+		_c.SetErrorMessage(*v)
+	}
+	return _c
+}
+
+// SetLastUsedAt sets the "last_used_at" field.
+func (_c *ProviderAccountCreate) SetLastUsedAt(v time.Time) *ProviderAccountCreate {
+	_c.mutation.SetLastUsedAt(v)
+	return _c
+}
+
+// SetNillableLastUsedAt sets the "last_used_at" field if the given value is not nil.
+func (_c *ProviderAccountCreate) SetNillableLastUsedAt(v *time.Time) *ProviderAccountCreate {
+	if v != nil {
+		_c.SetLastUsedAt(*v)
+	}
+	return _c
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (_c *ProviderAccountCreate) SetExpiresAt(v time.Time) *ProviderAccountCreate {
+	_c.mutation.SetExpiresAt(v)
+	return _c
+}
+
+// SetNillableExpiresAt sets the "expires_at" field if the given value is not nil.
+func (_c *ProviderAccountCreate) SetNillableExpiresAt(v *time.Time) *ProviderAccountCreate {
+	if v != nil {
+		_c.SetExpiresAt(*v)
+	}
+	return _c
+}
+
+// SetAutoPauseOnExpired sets the "auto_pause_on_expired" field.
+func (_c *ProviderAccountCreate) SetAutoPauseOnExpired(v bool) *ProviderAccountCreate {
+	_c.mutation.SetAutoPauseOnExpired(v)
+	return _c
+}
+
+// SetNillableAutoPauseOnExpired sets the "auto_pause_on_expired" field if the given value is not nil.
+func (_c *ProviderAccountCreate) SetNillableAutoPauseOnExpired(v *bool) *ProviderAccountCreate {
+	if v != nil {
+		_c.SetAutoPauseOnExpired(*v)
+	}
+	return _c
+}
+
+// SetRateLimitedAt sets the "rate_limited_at" field.
+func (_c *ProviderAccountCreate) SetRateLimitedAt(v time.Time) *ProviderAccountCreate {
+	_c.mutation.SetRateLimitedAt(v)
+	return _c
+}
+
+// SetNillableRateLimitedAt sets the "rate_limited_at" field if the given value is not nil.
+func (_c *ProviderAccountCreate) SetNillableRateLimitedAt(v *time.Time) *ProviderAccountCreate {
+	if v != nil {
+		_c.SetRateLimitedAt(*v)
+	}
+	return _c
+}
+
+// SetRateLimitResetAt sets the "rate_limit_reset_at" field.
+func (_c *ProviderAccountCreate) SetRateLimitResetAt(v time.Time) *ProviderAccountCreate {
+	_c.mutation.SetRateLimitResetAt(v)
+	return _c
+}
+
+// SetNillableRateLimitResetAt sets the "rate_limit_reset_at" field if the given value is not nil.
+func (_c *ProviderAccountCreate) SetNillableRateLimitResetAt(v *time.Time) *ProviderAccountCreate {
+	if v != nil {
+		_c.SetRateLimitResetAt(*v)
+	}
+	return _c
+}
+
+// SetOverloadUntil sets the "overload_until" field.
+func (_c *ProviderAccountCreate) SetOverloadUntil(v time.Time) *ProviderAccountCreate {
+	_c.mutation.SetOverloadUntil(v)
+	return _c
+}
+
+// SetNillableOverloadUntil sets the "overload_until" field if the given value is not nil.
+func (_c *ProviderAccountCreate) SetNillableOverloadUntil(v *time.Time) *ProviderAccountCreate {
+	if v != nil {
+		_c.SetOverloadUntil(*v)
+	}
+	return _c
+}
+
+// SetTempUnschedulableUntil sets the "temp_unschedulable_until" field.
+func (_c *ProviderAccountCreate) SetTempUnschedulableUntil(v time.Time) *ProviderAccountCreate {
+	_c.mutation.SetTempUnschedulableUntil(v)
+	return _c
+}
+
+// SetNillableTempUnschedulableUntil sets the "temp_unschedulable_until" field if the given value is not nil.
+func (_c *ProviderAccountCreate) SetNillableTempUnschedulableUntil(v *time.Time) *ProviderAccountCreate {
+	if v != nil {
+		_c.SetTempUnschedulableUntil(*v)
+	}
+	return _c
+}
+
+// SetTempUnschedulableReason sets the "temp_unschedulable_reason" field.
+func (_c *ProviderAccountCreate) SetTempUnschedulableReason(v string) *ProviderAccountCreate {
+	_c.mutation.SetTempUnschedulableReason(v)
+	return _c
+}
+
+// SetNillableTempUnschedulableReason sets the "temp_unschedulable_reason" field if the given value is not nil.
+func (_c *ProviderAccountCreate) SetNillableTempUnschedulableReason(v *string) *ProviderAccountCreate {
+	if v != nil {
+		_c.SetTempUnschedulableReason(*v)
+	}
+	return _c
+}
+
+// SetSessionWindowStart sets the "session_window_start" field.
+func (_c *ProviderAccountCreate) SetSessionWindowStart(v time.Time) *ProviderAccountCreate {
+	_c.mutation.SetSessionWindowStart(v)
+	return _c
+}
+
+// SetNillableSessionWindowStart sets the "session_window_start" field if the given value is not nil.
+func (_c *ProviderAccountCreate) SetNillableSessionWindowStart(v *time.Time) *ProviderAccountCreate {
+	if v != nil {
+		_c.SetSessionWindowStart(*v)
+	}
+	return _c
+}
+
+// SetSessionWindowEnd sets the "session_window_end" field.
+func (_c *ProviderAccountCreate) SetSessionWindowEnd(v time.Time) *ProviderAccountCreate {
+	_c.mutation.SetSessionWindowEnd(v)
+	return _c
+}
+
+// SetNillableSessionWindowEnd sets the "session_window_end" field if the given value is not nil.
+func (_c *ProviderAccountCreate) SetNillableSessionWindowEnd(v *time.Time) *ProviderAccountCreate {
+	if v != nil {
+		_c.SetSessionWindowEnd(*v)
+	}
+	return _c
+}
+
+// SetSessionWindowStatus sets the "session_window_status" field.
+func (_c *ProviderAccountCreate) SetSessionWindowStatus(v string) *ProviderAccountCreate {
+	_c.mutation.SetSessionWindowStatus(v)
+	return _c
+}
+
+// SetNillableSessionWindowStatus sets the "session_window_status" field if the given value is not nil.
+func (_c *ProviderAccountCreate) SetNillableSessionWindowStatus(v *string) *ProviderAccountCreate {
+	if v != nil {
+		_c.SetSessionWindowStatus(*v)
+	}
+	return _c
+}
+
+// SetExtraJSON sets the "extra_json" field.
+func (_c *ProviderAccountCreate) SetExtraJSON(v map[string]interface{}) *ProviderAccountCreate {
+	_c.mutation.SetExtraJSON(v)
+	return _c
+}
+
 // SetTokenExpiresAt sets the "token_expires_at" field.
 func (_c *ProviderAccountCreate) SetTokenExpiresAt(v time.Time) *ProviderAccountCreate {
 	_c.mutation.SetTokenExpiresAt(v)
@@ -325,6 +583,10 @@ func (_c *ProviderAccountCreate) defaults() {
 		v := provideraccount.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
+	if _, ok := _c.mutation.Platform(); !ok {
+		v := provideraccount.DefaultPlatform
+		_c.mutation.SetPlatform(v)
+	}
 	if _, ok := _c.mutation.AccountType(); !ok {
 		v := provideraccount.DefaultAccountType
 		_c.mutation.SetAccountType(v)
@@ -352,6 +614,38 @@ func (_c *ProviderAccountCreate) defaults() {
 	if _, ok := _c.mutation.RiskLevel(); !ok {
 		v := provideraccount.DefaultRiskLevel
 		_c.mutation.SetRiskLevel(v)
+	}
+	if _, ok := _c.mutation.Notes(); !ok {
+		v := provideraccount.DefaultNotes
+		_c.mutation.SetNotes(v)
+	}
+	if _, ok := _c.mutation.Concurrency(); !ok {
+		v := provideraccount.DefaultConcurrency
+		_c.mutation.SetConcurrency(v)
+	}
+	if _, ok := _c.mutation.RateMultiplier(); !ok {
+		v := provideraccount.DefaultRateMultiplier
+		_c.mutation.SetRateMultiplier(v)
+	}
+	if _, ok := _c.mutation.Schedulable(); !ok {
+		v := provideraccount.DefaultSchedulable
+		_c.mutation.SetSchedulable(v)
+	}
+	if _, ok := _c.mutation.ErrorMessage(); !ok {
+		v := provideraccount.DefaultErrorMessage
+		_c.mutation.SetErrorMessage(v)
+	}
+	if _, ok := _c.mutation.AutoPauseOnExpired(); !ok {
+		v := provideraccount.DefaultAutoPauseOnExpired
+		_c.mutation.SetAutoPauseOnExpired(v)
+	}
+	if _, ok := _c.mutation.TempUnschedulableReason(); !ok {
+		v := provideraccount.DefaultTempUnschedulableReason
+		_c.mutation.SetTempUnschedulableReason(v)
+	}
+	if _, ok := _c.mutation.SessionWindowStatus(); !ok {
+		v := provideraccount.DefaultSessionWindowStatus
+		_c.mutation.SetSessionWindowStatus(v)
 	}
 	if _, ok := _c.mutation.RefreshAttempts(); !ok {
 		v := provideraccount.DefaultRefreshAttempts
@@ -382,6 +676,9 @@ func (_c *ProviderAccountCreate) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "ProviderAccount.name": %w`, err)}
 		}
 	}
+	if _, ok := _c.mutation.Platform(); !ok {
+		return &ValidationError{Name: "platform", err: errors.New(`ent: missing required field "ProviderAccount.platform"`)}
+	}
 	if _, ok := _c.mutation.AccountType(); !ok {
 		return &ValidationError{Name: "account_type", err: errors.New(`ent: missing required field "ProviderAccount.account_type"`)}
 	}
@@ -402,6 +699,27 @@ func (_c *ProviderAccountCreate) check() error {
 	}
 	if _, ok := _c.mutation.RiskLevel(); !ok {
 		return &ValidationError{Name: "risk_level", err: errors.New(`ent: missing required field "ProviderAccount.risk_level"`)}
+	}
+	if _, ok := _c.mutation.Concurrency(); !ok {
+		return &ValidationError{Name: "concurrency", err: errors.New(`ent: missing required field "ProviderAccount.concurrency"`)}
+	}
+	if _, ok := _c.mutation.RateMultiplier(); !ok {
+		return &ValidationError{Name: "rate_multiplier", err: errors.New(`ent: missing required field "ProviderAccount.rate_multiplier"`)}
+	}
+	if _, ok := _c.mutation.Schedulable(); !ok {
+		return &ValidationError{Name: "schedulable", err: errors.New(`ent: missing required field "ProviderAccount.schedulable"`)}
+	}
+	if _, ok := _c.mutation.ErrorMessage(); !ok {
+		return &ValidationError{Name: "error_message", err: errors.New(`ent: missing required field "ProviderAccount.error_message"`)}
+	}
+	if _, ok := _c.mutation.AutoPauseOnExpired(); !ok {
+		return &ValidationError{Name: "auto_pause_on_expired", err: errors.New(`ent: missing required field "ProviderAccount.auto_pause_on_expired"`)}
+	}
+	if _, ok := _c.mutation.TempUnschedulableReason(); !ok {
+		return &ValidationError{Name: "temp_unschedulable_reason", err: errors.New(`ent: missing required field "ProviderAccount.temp_unschedulable_reason"`)}
+	}
+	if _, ok := _c.mutation.SessionWindowStatus(); !ok {
+		return &ValidationError{Name: "session_window_status", err: errors.New(`ent: missing required field "ProviderAccount.session_window_status"`)}
 	}
 	if _, ok := _c.mutation.RefreshAttempts(); !ok {
 		return &ValidationError{Name: "refresh_attempts", err: errors.New(`ent: missing required field "ProviderAccount.refresh_attempts"`)}
@@ -460,6 +778,10 @@ func (_c *ProviderAccountCreate) createSpec() (*ProviderAccount, *sqlgraph.Creat
 		_spec.SetField(provideraccount.FieldName, field.TypeString, value)
 		_node.Name = value
 	}
+	if value, ok := _c.mutation.Platform(); ok {
+		_spec.SetField(provideraccount.FieldPlatform, field.TypeString, value)
+		_node.Platform = value
+	}
 	if value, ok := _c.mutation.AccountType(); ok {
 		_spec.SetField(provideraccount.FieldAccountType, field.TypeString, value)
 		_node.AccountType = value
@@ -503,6 +825,78 @@ func (_c *ProviderAccountCreate) createSpec() (*ProviderAccount, *sqlgraph.Creat
 	if value, ok := _c.mutation.MetadataJSON(); ok {
 		_spec.SetField(provideraccount.FieldMetadataJSON, field.TypeJSON, value)
 		_node.MetadataJSON = value
+	}
+	if value, ok := _c.mutation.Notes(); ok {
+		_spec.SetField(provideraccount.FieldNotes, field.TypeString, value)
+		_node.Notes = value
+	}
+	if value, ok := _c.mutation.Concurrency(); ok {
+		_spec.SetField(provideraccount.FieldConcurrency, field.TypeInt, value)
+		_node.Concurrency = value
+	}
+	if value, ok := _c.mutation.RateMultiplier(); ok {
+		_spec.SetField(provideraccount.FieldRateMultiplier, field.TypeFloat64, value)
+		_node.RateMultiplier = value
+	}
+	if value, ok := _c.mutation.LoadFactor(); ok {
+		_spec.SetField(provideraccount.FieldLoadFactor, field.TypeInt, value)
+		_node.LoadFactor = &value
+	}
+	if value, ok := _c.mutation.Schedulable(); ok {
+		_spec.SetField(provideraccount.FieldSchedulable, field.TypeBool, value)
+		_node.Schedulable = value
+	}
+	if value, ok := _c.mutation.ErrorMessage(); ok {
+		_spec.SetField(provideraccount.FieldErrorMessage, field.TypeString, value)
+		_node.ErrorMessage = value
+	}
+	if value, ok := _c.mutation.LastUsedAt(); ok {
+		_spec.SetField(provideraccount.FieldLastUsedAt, field.TypeTime, value)
+		_node.LastUsedAt = &value
+	}
+	if value, ok := _c.mutation.ExpiresAt(); ok {
+		_spec.SetField(provideraccount.FieldExpiresAt, field.TypeTime, value)
+		_node.ExpiresAt = &value
+	}
+	if value, ok := _c.mutation.AutoPauseOnExpired(); ok {
+		_spec.SetField(provideraccount.FieldAutoPauseOnExpired, field.TypeBool, value)
+		_node.AutoPauseOnExpired = value
+	}
+	if value, ok := _c.mutation.RateLimitedAt(); ok {
+		_spec.SetField(provideraccount.FieldRateLimitedAt, field.TypeTime, value)
+		_node.RateLimitedAt = &value
+	}
+	if value, ok := _c.mutation.RateLimitResetAt(); ok {
+		_spec.SetField(provideraccount.FieldRateLimitResetAt, field.TypeTime, value)
+		_node.RateLimitResetAt = &value
+	}
+	if value, ok := _c.mutation.OverloadUntil(); ok {
+		_spec.SetField(provideraccount.FieldOverloadUntil, field.TypeTime, value)
+		_node.OverloadUntil = &value
+	}
+	if value, ok := _c.mutation.TempUnschedulableUntil(); ok {
+		_spec.SetField(provideraccount.FieldTempUnschedulableUntil, field.TypeTime, value)
+		_node.TempUnschedulableUntil = &value
+	}
+	if value, ok := _c.mutation.TempUnschedulableReason(); ok {
+		_spec.SetField(provideraccount.FieldTempUnschedulableReason, field.TypeString, value)
+		_node.TempUnschedulableReason = value
+	}
+	if value, ok := _c.mutation.SessionWindowStart(); ok {
+		_spec.SetField(provideraccount.FieldSessionWindowStart, field.TypeTime, value)
+		_node.SessionWindowStart = &value
+	}
+	if value, ok := _c.mutation.SessionWindowEnd(); ok {
+		_spec.SetField(provideraccount.FieldSessionWindowEnd, field.TypeTime, value)
+		_node.SessionWindowEnd = &value
+	}
+	if value, ok := _c.mutation.SessionWindowStatus(); ok {
+		_spec.SetField(provideraccount.FieldSessionWindowStatus, field.TypeString, value)
+		_node.SessionWindowStatus = value
+	}
+	if value, ok := _c.mutation.ExtraJSON(); ok {
+		_spec.SetField(provideraccount.FieldExtraJSON, field.TypeJSON, value)
+		_node.ExtraJSON = value
 	}
 	if value, ok := _c.mutation.TokenExpiresAt(); ok {
 		_spec.SetField(provideraccount.FieldTokenExpiresAt, field.TypeTime, value)

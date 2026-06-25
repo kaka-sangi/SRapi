@@ -22,12 +22,20 @@ type Proxy struct {
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
-	// DeletedAt holds the value of the "deleted_at" field.
-	DeletedAt *time.Time `json:"deleted_at,omitempty"`
 	// Name holds the value of the "name" field.
 	Name string `json:"name,omitempty"`
 	// Type holds the value of the "type" field.
 	Type string `json:"type,omitempty"`
+	// Protocol holds the value of the "protocol" field.
+	Protocol string `json:"protocol,omitempty"`
+	// Host holds the value of the "host" field.
+	Host string `json:"host,omitempty"`
+	// Port holds the value of the "port" field.
+	Port int `json:"port,omitempty"`
+	// Username holds the value of the "username" field.
+	Username string `json:"username,omitempty"`
+	// PasswordCiphertext holds the value of the "password_ciphertext" field.
+	PasswordCiphertext []byte `json:"-"`
 	// URLCiphertext holds the value of the "url_ciphertext" field.
 	URLCiphertext []byte `json:"-"`
 	// URLVersion holds the value of the "url_version" field.
@@ -36,23 +44,25 @@ type Proxy struct {
 	Status string `json:"status,omitempty"`
 	// MetadataJSON holds the value of the "metadata_json" field.
 	MetadataJSON map[string]interface{} `json:"metadata_json,omitempty"`
-	// ISO-3166-1 alpha-2 country code (operator-supplied).
+	// CountryCode holds the value of the "country_code" field.
 	CountryCode string `json:"country_code,omitempty"`
-	// Display name for the country, snapshotted at write time.
+	// CountryName holds the value of the "country_name" field.
 	CountryName string `json:"country_name,omitempty"`
-	// Optional operator-defined expiry; expired proxies follow fallback_mode.
+	// ExpiresAt holds the value of the "expires_at" field.
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
-	// Expiry fallback mode: none, direct, or proxy.
+	// FallbackMode holds the value of the "fallback_mode" field.
 	FallbackMode string `json:"fallback_mode,omitempty"`
-	// Proxy definition id used when fallback_mode is proxy.
+	// BackupProxyID holds the value of the "backup_proxy_id" field.
 	BackupProxyID *int `json:"backup_proxy_id,omitempty"`
-	// Last time the probe worker tested this proxy.
+	// ExpiryWarnDays holds the value of the "expiry_warn_days" field.
+	ExpiryWarnDays int `json:"expiry_warn_days,omitempty"`
+	// LastProbedAt holds the value of the "last_probed_at" field.
 	LastProbedAt *time.Time `json:"last_probed_at,omitempty"`
-	// Successful probes since last counter reset (~7 days). Used for availability %.
+	// ProbeSuccessCount holds the value of the "probe_success_count" field.
 	ProbeSuccessCount int `json:"probe_success_count,omitempty"`
-	// Failed probes since last counter reset (~7 days).
+	// ProbeFailureCount holds the value of the "probe_failure_count" field.
 	ProbeFailureCount int `json:"probe_failure_count,omitempty"`
-	// Latency of the most recent successful probe, in milliseconds. 0 if never succeeded.
+	// LastProbeLatencyMs holds the value of the "last_probe_latency_ms" field.
 	LastProbeLatencyMs int `json:"last_probe_latency_ms,omitempty"`
 	selectValues       sql.SelectValues
 }
@@ -62,13 +72,13 @@ func (*Proxy) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case proxy.FieldURLCiphertext, proxy.FieldMetadataJSON:
+		case proxy.FieldPasswordCiphertext, proxy.FieldURLCiphertext, proxy.FieldMetadataJSON:
 			values[i] = new([]byte)
-		case proxy.FieldID, proxy.FieldURLVersion, proxy.FieldBackupProxyID, proxy.FieldProbeSuccessCount, proxy.FieldProbeFailureCount, proxy.FieldLastProbeLatencyMs:
+		case proxy.FieldID, proxy.FieldPort, proxy.FieldURLVersion, proxy.FieldBackupProxyID, proxy.FieldExpiryWarnDays, proxy.FieldProbeSuccessCount, proxy.FieldProbeFailureCount, proxy.FieldLastProbeLatencyMs:
 			values[i] = new(sql.NullInt64)
-		case proxy.FieldName, proxy.FieldType, proxy.FieldStatus, proxy.FieldCountryCode, proxy.FieldCountryName, proxy.FieldFallbackMode:
+		case proxy.FieldName, proxy.FieldType, proxy.FieldProtocol, proxy.FieldHost, proxy.FieldUsername, proxy.FieldStatus, proxy.FieldCountryCode, proxy.FieldCountryName, proxy.FieldFallbackMode:
 			values[i] = new(sql.NullString)
-		case proxy.FieldCreatedAt, proxy.FieldUpdatedAt, proxy.FieldDeletedAt, proxy.FieldExpiresAt, proxy.FieldLastProbedAt:
+		case proxy.FieldCreatedAt, proxy.FieldUpdatedAt, proxy.FieldExpiresAt, proxy.FieldLastProbedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -103,13 +113,6 @@ func (_m *Proxy) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.UpdatedAt = value.Time
 			}
-		case proxy.FieldDeletedAt:
-			if value, ok := values[i].(*sql.NullTime); !ok {
-				return fmt.Errorf("unexpected type %T for field deleted_at", values[i])
-			} else if value.Valid {
-				_m.DeletedAt = new(time.Time)
-				*_m.DeletedAt = value.Time
-			}
 		case proxy.FieldName:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field name", values[i])
@@ -121,6 +124,36 @@ func (_m *Proxy) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field type", values[i])
 			} else if value.Valid {
 				_m.Type = value.String
+			}
+		case proxy.FieldProtocol:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field protocol", values[i])
+			} else if value.Valid {
+				_m.Protocol = value.String
+			}
+		case proxy.FieldHost:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field host", values[i])
+			} else if value.Valid {
+				_m.Host = value.String
+			}
+		case proxy.FieldPort:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field port", values[i])
+			} else if value.Valid {
+				_m.Port = int(value.Int64)
+			}
+		case proxy.FieldUsername:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field username", values[i])
+			} else if value.Valid {
+				_m.Username = value.String
+			}
+		case proxy.FieldPasswordCiphertext:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field password_ciphertext", values[i])
+			} else if value != nil {
+				_m.PasswordCiphertext = *value
 			}
 		case proxy.FieldURLCiphertext:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -179,6 +212,12 @@ func (_m *Proxy) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.BackupProxyID = new(int)
 				*_m.BackupProxyID = int(value.Int64)
+			}
+		case proxy.FieldExpiryWarnDays:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field expiry_warn_days", values[i])
+			} else if value.Valid {
+				_m.ExpiryWarnDays = int(value.Int64)
 			}
 		case proxy.FieldLastProbedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -247,16 +286,25 @@ func (_m *Proxy) String() string {
 	builder.WriteString("updated_at=")
 	builder.WriteString(_m.UpdatedAt.Format(time.ANSIC))
 	builder.WriteString(", ")
-	if v := _m.DeletedAt; v != nil {
-		builder.WriteString("deleted_at=")
-		builder.WriteString(v.Format(time.ANSIC))
-	}
-	builder.WriteString(", ")
 	builder.WriteString("name=")
 	builder.WriteString(_m.Name)
 	builder.WriteString(", ")
 	builder.WriteString("type=")
 	builder.WriteString(_m.Type)
+	builder.WriteString(", ")
+	builder.WriteString("protocol=")
+	builder.WriteString(_m.Protocol)
+	builder.WriteString(", ")
+	builder.WriteString("host=")
+	builder.WriteString(_m.Host)
+	builder.WriteString(", ")
+	builder.WriteString("port=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Port))
+	builder.WriteString(", ")
+	builder.WriteString("username=")
+	builder.WriteString(_m.Username)
+	builder.WriteString(", ")
+	builder.WriteString("password_ciphertext=<sensitive>")
 	builder.WriteString(", ")
 	builder.WriteString("url_ciphertext=<sensitive>")
 	builder.WriteString(", ")
@@ -287,6 +335,9 @@ func (_m *Proxy) String() string {
 		builder.WriteString("backup_proxy_id=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
+	builder.WriteString(", ")
+	builder.WriteString("expiry_warn_days=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ExpiryWarnDays))
 	builder.WriteString(", ")
 	if v := _m.LastProbedAt; v != nil {
 		builder.WriteString("last_probed_at=")

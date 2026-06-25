@@ -368,7 +368,7 @@ func (rt *runtimeState) acquireProviderAccountConcurrency(ctx context.Context, a
 	if rt.rateLimiter == nil || account.ID <= 0 {
 		return ratelimit.ConcurrencyLease{}, nil
 	}
-	limit := positiveLimit(metadataOptionalInt(account.Metadata, "max_concurrency"))
+	limit := positiveLimit(accountConcurrencyLimit(account))
 	if limit <= 0 {
 		return ratelimit.ConcurrencyLease{}, nil
 	}

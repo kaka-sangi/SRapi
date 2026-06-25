@@ -17,12 +17,20 @@ const (
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
 	FieldUpdatedAt = "updated_at"
-	// FieldDeletedAt holds the string denoting the deleted_at field in the database.
-	FieldDeletedAt = "deleted_at"
 	// FieldName holds the string denoting the name field in the database.
 	FieldName = "name"
 	// FieldType holds the string denoting the type field in the database.
 	FieldType = "type"
+	// FieldProtocol holds the string denoting the protocol field in the database.
+	FieldProtocol = "protocol"
+	// FieldHost holds the string denoting the host field in the database.
+	FieldHost = "host"
+	// FieldPort holds the string denoting the port field in the database.
+	FieldPort = "port"
+	// FieldUsername holds the string denoting the username field in the database.
+	FieldUsername = "username"
+	// FieldPasswordCiphertext holds the string denoting the password_ciphertext field in the database.
+	FieldPasswordCiphertext = "password_ciphertext"
 	// FieldURLCiphertext holds the string denoting the url_ciphertext field in the database.
 	FieldURLCiphertext = "url_ciphertext"
 	// FieldURLVersion holds the string denoting the url_version field in the database.
@@ -41,6 +49,8 @@ const (
 	FieldFallbackMode = "fallback_mode"
 	// FieldBackupProxyID holds the string denoting the backup_proxy_id field in the database.
 	FieldBackupProxyID = "backup_proxy_id"
+	// FieldExpiryWarnDays holds the string denoting the expiry_warn_days field in the database.
+	FieldExpiryWarnDays = "expiry_warn_days"
 	// FieldLastProbedAt holds the string denoting the last_probed_at field in the database.
 	FieldLastProbedAt = "last_probed_at"
 	// FieldProbeSuccessCount holds the string denoting the probe_success_count field in the database.
@@ -58,9 +68,13 @@ var Columns = []string{
 	FieldID,
 	FieldCreatedAt,
 	FieldUpdatedAt,
-	FieldDeletedAt,
 	FieldName,
 	FieldType,
+	FieldProtocol,
+	FieldHost,
+	FieldPort,
+	FieldUsername,
+	FieldPasswordCiphertext,
 	FieldURLCiphertext,
 	FieldURLVersion,
 	FieldStatus,
@@ -70,6 +84,7 @@ var Columns = []string{
 	FieldExpiresAt,
 	FieldFallbackMode,
 	FieldBackupProxyID,
+	FieldExpiryWarnDays,
 	FieldLastProbedAt,
 	FieldProbeSuccessCount,
 	FieldProbeFailureCount,
@@ -97,6 +112,14 @@ var (
 	NameValidator func(string) error
 	// TypeValidator is a validator for the "type" field. It is called by the builders before save.
 	TypeValidator func(string) error
+	// DefaultProtocol holds the default value on creation for the "protocol" field.
+	DefaultProtocol string
+	// DefaultHost holds the default value on creation for the "host" field.
+	DefaultHost string
+	// DefaultPort holds the default value on creation for the "port" field.
+	DefaultPort int
+	// DefaultUsername holds the default value on creation for the "username" field.
+	DefaultUsername string
 	// DefaultURLVersion holds the default value on creation for the "url_version" field.
 	DefaultURLVersion int
 	// DefaultStatus holds the default value on creation for the "status" field.
@@ -111,6 +134,8 @@ var (
 	CountryNameValidator func(string) error
 	// DefaultFallbackMode holds the default value on creation for the "fallback_mode" field.
 	DefaultFallbackMode string
+	// DefaultExpiryWarnDays holds the default value on creation for the "expiry_warn_days" field.
+	DefaultExpiryWarnDays int
 	// DefaultProbeSuccessCount holds the default value on creation for the "probe_success_count" field.
 	DefaultProbeSuccessCount int
 	// DefaultProbeFailureCount holds the default value on creation for the "probe_failure_count" field.
@@ -137,11 +162,6 @@ func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdatedAt, opts...).ToFunc()
 }
 
-// ByDeletedAt orders the results by the deleted_at field.
-func ByDeletedAt(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldDeletedAt, opts...).ToFunc()
-}
-
 // ByName orders the results by the name field.
 func ByName(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldName, opts...).ToFunc()
@@ -150,6 +170,26 @@ func ByName(opts ...sql.OrderTermOption) OrderOption {
 // ByType orders the results by the type field.
 func ByType(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldType, opts...).ToFunc()
+}
+
+// ByProtocol orders the results by the protocol field.
+func ByProtocol(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProtocol, opts...).ToFunc()
+}
+
+// ByHost orders the results by the host field.
+func ByHost(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldHost, opts...).ToFunc()
+}
+
+// ByPort orders the results by the port field.
+func ByPort(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPort, opts...).ToFunc()
+}
+
+// ByUsername orders the results by the username field.
+func ByUsername(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUsername, opts...).ToFunc()
 }
 
 // ByURLVersion orders the results by the url_version field.
@@ -185,6 +225,11 @@ func ByFallbackMode(opts ...sql.OrderTermOption) OrderOption {
 // ByBackupProxyID orders the results by the backup_proxy_id field.
 func ByBackupProxyID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldBackupProxyID, opts...).ToFunc()
+}
+
+// ByExpiryWarnDays orders the results by the expiry_warn_days field.
+func ByExpiryWarnDays(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldExpiryWarnDays, opts...).ToFunc()
 }
 
 // ByLastProbedAt orders the results by the last_probed_at field.

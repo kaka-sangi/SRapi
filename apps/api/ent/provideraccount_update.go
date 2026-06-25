@@ -89,6 +89,20 @@ func (_u *ProviderAccountUpdate) SetNillableName(v *string) *ProviderAccountUpda
 	return _u
 }
 
+// SetPlatform sets the "platform" field.
+func (_u *ProviderAccountUpdate) SetPlatform(v string) *ProviderAccountUpdate {
+	_u.mutation.SetPlatform(v)
+	return _u
+}
+
+// SetNillablePlatform sets the "platform" field if the given value is not nil.
+func (_u *ProviderAccountUpdate) SetNillablePlatform(v *string) *ProviderAccountUpdate {
+	if v != nil {
+		_u.SetPlatform(*v)
+	}
+	return _u
+}
+
 // SetAccountType sets the "account_type" field.
 func (_u *ProviderAccountUpdate) SetAccountType(v string) *ProviderAccountUpdate {
 	_u.mutation.SetAccountType(v)
@@ -269,6 +283,337 @@ func (_u *ProviderAccountUpdate) SetMetadataJSON(v map[string]interface{}) *Prov
 // ClearMetadataJSON clears the value of the "metadata_json" field.
 func (_u *ProviderAccountUpdate) ClearMetadataJSON() *ProviderAccountUpdate {
 	_u.mutation.ClearMetadataJSON()
+	return _u
+}
+
+// SetNotes sets the "notes" field.
+func (_u *ProviderAccountUpdate) SetNotes(v string) *ProviderAccountUpdate {
+	_u.mutation.SetNotes(v)
+	return _u
+}
+
+// SetNillableNotes sets the "notes" field if the given value is not nil.
+func (_u *ProviderAccountUpdate) SetNillableNotes(v *string) *ProviderAccountUpdate {
+	if v != nil {
+		_u.SetNotes(*v)
+	}
+	return _u
+}
+
+// ClearNotes clears the value of the "notes" field.
+func (_u *ProviderAccountUpdate) ClearNotes() *ProviderAccountUpdate {
+	_u.mutation.ClearNotes()
+	return _u
+}
+
+// SetConcurrency sets the "concurrency" field.
+func (_u *ProviderAccountUpdate) SetConcurrency(v int) *ProviderAccountUpdate {
+	_u.mutation.ResetConcurrency()
+	_u.mutation.SetConcurrency(v)
+	return _u
+}
+
+// SetNillableConcurrency sets the "concurrency" field if the given value is not nil.
+func (_u *ProviderAccountUpdate) SetNillableConcurrency(v *int) *ProviderAccountUpdate {
+	if v != nil {
+		_u.SetConcurrency(*v)
+	}
+	return _u
+}
+
+// AddConcurrency adds value to the "concurrency" field.
+func (_u *ProviderAccountUpdate) AddConcurrency(v int) *ProviderAccountUpdate {
+	_u.mutation.AddConcurrency(v)
+	return _u
+}
+
+// SetRateMultiplier sets the "rate_multiplier" field.
+func (_u *ProviderAccountUpdate) SetRateMultiplier(v float64) *ProviderAccountUpdate {
+	_u.mutation.ResetRateMultiplier()
+	_u.mutation.SetRateMultiplier(v)
+	return _u
+}
+
+// SetNillableRateMultiplier sets the "rate_multiplier" field if the given value is not nil.
+func (_u *ProviderAccountUpdate) SetNillableRateMultiplier(v *float64) *ProviderAccountUpdate {
+	if v != nil {
+		_u.SetRateMultiplier(*v)
+	}
+	return _u
+}
+
+// AddRateMultiplier adds value to the "rate_multiplier" field.
+func (_u *ProviderAccountUpdate) AddRateMultiplier(v float64) *ProviderAccountUpdate {
+	_u.mutation.AddRateMultiplier(v)
+	return _u
+}
+
+// SetLoadFactor sets the "load_factor" field.
+func (_u *ProviderAccountUpdate) SetLoadFactor(v int) *ProviderAccountUpdate {
+	_u.mutation.ResetLoadFactor()
+	_u.mutation.SetLoadFactor(v)
+	return _u
+}
+
+// SetNillableLoadFactor sets the "load_factor" field if the given value is not nil.
+func (_u *ProviderAccountUpdate) SetNillableLoadFactor(v *int) *ProviderAccountUpdate {
+	if v != nil {
+		_u.SetLoadFactor(*v)
+	}
+	return _u
+}
+
+// AddLoadFactor adds value to the "load_factor" field.
+func (_u *ProviderAccountUpdate) AddLoadFactor(v int) *ProviderAccountUpdate {
+	_u.mutation.AddLoadFactor(v)
+	return _u
+}
+
+// ClearLoadFactor clears the value of the "load_factor" field.
+func (_u *ProviderAccountUpdate) ClearLoadFactor() *ProviderAccountUpdate {
+	_u.mutation.ClearLoadFactor()
+	return _u
+}
+
+// SetSchedulable sets the "schedulable" field.
+func (_u *ProviderAccountUpdate) SetSchedulable(v bool) *ProviderAccountUpdate {
+	_u.mutation.SetSchedulable(v)
+	return _u
+}
+
+// SetNillableSchedulable sets the "schedulable" field if the given value is not nil.
+func (_u *ProviderAccountUpdate) SetNillableSchedulable(v *bool) *ProviderAccountUpdate {
+	if v != nil {
+		_u.SetSchedulable(*v)
+	}
+	return _u
+}
+
+// SetErrorMessage sets the "error_message" field.
+func (_u *ProviderAccountUpdate) SetErrorMessage(v string) *ProviderAccountUpdate {
+	_u.mutation.SetErrorMessage(v)
+	return _u
+}
+
+// SetNillableErrorMessage sets the "error_message" field if the given value is not nil.
+func (_u *ProviderAccountUpdate) SetNillableErrorMessage(v *string) *ProviderAccountUpdate {
+	if v != nil {
+		_u.SetErrorMessage(*v)
+	}
+	return _u
+}
+
+// SetLastUsedAt sets the "last_used_at" field.
+func (_u *ProviderAccountUpdate) SetLastUsedAt(v time.Time) *ProviderAccountUpdate {
+	_u.mutation.SetLastUsedAt(v)
+	return _u
+}
+
+// SetNillableLastUsedAt sets the "last_used_at" field if the given value is not nil.
+func (_u *ProviderAccountUpdate) SetNillableLastUsedAt(v *time.Time) *ProviderAccountUpdate {
+	if v != nil {
+		_u.SetLastUsedAt(*v)
+	}
+	return _u
+}
+
+// ClearLastUsedAt clears the value of the "last_used_at" field.
+func (_u *ProviderAccountUpdate) ClearLastUsedAt() *ProviderAccountUpdate {
+	_u.mutation.ClearLastUsedAt()
+	return _u
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (_u *ProviderAccountUpdate) SetExpiresAt(v time.Time) *ProviderAccountUpdate {
+	_u.mutation.SetExpiresAt(v)
+	return _u
+}
+
+// SetNillableExpiresAt sets the "expires_at" field if the given value is not nil.
+func (_u *ProviderAccountUpdate) SetNillableExpiresAt(v *time.Time) *ProviderAccountUpdate {
+	if v != nil {
+		_u.SetExpiresAt(*v)
+	}
+	return _u
+}
+
+// ClearExpiresAt clears the value of the "expires_at" field.
+func (_u *ProviderAccountUpdate) ClearExpiresAt() *ProviderAccountUpdate {
+	_u.mutation.ClearExpiresAt()
+	return _u
+}
+
+// SetAutoPauseOnExpired sets the "auto_pause_on_expired" field.
+func (_u *ProviderAccountUpdate) SetAutoPauseOnExpired(v bool) *ProviderAccountUpdate {
+	_u.mutation.SetAutoPauseOnExpired(v)
+	return _u
+}
+
+// SetNillableAutoPauseOnExpired sets the "auto_pause_on_expired" field if the given value is not nil.
+func (_u *ProviderAccountUpdate) SetNillableAutoPauseOnExpired(v *bool) *ProviderAccountUpdate {
+	if v != nil {
+		_u.SetAutoPauseOnExpired(*v)
+	}
+	return _u
+}
+
+// SetRateLimitedAt sets the "rate_limited_at" field.
+func (_u *ProviderAccountUpdate) SetRateLimitedAt(v time.Time) *ProviderAccountUpdate {
+	_u.mutation.SetRateLimitedAt(v)
+	return _u
+}
+
+// SetNillableRateLimitedAt sets the "rate_limited_at" field if the given value is not nil.
+func (_u *ProviderAccountUpdate) SetNillableRateLimitedAt(v *time.Time) *ProviderAccountUpdate {
+	if v != nil {
+		_u.SetRateLimitedAt(*v)
+	}
+	return _u
+}
+
+// ClearRateLimitedAt clears the value of the "rate_limited_at" field.
+func (_u *ProviderAccountUpdate) ClearRateLimitedAt() *ProviderAccountUpdate {
+	_u.mutation.ClearRateLimitedAt()
+	return _u
+}
+
+// SetRateLimitResetAt sets the "rate_limit_reset_at" field.
+func (_u *ProviderAccountUpdate) SetRateLimitResetAt(v time.Time) *ProviderAccountUpdate {
+	_u.mutation.SetRateLimitResetAt(v)
+	return _u
+}
+
+// SetNillableRateLimitResetAt sets the "rate_limit_reset_at" field if the given value is not nil.
+func (_u *ProviderAccountUpdate) SetNillableRateLimitResetAt(v *time.Time) *ProviderAccountUpdate {
+	if v != nil {
+		_u.SetRateLimitResetAt(*v)
+	}
+	return _u
+}
+
+// ClearRateLimitResetAt clears the value of the "rate_limit_reset_at" field.
+func (_u *ProviderAccountUpdate) ClearRateLimitResetAt() *ProviderAccountUpdate {
+	_u.mutation.ClearRateLimitResetAt()
+	return _u
+}
+
+// SetOverloadUntil sets the "overload_until" field.
+func (_u *ProviderAccountUpdate) SetOverloadUntil(v time.Time) *ProviderAccountUpdate {
+	_u.mutation.SetOverloadUntil(v)
+	return _u
+}
+
+// SetNillableOverloadUntil sets the "overload_until" field if the given value is not nil.
+func (_u *ProviderAccountUpdate) SetNillableOverloadUntil(v *time.Time) *ProviderAccountUpdate {
+	if v != nil {
+		_u.SetOverloadUntil(*v)
+	}
+	return _u
+}
+
+// ClearOverloadUntil clears the value of the "overload_until" field.
+func (_u *ProviderAccountUpdate) ClearOverloadUntil() *ProviderAccountUpdate {
+	_u.mutation.ClearOverloadUntil()
+	return _u
+}
+
+// SetTempUnschedulableUntil sets the "temp_unschedulable_until" field.
+func (_u *ProviderAccountUpdate) SetTempUnschedulableUntil(v time.Time) *ProviderAccountUpdate {
+	_u.mutation.SetTempUnschedulableUntil(v)
+	return _u
+}
+
+// SetNillableTempUnschedulableUntil sets the "temp_unschedulable_until" field if the given value is not nil.
+func (_u *ProviderAccountUpdate) SetNillableTempUnschedulableUntil(v *time.Time) *ProviderAccountUpdate {
+	if v != nil {
+		_u.SetTempUnschedulableUntil(*v)
+	}
+	return _u
+}
+
+// ClearTempUnschedulableUntil clears the value of the "temp_unschedulable_until" field.
+func (_u *ProviderAccountUpdate) ClearTempUnschedulableUntil() *ProviderAccountUpdate {
+	_u.mutation.ClearTempUnschedulableUntil()
+	return _u
+}
+
+// SetTempUnschedulableReason sets the "temp_unschedulable_reason" field.
+func (_u *ProviderAccountUpdate) SetTempUnschedulableReason(v string) *ProviderAccountUpdate {
+	_u.mutation.SetTempUnschedulableReason(v)
+	return _u
+}
+
+// SetNillableTempUnschedulableReason sets the "temp_unschedulable_reason" field if the given value is not nil.
+func (_u *ProviderAccountUpdate) SetNillableTempUnschedulableReason(v *string) *ProviderAccountUpdate {
+	if v != nil {
+		_u.SetTempUnschedulableReason(*v)
+	}
+	return _u
+}
+
+// SetSessionWindowStart sets the "session_window_start" field.
+func (_u *ProviderAccountUpdate) SetSessionWindowStart(v time.Time) *ProviderAccountUpdate {
+	_u.mutation.SetSessionWindowStart(v)
+	return _u
+}
+
+// SetNillableSessionWindowStart sets the "session_window_start" field if the given value is not nil.
+func (_u *ProviderAccountUpdate) SetNillableSessionWindowStart(v *time.Time) *ProviderAccountUpdate {
+	if v != nil {
+		_u.SetSessionWindowStart(*v)
+	}
+	return _u
+}
+
+// ClearSessionWindowStart clears the value of the "session_window_start" field.
+func (_u *ProviderAccountUpdate) ClearSessionWindowStart() *ProviderAccountUpdate {
+	_u.mutation.ClearSessionWindowStart()
+	return _u
+}
+
+// SetSessionWindowEnd sets the "session_window_end" field.
+func (_u *ProviderAccountUpdate) SetSessionWindowEnd(v time.Time) *ProviderAccountUpdate {
+	_u.mutation.SetSessionWindowEnd(v)
+	return _u
+}
+
+// SetNillableSessionWindowEnd sets the "session_window_end" field if the given value is not nil.
+func (_u *ProviderAccountUpdate) SetNillableSessionWindowEnd(v *time.Time) *ProviderAccountUpdate {
+	if v != nil {
+		_u.SetSessionWindowEnd(*v)
+	}
+	return _u
+}
+
+// ClearSessionWindowEnd clears the value of the "session_window_end" field.
+func (_u *ProviderAccountUpdate) ClearSessionWindowEnd() *ProviderAccountUpdate {
+	_u.mutation.ClearSessionWindowEnd()
+	return _u
+}
+
+// SetSessionWindowStatus sets the "session_window_status" field.
+func (_u *ProviderAccountUpdate) SetSessionWindowStatus(v string) *ProviderAccountUpdate {
+	_u.mutation.SetSessionWindowStatus(v)
+	return _u
+}
+
+// SetNillableSessionWindowStatus sets the "session_window_status" field if the given value is not nil.
+func (_u *ProviderAccountUpdate) SetNillableSessionWindowStatus(v *string) *ProviderAccountUpdate {
+	if v != nil {
+		_u.SetSessionWindowStatus(*v)
+	}
+	return _u
+}
+
+// SetExtraJSON sets the "extra_json" field.
+func (_u *ProviderAccountUpdate) SetExtraJSON(v map[string]interface{}) *ProviderAccountUpdate {
+	_u.mutation.SetExtraJSON(v)
+	return _u
+}
+
+// ClearExtraJSON clears the value of the "extra_json" field.
+func (_u *ProviderAccountUpdate) ClearExtraJSON() *ProviderAccountUpdate {
+	_u.mutation.ClearExtraJSON()
 	return _u
 }
 
@@ -453,6 +798,9 @@ func (_u *ProviderAccountUpdate) sqlSave(ctx context.Context) (_node int, err er
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(provideraccount.FieldName, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.Platform(); ok {
+		_spec.SetField(provideraccount.FieldPlatform, field.TypeString, value)
+	}
 	if value, ok := _u.mutation.AccountType(); ok {
 		_spec.SetField(provideraccount.FieldAccountType, field.TypeString, value)
 	}
@@ -506,6 +854,102 @@ func (_u *ProviderAccountUpdate) sqlSave(ctx context.Context) (_node int, err er
 	}
 	if _u.mutation.MetadataJSONCleared() {
 		_spec.ClearField(provideraccount.FieldMetadataJSON, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.Notes(); ok {
+		_spec.SetField(provideraccount.FieldNotes, field.TypeString, value)
+	}
+	if _u.mutation.NotesCleared() {
+		_spec.ClearField(provideraccount.FieldNotes, field.TypeString)
+	}
+	if value, ok := _u.mutation.Concurrency(); ok {
+		_spec.SetField(provideraccount.FieldConcurrency, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedConcurrency(); ok {
+		_spec.AddField(provideraccount.FieldConcurrency, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.RateMultiplier(); ok {
+		_spec.SetField(provideraccount.FieldRateMultiplier, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedRateMultiplier(); ok {
+		_spec.AddField(provideraccount.FieldRateMultiplier, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.LoadFactor(); ok {
+		_spec.SetField(provideraccount.FieldLoadFactor, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedLoadFactor(); ok {
+		_spec.AddField(provideraccount.FieldLoadFactor, field.TypeInt, value)
+	}
+	if _u.mutation.LoadFactorCleared() {
+		_spec.ClearField(provideraccount.FieldLoadFactor, field.TypeInt)
+	}
+	if value, ok := _u.mutation.Schedulable(); ok {
+		_spec.SetField(provideraccount.FieldSchedulable, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.ErrorMessage(); ok {
+		_spec.SetField(provideraccount.FieldErrorMessage, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.LastUsedAt(); ok {
+		_spec.SetField(provideraccount.FieldLastUsedAt, field.TypeTime, value)
+	}
+	if _u.mutation.LastUsedAtCleared() {
+		_spec.ClearField(provideraccount.FieldLastUsedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.ExpiresAt(); ok {
+		_spec.SetField(provideraccount.FieldExpiresAt, field.TypeTime, value)
+	}
+	if _u.mutation.ExpiresAtCleared() {
+		_spec.ClearField(provideraccount.FieldExpiresAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.AutoPauseOnExpired(); ok {
+		_spec.SetField(provideraccount.FieldAutoPauseOnExpired, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.RateLimitedAt(); ok {
+		_spec.SetField(provideraccount.FieldRateLimitedAt, field.TypeTime, value)
+	}
+	if _u.mutation.RateLimitedAtCleared() {
+		_spec.ClearField(provideraccount.FieldRateLimitedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.RateLimitResetAt(); ok {
+		_spec.SetField(provideraccount.FieldRateLimitResetAt, field.TypeTime, value)
+	}
+	if _u.mutation.RateLimitResetAtCleared() {
+		_spec.ClearField(provideraccount.FieldRateLimitResetAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.OverloadUntil(); ok {
+		_spec.SetField(provideraccount.FieldOverloadUntil, field.TypeTime, value)
+	}
+	if _u.mutation.OverloadUntilCleared() {
+		_spec.ClearField(provideraccount.FieldOverloadUntil, field.TypeTime)
+	}
+	if value, ok := _u.mutation.TempUnschedulableUntil(); ok {
+		_spec.SetField(provideraccount.FieldTempUnschedulableUntil, field.TypeTime, value)
+	}
+	if _u.mutation.TempUnschedulableUntilCleared() {
+		_spec.ClearField(provideraccount.FieldTempUnschedulableUntil, field.TypeTime)
+	}
+	if value, ok := _u.mutation.TempUnschedulableReason(); ok {
+		_spec.SetField(provideraccount.FieldTempUnschedulableReason, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.SessionWindowStart(); ok {
+		_spec.SetField(provideraccount.FieldSessionWindowStart, field.TypeTime, value)
+	}
+	if _u.mutation.SessionWindowStartCleared() {
+		_spec.ClearField(provideraccount.FieldSessionWindowStart, field.TypeTime)
+	}
+	if value, ok := _u.mutation.SessionWindowEnd(); ok {
+		_spec.SetField(provideraccount.FieldSessionWindowEnd, field.TypeTime, value)
+	}
+	if _u.mutation.SessionWindowEndCleared() {
+		_spec.ClearField(provideraccount.FieldSessionWindowEnd, field.TypeTime)
+	}
+	if value, ok := _u.mutation.SessionWindowStatus(); ok {
+		_spec.SetField(provideraccount.FieldSessionWindowStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.ExtraJSON(); ok {
+		_spec.SetField(provideraccount.FieldExtraJSON, field.TypeJSON, value)
+	}
+	if _u.mutation.ExtraJSONCleared() {
+		_spec.ClearField(provideraccount.FieldExtraJSON, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.TokenExpiresAt(); ok {
 		_spec.SetField(provideraccount.FieldTokenExpiresAt, field.TypeTime, value)
@@ -611,6 +1055,20 @@ func (_u *ProviderAccountUpdateOne) SetName(v string) *ProviderAccountUpdateOne 
 func (_u *ProviderAccountUpdateOne) SetNillableName(v *string) *ProviderAccountUpdateOne {
 	if v != nil {
 		_u.SetName(*v)
+	}
+	return _u
+}
+
+// SetPlatform sets the "platform" field.
+func (_u *ProviderAccountUpdateOne) SetPlatform(v string) *ProviderAccountUpdateOne {
+	_u.mutation.SetPlatform(v)
+	return _u
+}
+
+// SetNillablePlatform sets the "platform" field if the given value is not nil.
+func (_u *ProviderAccountUpdateOne) SetNillablePlatform(v *string) *ProviderAccountUpdateOne {
+	if v != nil {
+		_u.SetPlatform(*v)
 	}
 	return _u
 }
@@ -795,6 +1253,337 @@ func (_u *ProviderAccountUpdateOne) SetMetadataJSON(v map[string]interface{}) *P
 // ClearMetadataJSON clears the value of the "metadata_json" field.
 func (_u *ProviderAccountUpdateOne) ClearMetadataJSON() *ProviderAccountUpdateOne {
 	_u.mutation.ClearMetadataJSON()
+	return _u
+}
+
+// SetNotes sets the "notes" field.
+func (_u *ProviderAccountUpdateOne) SetNotes(v string) *ProviderAccountUpdateOne {
+	_u.mutation.SetNotes(v)
+	return _u
+}
+
+// SetNillableNotes sets the "notes" field if the given value is not nil.
+func (_u *ProviderAccountUpdateOne) SetNillableNotes(v *string) *ProviderAccountUpdateOne {
+	if v != nil {
+		_u.SetNotes(*v)
+	}
+	return _u
+}
+
+// ClearNotes clears the value of the "notes" field.
+func (_u *ProviderAccountUpdateOne) ClearNotes() *ProviderAccountUpdateOne {
+	_u.mutation.ClearNotes()
+	return _u
+}
+
+// SetConcurrency sets the "concurrency" field.
+func (_u *ProviderAccountUpdateOne) SetConcurrency(v int) *ProviderAccountUpdateOne {
+	_u.mutation.ResetConcurrency()
+	_u.mutation.SetConcurrency(v)
+	return _u
+}
+
+// SetNillableConcurrency sets the "concurrency" field if the given value is not nil.
+func (_u *ProviderAccountUpdateOne) SetNillableConcurrency(v *int) *ProviderAccountUpdateOne {
+	if v != nil {
+		_u.SetConcurrency(*v)
+	}
+	return _u
+}
+
+// AddConcurrency adds value to the "concurrency" field.
+func (_u *ProviderAccountUpdateOne) AddConcurrency(v int) *ProviderAccountUpdateOne {
+	_u.mutation.AddConcurrency(v)
+	return _u
+}
+
+// SetRateMultiplier sets the "rate_multiplier" field.
+func (_u *ProviderAccountUpdateOne) SetRateMultiplier(v float64) *ProviderAccountUpdateOne {
+	_u.mutation.ResetRateMultiplier()
+	_u.mutation.SetRateMultiplier(v)
+	return _u
+}
+
+// SetNillableRateMultiplier sets the "rate_multiplier" field if the given value is not nil.
+func (_u *ProviderAccountUpdateOne) SetNillableRateMultiplier(v *float64) *ProviderAccountUpdateOne {
+	if v != nil {
+		_u.SetRateMultiplier(*v)
+	}
+	return _u
+}
+
+// AddRateMultiplier adds value to the "rate_multiplier" field.
+func (_u *ProviderAccountUpdateOne) AddRateMultiplier(v float64) *ProviderAccountUpdateOne {
+	_u.mutation.AddRateMultiplier(v)
+	return _u
+}
+
+// SetLoadFactor sets the "load_factor" field.
+func (_u *ProviderAccountUpdateOne) SetLoadFactor(v int) *ProviderAccountUpdateOne {
+	_u.mutation.ResetLoadFactor()
+	_u.mutation.SetLoadFactor(v)
+	return _u
+}
+
+// SetNillableLoadFactor sets the "load_factor" field if the given value is not nil.
+func (_u *ProviderAccountUpdateOne) SetNillableLoadFactor(v *int) *ProviderAccountUpdateOne {
+	if v != nil {
+		_u.SetLoadFactor(*v)
+	}
+	return _u
+}
+
+// AddLoadFactor adds value to the "load_factor" field.
+func (_u *ProviderAccountUpdateOne) AddLoadFactor(v int) *ProviderAccountUpdateOne {
+	_u.mutation.AddLoadFactor(v)
+	return _u
+}
+
+// ClearLoadFactor clears the value of the "load_factor" field.
+func (_u *ProviderAccountUpdateOne) ClearLoadFactor() *ProviderAccountUpdateOne {
+	_u.mutation.ClearLoadFactor()
+	return _u
+}
+
+// SetSchedulable sets the "schedulable" field.
+func (_u *ProviderAccountUpdateOne) SetSchedulable(v bool) *ProviderAccountUpdateOne {
+	_u.mutation.SetSchedulable(v)
+	return _u
+}
+
+// SetNillableSchedulable sets the "schedulable" field if the given value is not nil.
+func (_u *ProviderAccountUpdateOne) SetNillableSchedulable(v *bool) *ProviderAccountUpdateOne {
+	if v != nil {
+		_u.SetSchedulable(*v)
+	}
+	return _u
+}
+
+// SetErrorMessage sets the "error_message" field.
+func (_u *ProviderAccountUpdateOne) SetErrorMessage(v string) *ProviderAccountUpdateOne {
+	_u.mutation.SetErrorMessage(v)
+	return _u
+}
+
+// SetNillableErrorMessage sets the "error_message" field if the given value is not nil.
+func (_u *ProviderAccountUpdateOne) SetNillableErrorMessage(v *string) *ProviderAccountUpdateOne {
+	if v != nil {
+		_u.SetErrorMessage(*v)
+	}
+	return _u
+}
+
+// SetLastUsedAt sets the "last_used_at" field.
+func (_u *ProviderAccountUpdateOne) SetLastUsedAt(v time.Time) *ProviderAccountUpdateOne {
+	_u.mutation.SetLastUsedAt(v)
+	return _u
+}
+
+// SetNillableLastUsedAt sets the "last_used_at" field if the given value is not nil.
+func (_u *ProviderAccountUpdateOne) SetNillableLastUsedAt(v *time.Time) *ProviderAccountUpdateOne {
+	if v != nil {
+		_u.SetLastUsedAt(*v)
+	}
+	return _u
+}
+
+// ClearLastUsedAt clears the value of the "last_used_at" field.
+func (_u *ProviderAccountUpdateOne) ClearLastUsedAt() *ProviderAccountUpdateOne {
+	_u.mutation.ClearLastUsedAt()
+	return _u
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (_u *ProviderAccountUpdateOne) SetExpiresAt(v time.Time) *ProviderAccountUpdateOne {
+	_u.mutation.SetExpiresAt(v)
+	return _u
+}
+
+// SetNillableExpiresAt sets the "expires_at" field if the given value is not nil.
+func (_u *ProviderAccountUpdateOne) SetNillableExpiresAt(v *time.Time) *ProviderAccountUpdateOne {
+	if v != nil {
+		_u.SetExpiresAt(*v)
+	}
+	return _u
+}
+
+// ClearExpiresAt clears the value of the "expires_at" field.
+func (_u *ProviderAccountUpdateOne) ClearExpiresAt() *ProviderAccountUpdateOne {
+	_u.mutation.ClearExpiresAt()
+	return _u
+}
+
+// SetAutoPauseOnExpired sets the "auto_pause_on_expired" field.
+func (_u *ProviderAccountUpdateOne) SetAutoPauseOnExpired(v bool) *ProviderAccountUpdateOne {
+	_u.mutation.SetAutoPauseOnExpired(v)
+	return _u
+}
+
+// SetNillableAutoPauseOnExpired sets the "auto_pause_on_expired" field if the given value is not nil.
+func (_u *ProviderAccountUpdateOne) SetNillableAutoPauseOnExpired(v *bool) *ProviderAccountUpdateOne {
+	if v != nil {
+		_u.SetAutoPauseOnExpired(*v)
+	}
+	return _u
+}
+
+// SetRateLimitedAt sets the "rate_limited_at" field.
+func (_u *ProviderAccountUpdateOne) SetRateLimitedAt(v time.Time) *ProviderAccountUpdateOne {
+	_u.mutation.SetRateLimitedAt(v)
+	return _u
+}
+
+// SetNillableRateLimitedAt sets the "rate_limited_at" field if the given value is not nil.
+func (_u *ProviderAccountUpdateOne) SetNillableRateLimitedAt(v *time.Time) *ProviderAccountUpdateOne {
+	if v != nil {
+		_u.SetRateLimitedAt(*v)
+	}
+	return _u
+}
+
+// ClearRateLimitedAt clears the value of the "rate_limited_at" field.
+func (_u *ProviderAccountUpdateOne) ClearRateLimitedAt() *ProviderAccountUpdateOne {
+	_u.mutation.ClearRateLimitedAt()
+	return _u
+}
+
+// SetRateLimitResetAt sets the "rate_limit_reset_at" field.
+func (_u *ProviderAccountUpdateOne) SetRateLimitResetAt(v time.Time) *ProviderAccountUpdateOne {
+	_u.mutation.SetRateLimitResetAt(v)
+	return _u
+}
+
+// SetNillableRateLimitResetAt sets the "rate_limit_reset_at" field if the given value is not nil.
+func (_u *ProviderAccountUpdateOne) SetNillableRateLimitResetAt(v *time.Time) *ProviderAccountUpdateOne {
+	if v != nil {
+		_u.SetRateLimitResetAt(*v)
+	}
+	return _u
+}
+
+// ClearRateLimitResetAt clears the value of the "rate_limit_reset_at" field.
+func (_u *ProviderAccountUpdateOne) ClearRateLimitResetAt() *ProviderAccountUpdateOne {
+	_u.mutation.ClearRateLimitResetAt()
+	return _u
+}
+
+// SetOverloadUntil sets the "overload_until" field.
+func (_u *ProviderAccountUpdateOne) SetOverloadUntil(v time.Time) *ProviderAccountUpdateOne {
+	_u.mutation.SetOverloadUntil(v)
+	return _u
+}
+
+// SetNillableOverloadUntil sets the "overload_until" field if the given value is not nil.
+func (_u *ProviderAccountUpdateOne) SetNillableOverloadUntil(v *time.Time) *ProviderAccountUpdateOne {
+	if v != nil {
+		_u.SetOverloadUntil(*v)
+	}
+	return _u
+}
+
+// ClearOverloadUntil clears the value of the "overload_until" field.
+func (_u *ProviderAccountUpdateOne) ClearOverloadUntil() *ProviderAccountUpdateOne {
+	_u.mutation.ClearOverloadUntil()
+	return _u
+}
+
+// SetTempUnschedulableUntil sets the "temp_unschedulable_until" field.
+func (_u *ProviderAccountUpdateOne) SetTempUnschedulableUntil(v time.Time) *ProviderAccountUpdateOne {
+	_u.mutation.SetTempUnschedulableUntil(v)
+	return _u
+}
+
+// SetNillableTempUnschedulableUntil sets the "temp_unschedulable_until" field if the given value is not nil.
+func (_u *ProviderAccountUpdateOne) SetNillableTempUnschedulableUntil(v *time.Time) *ProviderAccountUpdateOne {
+	if v != nil {
+		_u.SetTempUnschedulableUntil(*v)
+	}
+	return _u
+}
+
+// ClearTempUnschedulableUntil clears the value of the "temp_unschedulable_until" field.
+func (_u *ProviderAccountUpdateOne) ClearTempUnschedulableUntil() *ProviderAccountUpdateOne {
+	_u.mutation.ClearTempUnschedulableUntil()
+	return _u
+}
+
+// SetTempUnschedulableReason sets the "temp_unschedulable_reason" field.
+func (_u *ProviderAccountUpdateOne) SetTempUnschedulableReason(v string) *ProviderAccountUpdateOne {
+	_u.mutation.SetTempUnschedulableReason(v)
+	return _u
+}
+
+// SetNillableTempUnschedulableReason sets the "temp_unschedulable_reason" field if the given value is not nil.
+func (_u *ProviderAccountUpdateOne) SetNillableTempUnschedulableReason(v *string) *ProviderAccountUpdateOne {
+	if v != nil {
+		_u.SetTempUnschedulableReason(*v)
+	}
+	return _u
+}
+
+// SetSessionWindowStart sets the "session_window_start" field.
+func (_u *ProviderAccountUpdateOne) SetSessionWindowStart(v time.Time) *ProviderAccountUpdateOne {
+	_u.mutation.SetSessionWindowStart(v)
+	return _u
+}
+
+// SetNillableSessionWindowStart sets the "session_window_start" field if the given value is not nil.
+func (_u *ProviderAccountUpdateOne) SetNillableSessionWindowStart(v *time.Time) *ProviderAccountUpdateOne {
+	if v != nil {
+		_u.SetSessionWindowStart(*v)
+	}
+	return _u
+}
+
+// ClearSessionWindowStart clears the value of the "session_window_start" field.
+func (_u *ProviderAccountUpdateOne) ClearSessionWindowStart() *ProviderAccountUpdateOne {
+	_u.mutation.ClearSessionWindowStart()
+	return _u
+}
+
+// SetSessionWindowEnd sets the "session_window_end" field.
+func (_u *ProviderAccountUpdateOne) SetSessionWindowEnd(v time.Time) *ProviderAccountUpdateOne {
+	_u.mutation.SetSessionWindowEnd(v)
+	return _u
+}
+
+// SetNillableSessionWindowEnd sets the "session_window_end" field if the given value is not nil.
+func (_u *ProviderAccountUpdateOne) SetNillableSessionWindowEnd(v *time.Time) *ProviderAccountUpdateOne {
+	if v != nil {
+		_u.SetSessionWindowEnd(*v)
+	}
+	return _u
+}
+
+// ClearSessionWindowEnd clears the value of the "session_window_end" field.
+func (_u *ProviderAccountUpdateOne) ClearSessionWindowEnd() *ProviderAccountUpdateOne {
+	_u.mutation.ClearSessionWindowEnd()
+	return _u
+}
+
+// SetSessionWindowStatus sets the "session_window_status" field.
+func (_u *ProviderAccountUpdateOne) SetSessionWindowStatus(v string) *ProviderAccountUpdateOne {
+	_u.mutation.SetSessionWindowStatus(v)
+	return _u
+}
+
+// SetNillableSessionWindowStatus sets the "session_window_status" field if the given value is not nil.
+func (_u *ProviderAccountUpdateOne) SetNillableSessionWindowStatus(v *string) *ProviderAccountUpdateOne {
+	if v != nil {
+		_u.SetSessionWindowStatus(*v)
+	}
+	return _u
+}
+
+// SetExtraJSON sets the "extra_json" field.
+func (_u *ProviderAccountUpdateOne) SetExtraJSON(v map[string]interface{}) *ProviderAccountUpdateOne {
+	_u.mutation.SetExtraJSON(v)
+	return _u
+}
+
+// ClearExtraJSON clears the value of the "extra_json" field.
+func (_u *ProviderAccountUpdateOne) ClearExtraJSON() *ProviderAccountUpdateOne {
+	_u.mutation.ClearExtraJSON()
 	return _u
 }
 
@@ -1009,6 +1798,9 @@ func (_u *ProviderAccountUpdateOne) sqlSave(ctx context.Context) (_node *Provide
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(provideraccount.FieldName, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.Platform(); ok {
+		_spec.SetField(provideraccount.FieldPlatform, field.TypeString, value)
+	}
 	if value, ok := _u.mutation.AccountType(); ok {
 		_spec.SetField(provideraccount.FieldAccountType, field.TypeString, value)
 	}
@@ -1062,6 +1854,102 @@ func (_u *ProviderAccountUpdateOne) sqlSave(ctx context.Context) (_node *Provide
 	}
 	if _u.mutation.MetadataJSONCleared() {
 		_spec.ClearField(provideraccount.FieldMetadataJSON, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.Notes(); ok {
+		_spec.SetField(provideraccount.FieldNotes, field.TypeString, value)
+	}
+	if _u.mutation.NotesCleared() {
+		_spec.ClearField(provideraccount.FieldNotes, field.TypeString)
+	}
+	if value, ok := _u.mutation.Concurrency(); ok {
+		_spec.SetField(provideraccount.FieldConcurrency, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedConcurrency(); ok {
+		_spec.AddField(provideraccount.FieldConcurrency, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.RateMultiplier(); ok {
+		_spec.SetField(provideraccount.FieldRateMultiplier, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedRateMultiplier(); ok {
+		_spec.AddField(provideraccount.FieldRateMultiplier, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.LoadFactor(); ok {
+		_spec.SetField(provideraccount.FieldLoadFactor, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedLoadFactor(); ok {
+		_spec.AddField(provideraccount.FieldLoadFactor, field.TypeInt, value)
+	}
+	if _u.mutation.LoadFactorCleared() {
+		_spec.ClearField(provideraccount.FieldLoadFactor, field.TypeInt)
+	}
+	if value, ok := _u.mutation.Schedulable(); ok {
+		_spec.SetField(provideraccount.FieldSchedulable, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.ErrorMessage(); ok {
+		_spec.SetField(provideraccount.FieldErrorMessage, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.LastUsedAt(); ok {
+		_spec.SetField(provideraccount.FieldLastUsedAt, field.TypeTime, value)
+	}
+	if _u.mutation.LastUsedAtCleared() {
+		_spec.ClearField(provideraccount.FieldLastUsedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.ExpiresAt(); ok {
+		_spec.SetField(provideraccount.FieldExpiresAt, field.TypeTime, value)
+	}
+	if _u.mutation.ExpiresAtCleared() {
+		_spec.ClearField(provideraccount.FieldExpiresAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.AutoPauseOnExpired(); ok {
+		_spec.SetField(provideraccount.FieldAutoPauseOnExpired, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.RateLimitedAt(); ok {
+		_spec.SetField(provideraccount.FieldRateLimitedAt, field.TypeTime, value)
+	}
+	if _u.mutation.RateLimitedAtCleared() {
+		_spec.ClearField(provideraccount.FieldRateLimitedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.RateLimitResetAt(); ok {
+		_spec.SetField(provideraccount.FieldRateLimitResetAt, field.TypeTime, value)
+	}
+	if _u.mutation.RateLimitResetAtCleared() {
+		_spec.ClearField(provideraccount.FieldRateLimitResetAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.OverloadUntil(); ok {
+		_spec.SetField(provideraccount.FieldOverloadUntil, field.TypeTime, value)
+	}
+	if _u.mutation.OverloadUntilCleared() {
+		_spec.ClearField(provideraccount.FieldOverloadUntil, field.TypeTime)
+	}
+	if value, ok := _u.mutation.TempUnschedulableUntil(); ok {
+		_spec.SetField(provideraccount.FieldTempUnschedulableUntil, field.TypeTime, value)
+	}
+	if _u.mutation.TempUnschedulableUntilCleared() {
+		_spec.ClearField(provideraccount.FieldTempUnschedulableUntil, field.TypeTime)
+	}
+	if value, ok := _u.mutation.TempUnschedulableReason(); ok {
+		_spec.SetField(provideraccount.FieldTempUnschedulableReason, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.SessionWindowStart(); ok {
+		_spec.SetField(provideraccount.FieldSessionWindowStart, field.TypeTime, value)
+	}
+	if _u.mutation.SessionWindowStartCleared() {
+		_spec.ClearField(provideraccount.FieldSessionWindowStart, field.TypeTime)
+	}
+	if value, ok := _u.mutation.SessionWindowEnd(); ok {
+		_spec.SetField(provideraccount.FieldSessionWindowEnd, field.TypeTime, value)
+	}
+	if _u.mutation.SessionWindowEndCleared() {
+		_spec.ClearField(provideraccount.FieldSessionWindowEnd, field.TypeTime)
+	}
+	if value, ok := _u.mutation.SessionWindowStatus(); ok {
+		_spec.SetField(provideraccount.FieldSessionWindowStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.ExtraJSON(); ok {
+		_spec.SetField(provideraccount.FieldExtraJSON, field.TypeJSON, value)
+	}
+	if _u.mutation.ExtraJSONCleared() {
+		_spec.ClearField(provideraccount.FieldExtraJSON, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.TokenExpiresAt(); ok {
 		_spec.SetField(provideraccount.FieldTokenExpiresAt, field.TypeTime, value)

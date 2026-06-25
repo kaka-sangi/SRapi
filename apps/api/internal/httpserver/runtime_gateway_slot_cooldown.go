@@ -54,7 +54,7 @@ func (rt *runtimeState) acquireGatewayAccountConcurrencySlot(ctx context.Context
 	if !accountConcurrencySlotEnabled(account.Metadata) {
 		return func() {}, false, nil
 	}
-	capacity := accountConcurrencySlotCapacity(account.Metadata)
+	capacity := accountConcurrencySlotCapacity(account)
 	release, err = rt.concurrencySlots.AcquireSlot(ctx, int64(account.ID), capacity, gatewayConcurrencySlotWaitBudget)
 	if err != nil {
 		return nil, false, err
@@ -124,9 +124,12 @@ func accountRateLimitCooldownEnabled(metadata map[string]any) bool {
 	return false
 }
 
-func accountConcurrencySlotCapacity(metadata map[string]any) int {
+func accountConcurrencySlotCapacity(account accountcontract.ProviderAccount) int {
+	if account.Concurrency > 0 {
+		return account.Concurrency
+	}
 	for _, key := range []string{"concurrency_slot_capacity", "max_concurrency"} {
-		if cap := metadataInt(metadata, key); cap > 0 {
+		if cap := metadataInt(account.Metadata, key); cap > 0 {
 			return cap
 		}
 	}

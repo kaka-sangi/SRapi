@@ -163,7 +163,7 @@ export function AccountOAuthAuthorizeDialog({
       authorize_url: authorizeUrl.trim() || undefined,
       token_url: tokenUrl.trim() || undefined,
       device_authorize_url: deviceAuthorizeUrl.trim() || undefined,
-      redirect_uri: redirectUri.trim() || undefined,
+      redirect_uri: effectiveRedirectUri || undefined,
       scopes: scopeList.length ? scopeList : undefined,
       use_pkce: true,
     };
@@ -265,10 +265,11 @@ export function AccountOAuthAuthorizeDialog({
   }
 
   const isAuthCode = mode === "authorization_code";
+  const effectiveRedirectUri = redirectUri.trim() || `${window.location.origin}/api/v1/oauth/callback`;
   const configReady =
     clientId.trim() !== "" &&
     (isAuthCode
-      ? authorizeUrl.trim() !== "" && tokenUrl.trim() !== "" && redirectUri.trim() !== ""
+      ? authorizeUrl.trim() !== "" && tokenUrl.trim() !== ""
       : deviceAuthorizeUrl.trim() !== "" && tokenUrl.trim() !== "");
 
   return (

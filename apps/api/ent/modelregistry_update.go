@@ -35,26 +35,6 @@ func (_u *ModelRegistryUpdate) SetUpdatedAt(v time.Time) *ModelRegistryUpdate {
 	return _u
 }
 
-// SetDeletedAt sets the "deleted_at" field.
-func (_u *ModelRegistryUpdate) SetDeletedAt(v time.Time) *ModelRegistryUpdate {
-	_u.mutation.SetDeletedAt(v)
-	return _u
-}
-
-// SetNillableDeletedAt sets the "deleted_at" field if the given value is not nil.
-func (_u *ModelRegistryUpdate) SetNillableDeletedAt(v *time.Time) *ModelRegistryUpdate {
-	if v != nil {
-		_u.SetDeletedAt(*v)
-	}
-	return _u
-}
-
-// ClearDeletedAt clears the value of the "deleted_at" field.
-func (_u *ModelRegistryUpdate) ClearDeletedAt() *ModelRegistryUpdate {
-	_u.mutation.ClearDeletedAt()
-	return _u
-}
-
 // SetCanonicalName sets the "canonical_name" field.
 func (_u *ModelRegistryUpdate) SetCanonicalName(v string) *ModelRegistryUpdate {
 	_u.mutation.SetCanonicalName(v)
@@ -268,12 +248,6 @@ func (_u *ModelRegistryUpdate) sqlSave(ctx context.Context) (_node int, err erro
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(modelregistry.FieldUpdatedAt, field.TypeTime, value)
 	}
-	if value, ok := _u.mutation.DeletedAt(); ok {
-		_spec.SetField(modelregistry.FieldDeletedAt, field.TypeTime, value)
-	}
-	if _u.mutation.DeletedAtCleared() {
-		_spec.ClearField(modelregistry.FieldDeletedAt, field.TypeTime)
-	}
 	if value, ok := _u.mutation.CanonicalName(); ok {
 		_spec.SetField(modelregistry.FieldCanonicalName, field.TypeString, value)
 	}
@@ -341,26 +315,6 @@ type ModelRegistryUpdateOne struct {
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *ModelRegistryUpdateOne) SetUpdatedAt(v time.Time) *ModelRegistryUpdateOne {
 	_u.mutation.SetUpdatedAt(v)
-	return _u
-}
-
-// SetDeletedAt sets the "deleted_at" field.
-func (_u *ModelRegistryUpdateOne) SetDeletedAt(v time.Time) *ModelRegistryUpdateOne {
-	_u.mutation.SetDeletedAt(v)
-	return _u
-}
-
-// SetNillableDeletedAt sets the "deleted_at" field if the given value is not nil.
-func (_u *ModelRegistryUpdateOne) SetNillableDeletedAt(v *time.Time) *ModelRegistryUpdateOne {
-	if v != nil {
-		_u.SetDeletedAt(*v)
-	}
-	return _u
-}
-
-// ClearDeletedAt clears the value of the "deleted_at" field.
-func (_u *ModelRegistryUpdateOne) ClearDeletedAt() *ModelRegistryUpdateOne {
-	_u.mutation.ClearDeletedAt()
 	return _u
 }
 
@@ -606,12 +560,6 @@ func (_u *ModelRegistryUpdateOne) sqlSave(ctx context.Context) (_node *ModelRegi
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(modelregistry.FieldUpdatedAt, field.TypeTime, value)
-	}
-	if value, ok := _u.mutation.DeletedAt(); ok {
-		_spec.SetField(modelregistry.FieldDeletedAt, field.TypeTime, value)
-	}
-	if _u.mutation.DeletedAtCleared() {
-		_spec.ClearField(modelregistry.FieldDeletedAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.CanonicalName(); ok {
 		_spec.SetField(modelregistry.FieldCanonicalName, field.TypeString, value)

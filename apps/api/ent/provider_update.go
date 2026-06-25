@@ -34,26 +34,6 @@ func (_u *ProviderUpdate) SetUpdatedAt(v time.Time) *ProviderUpdate {
 	return _u
 }
 
-// SetDeletedAt sets the "deleted_at" field.
-func (_u *ProviderUpdate) SetDeletedAt(v time.Time) *ProviderUpdate {
-	_u.mutation.SetDeletedAt(v)
-	return _u
-}
-
-// SetNillableDeletedAt sets the "deleted_at" field if the given value is not nil.
-func (_u *ProviderUpdate) SetNillableDeletedAt(v *time.Time) *ProviderUpdate {
-	if v != nil {
-		_u.SetDeletedAt(*v)
-	}
-	return _u
-}
-
-// ClearDeletedAt clears the value of the "deleted_at" field.
-func (_u *ProviderUpdate) ClearDeletedAt() *ProviderUpdate {
-	_u.mutation.ClearDeletedAt()
-	return _u
-}
-
 // SetName sets the "name" field.
 func (_u *ProviderUpdate) SetName(v string) *ProviderUpdate {
 	_u.mutation.SetName(v)
@@ -224,12 +204,6 @@ func (_u *ProviderUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(provider.FieldUpdatedAt, field.TypeTime, value)
 	}
-	if value, ok := _u.mutation.DeletedAt(); ok {
-		_spec.SetField(provider.FieldDeletedAt, field.TypeTime, value)
-	}
-	if _u.mutation.DeletedAtCleared() {
-		_spec.ClearField(provider.FieldDeletedAt, field.TypeTime)
-	}
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(provider.FieldName, field.TypeString, value)
 	}
@@ -280,26 +254,6 @@ type ProviderUpdateOne struct {
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *ProviderUpdateOne) SetUpdatedAt(v time.Time) *ProviderUpdateOne {
 	_u.mutation.SetUpdatedAt(v)
-	return _u
-}
-
-// SetDeletedAt sets the "deleted_at" field.
-func (_u *ProviderUpdateOne) SetDeletedAt(v time.Time) *ProviderUpdateOne {
-	_u.mutation.SetDeletedAt(v)
-	return _u
-}
-
-// SetNillableDeletedAt sets the "deleted_at" field if the given value is not nil.
-func (_u *ProviderUpdateOne) SetNillableDeletedAt(v *time.Time) *ProviderUpdateOne {
-	if v != nil {
-		_u.SetDeletedAt(*v)
-	}
-	return _u
-}
-
-// ClearDeletedAt clears the value of the "deleted_at" field.
-func (_u *ProviderUpdateOne) ClearDeletedAt() *ProviderUpdateOne {
-	_u.mutation.ClearDeletedAt()
 	return _u
 }
 
@@ -502,12 +456,6 @@ func (_u *ProviderUpdateOne) sqlSave(ctx context.Context) (_node *Provider, err 
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(provider.FieldUpdatedAt, field.TypeTime, value)
-	}
-	if value, ok := _u.mutation.DeletedAt(); ok {
-		_spec.SetField(provider.FieldDeletedAt, field.TypeTime, value)
-	}
-	if _u.mutation.DeletedAtCleared() {
-		_spec.ClearField(provider.FieldDeletedAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(provider.FieldName, field.TypeString, value)

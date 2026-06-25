@@ -25631,7 +25631,6 @@ type ModelRegistryMutation struct {
 	id                      *int
 	created_at              *time.Time
 	updated_at              *time.Time
-	deleted_at              *time.Time
 	canonical_name          *string
 	display_name            *string
 	family                  *string
@@ -25817,55 +25816,6 @@ func (m *ModelRegistryMutation) OldUpdatedAt(ctx context.Context) (v time.Time, 
 // ResetUpdatedAt resets all changes to the "updated_at" field.
 func (m *ModelRegistryMutation) ResetUpdatedAt() {
 	m.updated_at = nil
-}
-
-// SetDeletedAt sets the "deleted_at" field.
-func (m *ModelRegistryMutation) SetDeletedAt(t time.Time) {
-	m.deleted_at = &t
-}
-
-// DeletedAt returns the value of the "deleted_at" field in the mutation.
-func (m *ModelRegistryMutation) DeletedAt() (r time.Time, exists bool) {
-	v := m.deleted_at
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldDeletedAt returns the old "deleted_at" field's value of the ModelRegistry entity.
-// If the ModelRegistry object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ModelRegistryMutation) OldDeletedAt(ctx context.Context) (v *time.Time, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldDeletedAt is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldDeletedAt requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldDeletedAt: %w", err)
-	}
-	return oldValue.DeletedAt, nil
-}
-
-// ClearDeletedAt clears the value of the "deleted_at" field.
-func (m *ModelRegistryMutation) ClearDeletedAt() {
-	m.deleted_at = nil
-	m.clearedFields[modelregistry.FieldDeletedAt] = struct{}{}
-}
-
-// DeletedAtCleared returns if the "deleted_at" field was cleared in this mutation.
-func (m *ModelRegistryMutation) DeletedAtCleared() bool {
-	_, ok := m.clearedFields[modelregistry.FieldDeletedAt]
-	return ok
-}
-
-// ResetDeletedAt resets all changes to the "deleted_at" field.
-func (m *ModelRegistryMutation) ResetDeletedAt() {
-	m.deleted_at = nil
-	delete(m.clearedFields, modelregistry.FieldDeletedAt)
 }
 
 // SetCanonicalName sets the "canonical_name" field.
@@ -26287,15 +26237,12 @@ func (m *ModelRegistryMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ModelRegistryMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 10)
 	if m.created_at != nil {
 		fields = append(fields, modelregistry.FieldCreatedAt)
 	}
 	if m.updated_at != nil {
 		fields = append(fields, modelregistry.FieldUpdatedAt)
-	}
-	if m.deleted_at != nil {
-		fields = append(fields, modelregistry.FieldDeletedAt)
 	}
 	if m.canonical_name != nil {
 		fields = append(fields, modelregistry.FieldCanonicalName)
@@ -26333,8 +26280,6 @@ func (m *ModelRegistryMutation) Field(name string) (ent.Value, bool) {
 		return m.CreatedAt()
 	case modelregistry.FieldUpdatedAt:
 		return m.UpdatedAt()
-	case modelregistry.FieldDeletedAt:
-		return m.DeletedAt()
 	case modelregistry.FieldCanonicalName:
 		return m.CanonicalName()
 	case modelregistry.FieldDisplayName:
@@ -26364,8 +26309,6 @@ func (m *ModelRegistryMutation) OldField(ctx context.Context, name string) (ent.
 		return m.OldCreatedAt(ctx)
 	case modelregistry.FieldUpdatedAt:
 		return m.OldUpdatedAt(ctx)
-	case modelregistry.FieldDeletedAt:
-		return m.OldDeletedAt(ctx)
 	case modelregistry.FieldCanonicalName:
 		return m.OldCanonicalName(ctx)
 	case modelregistry.FieldDisplayName:
@@ -26404,13 +26347,6 @@ func (m *ModelRegistryMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetUpdatedAt(v)
-		return nil
-	case modelregistry.FieldDeletedAt:
-		v, ok := value.(time.Time)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetDeletedAt(v)
 		return nil
 	case modelregistry.FieldCanonicalName:
 		v, ok := value.(string)
@@ -26525,9 +26461,6 @@ func (m *ModelRegistryMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *ModelRegistryMutation) ClearedFields() []string {
 	var fields []string
-	if m.FieldCleared(modelregistry.FieldDeletedAt) {
-		fields = append(fields, modelregistry.FieldDeletedAt)
-	}
 	if m.FieldCleared(modelregistry.FieldContextWindow) {
 		fields = append(fields, modelregistry.FieldContextWindow)
 	}
@@ -26551,9 +26484,6 @@ func (m *ModelRegistryMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *ModelRegistryMutation) ClearField(name string) error {
 	switch name {
-	case modelregistry.FieldDeletedAt:
-		m.ClearDeletedAt()
-		return nil
 	case modelregistry.FieldContextWindow:
 		m.ClearContextWindow()
 		return nil
@@ -26576,9 +26506,6 @@ func (m *ModelRegistryMutation) ResetField(name string) error {
 		return nil
 	case modelregistry.FieldUpdatedAt:
 		m.ResetUpdatedAt()
-		return nil
-	case modelregistry.FieldDeletedAt:
-		m.ResetDeletedAt()
 		return nil
 	case modelregistry.FieldCanonicalName:
 		m.ResetCanonicalName()
@@ -42756,7 +42683,6 @@ type PaymentProviderInstanceMutation struct {
 	id                           *int
 	created_at                   *time.Time
 	updated_at                   *time.Time
-	deleted_at                   *time.Time
 	provider                     *string
 	name                         *string
 	status                       *string
@@ -42946,55 +42872,6 @@ func (m *PaymentProviderInstanceMutation) OldUpdatedAt(ctx context.Context) (v t
 // ResetUpdatedAt resets all changes to the "updated_at" field.
 func (m *PaymentProviderInstanceMutation) ResetUpdatedAt() {
 	m.updated_at = nil
-}
-
-// SetDeletedAt sets the "deleted_at" field.
-func (m *PaymentProviderInstanceMutation) SetDeletedAt(t time.Time) {
-	m.deleted_at = &t
-}
-
-// DeletedAt returns the value of the "deleted_at" field in the mutation.
-func (m *PaymentProviderInstanceMutation) DeletedAt() (r time.Time, exists bool) {
-	v := m.deleted_at
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldDeletedAt returns the old "deleted_at" field's value of the PaymentProviderInstance entity.
-// If the PaymentProviderInstance object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PaymentProviderInstanceMutation) OldDeletedAt(ctx context.Context) (v *time.Time, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldDeletedAt is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldDeletedAt requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldDeletedAt: %w", err)
-	}
-	return oldValue.DeletedAt, nil
-}
-
-// ClearDeletedAt clears the value of the "deleted_at" field.
-func (m *PaymentProviderInstanceMutation) ClearDeletedAt() {
-	m.deleted_at = nil
-	m.clearedFields[paymentproviderinstance.FieldDeletedAt] = struct{}{}
-}
-
-// DeletedAtCleared returns if the "deleted_at" field was cleared in this mutation.
-func (m *PaymentProviderInstanceMutation) DeletedAtCleared() bool {
-	_, ok := m.clearedFields[paymentproviderinstance.FieldDeletedAt]
-	return ok
-}
-
-// ResetDeletedAt resets all changes to the "deleted_at" field.
-func (m *PaymentProviderInstanceMutation) ResetDeletedAt() {
-	m.deleted_at = nil
-	delete(m.clearedFields, paymentproviderinstance.FieldDeletedAt)
 }
 
 // SetProvider sets the "provider" field.
@@ -43555,15 +43432,12 @@ func (m *PaymentProviderInstanceMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PaymentProviderInstanceMutation) Fields() []string {
-	fields := make([]string, 0, 14)
+	fields := make([]string, 0, 13)
 	if m.created_at != nil {
 		fields = append(fields, paymentproviderinstance.FieldCreatedAt)
 	}
 	if m.updated_at != nil {
 		fields = append(fields, paymentproviderinstance.FieldUpdatedAt)
-	}
-	if m.deleted_at != nil {
-		fields = append(fields, paymentproviderinstance.FieldDeletedAt)
 	}
 	if m.provider != nil {
 		fields = append(fields, paymentproviderinstance.FieldProvider)
@@ -43610,8 +43484,6 @@ func (m *PaymentProviderInstanceMutation) Field(name string) (ent.Value, bool) {
 		return m.CreatedAt()
 	case paymentproviderinstance.FieldUpdatedAt:
 		return m.UpdatedAt()
-	case paymentproviderinstance.FieldDeletedAt:
-		return m.DeletedAt()
 	case paymentproviderinstance.FieldProvider:
 		return m.Provider()
 	case paymentproviderinstance.FieldName:
@@ -43647,8 +43519,6 @@ func (m *PaymentProviderInstanceMutation) OldField(ctx context.Context, name str
 		return m.OldCreatedAt(ctx)
 	case paymentproviderinstance.FieldUpdatedAt:
 		return m.OldUpdatedAt(ctx)
-	case paymentproviderinstance.FieldDeletedAt:
-		return m.OldDeletedAt(ctx)
 	case paymentproviderinstance.FieldProvider:
 		return m.OldProvider(ctx)
 	case paymentproviderinstance.FieldName:
@@ -43693,13 +43563,6 @@ func (m *PaymentProviderInstanceMutation) SetField(name string, value ent.Value)
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetUpdatedAt(v)
-		return nil
-	case paymentproviderinstance.FieldDeletedAt:
-		v, ok := value.(time.Time)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetDeletedAt(v)
 		return nil
 	case paymentproviderinstance.FieldProvider:
 		v, ok := value.(string)
@@ -43847,9 +43710,6 @@ func (m *PaymentProviderInstanceMutation) AddField(name string, value ent.Value)
 // mutation.
 func (m *PaymentProviderInstanceMutation) ClearedFields() []string {
 	var fields []string
-	if m.FieldCleared(paymentproviderinstance.FieldDeletedAt) {
-		fields = append(fields, paymentproviderinstance.FieldDeletedAt)
-	}
 	if m.FieldCleared(paymentproviderinstance.FieldConfigCiphertext) {
 		fields = append(fields, paymentproviderinstance.FieldConfigCiphertext)
 	}
@@ -43876,9 +43736,6 @@ func (m *PaymentProviderInstanceMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *PaymentProviderInstanceMutation) ClearField(name string) error {
 	switch name {
-	case paymentproviderinstance.FieldDeletedAt:
-		m.ClearDeletedAt()
-		return nil
 	case paymentproviderinstance.FieldConfigCiphertext:
 		m.ClearConfigCiphertext()
 		return nil
@@ -43904,9 +43761,6 @@ func (m *PaymentProviderInstanceMutation) ResetField(name string) error {
 		return nil
 	case paymentproviderinstance.FieldUpdatedAt:
 		m.ResetUpdatedAt()
-		return nil
-	case paymentproviderinstance.FieldDeletedAt:
-		m.ResetDeletedAt()
 		return nil
 	case paymentproviderinstance.FieldProvider:
 		m.ResetProvider()
@@ -48911,7 +48765,6 @@ type ProviderMutation struct {
 	id                 *int
 	created_at         *time.Time
 	updated_at         *time.Time
-	deleted_at         *time.Time
 	name               *string
 	display_name       *string
 	adapter_type       *string
@@ -49093,55 +48946,6 @@ func (m *ProviderMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err e
 // ResetUpdatedAt resets all changes to the "updated_at" field.
 func (m *ProviderMutation) ResetUpdatedAt() {
 	m.updated_at = nil
-}
-
-// SetDeletedAt sets the "deleted_at" field.
-func (m *ProviderMutation) SetDeletedAt(t time.Time) {
-	m.deleted_at = &t
-}
-
-// DeletedAt returns the value of the "deleted_at" field in the mutation.
-func (m *ProviderMutation) DeletedAt() (r time.Time, exists bool) {
-	v := m.deleted_at
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldDeletedAt returns the old "deleted_at" field's value of the Provider entity.
-// If the Provider object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ProviderMutation) OldDeletedAt(ctx context.Context) (v *time.Time, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldDeletedAt is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldDeletedAt requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldDeletedAt: %w", err)
-	}
-	return oldValue.DeletedAt, nil
-}
-
-// ClearDeletedAt clears the value of the "deleted_at" field.
-func (m *ProviderMutation) ClearDeletedAt() {
-	m.deleted_at = nil
-	m.clearedFields[provider.FieldDeletedAt] = struct{}{}
-}
-
-// DeletedAtCleared returns if the "deleted_at" field was cleared in this mutation.
-func (m *ProviderMutation) DeletedAtCleared() bool {
-	_, ok := m.clearedFields[provider.FieldDeletedAt]
-	return ok
-}
-
-// ResetDeletedAt resets all changes to the "deleted_at" field.
-func (m *ProviderMutation) ResetDeletedAt() {
-	m.deleted_at = nil
-	delete(m.clearedFields, provider.FieldDeletedAt)
 }
 
 // SetName sets the "name" field.
@@ -49456,15 +49260,12 @@ func (m *ProviderMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ProviderMutation) Fields() []string {
-	fields := make([]string, 0, 10)
+	fields := make([]string, 0, 9)
 	if m.created_at != nil {
 		fields = append(fields, provider.FieldCreatedAt)
 	}
 	if m.updated_at != nil {
 		fields = append(fields, provider.FieldUpdatedAt)
-	}
-	if m.deleted_at != nil {
-		fields = append(fields, provider.FieldDeletedAt)
 	}
 	if m.name != nil {
 		fields = append(fields, provider.FieldName)
@@ -49499,8 +49300,6 @@ func (m *ProviderMutation) Field(name string) (ent.Value, bool) {
 		return m.CreatedAt()
 	case provider.FieldUpdatedAt:
 		return m.UpdatedAt()
-	case provider.FieldDeletedAt:
-		return m.DeletedAt()
 	case provider.FieldName:
 		return m.Name()
 	case provider.FieldDisplayName:
@@ -49528,8 +49327,6 @@ func (m *ProviderMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldCreatedAt(ctx)
 	case provider.FieldUpdatedAt:
 		return m.OldUpdatedAt(ctx)
-	case provider.FieldDeletedAt:
-		return m.OldDeletedAt(ctx)
 	case provider.FieldName:
 		return m.OldName(ctx)
 	case provider.FieldDisplayName:
@@ -49566,13 +49363,6 @@ func (m *ProviderMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetUpdatedAt(v)
-		return nil
-	case provider.FieldDeletedAt:
-		v, ok := value.(time.Time)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetDeletedAt(v)
 		return nil
 	case provider.FieldName:
 		v, ok := value.(string)
@@ -49653,9 +49443,6 @@ func (m *ProviderMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *ProviderMutation) ClearedFields() []string {
 	var fields []string
-	if m.FieldCleared(provider.FieldDeletedAt) {
-		fields = append(fields, provider.FieldDeletedAt)
-	}
 	if m.FieldCleared(provider.FieldCapabilitiesJSON) {
 		fields = append(fields, provider.FieldCapabilitiesJSON)
 	}
@@ -49676,9 +49463,6 @@ func (m *ProviderMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *ProviderMutation) ClearField(name string) error {
 	switch name {
-	case provider.FieldDeletedAt:
-		m.ClearDeletedAt()
-		return nil
 	case provider.FieldCapabilitiesJSON:
 		m.ClearCapabilitiesJSON()
 		return nil
@@ -49698,9 +49482,6 @@ func (m *ProviderMutation) ResetField(name string) error {
 		return nil
 	case provider.FieldUpdatedAt:
 		m.ResetUpdatedAt()
-		return nil
-	case provider.FieldDeletedAt:
-		m.ResetDeletedAt()
 		return nil
 	case provider.FieldName:
 		m.ResetName()
@@ -49778,39 +49559,61 @@ func (m *ProviderMutation) ResetEdge(name string) error {
 // ProviderAccountMutation represents an operation that mutates the ProviderAccount nodes in the graph.
 type ProviderAccountMutation struct {
 	config
-	op                    Op
-	typ                   string
-	id                    *int
-	created_at            *time.Time
-	updated_at            *time.Time
-	deleted_at            *time.Time
-	provider_id           *int
-	addprovider_id        *int
-	name                  *string
-	account_type          *string
-	runtime_class         *string
-	upstream_client       *string
-	credential_ciphertext *[]byte
-	credential_version    *int
-	addcredential_version *int
-	proxy_id              *string
-	status                *string
-	priority              *int
-	addpriority           *int
-	weight                *float64
-	addweight             *float64
-	risk_level            *string
-	metadata_json         *map[string]interface{}
-	token_expires_at      *time.Time
-	last_refreshed_at     *time.Time
-	needs_reauth_at       *time.Time
-	refresh_attempts      *int
-	addrefresh_attempts   *int
-	refresh_last_error    *string
-	clearedFields         map[string]struct{}
-	done                  bool
-	oldValue              func(context.Context) (*ProviderAccount, error)
-	predicates            []predicate.ProviderAccount
+	op                        Op
+	typ                       string
+	id                        *int
+	created_at                *time.Time
+	updated_at                *time.Time
+	deleted_at                *time.Time
+	provider_id               *int
+	addprovider_id            *int
+	name                      *string
+	platform                  *string
+	account_type              *string
+	runtime_class             *string
+	upstream_client           *string
+	credential_ciphertext     *[]byte
+	credential_version        *int
+	addcredential_version     *int
+	proxy_id                  *string
+	status                    *string
+	priority                  *int
+	addpriority               *int
+	weight                    *float64
+	addweight                 *float64
+	risk_level                *string
+	metadata_json             *map[string]interface{}
+	notes                     *string
+	concurrency               *int
+	addconcurrency            *int
+	rate_multiplier           *float64
+	addrate_multiplier        *float64
+	load_factor               *int
+	addload_factor            *int
+	schedulable               *bool
+	error_message             *string
+	last_used_at              *time.Time
+	expires_at                *time.Time
+	auto_pause_on_expired     *bool
+	rate_limited_at           *time.Time
+	rate_limit_reset_at       *time.Time
+	overload_until            *time.Time
+	temp_unschedulable_until  *time.Time
+	temp_unschedulable_reason *string
+	session_window_start      *time.Time
+	session_window_end        *time.Time
+	session_window_status     *string
+	extra_json                *map[string]interface{}
+	token_expires_at          *time.Time
+	last_refreshed_at         *time.Time
+	needs_reauth_at           *time.Time
+	refresh_attempts          *int
+	addrefresh_attempts       *int
+	refresh_last_error        *string
+	clearedFields             map[string]struct{}
+	done                      bool
+	oldValue                  func(context.Context) (*ProviderAccount, error)
+	predicates                []predicate.ProviderAccount
 }
 
 var _ ent.Mutation = (*ProviderAccountMutation)(nil)
@@ -50122,6 +49925,42 @@ func (m *ProviderAccountMutation) OldName(ctx context.Context) (v string, err er
 // ResetName resets all changes to the "name" field.
 func (m *ProviderAccountMutation) ResetName() {
 	m.name = nil
+}
+
+// SetPlatform sets the "platform" field.
+func (m *ProviderAccountMutation) SetPlatform(s string) {
+	m.platform = &s
+}
+
+// Platform returns the value of the "platform" field in the mutation.
+func (m *ProviderAccountMutation) Platform() (r string, exists bool) {
+	v := m.platform
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPlatform returns the old "platform" field's value of the ProviderAccount entity.
+// If the ProviderAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProviderAccountMutation) OldPlatform(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPlatform is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPlatform requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPlatform: %w", err)
+	}
+	return oldValue.Platform, nil
+}
+
+// ResetPlatform resets all changes to the "platform" field.
+func (m *ProviderAccountMutation) ResetPlatform() {
+	m.platform = nil
 }
 
 // SetAccountType sets the "account_type" field.
@@ -50632,6 +50471,858 @@ func (m *ProviderAccountMutation) ResetMetadataJSON() {
 	delete(m.clearedFields, provideraccount.FieldMetadataJSON)
 }
 
+// SetNotes sets the "notes" field.
+func (m *ProviderAccountMutation) SetNotes(s string) {
+	m.notes = &s
+}
+
+// Notes returns the value of the "notes" field in the mutation.
+func (m *ProviderAccountMutation) Notes() (r string, exists bool) {
+	v := m.notes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNotes returns the old "notes" field's value of the ProviderAccount entity.
+// If the ProviderAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProviderAccountMutation) OldNotes(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNotes is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNotes requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNotes: %w", err)
+	}
+	return oldValue.Notes, nil
+}
+
+// ClearNotes clears the value of the "notes" field.
+func (m *ProviderAccountMutation) ClearNotes() {
+	m.notes = nil
+	m.clearedFields[provideraccount.FieldNotes] = struct{}{}
+}
+
+// NotesCleared returns if the "notes" field was cleared in this mutation.
+func (m *ProviderAccountMutation) NotesCleared() bool {
+	_, ok := m.clearedFields[provideraccount.FieldNotes]
+	return ok
+}
+
+// ResetNotes resets all changes to the "notes" field.
+func (m *ProviderAccountMutation) ResetNotes() {
+	m.notes = nil
+	delete(m.clearedFields, provideraccount.FieldNotes)
+}
+
+// SetConcurrency sets the "concurrency" field.
+func (m *ProviderAccountMutation) SetConcurrency(i int) {
+	m.concurrency = &i
+	m.addconcurrency = nil
+}
+
+// Concurrency returns the value of the "concurrency" field in the mutation.
+func (m *ProviderAccountMutation) Concurrency() (r int, exists bool) {
+	v := m.concurrency
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConcurrency returns the old "concurrency" field's value of the ProviderAccount entity.
+// If the ProviderAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProviderAccountMutation) OldConcurrency(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConcurrency is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConcurrency requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConcurrency: %w", err)
+	}
+	return oldValue.Concurrency, nil
+}
+
+// AddConcurrency adds i to the "concurrency" field.
+func (m *ProviderAccountMutation) AddConcurrency(i int) {
+	if m.addconcurrency != nil {
+		*m.addconcurrency += i
+	} else {
+		m.addconcurrency = &i
+	}
+}
+
+// AddedConcurrency returns the value that was added to the "concurrency" field in this mutation.
+func (m *ProviderAccountMutation) AddedConcurrency() (r int, exists bool) {
+	v := m.addconcurrency
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetConcurrency resets all changes to the "concurrency" field.
+func (m *ProviderAccountMutation) ResetConcurrency() {
+	m.concurrency = nil
+	m.addconcurrency = nil
+}
+
+// SetRateMultiplier sets the "rate_multiplier" field.
+func (m *ProviderAccountMutation) SetRateMultiplier(f float64) {
+	m.rate_multiplier = &f
+	m.addrate_multiplier = nil
+}
+
+// RateMultiplier returns the value of the "rate_multiplier" field in the mutation.
+func (m *ProviderAccountMutation) RateMultiplier() (r float64, exists bool) {
+	v := m.rate_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRateMultiplier returns the old "rate_multiplier" field's value of the ProviderAccount entity.
+// If the ProviderAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProviderAccountMutation) OldRateMultiplier(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRateMultiplier is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRateMultiplier requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRateMultiplier: %w", err)
+	}
+	return oldValue.RateMultiplier, nil
+}
+
+// AddRateMultiplier adds f to the "rate_multiplier" field.
+func (m *ProviderAccountMutation) AddRateMultiplier(f float64) {
+	if m.addrate_multiplier != nil {
+		*m.addrate_multiplier += f
+	} else {
+		m.addrate_multiplier = &f
+	}
+}
+
+// AddedRateMultiplier returns the value that was added to the "rate_multiplier" field in this mutation.
+func (m *ProviderAccountMutation) AddedRateMultiplier() (r float64, exists bool) {
+	v := m.addrate_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRateMultiplier resets all changes to the "rate_multiplier" field.
+func (m *ProviderAccountMutation) ResetRateMultiplier() {
+	m.rate_multiplier = nil
+	m.addrate_multiplier = nil
+}
+
+// SetLoadFactor sets the "load_factor" field.
+func (m *ProviderAccountMutation) SetLoadFactor(i int) {
+	m.load_factor = &i
+	m.addload_factor = nil
+}
+
+// LoadFactor returns the value of the "load_factor" field in the mutation.
+func (m *ProviderAccountMutation) LoadFactor() (r int, exists bool) {
+	v := m.load_factor
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLoadFactor returns the old "load_factor" field's value of the ProviderAccount entity.
+// If the ProviderAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProviderAccountMutation) OldLoadFactor(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLoadFactor is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLoadFactor requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLoadFactor: %w", err)
+	}
+	return oldValue.LoadFactor, nil
+}
+
+// AddLoadFactor adds i to the "load_factor" field.
+func (m *ProviderAccountMutation) AddLoadFactor(i int) {
+	if m.addload_factor != nil {
+		*m.addload_factor += i
+	} else {
+		m.addload_factor = &i
+	}
+}
+
+// AddedLoadFactor returns the value that was added to the "load_factor" field in this mutation.
+func (m *ProviderAccountMutation) AddedLoadFactor() (r int, exists bool) {
+	v := m.addload_factor
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearLoadFactor clears the value of the "load_factor" field.
+func (m *ProviderAccountMutation) ClearLoadFactor() {
+	m.load_factor = nil
+	m.addload_factor = nil
+	m.clearedFields[provideraccount.FieldLoadFactor] = struct{}{}
+}
+
+// LoadFactorCleared returns if the "load_factor" field was cleared in this mutation.
+func (m *ProviderAccountMutation) LoadFactorCleared() bool {
+	_, ok := m.clearedFields[provideraccount.FieldLoadFactor]
+	return ok
+}
+
+// ResetLoadFactor resets all changes to the "load_factor" field.
+func (m *ProviderAccountMutation) ResetLoadFactor() {
+	m.load_factor = nil
+	m.addload_factor = nil
+	delete(m.clearedFields, provideraccount.FieldLoadFactor)
+}
+
+// SetSchedulable sets the "schedulable" field.
+func (m *ProviderAccountMutation) SetSchedulable(b bool) {
+	m.schedulable = &b
+}
+
+// Schedulable returns the value of the "schedulable" field in the mutation.
+func (m *ProviderAccountMutation) Schedulable() (r bool, exists bool) {
+	v := m.schedulable
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSchedulable returns the old "schedulable" field's value of the ProviderAccount entity.
+// If the ProviderAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProviderAccountMutation) OldSchedulable(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSchedulable is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSchedulable requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSchedulable: %w", err)
+	}
+	return oldValue.Schedulable, nil
+}
+
+// ResetSchedulable resets all changes to the "schedulable" field.
+func (m *ProviderAccountMutation) ResetSchedulable() {
+	m.schedulable = nil
+}
+
+// SetErrorMessage sets the "error_message" field.
+func (m *ProviderAccountMutation) SetErrorMessage(s string) {
+	m.error_message = &s
+}
+
+// ErrorMessage returns the value of the "error_message" field in the mutation.
+func (m *ProviderAccountMutation) ErrorMessage() (r string, exists bool) {
+	v := m.error_message
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldErrorMessage returns the old "error_message" field's value of the ProviderAccount entity.
+// If the ProviderAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProviderAccountMutation) OldErrorMessage(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldErrorMessage is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldErrorMessage requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldErrorMessage: %w", err)
+	}
+	return oldValue.ErrorMessage, nil
+}
+
+// ResetErrorMessage resets all changes to the "error_message" field.
+func (m *ProviderAccountMutation) ResetErrorMessage() {
+	m.error_message = nil
+}
+
+// SetLastUsedAt sets the "last_used_at" field.
+func (m *ProviderAccountMutation) SetLastUsedAt(t time.Time) {
+	m.last_used_at = &t
+}
+
+// LastUsedAt returns the value of the "last_used_at" field in the mutation.
+func (m *ProviderAccountMutation) LastUsedAt() (r time.Time, exists bool) {
+	v := m.last_used_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastUsedAt returns the old "last_used_at" field's value of the ProviderAccount entity.
+// If the ProviderAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProviderAccountMutation) OldLastUsedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastUsedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastUsedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastUsedAt: %w", err)
+	}
+	return oldValue.LastUsedAt, nil
+}
+
+// ClearLastUsedAt clears the value of the "last_used_at" field.
+func (m *ProviderAccountMutation) ClearLastUsedAt() {
+	m.last_used_at = nil
+	m.clearedFields[provideraccount.FieldLastUsedAt] = struct{}{}
+}
+
+// LastUsedAtCleared returns if the "last_used_at" field was cleared in this mutation.
+func (m *ProviderAccountMutation) LastUsedAtCleared() bool {
+	_, ok := m.clearedFields[provideraccount.FieldLastUsedAt]
+	return ok
+}
+
+// ResetLastUsedAt resets all changes to the "last_used_at" field.
+func (m *ProviderAccountMutation) ResetLastUsedAt() {
+	m.last_used_at = nil
+	delete(m.clearedFields, provideraccount.FieldLastUsedAt)
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (m *ProviderAccountMutation) SetExpiresAt(t time.Time) {
+	m.expires_at = &t
+}
+
+// ExpiresAt returns the value of the "expires_at" field in the mutation.
+func (m *ProviderAccountMutation) ExpiresAt() (r time.Time, exists bool) {
+	v := m.expires_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpiresAt returns the old "expires_at" field's value of the ProviderAccount entity.
+// If the ProviderAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProviderAccountMutation) OldExpiresAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpiresAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpiresAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpiresAt: %w", err)
+	}
+	return oldValue.ExpiresAt, nil
+}
+
+// ClearExpiresAt clears the value of the "expires_at" field.
+func (m *ProviderAccountMutation) ClearExpiresAt() {
+	m.expires_at = nil
+	m.clearedFields[provideraccount.FieldExpiresAt] = struct{}{}
+}
+
+// ExpiresAtCleared returns if the "expires_at" field was cleared in this mutation.
+func (m *ProviderAccountMutation) ExpiresAtCleared() bool {
+	_, ok := m.clearedFields[provideraccount.FieldExpiresAt]
+	return ok
+}
+
+// ResetExpiresAt resets all changes to the "expires_at" field.
+func (m *ProviderAccountMutation) ResetExpiresAt() {
+	m.expires_at = nil
+	delete(m.clearedFields, provideraccount.FieldExpiresAt)
+}
+
+// SetAutoPauseOnExpired sets the "auto_pause_on_expired" field.
+func (m *ProviderAccountMutation) SetAutoPauseOnExpired(b bool) {
+	m.auto_pause_on_expired = &b
+}
+
+// AutoPauseOnExpired returns the value of the "auto_pause_on_expired" field in the mutation.
+func (m *ProviderAccountMutation) AutoPauseOnExpired() (r bool, exists bool) {
+	v := m.auto_pause_on_expired
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAutoPauseOnExpired returns the old "auto_pause_on_expired" field's value of the ProviderAccount entity.
+// If the ProviderAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProviderAccountMutation) OldAutoPauseOnExpired(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAutoPauseOnExpired is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAutoPauseOnExpired requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAutoPauseOnExpired: %w", err)
+	}
+	return oldValue.AutoPauseOnExpired, nil
+}
+
+// ResetAutoPauseOnExpired resets all changes to the "auto_pause_on_expired" field.
+func (m *ProviderAccountMutation) ResetAutoPauseOnExpired() {
+	m.auto_pause_on_expired = nil
+}
+
+// SetRateLimitedAt sets the "rate_limited_at" field.
+func (m *ProviderAccountMutation) SetRateLimitedAt(t time.Time) {
+	m.rate_limited_at = &t
+}
+
+// RateLimitedAt returns the value of the "rate_limited_at" field in the mutation.
+func (m *ProviderAccountMutation) RateLimitedAt() (r time.Time, exists bool) {
+	v := m.rate_limited_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRateLimitedAt returns the old "rate_limited_at" field's value of the ProviderAccount entity.
+// If the ProviderAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProviderAccountMutation) OldRateLimitedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRateLimitedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRateLimitedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRateLimitedAt: %w", err)
+	}
+	return oldValue.RateLimitedAt, nil
+}
+
+// ClearRateLimitedAt clears the value of the "rate_limited_at" field.
+func (m *ProviderAccountMutation) ClearRateLimitedAt() {
+	m.rate_limited_at = nil
+	m.clearedFields[provideraccount.FieldRateLimitedAt] = struct{}{}
+}
+
+// RateLimitedAtCleared returns if the "rate_limited_at" field was cleared in this mutation.
+func (m *ProviderAccountMutation) RateLimitedAtCleared() bool {
+	_, ok := m.clearedFields[provideraccount.FieldRateLimitedAt]
+	return ok
+}
+
+// ResetRateLimitedAt resets all changes to the "rate_limited_at" field.
+func (m *ProviderAccountMutation) ResetRateLimitedAt() {
+	m.rate_limited_at = nil
+	delete(m.clearedFields, provideraccount.FieldRateLimitedAt)
+}
+
+// SetRateLimitResetAt sets the "rate_limit_reset_at" field.
+func (m *ProviderAccountMutation) SetRateLimitResetAt(t time.Time) {
+	m.rate_limit_reset_at = &t
+}
+
+// RateLimitResetAt returns the value of the "rate_limit_reset_at" field in the mutation.
+func (m *ProviderAccountMutation) RateLimitResetAt() (r time.Time, exists bool) {
+	v := m.rate_limit_reset_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRateLimitResetAt returns the old "rate_limit_reset_at" field's value of the ProviderAccount entity.
+// If the ProviderAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProviderAccountMutation) OldRateLimitResetAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRateLimitResetAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRateLimitResetAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRateLimitResetAt: %w", err)
+	}
+	return oldValue.RateLimitResetAt, nil
+}
+
+// ClearRateLimitResetAt clears the value of the "rate_limit_reset_at" field.
+func (m *ProviderAccountMutation) ClearRateLimitResetAt() {
+	m.rate_limit_reset_at = nil
+	m.clearedFields[provideraccount.FieldRateLimitResetAt] = struct{}{}
+}
+
+// RateLimitResetAtCleared returns if the "rate_limit_reset_at" field was cleared in this mutation.
+func (m *ProviderAccountMutation) RateLimitResetAtCleared() bool {
+	_, ok := m.clearedFields[provideraccount.FieldRateLimitResetAt]
+	return ok
+}
+
+// ResetRateLimitResetAt resets all changes to the "rate_limit_reset_at" field.
+func (m *ProviderAccountMutation) ResetRateLimitResetAt() {
+	m.rate_limit_reset_at = nil
+	delete(m.clearedFields, provideraccount.FieldRateLimitResetAt)
+}
+
+// SetOverloadUntil sets the "overload_until" field.
+func (m *ProviderAccountMutation) SetOverloadUntil(t time.Time) {
+	m.overload_until = &t
+}
+
+// OverloadUntil returns the value of the "overload_until" field in the mutation.
+func (m *ProviderAccountMutation) OverloadUntil() (r time.Time, exists bool) {
+	v := m.overload_until
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOverloadUntil returns the old "overload_until" field's value of the ProviderAccount entity.
+// If the ProviderAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProviderAccountMutation) OldOverloadUntil(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOverloadUntil is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOverloadUntil requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOverloadUntil: %w", err)
+	}
+	return oldValue.OverloadUntil, nil
+}
+
+// ClearOverloadUntil clears the value of the "overload_until" field.
+func (m *ProviderAccountMutation) ClearOverloadUntil() {
+	m.overload_until = nil
+	m.clearedFields[provideraccount.FieldOverloadUntil] = struct{}{}
+}
+
+// OverloadUntilCleared returns if the "overload_until" field was cleared in this mutation.
+func (m *ProviderAccountMutation) OverloadUntilCleared() bool {
+	_, ok := m.clearedFields[provideraccount.FieldOverloadUntil]
+	return ok
+}
+
+// ResetOverloadUntil resets all changes to the "overload_until" field.
+func (m *ProviderAccountMutation) ResetOverloadUntil() {
+	m.overload_until = nil
+	delete(m.clearedFields, provideraccount.FieldOverloadUntil)
+}
+
+// SetTempUnschedulableUntil sets the "temp_unschedulable_until" field.
+func (m *ProviderAccountMutation) SetTempUnschedulableUntil(t time.Time) {
+	m.temp_unschedulable_until = &t
+}
+
+// TempUnschedulableUntil returns the value of the "temp_unschedulable_until" field in the mutation.
+func (m *ProviderAccountMutation) TempUnschedulableUntil() (r time.Time, exists bool) {
+	v := m.temp_unschedulable_until
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTempUnschedulableUntil returns the old "temp_unschedulable_until" field's value of the ProviderAccount entity.
+// If the ProviderAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProviderAccountMutation) OldTempUnschedulableUntil(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTempUnschedulableUntil is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTempUnschedulableUntil requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTempUnschedulableUntil: %w", err)
+	}
+	return oldValue.TempUnschedulableUntil, nil
+}
+
+// ClearTempUnschedulableUntil clears the value of the "temp_unschedulable_until" field.
+func (m *ProviderAccountMutation) ClearTempUnschedulableUntil() {
+	m.temp_unschedulable_until = nil
+	m.clearedFields[provideraccount.FieldTempUnschedulableUntil] = struct{}{}
+}
+
+// TempUnschedulableUntilCleared returns if the "temp_unschedulable_until" field was cleared in this mutation.
+func (m *ProviderAccountMutation) TempUnschedulableUntilCleared() bool {
+	_, ok := m.clearedFields[provideraccount.FieldTempUnschedulableUntil]
+	return ok
+}
+
+// ResetTempUnschedulableUntil resets all changes to the "temp_unschedulable_until" field.
+func (m *ProviderAccountMutation) ResetTempUnschedulableUntil() {
+	m.temp_unschedulable_until = nil
+	delete(m.clearedFields, provideraccount.FieldTempUnschedulableUntil)
+}
+
+// SetTempUnschedulableReason sets the "temp_unschedulable_reason" field.
+func (m *ProviderAccountMutation) SetTempUnschedulableReason(s string) {
+	m.temp_unschedulable_reason = &s
+}
+
+// TempUnschedulableReason returns the value of the "temp_unschedulable_reason" field in the mutation.
+func (m *ProviderAccountMutation) TempUnschedulableReason() (r string, exists bool) {
+	v := m.temp_unschedulable_reason
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTempUnschedulableReason returns the old "temp_unschedulable_reason" field's value of the ProviderAccount entity.
+// If the ProviderAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProviderAccountMutation) OldTempUnschedulableReason(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTempUnschedulableReason is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTempUnschedulableReason requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTempUnschedulableReason: %w", err)
+	}
+	return oldValue.TempUnschedulableReason, nil
+}
+
+// ResetTempUnschedulableReason resets all changes to the "temp_unschedulable_reason" field.
+func (m *ProviderAccountMutation) ResetTempUnschedulableReason() {
+	m.temp_unschedulable_reason = nil
+}
+
+// SetSessionWindowStart sets the "session_window_start" field.
+func (m *ProviderAccountMutation) SetSessionWindowStart(t time.Time) {
+	m.session_window_start = &t
+}
+
+// SessionWindowStart returns the value of the "session_window_start" field in the mutation.
+func (m *ProviderAccountMutation) SessionWindowStart() (r time.Time, exists bool) {
+	v := m.session_window_start
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSessionWindowStart returns the old "session_window_start" field's value of the ProviderAccount entity.
+// If the ProviderAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProviderAccountMutation) OldSessionWindowStart(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSessionWindowStart is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSessionWindowStart requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSessionWindowStart: %w", err)
+	}
+	return oldValue.SessionWindowStart, nil
+}
+
+// ClearSessionWindowStart clears the value of the "session_window_start" field.
+func (m *ProviderAccountMutation) ClearSessionWindowStart() {
+	m.session_window_start = nil
+	m.clearedFields[provideraccount.FieldSessionWindowStart] = struct{}{}
+}
+
+// SessionWindowStartCleared returns if the "session_window_start" field was cleared in this mutation.
+func (m *ProviderAccountMutation) SessionWindowStartCleared() bool {
+	_, ok := m.clearedFields[provideraccount.FieldSessionWindowStart]
+	return ok
+}
+
+// ResetSessionWindowStart resets all changes to the "session_window_start" field.
+func (m *ProviderAccountMutation) ResetSessionWindowStart() {
+	m.session_window_start = nil
+	delete(m.clearedFields, provideraccount.FieldSessionWindowStart)
+}
+
+// SetSessionWindowEnd sets the "session_window_end" field.
+func (m *ProviderAccountMutation) SetSessionWindowEnd(t time.Time) {
+	m.session_window_end = &t
+}
+
+// SessionWindowEnd returns the value of the "session_window_end" field in the mutation.
+func (m *ProviderAccountMutation) SessionWindowEnd() (r time.Time, exists bool) {
+	v := m.session_window_end
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSessionWindowEnd returns the old "session_window_end" field's value of the ProviderAccount entity.
+// If the ProviderAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProviderAccountMutation) OldSessionWindowEnd(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSessionWindowEnd is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSessionWindowEnd requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSessionWindowEnd: %w", err)
+	}
+	return oldValue.SessionWindowEnd, nil
+}
+
+// ClearSessionWindowEnd clears the value of the "session_window_end" field.
+func (m *ProviderAccountMutation) ClearSessionWindowEnd() {
+	m.session_window_end = nil
+	m.clearedFields[provideraccount.FieldSessionWindowEnd] = struct{}{}
+}
+
+// SessionWindowEndCleared returns if the "session_window_end" field was cleared in this mutation.
+func (m *ProviderAccountMutation) SessionWindowEndCleared() bool {
+	_, ok := m.clearedFields[provideraccount.FieldSessionWindowEnd]
+	return ok
+}
+
+// ResetSessionWindowEnd resets all changes to the "session_window_end" field.
+func (m *ProviderAccountMutation) ResetSessionWindowEnd() {
+	m.session_window_end = nil
+	delete(m.clearedFields, provideraccount.FieldSessionWindowEnd)
+}
+
+// SetSessionWindowStatus sets the "session_window_status" field.
+func (m *ProviderAccountMutation) SetSessionWindowStatus(s string) {
+	m.session_window_status = &s
+}
+
+// SessionWindowStatus returns the value of the "session_window_status" field in the mutation.
+func (m *ProviderAccountMutation) SessionWindowStatus() (r string, exists bool) {
+	v := m.session_window_status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSessionWindowStatus returns the old "session_window_status" field's value of the ProviderAccount entity.
+// If the ProviderAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProviderAccountMutation) OldSessionWindowStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSessionWindowStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSessionWindowStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSessionWindowStatus: %w", err)
+	}
+	return oldValue.SessionWindowStatus, nil
+}
+
+// ResetSessionWindowStatus resets all changes to the "session_window_status" field.
+func (m *ProviderAccountMutation) ResetSessionWindowStatus() {
+	m.session_window_status = nil
+}
+
+// SetExtraJSON sets the "extra_json" field.
+func (m *ProviderAccountMutation) SetExtraJSON(value map[string]interface{}) {
+	m.extra_json = &value
+}
+
+// ExtraJSON returns the value of the "extra_json" field in the mutation.
+func (m *ProviderAccountMutation) ExtraJSON() (r map[string]interface{}, exists bool) {
+	v := m.extra_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExtraJSON returns the old "extra_json" field's value of the ProviderAccount entity.
+// If the ProviderAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProviderAccountMutation) OldExtraJSON(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExtraJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExtraJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExtraJSON: %w", err)
+	}
+	return oldValue.ExtraJSON, nil
+}
+
+// ClearExtraJSON clears the value of the "extra_json" field.
+func (m *ProviderAccountMutation) ClearExtraJSON() {
+	m.extra_json = nil
+	m.clearedFields[provideraccount.FieldExtraJSON] = struct{}{}
+}
+
+// ExtraJSONCleared returns if the "extra_json" field was cleared in this mutation.
+func (m *ProviderAccountMutation) ExtraJSONCleared() bool {
+	_, ok := m.clearedFields[provideraccount.FieldExtraJSON]
+	return ok
+}
+
+// ResetExtraJSON resets all changes to the "extra_json" field.
+func (m *ProviderAccountMutation) ResetExtraJSON() {
+	m.extra_json = nil
+	delete(m.clearedFields, provideraccount.FieldExtraJSON)
+}
+
 // SetTokenExpiresAt sets the "token_expires_at" field.
 func (m *ProviderAccountMutation) SetTokenExpiresAt(t time.Time) {
 	m.token_expires_at = &t
@@ -50905,7 +51596,7 @@ func (m *ProviderAccountMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ProviderAccountMutation) Fields() []string {
-	fields := make([]string, 0, 21)
+	fields := make([]string, 0, 40)
 	if m.created_at != nil {
 		fields = append(fields, provideraccount.FieldCreatedAt)
 	}
@@ -50920,6 +51611,9 @@ func (m *ProviderAccountMutation) Fields() []string {
 	}
 	if m.name != nil {
 		fields = append(fields, provideraccount.FieldName)
+	}
+	if m.platform != nil {
+		fields = append(fields, provideraccount.FieldPlatform)
 	}
 	if m.account_type != nil {
 		fields = append(fields, provideraccount.FieldAccountType)
@@ -50954,6 +51648,60 @@ func (m *ProviderAccountMutation) Fields() []string {
 	if m.metadata_json != nil {
 		fields = append(fields, provideraccount.FieldMetadataJSON)
 	}
+	if m.notes != nil {
+		fields = append(fields, provideraccount.FieldNotes)
+	}
+	if m.concurrency != nil {
+		fields = append(fields, provideraccount.FieldConcurrency)
+	}
+	if m.rate_multiplier != nil {
+		fields = append(fields, provideraccount.FieldRateMultiplier)
+	}
+	if m.load_factor != nil {
+		fields = append(fields, provideraccount.FieldLoadFactor)
+	}
+	if m.schedulable != nil {
+		fields = append(fields, provideraccount.FieldSchedulable)
+	}
+	if m.error_message != nil {
+		fields = append(fields, provideraccount.FieldErrorMessage)
+	}
+	if m.last_used_at != nil {
+		fields = append(fields, provideraccount.FieldLastUsedAt)
+	}
+	if m.expires_at != nil {
+		fields = append(fields, provideraccount.FieldExpiresAt)
+	}
+	if m.auto_pause_on_expired != nil {
+		fields = append(fields, provideraccount.FieldAutoPauseOnExpired)
+	}
+	if m.rate_limited_at != nil {
+		fields = append(fields, provideraccount.FieldRateLimitedAt)
+	}
+	if m.rate_limit_reset_at != nil {
+		fields = append(fields, provideraccount.FieldRateLimitResetAt)
+	}
+	if m.overload_until != nil {
+		fields = append(fields, provideraccount.FieldOverloadUntil)
+	}
+	if m.temp_unschedulable_until != nil {
+		fields = append(fields, provideraccount.FieldTempUnschedulableUntil)
+	}
+	if m.temp_unschedulable_reason != nil {
+		fields = append(fields, provideraccount.FieldTempUnschedulableReason)
+	}
+	if m.session_window_start != nil {
+		fields = append(fields, provideraccount.FieldSessionWindowStart)
+	}
+	if m.session_window_end != nil {
+		fields = append(fields, provideraccount.FieldSessionWindowEnd)
+	}
+	if m.session_window_status != nil {
+		fields = append(fields, provideraccount.FieldSessionWindowStatus)
+	}
+	if m.extra_json != nil {
+		fields = append(fields, provideraccount.FieldExtraJSON)
+	}
 	if m.token_expires_at != nil {
 		fields = append(fields, provideraccount.FieldTokenExpiresAt)
 	}
@@ -50987,6 +51735,8 @@ func (m *ProviderAccountMutation) Field(name string) (ent.Value, bool) {
 		return m.ProviderID()
 	case provideraccount.FieldName:
 		return m.Name()
+	case provideraccount.FieldPlatform:
+		return m.Platform()
 	case provideraccount.FieldAccountType:
 		return m.AccountType()
 	case provideraccount.FieldRuntimeClass:
@@ -51009,6 +51759,42 @@ func (m *ProviderAccountMutation) Field(name string) (ent.Value, bool) {
 		return m.RiskLevel()
 	case provideraccount.FieldMetadataJSON:
 		return m.MetadataJSON()
+	case provideraccount.FieldNotes:
+		return m.Notes()
+	case provideraccount.FieldConcurrency:
+		return m.Concurrency()
+	case provideraccount.FieldRateMultiplier:
+		return m.RateMultiplier()
+	case provideraccount.FieldLoadFactor:
+		return m.LoadFactor()
+	case provideraccount.FieldSchedulable:
+		return m.Schedulable()
+	case provideraccount.FieldErrorMessage:
+		return m.ErrorMessage()
+	case provideraccount.FieldLastUsedAt:
+		return m.LastUsedAt()
+	case provideraccount.FieldExpiresAt:
+		return m.ExpiresAt()
+	case provideraccount.FieldAutoPauseOnExpired:
+		return m.AutoPauseOnExpired()
+	case provideraccount.FieldRateLimitedAt:
+		return m.RateLimitedAt()
+	case provideraccount.FieldRateLimitResetAt:
+		return m.RateLimitResetAt()
+	case provideraccount.FieldOverloadUntil:
+		return m.OverloadUntil()
+	case provideraccount.FieldTempUnschedulableUntil:
+		return m.TempUnschedulableUntil()
+	case provideraccount.FieldTempUnschedulableReason:
+		return m.TempUnschedulableReason()
+	case provideraccount.FieldSessionWindowStart:
+		return m.SessionWindowStart()
+	case provideraccount.FieldSessionWindowEnd:
+		return m.SessionWindowEnd()
+	case provideraccount.FieldSessionWindowStatus:
+		return m.SessionWindowStatus()
+	case provideraccount.FieldExtraJSON:
+		return m.ExtraJSON()
 	case provideraccount.FieldTokenExpiresAt:
 		return m.TokenExpiresAt()
 	case provideraccount.FieldLastRefreshedAt:
@@ -51038,6 +51824,8 @@ func (m *ProviderAccountMutation) OldField(ctx context.Context, name string) (en
 		return m.OldProviderID(ctx)
 	case provideraccount.FieldName:
 		return m.OldName(ctx)
+	case provideraccount.FieldPlatform:
+		return m.OldPlatform(ctx)
 	case provideraccount.FieldAccountType:
 		return m.OldAccountType(ctx)
 	case provideraccount.FieldRuntimeClass:
@@ -51060,6 +51848,42 @@ func (m *ProviderAccountMutation) OldField(ctx context.Context, name string) (en
 		return m.OldRiskLevel(ctx)
 	case provideraccount.FieldMetadataJSON:
 		return m.OldMetadataJSON(ctx)
+	case provideraccount.FieldNotes:
+		return m.OldNotes(ctx)
+	case provideraccount.FieldConcurrency:
+		return m.OldConcurrency(ctx)
+	case provideraccount.FieldRateMultiplier:
+		return m.OldRateMultiplier(ctx)
+	case provideraccount.FieldLoadFactor:
+		return m.OldLoadFactor(ctx)
+	case provideraccount.FieldSchedulable:
+		return m.OldSchedulable(ctx)
+	case provideraccount.FieldErrorMessage:
+		return m.OldErrorMessage(ctx)
+	case provideraccount.FieldLastUsedAt:
+		return m.OldLastUsedAt(ctx)
+	case provideraccount.FieldExpiresAt:
+		return m.OldExpiresAt(ctx)
+	case provideraccount.FieldAutoPauseOnExpired:
+		return m.OldAutoPauseOnExpired(ctx)
+	case provideraccount.FieldRateLimitedAt:
+		return m.OldRateLimitedAt(ctx)
+	case provideraccount.FieldRateLimitResetAt:
+		return m.OldRateLimitResetAt(ctx)
+	case provideraccount.FieldOverloadUntil:
+		return m.OldOverloadUntil(ctx)
+	case provideraccount.FieldTempUnschedulableUntil:
+		return m.OldTempUnschedulableUntil(ctx)
+	case provideraccount.FieldTempUnschedulableReason:
+		return m.OldTempUnschedulableReason(ctx)
+	case provideraccount.FieldSessionWindowStart:
+		return m.OldSessionWindowStart(ctx)
+	case provideraccount.FieldSessionWindowEnd:
+		return m.OldSessionWindowEnd(ctx)
+	case provideraccount.FieldSessionWindowStatus:
+		return m.OldSessionWindowStatus(ctx)
+	case provideraccount.FieldExtraJSON:
+		return m.OldExtraJSON(ctx)
 	case provideraccount.FieldTokenExpiresAt:
 		return m.OldTokenExpiresAt(ctx)
 	case provideraccount.FieldLastRefreshedAt:
@@ -51113,6 +51937,13 @@ func (m *ProviderAccountMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetName(v)
+		return nil
+	case provideraccount.FieldPlatform:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPlatform(v)
 		return nil
 	case provideraccount.FieldAccountType:
 		v, ok := value.(string)
@@ -51191,6 +52022,132 @@ func (m *ProviderAccountMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetMetadataJSON(v)
 		return nil
+	case provideraccount.FieldNotes:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNotes(v)
+		return nil
+	case provideraccount.FieldConcurrency:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConcurrency(v)
+		return nil
+	case provideraccount.FieldRateMultiplier:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRateMultiplier(v)
+		return nil
+	case provideraccount.FieldLoadFactor:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLoadFactor(v)
+		return nil
+	case provideraccount.FieldSchedulable:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSchedulable(v)
+		return nil
+	case provideraccount.FieldErrorMessage:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetErrorMessage(v)
+		return nil
+	case provideraccount.FieldLastUsedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastUsedAt(v)
+		return nil
+	case provideraccount.FieldExpiresAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpiresAt(v)
+		return nil
+	case provideraccount.FieldAutoPauseOnExpired:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAutoPauseOnExpired(v)
+		return nil
+	case provideraccount.FieldRateLimitedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRateLimitedAt(v)
+		return nil
+	case provideraccount.FieldRateLimitResetAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRateLimitResetAt(v)
+		return nil
+	case provideraccount.FieldOverloadUntil:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOverloadUntil(v)
+		return nil
+	case provideraccount.FieldTempUnschedulableUntil:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTempUnschedulableUntil(v)
+		return nil
+	case provideraccount.FieldTempUnschedulableReason:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTempUnschedulableReason(v)
+		return nil
+	case provideraccount.FieldSessionWindowStart:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSessionWindowStart(v)
+		return nil
+	case provideraccount.FieldSessionWindowEnd:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSessionWindowEnd(v)
+		return nil
+	case provideraccount.FieldSessionWindowStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSessionWindowStatus(v)
+		return nil
+	case provideraccount.FieldExtraJSON:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExtraJSON(v)
+		return nil
 	case provideraccount.FieldTokenExpiresAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -51246,6 +52203,15 @@ func (m *ProviderAccountMutation) AddedFields() []string {
 	if m.addweight != nil {
 		fields = append(fields, provideraccount.FieldWeight)
 	}
+	if m.addconcurrency != nil {
+		fields = append(fields, provideraccount.FieldConcurrency)
+	}
+	if m.addrate_multiplier != nil {
+		fields = append(fields, provideraccount.FieldRateMultiplier)
+	}
+	if m.addload_factor != nil {
+		fields = append(fields, provideraccount.FieldLoadFactor)
+	}
 	if m.addrefresh_attempts != nil {
 		fields = append(fields, provideraccount.FieldRefreshAttempts)
 	}
@@ -51265,6 +52231,12 @@ func (m *ProviderAccountMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedPriority()
 	case provideraccount.FieldWeight:
 		return m.AddedWeight()
+	case provideraccount.FieldConcurrency:
+		return m.AddedConcurrency()
+	case provideraccount.FieldRateMultiplier:
+		return m.AddedRateMultiplier()
+	case provideraccount.FieldLoadFactor:
+		return m.AddedLoadFactor()
 	case provideraccount.FieldRefreshAttempts:
 		return m.AddedRefreshAttempts()
 	}
@@ -51304,6 +52276,27 @@ func (m *ProviderAccountMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddWeight(v)
 		return nil
+	case provideraccount.FieldConcurrency:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddConcurrency(v)
+		return nil
+	case provideraccount.FieldRateMultiplier:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRateMultiplier(v)
+		return nil
+	case provideraccount.FieldLoadFactor:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddLoadFactor(v)
+		return nil
 	case provideraccount.FieldRefreshAttempts:
 		v, ok := value.(int)
 		if !ok {
@@ -51333,6 +52326,39 @@ func (m *ProviderAccountMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(provideraccount.FieldMetadataJSON) {
 		fields = append(fields, provideraccount.FieldMetadataJSON)
+	}
+	if m.FieldCleared(provideraccount.FieldNotes) {
+		fields = append(fields, provideraccount.FieldNotes)
+	}
+	if m.FieldCleared(provideraccount.FieldLoadFactor) {
+		fields = append(fields, provideraccount.FieldLoadFactor)
+	}
+	if m.FieldCleared(provideraccount.FieldLastUsedAt) {
+		fields = append(fields, provideraccount.FieldLastUsedAt)
+	}
+	if m.FieldCleared(provideraccount.FieldExpiresAt) {
+		fields = append(fields, provideraccount.FieldExpiresAt)
+	}
+	if m.FieldCleared(provideraccount.FieldRateLimitedAt) {
+		fields = append(fields, provideraccount.FieldRateLimitedAt)
+	}
+	if m.FieldCleared(provideraccount.FieldRateLimitResetAt) {
+		fields = append(fields, provideraccount.FieldRateLimitResetAt)
+	}
+	if m.FieldCleared(provideraccount.FieldOverloadUntil) {
+		fields = append(fields, provideraccount.FieldOverloadUntil)
+	}
+	if m.FieldCleared(provideraccount.FieldTempUnschedulableUntil) {
+		fields = append(fields, provideraccount.FieldTempUnschedulableUntil)
+	}
+	if m.FieldCleared(provideraccount.FieldSessionWindowStart) {
+		fields = append(fields, provideraccount.FieldSessionWindowStart)
+	}
+	if m.FieldCleared(provideraccount.FieldSessionWindowEnd) {
+		fields = append(fields, provideraccount.FieldSessionWindowEnd)
+	}
+	if m.FieldCleared(provideraccount.FieldExtraJSON) {
+		fields = append(fields, provideraccount.FieldExtraJSON)
 	}
 	if m.FieldCleared(provideraccount.FieldTokenExpiresAt) {
 		fields = append(fields, provideraccount.FieldTokenExpiresAt)
@@ -51372,6 +52398,39 @@ func (m *ProviderAccountMutation) ClearField(name string) error {
 	case provideraccount.FieldMetadataJSON:
 		m.ClearMetadataJSON()
 		return nil
+	case provideraccount.FieldNotes:
+		m.ClearNotes()
+		return nil
+	case provideraccount.FieldLoadFactor:
+		m.ClearLoadFactor()
+		return nil
+	case provideraccount.FieldLastUsedAt:
+		m.ClearLastUsedAt()
+		return nil
+	case provideraccount.FieldExpiresAt:
+		m.ClearExpiresAt()
+		return nil
+	case provideraccount.FieldRateLimitedAt:
+		m.ClearRateLimitedAt()
+		return nil
+	case provideraccount.FieldRateLimitResetAt:
+		m.ClearRateLimitResetAt()
+		return nil
+	case provideraccount.FieldOverloadUntil:
+		m.ClearOverloadUntil()
+		return nil
+	case provideraccount.FieldTempUnschedulableUntil:
+		m.ClearTempUnschedulableUntil()
+		return nil
+	case provideraccount.FieldSessionWindowStart:
+		m.ClearSessionWindowStart()
+		return nil
+	case provideraccount.FieldSessionWindowEnd:
+		m.ClearSessionWindowEnd()
+		return nil
+	case provideraccount.FieldExtraJSON:
+		m.ClearExtraJSON()
+		return nil
 	case provideraccount.FieldTokenExpiresAt:
 		m.ClearTokenExpiresAt()
 		return nil
@@ -51403,6 +52462,9 @@ func (m *ProviderAccountMutation) ResetField(name string) error {
 		return nil
 	case provideraccount.FieldName:
 		m.ResetName()
+		return nil
+	case provideraccount.FieldPlatform:
+		m.ResetPlatform()
 		return nil
 	case provideraccount.FieldAccountType:
 		m.ResetAccountType()
@@ -51436,6 +52498,60 @@ func (m *ProviderAccountMutation) ResetField(name string) error {
 		return nil
 	case provideraccount.FieldMetadataJSON:
 		m.ResetMetadataJSON()
+		return nil
+	case provideraccount.FieldNotes:
+		m.ResetNotes()
+		return nil
+	case provideraccount.FieldConcurrency:
+		m.ResetConcurrency()
+		return nil
+	case provideraccount.FieldRateMultiplier:
+		m.ResetRateMultiplier()
+		return nil
+	case provideraccount.FieldLoadFactor:
+		m.ResetLoadFactor()
+		return nil
+	case provideraccount.FieldSchedulable:
+		m.ResetSchedulable()
+		return nil
+	case provideraccount.FieldErrorMessage:
+		m.ResetErrorMessage()
+		return nil
+	case provideraccount.FieldLastUsedAt:
+		m.ResetLastUsedAt()
+		return nil
+	case provideraccount.FieldExpiresAt:
+		m.ResetExpiresAt()
+		return nil
+	case provideraccount.FieldAutoPauseOnExpired:
+		m.ResetAutoPauseOnExpired()
+		return nil
+	case provideraccount.FieldRateLimitedAt:
+		m.ResetRateLimitedAt()
+		return nil
+	case provideraccount.FieldRateLimitResetAt:
+		m.ResetRateLimitResetAt()
+		return nil
+	case provideraccount.FieldOverloadUntil:
+		m.ResetOverloadUntil()
+		return nil
+	case provideraccount.FieldTempUnschedulableUntil:
+		m.ResetTempUnschedulableUntil()
+		return nil
+	case provideraccount.FieldTempUnschedulableReason:
+		m.ResetTempUnschedulableReason()
+		return nil
+	case provideraccount.FieldSessionWindowStart:
+		m.ResetSessionWindowStart()
+		return nil
+	case provideraccount.FieldSessionWindowEnd:
+		m.ResetSessionWindowEnd()
+		return nil
+	case provideraccount.FieldSessionWindowStatus:
+		m.ResetSessionWindowStatus()
+		return nil
+	case provideraccount.FieldExtraJSON:
+		m.ResetExtraJSON()
 		return nil
 	case provideraccount.FieldTokenExpiresAt:
 		m.ResetTokenExpiresAt()
@@ -51512,9 +52628,14 @@ type ProxyMutation struct {
 	id                       *int
 	created_at               *time.Time
 	updated_at               *time.Time
-	deleted_at               *time.Time
 	name                     *string
 	_type                    *string
+	protocol                 *string
+	host                     *string
+	port                     *int
+	addport                  *int
+	username                 *string
+	password_ciphertext      *[]byte
 	url_ciphertext           *[]byte
 	url_version              *int
 	addurl_version           *int
@@ -51526,6 +52647,8 @@ type ProxyMutation struct {
 	fallback_mode            *string
 	backup_proxy_id          *int
 	addbackup_proxy_id       *int
+	expiry_warn_days         *int
+	addexpiry_warn_days      *int
 	last_probed_at           *time.Time
 	probe_success_count      *int
 	addprobe_success_count   *int
@@ -51709,55 +52832,6 @@ func (m *ProxyMutation) ResetUpdatedAt() {
 	m.updated_at = nil
 }
 
-// SetDeletedAt sets the "deleted_at" field.
-func (m *ProxyMutation) SetDeletedAt(t time.Time) {
-	m.deleted_at = &t
-}
-
-// DeletedAt returns the value of the "deleted_at" field in the mutation.
-func (m *ProxyMutation) DeletedAt() (r time.Time, exists bool) {
-	v := m.deleted_at
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldDeletedAt returns the old "deleted_at" field's value of the Proxy entity.
-// If the Proxy object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ProxyMutation) OldDeletedAt(ctx context.Context) (v *time.Time, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldDeletedAt is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldDeletedAt requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldDeletedAt: %w", err)
-	}
-	return oldValue.DeletedAt, nil
-}
-
-// ClearDeletedAt clears the value of the "deleted_at" field.
-func (m *ProxyMutation) ClearDeletedAt() {
-	m.deleted_at = nil
-	m.clearedFields[proxy.FieldDeletedAt] = struct{}{}
-}
-
-// DeletedAtCleared returns if the "deleted_at" field was cleared in this mutation.
-func (m *ProxyMutation) DeletedAtCleared() bool {
-	_, ok := m.clearedFields[proxy.FieldDeletedAt]
-	return ok
-}
-
-// ResetDeletedAt resets all changes to the "deleted_at" field.
-func (m *ProxyMutation) ResetDeletedAt() {
-	m.deleted_at = nil
-	delete(m.clearedFields, proxy.FieldDeletedAt)
-}
-
 // SetName sets the "name" field.
 func (m *ProxyMutation) SetName(s string) {
 	m.name = &s
@@ -51828,6 +52902,232 @@ func (m *ProxyMutation) OldType(ctx context.Context) (v string, err error) {
 // ResetType resets all changes to the "type" field.
 func (m *ProxyMutation) ResetType() {
 	m._type = nil
+}
+
+// SetProtocol sets the "protocol" field.
+func (m *ProxyMutation) SetProtocol(s string) {
+	m.protocol = &s
+}
+
+// Protocol returns the value of the "protocol" field in the mutation.
+func (m *ProxyMutation) Protocol() (r string, exists bool) {
+	v := m.protocol
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProtocol returns the old "protocol" field's value of the Proxy entity.
+// If the Proxy object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProxyMutation) OldProtocol(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProtocol is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProtocol requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProtocol: %w", err)
+	}
+	return oldValue.Protocol, nil
+}
+
+// ResetProtocol resets all changes to the "protocol" field.
+func (m *ProxyMutation) ResetProtocol() {
+	m.protocol = nil
+}
+
+// SetHost sets the "host" field.
+func (m *ProxyMutation) SetHost(s string) {
+	m.host = &s
+}
+
+// Host returns the value of the "host" field in the mutation.
+func (m *ProxyMutation) Host() (r string, exists bool) {
+	v := m.host
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldHost returns the old "host" field's value of the Proxy entity.
+// If the Proxy object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProxyMutation) OldHost(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldHost is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldHost requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldHost: %w", err)
+	}
+	return oldValue.Host, nil
+}
+
+// ResetHost resets all changes to the "host" field.
+func (m *ProxyMutation) ResetHost() {
+	m.host = nil
+}
+
+// SetPort sets the "port" field.
+func (m *ProxyMutation) SetPort(i int) {
+	m.port = &i
+	m.addport = nil
+}
+
+// Port returns the value of the "port" field in the mutation.
+func (m *ProxyMutation) Port() (r int, exists bool) {
+	v := m.port
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPort returns the old "port" field's value of the Proxy entity.
+// If the Proxy object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProxyMutation) OldPort(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPort is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPort requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPort: %w", err)
+	}
+	return oldValue.Port, nil
+}
+
+// AddPort adds i to the "port" field.
+func (m *ProxyMutation) AddPort(i int) {
+	if m.addport != nil {
+		*m.addport += i
+	} else {
+		m.addport = &i
+	}
+}
+
+// AddedPort returns the value that was added to the "port" field in this mutation.
+func (m *ProxyMutation) AddedPort() (r int, exists bool) {
+	v := m.addport
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetPort resets all changes to the "port" field.
+func (m *ProxyMutation) ResetPort() {
+	m.port = nil
+	m.addport = nil
+}
+
+// SetUsername sets the "username" field.
+func (m *ProxyMutation) SetUsername(s string) {
+	m.username = &s
+}
+
+// Username returns the value of the "username" field in the mutation.
+func (m *ProxyMutation) Username() (r string, exists bool) {
+	v := m.username
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUsername returns the old "username" field's value of the Proxy entity.
+// If the Proxy object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProxyMutation) OldUsername(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUsername is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUsername requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUsername: %w", err)
+	}
+	return oldValue.Username, nil
+}
+
+// ClearUsername clears the value of the "username" field.
+func (m *ProxyMutation) ClearUsername() {
+	m.username = nil
+	m.clearedFields[proxy.FieldUsername] = struct{}{}
+}
+
+// UsernameCleared returns if the "username" field was cleared in this mutation.
+func (m *ProxyMutation) UsernameCleared() bool {
+	_, ok := m.clearedFields[proxy.FieldUsername]
+	return ok
+}
+
+// ResetUsername resets all changes to the "username" field.
+func (m *ProxyMutation) ResetUsername() {
+	m.username = nil
+	delete(m.clearedFields, proxy.FieldUsername)
+}
+
+// SetPasswordCiphertext sets the "password_ciphertext" field.
+func (m *ProxyMutation) SetPasswordCiphertext(b []byte) {
+	m.password_ciphertext = &b
+}
+
+// PasswordCiphertext returns the value of the "password_ciphertext" field in the mutation.
+func (m *ProxyMutation) PasswordCiphertext() (r []byte, exists bool) {
+	v := m.password_ciphertext
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPasswordCiphertext returns the old "password_ciphertext" field's value of the Proxy entity.
+// If the Proxy object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProxyMutation) OldPasswordCiphertext(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPasswordCiphertext is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPasswordCiphertext requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPasswordCiphertext: %w", err)
+	}
+	return oldValue.PasswordCiphertext, nil
+}
+
+// ClearPasswordCiphertext clears the value of the "password_ciphertext" field.
+func (m *ProxyMutation) ClearPasswordCiphertext() {
+	m.password_ciphertext = nil
+	m.clearedFields[proxy.FieldPasswordCiphertext] = struct{}{}
+}
+
+// PasswordCiphertextCleared returns if the "password_ciphertext" field was cleared in this mutation.
+func (m *ProxyMutation) PasswordCiphertextCleared() bool {
+	_, ok := m.clearedFields[proxy.FieldPasswordCiphertext]
+	return ok
+}
+
+// ResetPasswordCiphertext resets all changes to the "password_ciphertext" field.
+func (m *ProxyMutation) ResetPasswordCiphertext() {
+	m.password_ciphertext = nil
+	delete(m.clearedFields, proxy.FieldPasswordCiphertext)
 }
 
 // SetURLCiphertext sets the "url_ciphertext" field.
@@ -52273,6 +53573,62 @@ func (m *ProxyMutation) ResetBackupProxyID() {
 	delete(m.clearedFields, proxy.FieldBackupProxyID)
 }
 
+// SetExpiryWarnDays sets the "expiry_warn_days" field.
+func (m *ProxyMutation) SetExpiryWarnDays(i int) {
+	m.expiry_warn_days = &i
+	m.addexpiry_warn_days = nil
+}
+
+// ExpiryWarnDays returns the value of the "expiry_warn_days" field in the mutation.
+func (m *ProxyMutation) ExpiryWarnDays() (r int, exists bool) {
+	v := m.expiry_warn_days
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpiryWarnDays returns the old "expiry_warn_days" field's value of the Proxy entity.
+// If the Proxy object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProxyMutation) OldExpiryWarnDays(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpiryWarnDays is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpiryWarnDays requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpiryWarnDays: %w", err)
+	}
+	return oldValue.ExpiryWarnDays, nil
+}
+
+// AddExpiryWarnDays adds i to the "expiry_warn_days" field.
+func (m *ProxyMutation) AddExpiryWarnDays(i int) {
+	if m.addexpiry_warn_days != nil {
+		*m.addexpiry_warn_days += i
+	} else {
+		m.addexpiry_warn_days = &i
+	}
+}
+
+// AddedExpiryWarnDays returns the value that was added to the "expiry_warn_days" field in this mutation.
+func (m *ProxyMutation) AddedExpiryWarnDays() (r int, exists bool) {
+	v := m.addexpiry_warn_days
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetExpiryWarnDays resets all changes to the "expiry_warn_days" field.
+func (m *ProxyMutation) ResetExpiryWarnDays() {
+	m.expiry_warn_days = nil
+	m.addexpiry_warn_days = nil
+}
+
 // SetLastProbedAt sets the "last_probed_at" field.
 func (m *ProxyMutation) SetLastProbedAt(t time.Time) {
 	m.last_probed_at = &t
@@ -52524,21 +53880,33 @@ func (m *ProxyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ProxyMutation) Fields() []string {
-	fields := make([]string, 0, 18)
+	fields := make([]string, 0, 23)
 	if m.created_at != nil {
 		fields = append(fields, proxy.FieldCreatedAt)
 	}
 	if m.updated_at != nil {
 		fields = append(fields, proxy.FieldUpdatedAt)
 	}
-	if m.deleted_at != nil {
-		fields = append(fields, proxy.FieldDeletedAt)
-	}
 	if m.name != nil {
 		fields = append(fields, proxy.FieldName)
 	}
 	if m._type != nil {
 		fields = append(fields, proxy.FieldType)
+	}
+	if m.protocol != nil {
+		fields = append(fields, proxy.FieldProtocol)
+	}
+	if m.host != nil {
+		fields = append(fields, proxy.FieldHost)
+	}
+	if m.port != nil {
+		fields = append(fields, proxy.FieldPort)
+	}
+	if m.username != nil {
+		fields = append(fields, proxy.FieldUsername)
+	}
+	if m.password_ciphertext != nil {
+		fields = append(fields, proxy.FieldPasswordCiphertext)
 	}
 	if m.url_ciphertext != nil {
 		fields = append(fields, proxy.FieldURLCiphertext)
@@ -52567,6 +53935,9 @@ func (m *ProxyMutation) Fields() []string {
 	if m.backup_proxy_id != nil {
 		fields = append(fields, proxy.FieldBackupProxyID)
 	}
+	if m.expiry_warn_days != nil {
+		fields = append(fields, proxy.FieldExpiryWarnDays)
+	}
 	if m.last_probed_at != nil {
 		fields = append(fields, proxy.FieldLastProbedAt)
 	}
@@ -52591,12 +53962,20 @@ func (m *ProxyMutation) Field(name string) (ent.Value, bool) {
 		return m.CreatedAt()
 	case proxy.FieldUpdatedAt:
 		return m.UpdatedAt()
-	case proxy.FieldDeletedAt:
-		return m.DeletedAt()
 	case proxy.FieldName:
 		return m.Name()
 	case proxy.FieldType:
 		return m.GetType()
+	case proxy.FieldProtocol:
+		return m.Protocol()
+	case proxy.FieldHost:
+		return m.Host()
+	case proxy.FieldPort:
+		return m.Port()
+	case proxy.FieldUsername:
+		return m.Username()
+	case proxy.FieldPasswordCiphertext:
+		return m.PasswordCiphertext()
 	case proxy.FieldURLCiphertext:
 		return m.URLCiphertext()
 	case proxy.FieldURLVersion:
@@ -52615,6 +53994,8 @@ func (m *ProxyMutation) Field(name string) (ent.Value, bool) {
 		return m.FallbackMode()
 	case proxy.FieldBackupProxyID:
 		return m.BackupProxyID()
+	case proxy.FieldExpiryWarnDays:
+		return m.ExpiryWarnDays()
 	case proxy.FieldLastProbedAt:
 		return m.LastProbedAt()
 	case proxy.FieldProbeSuccessCount:
@@ -52636,12 +54017,20 @@ func (m *ProxyMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldCreatedAt(ctx)
 	case proxy.FieldUpdatedAt:
 		return m.OldUpdatedAt(ctx)
-	case proxy.FieldDeletedAt:
-		return m.OldDeletedAt(ctx)
 	case proxy.FieldName:
 		return m.OldName(ctx)
 	case proxy.FieldType:
 		return m.OldType(ctx)
+	case proxy.FieldProtocol:
+		return m.OldProtocol(ctx)
+	case proxy.FieldHost:
+		return m.OldHost(ctx)
+	case proxy.FieldPort:
+		return m.OldPort(ctx)
+	case proxy.FieldUsername:
+		return m.OldUsername(ctx)
+	case proxy.FieldPasswordCiphertext:
+		return m.OldPasswordCiphertext(ctx)
 	case proxy.FieldURLCiphertext:
 		return m.OldURLCiphertext(ctx)
 	case proxy.FieldURLVersion:
@@ -52660,6 +54049,8 @@ func (m *ProxyMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldFallbackMode(ctx)
 	case proxy.FieldBackupProxyID:
 		return m.OldBackupProxyID(ctx)
+	case proxy.FieldExpiryWarnDays:
+		return m.OldExpiryWarnDays(ctx)
 	case proxy.FieldLastProbedAt:
 		return m.OldLastProbedAt(ctx)
 	case proxy.FieldProbeSuccessCount:
@@ -52691,13 +54082,6 @@ func (m *ProxyMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetUpdatedAt(v)
 		return nil
-	case proxy.FieldDeletedAt:
-		v, ok := value.(time.Time)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetDeletedAt(v)
-		return nil
 	case proxy.FieldName:
 		v, ok := value.(string)
 		if !ok {
@@ -52711,6 +54095,41 @@ func (m *ProxyMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetType(v)
+		return nil
+	case proxy.FieldProtocol:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProtocol(v)
+		return nil
+	case proxy.FieldHost:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetHost(v)
+		return nil
+	case proxy.FieldPort:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPort(v)
+		return nil
+	case proxy.FieldUsername:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUsername(v)
+		return nil
+	case proxy.FieldPasswordCiphertext:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPasswordCiphertext(v)
 		return nil
 	case proxy.FieldURLCiphertext:
 		v, ok := value.([]byte)
@@ -52775,6 +54194,13 @@ func (m *ProxyMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetBackupProxyID(v)
 		return nil
+	case proxy.FieldExpiryWarnDays:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpiryWarnDays(v)
+		return nil
 	case proxy.FieldLastProbedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -52811,11 +54237,17 @@ func (m *ProxyMutation) SetField(name string, value ent.Value) error {
 // this mutation.
 func (m *ProxyMutation) AddedFields() []string {
 	var fields []string
+	if m.addport != nil {
+		fields = append(fields, proxy.FieldPort)
+	}
 	if m.addurl_version != nil {
 		fields = append(fields, proxy.FieldURLVersion)
 	}
 	if m.addbackup_proxy_id != nil {
 		fields = append(fields, proxy.FieldBackupProxyID)
+	}
+	if m.addexpiry_warn_days != nil {
+		fields = append(fields, proxy.FieldExpiryWarnDays)
 	}
 	if m.addprobe_success_count != nil {
 		fields = append(fields, proxy.FieldProbeSuccessCount)
@@ -52834,10 +54266,14 @@ func (m *ProxyMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *ProxyMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case proxy.FieldPort:
+		return m.AddedPort()
 	case proxy.FieldURLVersion:
 		return m.AddedURLVersion()
 	case proxy.FieldBackupProxyID:
 		return m.AddedBackupProxyID()
+	case proxy.FieldExpiryWarnDays:
+		return m.AddedExpiryWarnDays()
 	case proxy.FieldProbeSuccessCount:
 		return m.AddedProbeSuccessCount()
 	case proxy.FieldProbeFailureCount:
@@ -52853,6 +54289,13 @@ func (m *ProxyMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *ProxyMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case proxy.FieldPort:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPort(v)
+		return nil
 	case proxy.FieldURLVersion:
 		v, ok := value.(int)
 		if !ok {
@@ -52866,6 +54309,13 @@ func (m *ProxyMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddBackupProxyID(v)
+		return nil
+	case proxy.FieldExpiryWarnDays:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddExpiryWarnDays(v)
 		return nil
 	case proxy.FieldProbeSuccessCount:
 		v, ok := value.(int)
@@ -52896,8 +54346,11 @@ func (m *ProxyMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *ProxyMutation) ClearedFields() []string {
 	var fields []string
-	if m.FieldCleared(proxy.FieldDeletedAt) {
-		fields = append(fields, proxy.FieldDeletedAt)
+	if m.FieldCleared(proxy.FieldUsername) {
+		fields = append(fields, proxy.FieldUsername)
+	}
+	if m.FieldCleared(proxy.FieldPasswordCiphertext) {
+		fields = append(fields, proxy.FieldPasswordCiphertext)
 	}
 	if m.FieldCleared(proxy.FieldURLCiphertext) {
 		fields = append(fields, proxy.FieldURLCiphertext)
@@ -52934,8 +54387,11 @@ func (m *ProxyMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *ProxyMutation) ClearField(name string) error {
 	switch name {
-	case proxy.FieldDeletedAt:
-		m.ClearDeletedAt()
+	case proxy.FieldUsername:
+		m.ClearUsername()
+		return nil
+	case proxy.FieldPasswordCiphertext:
+		m.ClearPasswordCiphertext()
 		return nil
 	case proxy.FieldURLCiphertext:
 		m.ClearURLCiphertext()
@@ -52972,14 +54428,26 @@ func (m *ProxyMutation) ResetField(name string) error {
 	case proxy.FieldUpdatedAt:
 		m.ResetUpdatedAt()
 		return nil
-	case proxy.FieldDeletedAt:
-		m.ResetDeletedAt()
-		return nil
 	case proxy.FieldName:
 		m.ResetName()
 		return nil
 	case proxy.FieldType:
 		m.ResetType()
+		return nil
+	case proxy.FieldProtocol:
+		m.ResetProtocol()
+		return nil
+	case proxy.FieldHost:
+		m.ResetHost()
+		return nil
+	case proxy.FieldPort:
+		m.ResetPort()
+		return nil
+	case proxy.FieldUsername:
+		m.ResetUsername()
+		return nil
+	case proxy.FieldPasswordCiphertext:
+		m.ResetPasswordCiphertext()
 		return nil
 	case proxy.FieldURLCiphertext:
 		m.ResetURLCiphertext()
@@ -53007,6 +54475,9 @@ func (m *ProxyMutation) ResetField(name string) error {
 		return nil
 	case proxy.FieldBackupProxyID:
 		m.ResetBackupProxyID()
+		return nil
+	case proxy.FieldExpiryWarnDays:
+		m.ResetExpiryWarnDays()
 		return nil
 	case proxy.FieldLastProbedAt:
 		m.ResetLastProbedAt()
@@ -81330,7 +82801,6 @@ type WorkspaceMutation struct {
 	id               *int
 	created_at       *time.Time
 	updated_at       *time.Time
-	deleted_at       *time.Time
 	name             *string
 	slug             *string
 	owner_user_id    *int
@@ -81512,55 +82982,6 @@ func (m *WorkspaceMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err 
 // ResetUpdatedAt resets all changes to the "updated_at" field.
 func (m *WorkspaceMutation) ResetUpdatedAt() {
 	m.updated_at = nil
-}
-
-// SetDeletedAt sets the "deleted_at" field.
-func (m *WorkspaceMutation) SetDeletedAt(t time.Time) {
-	m.deleted_at = &t
-}
-
-// DeletedAt returns the value of the "deleted_at" field in the mutation.
-func (m *WorkspaceMutation) DeletedAt() (r time.Time, exists bool) {
-	v := m.deleted_at
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldDeletedAt returns the old "deleted_at" field's value of the Workspace entity.
-// If the Workspace object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *WorkspaceMutation) OldDeletedAt(ctx context.Context) (v *time.Time, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldDeletedAt is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldDeletedAt requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldDeletedAt: %w", err)
-	}
-	return oldValue.DeletedAt, nil
-}
-
-// ClearDeletedAt clears the value of the "deleted_at" field.
-func (m *WorkspaceMutation) ClearDeletedAt() {
-	m.deleted_at = nil
-	m.clearedFields[workspace.FieldDeletedAt] = struct{}{}
-}
-
-// DeletedAtCleared returns if the "deleted_at" field was cleared in this mutation.
-func (m *WorkspaceMutation) DeletedAtCleared() bool {
-	_, ok := m.clearedFields[workspace.FieldDeletedAt]
-	return ok
-}
-
-// ResetDeletedAt resets all changes to the "deleted_at" field.
-func (m *WorkspaceMutation) ResetDeletedAt() {
-	m.deleted_at = nil
-	delete(m.clearedFields, workspace.FieldDeletedAt)
 }
 
 // SetName sets the "name" field.
@@ -81860,15 +83281,12 @@ func (m *WorkspaceMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *WorkspaceMutation) Fields() []string {
-	fields := make([]string, 0, 9)
+	fields := make([]string, 0, 8)
 	if m.created_at != nil {
 		fields = append(fields, workspace.FieldCreatedAt)
 	}
 	if m.updated_at != nil {
 		fields = append(fields, workspace.FieldUpdatedAt)
-	}
-	if m.deleted_at != nil {
-		fields = append(fields, workspace.FieldDeletedAt)
 	}
 	if m.name != nil {
 		fields = append(fields, workspace.FieldName)
@@ -81900,8 +83318,6 @@ func (m *WorkspaceMutation) Field(name string) (ent.Value, bool) {
 		return m.CreatedAt()
 	case workspace.FieldUpdatedAt:
 		return m.UpdatedAt()
-	case workspace.FieldDeletedAt:
-		return m.DeletedAt()
 	case workspace.FieldName:
 		return m.Name()
 	case workspace.FieldSlug:
@@ -81927,8 +83343,6 @@ func (m *WorkspaceMutation) OldField(ctx context.Context, name string) (ent.Valu
 		return m.OldCreatedAt(ctx)
 	case workspace.FieldUpdatedAt:
 		return m.OldUpdatedAt(ctx)
-	case workspace.FieldDeletedAt:
-		return m.OldDeletedAt(ctx)
 	case workspace.FieldName:
 		return m.OldName(ctx)
 	case workspace.FieldSlug:
@@ -81963,13 +83377,6 @@ func (m *WorkspaceMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetUpdatedAt(v)
-		return nil
-	case workspace.FieldDeletedAt:
-		v, ok := value.(time.Time)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetDeletedAt(v)
 		return nil
 	case workspace.FieldName:
 		v, ok := value.(string)
@@ -82058,9 +83465,6 @@ func (m *WorkspaceMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *WorkspaceMutation) ClearedFields() []string {
 	var fields []string
-	if m.FieldCleared(workspace.FieldDeletedAt) {
-		fields = append(fields, workspace.FieldDeletedAt)
-	}
 	if m.FieldCleared(workspace.FieldOwnerUserID) {
 		fields = append(fields, workspace.FieldOwnerUserID)
 	}
@@ -82081,9 +83485,6 @@ func (m *WorkspaceMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *WorkspaceMutation) ClearField(name string) error {
 	switch name {
-	case workspace.FieldDeletedAt:
-		m.ClearDeletedAt()
-		return nil
 	case workspace.FieldOwnerUserID:
 		m.ClearOwnerUserID()
 		return nil
@@ -82103,9 +83504,6 @@ func (m *WorkspaceMutation) ResetField(name string) error {
 		return nil
 	case workspace.FieldUpdatedAt:
 		m.ResetUpdatedAt()
-		return nil
-	case workspace.FieldDeletedAt:
-		m.ResetDeletedAt()
 		return nil
 	case workspace.FieldName:
 		m.ResetName()

@@ -59,6 +59,8 @@ func (s *Store) Create(_ context.Context, input contract.CreateStoredAccount) (c
 		ID:                   s.nextID,
 		ProviderID:           input.ProviderID,
 		Name:                 input.Name,
+		Platform:             input.Platform,
+		AccountType:          input.AccountType,
 		RuntimeClass:         input.RuntimeClass,
 		CredentialCiphertext: input.CredentialCiphertext,
 		CredentialVersion:    input.CredentialVersion,
@@ -69,6 +71,14 @@ func (s *Store) Create(_ context.Context, input contract.CreateStoredAccount) (c
 		RiskLevel:            cloneString(input.RiskLevel),
 		UpstreamClient:       input.UpstreamClient,
 		Metadata:             input.Metadata,
+		Notes:                input.Notes,
+		Concurrency:          input.Concurrency,
+		RateMultiplier:       input.RateMultiplier,
+		LoadFactor:           cloneIntPtr(input.LoadFactor),
+		Schedulable:          input.Schedulable,
+		ExpiresAt:            cloneTimePtr(input.ExpiresAt),
+		AutoPauseOnExpired:   input.AutoPauseOnExpired,
+		Extra:                cloneMap(input.Extra),
 		CreatedAt:            now,
 		UpdatedAt:            now,
 	}
@@ -76,6 +86,22 @@ func (s *Store) Create(_ context.Context, input contract.CreateStoredAccount) (c
 	s.byName[strings.ToLower(account.Name)] = account.ID
 	s.nextID++
 	return account, nil
+}
+
+func cloneIntPtr(v *int) *int {
+	if v == nil {
+		return nil
+	}
+	c := *v
+	return &c
+}
+
+func cloneTimePtr(v *time.Time) *time.Time {
+	if v == nil {
+		return nil
+	}
+	c := *v
+	return &c
 }
 
 func (s *Store) Update(_ context.Context, account contract.ProviderAccount) (contract.ProviderAccount, error) {
@@ -177,7 +203,16 @@ func accountPageMatches(account contract.ProviderAccount, filter contract.ListFi
 	if filter.ProviderID != nil && account.ProviderID != *filter.ProviderID {
 		return false
 	}
+	if filter.Platform != "" && account.Platform != filter.Platform {
+		return false
+	}
 	if filter.RuntimeClass != "" && account.RuntimeClass != filter.RuntimeClass {
+		return false
+	}
+	if filter.AccountType != "" && account.AccountType != filter.AccountType {
+		return false
+	}
+	if filter.SchedulableOnly && !account.Schedulable {
 		return false
 	}
 	if search := strings.ToLower(strings.TrimSpace(filter.Search)); search != "" {
@@ -319,20 +354,26 @@ func (s *Store) CreateProxy(_ context.Context, input contract.CreateStoredProxy)
 	}
 	now := time.Now().UTC()
 	proxy := contract.ProxyDefinition{
-		ID:            s.nextProxyID,
-		Name:          input.Name,
-		Type:          input.Type,
-		URLCiphertext: input.URLCiphertext,
-		URLVersion:    input.URLVersion,
-		Status:        input.Status,
-		Metadata:      cloneMap(input.Metadata),
-		CountryCode:   input.CountryCode,
-		CountryName:   input.CountryName,
-		ExpiresAt:     cloneTime(input.ExpiresAt),
-		FallbackMode:  input.FallbackMode,
-		BackupProxyID: cloneInt(input.BackupProxyID),
-		CreatedAt:     now,
-		UpdatedAt:     now,
+		ID:                 s.nextProxyID,
+		Name:               input.Name,
+		Type:               input.Type,
+		Protocol:           input.Protocol,
+		Host:               input.Host,
+		Port:               input.Port,
+		Username:           input.Username,
+		PasswordCiphertext: input.PasswordCiphertext,
+		URLCiphertext:      input.URLCiphertext,
+		URLVersion:         input.URLVersion,
+		Status:             input.Status,
+		Metadata:           cloneMap(input.Metadata),
+		CountryCode:        input.CountryCode,
+		CountryName:        input.CountryName,
+		ExpiresAt:          cloneTime(input.ExpiresAt),
+		FallbackMode:       input.FallbackMode,
+		BackupProxyID:      cloneInt(input.BackupProxyID),
+		ExpiryWarnDays:     input.ExpiryWarnDays,
+		CreatedAt:          now,
+		UpdatedAt:          now,
 	}
 	s.proxiesByID[proxy.ID] = proxy
 	s.proxiesByName[strings.ToLower(proxy.Name)] = proxy.ID
@@ -711,21 +752,23 @@ func limitQuotaSnapshotsByType(snapshots []contract.AccountQuotaSnapshot, limit 
 
 func cloneAccount(value contract.ProviderAccount) contract.ProviderAccount {
 	value.Metadata = cloneMap(value.Metadata)
+	value.Extra = cloneMap(value.Extra)
 	value.RiskLevel = cloneString(value.RiskLevel)
 	value.UpstreamClient = cloneString(value.UpstreamClient)
 	value.ProxyID = cloneString(value.ProxyID)
-	if value.TokenExpiresAt != nil {
-		t := *value.TokenExpiresAt
-		value.TokenExpiresAt = &t
-	}
-	if value.LastRefreshedAt != nil {
-		t := *value.LastRefreshedAt
-		value.LastRefreshedAt = &t
-	}
-	if value.NeedsReauthAt != nil {
-		t := *value.NeedsReauthAt
-		value.NeedsReauthAt = &t
-	}
+	value.LoadFactor = cloneIntPtr(value.LoadFactor)
+	value.TokenExpiresAt = cloneTimePtr(value.TokenExpiresAt)
+	value.LastRefreshedAt = cloneTimePtr(value.LastRefreshedAt)
+	value.NeedsReauthAt = cloneTimePtr(value.NeedsReauthAt)
+	value.LastUsedAt = cloneTimePtr(value.LastUsedAt)
+	value.ExpiresAt = cloneTimePtr(value.ExpiresAt)
+	value.RateLimitedAt = cloneTimePtr(value.RateLimitedAt)
+	value.RateLimitResetAt = cloneTimePtr(value.RateLimitResetAt)
+	value.OverloadUntil = cloneTimePtr(value.OverloadUntil)
+	value.TempUnschedulableUntil = cloneTimePtr(value.TempUnschedulableUntil)
+	value.SessionWindowStart = cloneTimePtr(value.SessionWindowStart)
+	value.SessionWindowEnd = cloneTimePtr(value.SessionWindowEnd)
+	value.DeletedAt = cloneTimePtr(value.DeletedAt)
 	return value
 }
 

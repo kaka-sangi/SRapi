@@ -35,26 +35,6 @@ func (_u *PaymentProviderInstanceUpdate) SetUpdatedAt(v time.Time) *PaymentProvi
 	return _u
 }
 
-// SetDeletedAt sets the "deleted_at" field.
-func (_u *PaymentProviderInstanceUpdate) SetDeletedAt(v time.Time) *PaymentProviderInstanceUpdate {
-	_u.mutation.SetDeletedAt(v)
-	return _u
-}
-
-// SetNillableDeletedAt sets the "deleted_at" field if the given value is not nil.
-func (_u *PaymentProviderInstanceUpdate) SetNillableDeletedAt(v *time.Time) *PaymentProviderInstanceUpdate {
-	if v != nil {
-		_u.SetDeletedAt(*v)
-	}
-	return _u
-}
-
-// ClearDeletedAt clears the value of the "deleted_at" field.
-func (_u *PaymentProviderInstanceUpdate) ClearDeletedAt() *PaymentProviderInstanceUpdate {
-	_u.mutation.ClearDeletedAt()
-	return _u
-}
-
 // SetProvider sets the "provider" field.
 func (_u *PaymentProviderInstanceUpdate) SetProvider(v string) *PaymentProviderInstanceUpdate {
 	_u.mutation.SetProvider(v)
@@ -299,12 +279,6 @@ func (_u *PaymentProviderInstanceUpdate) sqlSave(ctx context.Context) (_node int
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(paymentproviderinstance.FieldUpdatedAt, field.TypeTime, value)
 	}
-	if value, ok := _u.mutation.DeletedAt(); ok {
-		_spec.SetField(paymentproviderinstance.FieldDeletedAt, field.TypeTime, value)
-	}
-	if _u.mutation.DeletedAtCleared() {
-		_spec.ClearField(paymentproviderinstance.FieldDeletedAt, field.TypeTime)
-	}
 	if value, ok := _u.mutation.Provider(); ok {
 		_spec.SetField(paymentproviderinstance.FieldProvider, field.TypeString, value)
 	}
@@ -387,26 +361,6 @@ type PaymentProviderInstanceUpdateOne struct {
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *PaymentProviderInstanceUpdateOne) SetUpdatedAt(v time.Time) *PaymentProviderInstanceUpdateOne {
 	_u.mutation.SetUpdatedAt(v)
-	return _u
-}
-
-// SetDeletedAt sets the "deleted_at" field.
-func (_u *PaymentProviderInstanceUpdateOne) SetDeletedAt(v time.Time) *PaymentProviderInstanceUpdateOne {
-	_u.mutation.SetDeletedAt(v)
-	return _u
-}
-
-// SetNillableDeletedAt sets the "deleted_at" field if the given value is not nil.
-func (_u *PaymentProviderInstanceUpdateOne) SetNillableDeletedAt(v *time.Time) *PaymentProviderInstanceUpdateOne {
-	if v != nil {
-		_u.SetDeletedAt(*v)
-	}
-	return _u
-}
-
-// ClearDeletedAt clears the value of the "deleted_at" field.
-func (_u *PaymentProviderInstanceUpdateOne) ClearDeletedAt() *PaymentProviderInstanceUpdateOne {
-	_u.mutation.ClearDeletedAt()
 	return _u
 }
 
@@ -683,12 +637,6 @@ func (_u *PaymentProviderInstanceUpdateOne) sqlSave(ctx context.Context) (_node 
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(paymentproviderinstance.FieldUpdatedAt, field.TypeTime, value)
-	}
-	if value, ok := _u.mutation.DeletedAt(); ok {
-		_spec.SetField(paymentproviderinstance.FieldDeletedAt, field.TypeTime, value)
-	}
-	if _u.mutation.DeletedAtCleared() {
-		_spec.ClearField(paymentproviderinstance.FieldDeletedAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.Provider(); ok {
 		_spec.SetField(paymentproviderinstance.FieldProvider, field.TypeString, value)

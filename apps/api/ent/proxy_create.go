@@ -48,20 +48,6 @@ func (_c *ProxyCreate) SetNillableUpdatedAt(v *time.Time) *ProxyCreate {
 	return _c
 }
 
-// SetDeletedAt sets the "deleted_at" field.
-func (_c *ProxyCreate) SetDeletedAt(v time.Time) *ProxyCreate {
-	_c.mutation.SetDeletedAt(v)
-	return _c
-}
-
-// SetNillableDeletedAt sets the "deleted_at" field if the given value is not nil.
-func (_c *ProxyCreate) SetNillableDeletedAt(v *time.Time) *ProxyCreate {
-	if v != nil {
-		_c.SetDeletedAt(*v)
-	}
-	return _c
-}
-
 // SetName sets the "name" field.
 func (_c *ProxyCreate) SetName(v string) *ProxyCreate {
 	_c.mutation.SetName(v)
@@ -71,6 +57,68 @@ func (_c *ProxyCreate) SetName(v string) *ProxyCreate {
 // SetType sets the "type" field.
 func (_c *ProxyCreate) SetType(v string) *ProxyCreate {
 	_c.mutation.SetType(v)
+	return _c
+}
+
+// SetProtocol sets the "protocol" field.
+func (_c *ProxyCreate) SetProtocol(v string) *ProxyCreate {
+	_c.mutation.SetProtocol(v)
+	return _c
+}
+
+// SetNillableProtocol sets the "protocol" field if the given value is not nil.
+func (_c *ProxyCreate) SetNillableProtocol(v *string) *ProxyCreate {
+	if v != nil {
+		_c.SetProtocol(*v)
+	}
+	return _c
+}
+
+// SetHost sets the "host" field.
+func (_c *ProxyCreate) SetHost(v string) *ProxyCreate {
+	_c.mutation.SetHost(v)
+	return _c
+}
+
+// SetNillableHost sets the "host" field if the given value is not nil.
+func (_c *ProxyCreate) SetNillableHost(v *string) *ProxyCreate {
+	if v != nil {
+		_c.SetHost(*v)
+	}
+	return _c
+}
+
+// SetPort sets the "port" field.
+func (_c *ProxyCreate) SetPort(v int) *ProxyCreate {
+	_c.mutation.SetPort(v)
+	return _c
+}
+
+// SetNillablePort sets the "port" field if the given value is not nil.
+func (_c *ProxyCreate) SetNillablePort(v *int) *ProxyCreate {
+	if v != nil {
+		_c.SetPort(*v)
+	}
+	return _c
+}
+
+// SetUsername sets the "username" field.
+func (_c *ProxyCreate) SetUsername(v string) *ProxyCreate {
+	_c.mutation.SetUsername(v)
+	return _c
+}
+
+// SetNillableUsername sets the "username" field if the given value is not nil.
+func (_c *ProxyCreate) SetNillableUsername(v *string) *ProxyCreate {
+	if v != nil {
+		_c.SetUsername(*v)
+	}
+	return _c
+}
+
+// SetPasswordCiphertext sets the "password_ciphertext" field.
+func (_c *ProxyCreate) SetPasswordCiphertext(v []byte) *ProxyCreate {
+	_c.mutation.SetPasswordCiphertext(v)
 	return _c
 }
 
@@ -184,6 +232,20 @@ func (_c *ProxyCreate) SetNillableBackupProxyID(v *int) *ProxyCreate {
 	return _c
 }
 
+// SetExpiryWarnDays sets the "expiry_warn_days" field.
+func (_c *ProxyCreate) SetExpiryWarnDays(v int) *ProxyCreate {
+	_c.mutation.SetExpiryWarnDays(v)
+	return _c
+}
+
+// SetNillableExpiryWarnDays sets the "expiry_warn_days" field if the given value is not nil.
+func (_c *ProxyCreate) SetNillableExpiryWarnDays(v *int) *ProxyCreate {
+	if v != nil {
+		_c.SetExpiryWarnDays(*v)
+	}
+	return _c
+}
+
 // SetLastProbedAt sets the "last_probed_at" field.
 func (_c *ProxyCreate) SetLastProbedAt(v time.Time) *ProxyCreate {
 	_c.mutation.SetLastProbedAt(v)
@@ -283,6 +345,22 @@ func (_c *ProxyCreate) defaults() {
 		v := proxy.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
+	if _, ok := _c.mutation.Protocol(); !ok {
+		v := proxy.DefaultProtocol
+		_c.mutation.SetProtocol(v)
+	}
+	if _, ok := _c.mutation.Host(); !ok {
+		v := proxy.DefaultHost
+		_c.mutation.SetHost(v)
+	}
+	if _, ok := _c.mutation.Port(); !ok {
+		v := proxy.DefaultPort
+		_c.mutation.SetPort(v)
+	}
+	if _, ok := _c.mutation.Username(); !ok {
+		v := proxy.DefaultUsername
+		_c.mutation.SetUsername(v)
+	}
 	if _, ok := _c.mutation.URLVersion(); !ok {
 		v := proxy.DefaultURLVersion
 		_c.mutation.SetURLVersion(v)
@@ -302,6 +380,10 @@ func (_c *ProxyCreate) defaults() {
 	if _, ok := _c.mutation.FallbackMode(); !ok {
 		v := proxy.DefaultFallbackMode
 		_c.mutation.SetFallbackMode(v)
+	}
+	if _, ok := _c.mutation.ExpiryWarnDays(); !ok {
+		v := proxy.DefaultExpiryWarnDays
+		_c.mutation.SetExpiryWarnDays(v)
 	}
 	if _, ok := _c.mutation.ProbeSuccessCount(); !ok {
 		v := proxy.DefaultProbeSuccessCount
@@ -341,6 +423,15 @@ func (_c *ProxyCreate) check() error {
 			return &ValidationError{Name: "type", err: fmt.Errorf(`ent: validator failed for field "Proxy.type": %w`, err)}
 		}
 	}
+	if _, ok := _c.mutation.Protocol(); !ok {
+		return &ValidationError{Name: "protocol", err: errors.New(`ent: missing required field "Proxy.protocol"`)}
+	}
+	if _, ok := _c.mutation.Host(); !ok {
+		return &ValidationError{Name: "host", err: errors.New(`ent: missing required field "Proxy.host"`)}
+	}
+	if _, ok := _c.mutation.Port(); !ok {
+		return &ValidationError{Name: "port", err: errors.New(`ent: missing required field "Proxy.port"`)}
+	}
 	if _, ok := _c.mutation.URLVersion(); !ok {
 		return &ValidationError{Name: "url_version", err: errors.New(`ent: missing required field "Proxy.url_version"`)}
 	}
@@ -359,6 +450,9 @@ func (_c *ProxyCreate) check() error {
 	}
 	if _, ok := _c.mutation.FallbackMode(); !ok {
 		return &ValidationError{Name: "fallback_mode", err: errors.New(`ent: missing required field "Proxy.fallback_mode"`)}
+	}
+	if _, ok := _c.mutation.ExpiryWarnDays(); !ok {
+		return &ValidationError{Name: "expiry_warn_days", err: errors.New(`ent: missing required field "Proxy.expiry_warn_days"`)}
 	}
 	if _, ok := _c.mutation.ProbeSuccessCount(); !ok {
 		return &ValidationError{Name: "probe_success_count", err: errors.New(`ent: missing required field "Proxy.probe_success_count"`)}
@@ -403,10 +497,6 @@ func (_c *ProxyCreate) createSpec() (*Proxy, *sqlgraph.CreateSpec) {
 		_spec.SetField(proxy.FieldUpdatedAt, field.TypeTime, value)
 		_node.UpdatedAt = value
 	}
-	if value, ok := _c.mutation.DeletedAt(); ok {
-		_spec.SetField(proxy.FieldDeletedAt, field.TypeTime, value)
-		_node.DeletedAt = &value
-	}
 	if value, ok := _c.mutation.Name(); ok {
 		_spec.SetField(proxy.FieldName, field.TypeString, value)
 		_node.Name = value
@@ -414,6 +504,26 @@ func (_c *ProxyCreate) createSpec() (*Proxy, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.GetType(); ok {
 		_spec.SetField(proxy.FieldType, field.TypeString, value)
 		_node.Type = value
+	}
+	if value, ok := _c.mutation.Protocol(); ok {
+		_spec.SetField(proxy.FieldProtocol, field.TypeString, value)
+		_node.Protocol = value
+	}
+	if value, ok := _c.mutation.Host(); ok {
+		_spec.SetField(proxy.FieldHost, field.TypeString, value)
+		_node.Host = value
+	}
+	if value, ok := _c.mutation.Port(); ok {
+		_spec.SetField(proxy.FieldPort, field.TypeInt, value)
+		_node.Port = value
+	}
+	if value, ok := _c.mutation.Username(); ok {
+		_spec.SetField(proxy.FieldUsername, field.TypeString, value)
+		_node.Username = value
+	}
+	if value, ok := _c.mutation.PasswordCiphertext(); ok {
+		_spec.SetField(proxy.FieldPasswordCiphertext, field.TypeBytes, value)
+		_node.PasswordCiphertext = value
 	}
 	if value, ok := _c.mutation.URLCiphertext(); ok {
 		_spec.SetField(proxy.FieldURLCiphertext, field.TypeBytes, value)
@@ -450,6 +560,10 @@ func (_c *ProxyCreate) createSpec() (*Proxy, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.BackupProxyID(); ok {
 		_spec.SetField(proxy.FieldBackupProxyID, field.TypeInt, value)
 		_node.BackupProxyID = &value
+	}
+	if value, ok := _c.mutation.ExpiryWarnDays(); ok {
+		_spec.SetField(proxy.FieldExpiryWarnDays, field.TypeInt, value)
+		_node.ExpiryWarnDays = value
 	}
 	if value, ok := _c.mutation.LastProbedAt(); ok {
 		_spec.SetField(proxy.FieldLastProbedAt, field.TypeTime, value)

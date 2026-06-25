@@ -79,6 +79,11 @@ func Name(v string) predicate.ProviderAccount {
 	return predicate.ProviderAccount(sql.FieldEQ(FieldName, v))
 }
 
+// Platform applies equality check predicate on the "platform" field. It's identical to PlatformEQ.
+func Platform(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldPlatform, v))
+}
+
 // AccountType applies equality check predicate on the "account_type" field. It's identical to AccountTypeEQ.
 func AccountType(v string) predicate.ProviderAccount {
 	return predicate.ProviderAccount(sql.FieldEQ(FieldAccountType, v))
@@ -127,6 +132,91 @@ func Weight(v float64) predicate.ProviderAccount {
 // RiskLevel applies equality check predicate on the "risk_level" field. It's identical to RiskLevelEQ.
 func RiskLevel(v string) predicate.ProviderAccount {
 	return predicate.ProviderAccount(sql.FieldEQ(FieldRiskLevel, v))
+}
+
+// Notes applies equality check predicate on the "notes" field. It's identical to NotesEQ.
+func Notes(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldNotes, v))
+}
+
+// Concurrency applies equality check predicate on the "concurrency" field. It's identical to ConcurrencyEQ.
+func Concurrency(v int) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldConcurrency, v))
+}
+
+// RateMultiplier applies equality check predicate on the "rate_multiplier" field. It's identical to RateMultiplierEQ.
+func RateMultiplier(v float64) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldRateMultiplier, v))
+}
+
+// LoadFactor applies equality check predicate on the "load_factor" field. It's identical to LoadFactorEQ.
+func LoadFactor(v int) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldLoadFactor, v))
+}
+
+// Schedulable applies equality check predicate on the "schedulable" field. It's identical to SchedulableEQ.
+func Schedulable(v bool) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldSchedulable, v))
+}
+
+// ErrorMessage applies equality check predicate on the "error_message" field. It's identical to ErrorMessageEQ.
+func ErrorMessage(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldErrorMessage, v))
+}
+
+// LastUsedAt applies equality check predicate on the "last_used_at" field. It's identical to LastUsedAtEQ.
+func LastUsedAt(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldLastUsedAt, v))
+}
+
+// ExpiresAt applies equality check predicate on the "expires_at" field. It's identical to ExpiresAtEQ.
+func ExpiresAt(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldExpiresAt, v))
+}
+
+// AutoPauseOnExpired applies equality check predicate on the "auto_pause_on_expired" field. It's identical to AutoPauseOnExpiredEQ.
+func AutoPauseOnExpired(v bool) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldAutoPauseOnExpired, v))
+}
+
+// RateLimitedAt applies equality check predicate on the "rate_limited_at" field. It's identical to RateLimitedAtEQ.
+func RateLimitedAt(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldRateLimitedAt, v))
+}
+
+// RateLimitResetAt applies equality check predicate on the "rate_limit_reset_at" field. It's identical to RateLimitResetAtEQ.
+func RateLimitResetAt(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldRateLimitResetAt, v))
+}
+
+// OverloadUntil applies equality check predicate on the "overload_until" field. It's identical to OverloadUntilEQ.
+func OverloadUntil(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldOverloadUntil, v))
+}
+
+// TempUnschedulableUntil applies equality check predicate on the "temp_unschedulable_until" field. It's identical to TempUnschedulableUntilEQ.
+func TempUnschedulableUntil(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldTempUnschedulableUntil, v))
+}
+
+// TempUnschedulableReason applies equality check predicate on the "temp_unschedulable_reason" field. It's identical to TempUnschedulableReasonEQ.
+func TempUnschedulableReason(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldTempUnschedulableReason, v))
+}
+
+// SessionWindowStart applies equality check predicate on the "session_window_start" field. It's identical to SessionWindowStartEQ.
+func SessionWindowStart(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldSessionWindowStart, v))
+}
+
+// SessionWindowEnd applies equality check predicate on the "session_window_end" field. It's identical to SessionWindowEndEQ.
+func SessionWindowEnd(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldSessionWindowEnd, v))
+}
+
+// SessionWindowStatus applies equality check predicate on the "session_window_status" field. It's identical to SessionWindowStatusEQ.
+func SessionWindowStatus(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldSessionWindowStatus, v))
 }
 
 // TokenExpiresAt applies equality check predicate on the "token_expires_at" field. It's identical to TokenExpiresAtEQ.
@@ -387,6 +477,71 @@ func NameEqualFold(v string) predicate.ProviderAccount {
 // NameContainsFold applies the ContainsFold predicate on the "name" field.
 func NameContainsFold(v string) predicate.ProviderAccount {
 	return predicate.ProviderAccount(sql.FieldContainsFold(FieldName, v))
+}
+
+// PlatformEQ applies the EQ predicate on the "platform" field.
+func PlatformEQ(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldPlatform, v))
+}
+
+// PlatformNEQ applies the NEQ predicate on the "platform" field.
+func PlatformNEQ(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNEQ(FieldPlatform, v))
+}
+
+// PlatformIn applies the In predicate on the "platform" field.
+func PlatformIn(vs ...string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIn(FieldPlatform, vs...))
+}
+
+// PlatformNotIn applies the NotIn predicate on the "platform" field.
+func PlatformNotIn(vs ...string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotIn(FieldPlatform, vs...))
+}
+
+// PlatformGT applies the GT predicate on the "platform" field.
+func PlatformGT(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGT(FieldPlatform, v))
+}
+
+// PlatformGTE applies the GTE predicate on the "platform" field.
+func PlatformGTE(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGTE(FieldPlatform, v))
+}
+
+// PlatformLT applies the LT predicate on the "platform" field.
+func PlatformLT(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLT(FieldPlatform, v))
+}
+
+// PlatformLTE applies the LTE predicate on the "platform" field.
+func PlatformLTE(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLTE(FieldPlatform, v))
+}
+
+// PlatformContains applies the Contains predicate on the "platform" field.
+func PlatformContains(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldContains(FieldPlatform, v))
+}
+
+// PlatformHasPrefix applies the HasPrefix predicate on the "platform" field.
+func PlatformHasPrefix(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldHasPrefix(FieldPlatform, v))
+}
+
+// PlatformHasSuffix applies the HasSuffix predicate on the "platform" field.
+func PlatformHasSuffix(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldHasSuffix(FieldPlatform, v))
+}
+
+// PlatformEqualFold applies the EqualFold predicate on the "platform" field.
+func PlatformEqualFold(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEqualFold(FieldPlatform, v))
+}
+
+// PlatformContainsFold applies the ContainsFold predicate on the "platform" field.
+func PlatformContainsFold(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldContainsFold(FieldPlatform, v))
 }
 
 // AccountTypeEQ applies the EQ predicate on the "account_type" field.
@@ -977,6 +1132,836 @@ func MetadataJSONIsNil() predicate.ProviderAccount {
 // MetadataJSONNotNil applies the NotNil predicate on the "metadata_json" field.
 func MetadataJSONNotNil() predicate.ProviderAccount {
 	return predicate.ProviderAccount(sql.FieldNotNull(FieldMetadataJSON))
+}
+
+// NotesEQ applies the EQ predicate on the "notes" field.
+func NotesEQ(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldNotes, v))
+}
+
+// NotesNEQ applies the NEQ predicate on the "notes" field.
+func NotesNEQ(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNEQ(FieldNotes, v))
+}
+
+// NotesIn applies the In predicate on the "notes" field.
+func NotesIn(vs ...string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIn(FieldNotes, vs...))
+}
+
+// NotesNotIn applies the NotIn predicate on the "notes" field.
+func NotesNotIn(vs ...string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotIn(FieldNotes, vs...))
+}
+
+// NotesGT applies the GT predicate on the "notes" field.
+func NotesGT(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGT(FieldNotes, v))
+}
+
+// NotesGTE applies the GTE predicate on the "notes" field.
+func NotesGTE(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGTE(FieldNotes, v))
+}
+
+// NotesLT applies the LT predicate on the "notes" field.
+func NotesLT(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLT(FieldNotes, v))
+}
+
+// NotesLTE applies the LTE predicate on the "notes" field.
+func NotesLTE(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLTE(FieldNotes, v))
+}
+
+// NotesContains applies the Contains predicate on the "notes" field.
+func NotesContains(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldContains(FieldNotes, v))
+}
+
+// NotesHasPrefix applies the HasPrefix predicate on the "notes" field.
+func NotesHasPrefix(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldHasPrefix(FieldNotes, v))
+}
+
+// NotesHasSuffix applies the HasSuffix predicate on the "notes" field.
+func NotesHasSuffix(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldHasSuffix(FieldNotes, v))
+}
+
+// NotesIsNil applies the IsNil predicate on the "notes" field.
+func NotesIsNil() predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIsNull(FieldNotes))
+}
+
+// NotesNotNil applies the NotNil predicate on the "notes" field.
+func NotesNotNil() predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotNull(FieldNotes))
+}
+
+// NotesEqualFold applies the EqualFold predicate on the "notes" field.
+func NotesEqualFold(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEqualFold(FieldNotes, v))
+}
+
+// NotesContainsFold applies the ContainsFold predicate on the "notes" field.
+func NotesContainsFold(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldContainsFold(FieldNotes, v))
+}
+
+// ConcurrencyEQ applies the EQ predicate on the "concurrency" field.
+func ConcurrencyEQ(v int) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldConcurrency, v))
+}
+
+// ConcurrencyNEQ applies the NEQ predicate on the "concurrency" field.
+func ConcurrencyNEQ(v int) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNEQ(FieldConcurrency, v))
+}
+
+// ConcurrencyIn applies the In predicate on the "concurrency" field.
+func ConcurrencyIn(vs ...int) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIn(FieldConcurrency, vs...))
+}
+
+// ConcurrencyNotIn applies the NotIn predicate on the "concurrency" field.
+func ConcurrencyNotIn(vs ...int) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotIn(FieldConcurrency, vs...))
+}
+
+// ConcurrencyGT applies the GT predicate on the "concurrency" field.
+func ConcurrencyGT(v int) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGT(FieldConcurrency, v))
+}
+
+// ConcurrencyGTE applies the GTE predicate on the "concurrency" field.
+func ConcurrencyGTE(v int) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGTE(FieldConcurrency, v))
+}
+
+// ConcurrencyLT applies the LT predicate on the "concurrency" field.
+func ConcurrencyLT(v int) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLT(FieldConcurrency, v))
+}
+
+// ConcurrencyLTE applies the LTE predicate on the "concurrency" field.
+func ConcurrencyLTE(v int) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLTE(FieldConcurrency, v))
+}
+
+// RateMultiplierEQ applies the EQ predicate on the "rate_multiplier" field.
+func RateMultiplierEQ(v float64) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldRateMultiplier, v))
+}
+
+// RateMultiplierNEQ applies the NEQ predicate on the "rate_multiplier" field.
+func RateMultiplierNEQ(v float64) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNEQ(FieldRateMultiplier, v))
+}
+
+// RateMultiplierIn applies the In predicate on the "rate_multiplier" field.
+func RateMultiplierIn(vs ...float64) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIn(FieldRateMultiplier, vs...))
+}
+
+// RateMultiplierNotIn applies the NotIn predicate on the "rate_multiplier" field.
+func RateMultiplierNotIn(vs ...float64) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotIn(FieldRateMultiplier, vs...))
+}
+
+// RateMultiplierGT applies the GT predicate on the "rate_multiplier" field.
+func RateMultiplierGT(v float64) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGT(FieldRateMultiplier, v))
+}
+
+// RateMultiplierGTE applies the GTE predicate on the "rate_multiplier" field.
+func RateMultiplierGTE(v float64) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGTE(FieldRateMultiplier, v))
+}
+
+// RateMultiplierLT applies the LT predicate on the "rate_multiplier" field.
+func RateMultiplierLT(v float64) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLT(FieldRateMultiplier, v))
+}
+
+// RateMultiplierLTE applies the LTE predicate on the "rate_multiplier" field.
+func RateMultiplierLTE(v float64) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLTE(FieldRateMultiplier, v))
+}
+
+// LoadFactorEQ applies the EQ predicate on the "load_factor" field.
+func LoadFactorEQ(v int) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldLoadFactor, v))
+}
+
+// LoadFactorNEQ applies the NEQ predicate on the "load_factor" field.
+func LoadFactorNEQ(v int) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNEQ(FieldLoadFactor, v))
+}
+
+// LoadFactorIn applies the In predicate on the "load_factor" field.
+func LoadFactorIn(vs ...int) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIn(FieldLoadFactor, vs...))
+}
+
+// LoadFactorNotIn applies the NotIn predicate on the "load_factor" field.
+func LoadFactorNotIn(vs ...int) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotIn(FieldLoadFactor, vs...))
+}
+
+// LoadFactorGT applies the GT predicate on the "load_factor" field.
+func LoadFactorGT(v int) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGT(FieldLoadFactor, v))
+}
+
+// LoadFactorGTE applies the GTE predicate on the "load_factor" field.
+func LoadFactorGTE(v int) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGTE(FieldLoadFactor, v))
+}
+
+// LoadFactorLT applies the LT predicate on the "load_factor" field.
+func LoadFactorLT(v int) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLT(FieldLoadFactor, v))
+}
+
+// LoadFactorLTE applies the LTE predicate on the "load_factor" field.
+func LoadFactorLTE(v int) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLTE(FieldLoadFactor, v))
+}
+
+// LoadFactorIsNil applies the IsNil predicate on the "load_factor" field.
+func LoadFactorIsNil() predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIsNull(FieldLoadFactor))
+}
+
+// LoadFactorNotNil applies the NotNil predicate on the "load_factor" field.
+func LoadFactorNotNil() predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotNull(FieldLoadFactor))
+}
+
+// SchedulableEQ applies the EQ predicate on the "schedulable" field.
+func SchedulableEQ(v bool) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldSchedulable, v))
+}
+
+// SchedulableNEQ applies the NEQ predicate on the "schedulable" field.
+func SchedulableNEQ(v bool) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNEQ(FieldSchedulable, v))
+}
+
+// ErrorMessageEQ applies the EQ predicate on the "error_message" field.
+func ErrorMessageEQ(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldErrorMessage, v))
+}
+
+// ErrorMessageNEQ applies the NEQ predicate on the "error_message" field.
+func ErrorMessageNEQ(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNEQ(FieldErrorMessage, v))
+}
+
+// ErrorMessageIn applies the In predicate on the "error_message" field.
+func ErrorMessageIn(vs ...string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIn(FieldErrorMessage, vs...))
+}
+
+// ErrorMessageNotIn applies the NotIn predicate on the "error_message" field.
+func ErrorMessageNotIn(vs ...string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotIn(FieldErrorMessage, vs...))
+}
+
+// ErrorMessageGT applies the GT predicate on the "error_message" field.
+func ErrorMessageGT(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGT(FieldErrorMessage, v))
+}
+
+// ErrorMessageGTE applies the GTE predicate on the "error_message" field.
+func ErrorMessageGTE(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGTE(FieldErrorMessage, v))
+}
+
+// ErrorMessageLT applies the LT predicate on the "error_message" field.
+func ErrorMessageLT(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLT(FieldErrorMessage, v))
+}
+
+// ErrorMessageLTE applies the LTE predicate on the "error_message" field.
+func ErrorMessageLTE(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLTE(FieldErrorMessage, v))
+}
+
+// ErrorMessageContains applies the Contains predicate on the "error_message" field.
+func ErrorMessageContains(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldContains(FieldErrorMessage, v))
+}
+
+// ErrorMessageHasPrefix applies the HasPrefix predicate on the "error_message" field.
+func ErrorMessageHasPrefix(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldHasPrefix(FieldErrorMessage, v))
+}
+
+// ErrorMessageHasSuffix applies the HasSuffix predicate on the "error_message" field.
+func ErrorMessageHasSuffix(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldHasSuffix(FieldErrorMessage, v))
+}
+
+// ErrorMessageEqualFold applies the EqualFold predicate on the "error_message" field.
+func ErrorMessageEqualFold(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEqualFold(FieldErrorMessage, v))
+}
+
+// ErrorMessageContainsFold applies the ContainsFold predicate on the "error_message" field.
+func ErrorMessageContainsFold(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldContainsFold(FieldErrorMessage, v))
+}
+
+// LastUsedAtEQ applies the EQ predicate on the "last_used_at" field.
+func LastUsedAtEQ(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldLastUsedAt, v))
+}
+
+// LastUsedAtNEQ applies the NEQ predicate on the "last_used_at" field.
+func LastUsedAtNEQ(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNEQ(FieldLastUsedAt, v))
+}
+
+// LastUsedAtIn applies the In predicate on the "last_used_at" field.
+func LastUsedAtIn(vs ...time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIn(FieldLastUsedAt, vs...))
+}
+
+// LastUsedAtNotIn applies the NotIn predicate on the "last_used_at" field.
+func LastUsedAtNotIn(vs ...time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotIn(FieldLastUsedAt, vs...))
+}
+
+// LastUsedAtGT applies the GT predicate on the "last_used_at" field.
+func LastUsedAtGT(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGT(FieldLastUsedAt, v))
+}
+
+// LastUsedAtGTE applies the GTE predicate on the "last_used_at" field.
+func LastUsedAtGTE(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGTE(FieldLastUsedAt, v))
+}
+
+// LastUsedAtLT applies the LT predicate on the "last_used_at" field.
+func LastUsedAtLT(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLT(FieldLastUsedAt, v))
+}
+
+// LastUsedAtLTE applies the LTE predicate on the "last_used_at" field.
+func LastUsedAtLTE(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLTE(FieldLastUsedAt, v))
+}
+
+// LastUsedAtIsNil applies the IsNil predicate on the "last_used_at" field.
+func LastUsedAtIsNil() predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIsNull(FieldLastUsedAt))
+}
+
+// LastUsedAtNotNil applies the NotNil predicate on the "last_used_at" field.
+func LastUsedAtNotNil() predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotNull(FieldLastUsedAt))
+}
+
+// ExpiresAtEQ applies the EQ predicate on the "expires_at" field.
+func ExpiresAtEQ(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldExpiresAt, v))
+}
+
+// ExpiresAtNEQ applies the NEQ predicate on the "expires_at" field.
+func ExpiresAtNEQ(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNEQ(FieldExpiresAt, v))
+}
+
+// ExpiresAtIn applies the In predicate on the "expires_at" field.
+func ExpiresAtIn(vs ...time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIn(FieldExpiresAt, vs...))
+}
+
+// ExpiresAtNotIn applies the NotIn predicate on the "expires_at" field.
+func ExpiresAtNotIn(vs ...time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotIn(FieldExpiresAt, vs...))
+}
+
+// ExpiresAtGT applies the GT predicate on the "expires_at" field.
+func ExpiresAtGT(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGT(FieldExpiresAt, v))
+}
+
+// ExpiresAtGTE applies the GTE predicate on the "expires_at" field.
+func ExpiresAtGTE(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGTE(FieldExpiresAt, v))
+}
+
+// ExpiresAtLT applies the LT predicate on the "expires_at" field.
+func ExpiresAtLT(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLT(FieldExpiresAt, v))
+}
+
+// ExpiresAtLTE applies the LTE predicate on the "expires_at" field.
+func ExpiresAtLTE(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLTE(FieldExpiresAt, v))
+}
+
+// ExpiresAtIsNil applies the IsNil predicate on the "expires_at" field.
+func ExpiresAtIsNil() predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIsNull(FieldExpiresAt))
+}
+
+// ExpiresAtNotNil applies the NotNil predicate on the "expires_at" field.
+func ExpiresAtNotNil() predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotNull(FieldExpiresAt))
+}
+
+// AutoPauseOnExpiredEQ applies the EQ predicate on the "auto_pause_on_expired" field.
+func AutoPauseOnExpiredEQ(v bool) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldAutoPauseOnExpired, v))
+}
+
+// AutoPauseOnExpiredNEQ applies the NEQ predicate on the "auto_pause_on_expired" field.
+func AutoPauseOnExpiredNEQ(v bool) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNEQ(FieldAutoPauseOnExpired, v))
+}
+
+// RateLimitedAtEQ applies the EQ predicate on the "rate_limited_at" field.
+func RateLimitedAtEQ(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldRateLimitedAt, v))
+}
+
+// RateLimitedAtNEQ applies the NEQ predicate on the "rate_limited_at" field.
+func RateLimitedAtNEQ(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNEQ(FieldRateLimitedAt, v))
+}
+
+// RateLimitedAtIn applies the In predicate on the "rate_limited_at" field.
+func RateLimitedAtIn(vs ...time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIn(FieldRateLimitedAt, vs...))
+}
+
+// RateLimitedAtNotIn applies the NotIn predicate on the "rate_limited_at" field.
+func RateLimitedAtNotIn(vs ...time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotIn(FieldRateLimitedAt, vs...))
+}
+
+// RateLimitedAtGT applies the GT predicate on the "rate_limited_at" field.
+func RateLimitedAtGT(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGT(FieldRateLimitedAt, v))
+}
+
+// RateLimitedAtGTE applies the GTE predicate on the "rate_limited_at" field.
+func RateLimitedAtGTE(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGTE(FieldRateLimitedAt, v))
+}
+
+// RateLimitedAtLT applies the LT predicate on the "rate_limited_at" field.
+func RateLimitedAtLT(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLT(FieldRateLimitedAt, v))
+}
+
+// RateLimitedAtLTE applies the LTE predicate on the "rate_limited_at" field.
+func RateLimitedAtLTE(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLTE(FieldRateLimitedAt, v))
+}
+
+// RateLimitedAtIsNil applies the IsNil predicate on the "rate_limited_at" field.
+func RateLimitedAtIsNil() predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIsNull(FieldRateLimitedAt))
+}
+
+// RateLimitedAtNotNil applies the NotNil predicate on the "rate_limited_at" field.
+func RateLimitedAtNotNil() predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotNull(FieldRateLimitedAt))
+}
+
+// RateLimitResetAtEQ applies the EQ predicate on the "rate_limit_reset_at" field.
+func RateLimitResetAtEQ(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldRateLimitResetAt, v))
+}
+
+// RateLimitResetAtNEQ applies the NEQ predicate on the "rate_limit_reset_at" field.
+func RateLimitResetAtNEQ(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNEQ(FieldRateLimitResetAt, v))
+}
+
+// RateLimitResetAtIn applies the In predicate on the "rate_limit_reset_at" field.
+func RateLimitResetAtIn(vs ...time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIn(FieldRateLimitResetAt, vs...))
+}
+
+// RateLimitResetAtNotIn applies the NotIn predicate on the "rate_limit_reset_at" field.
+func RateLimitResetAtNotIn(vs ...time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotIn(FieldRateLimitResetAt, vs...))
+}
+
+// RateLimitResetAtGT applies the GT predicate on the "rate_limit_reset_at" field.
+func RateLimitResetAtGT(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGT(FieldRateLimitResetAt, v))
+}
+
+// RateLimitResetAtGTE applies the GTE predicate on the "rate_limit_reset_at" field.
+func RateLimitResetAtGTE(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGTE(FieldRateLimitResetAt, v))
+}
+
+// RateLimitResetAtLT applies the LT predicate on the "rate_limit_reset_at" field.
+func RateLimitResetAtLT(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLT(FieldRateLimitResetAt, v))
+}
+
+// RateLimitResetAtLTE applies the LTE predicate on the "rate_limit_reset_at" field.
+func RateLimitResetAtLTE(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLTE(FieldRateLimitResetAt, v))
+}
+
+// RateLimitResetAtIsNil applies the IsNil predicate on the "rate_limit_reset_at" field.
+func RateLimitResetAtIsNil() predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIsNull(FieldRateLimitResetAt))
+}
+
+// RateLimitResetAtNotNil applies the NotNil predicate on the "rate_limit_reset_at" field.
+func RateLimitResetAtNotNil() predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotNull(FieldRateLimitResetAt))
+}
+
+// OverloadUntilEQ applies the EQ predicate on the "overload_until" field.
+func OverloadUntilEQ(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldOverloadUntil, v))
+}
+
+// OverloadUntilNEQ applies the NEQ predicate on the "overload_until" field.
+func OverloadUntilNEQ(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNEQ(FieldOverloadUntil, v))
+}
+
+// OverloadUntilIn applies the In predicate on the "overload_until" field.
+func OverloadUntilIn(vs ...time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIn(FieldOverloadUntil, vs...))
+}
+
+// OverloadUntilNotIn applies the NotIn predicate on the "overload_until" field.
+func OverloadUntilNotIn(vs ...time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotIn(FieldOverloadUntil, vs...))
+}
+
+// OverloadUntilGT applies the GT predicate on the "overload_until" field.
+func OverloadUntilGT(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGT(FieldOverloadUntil, v))
+}
+
+// OverloadUntilGTE applies the GTE predicate on the "overload_until" field.
+func OverloadUntilGTE(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGTE(FieldOverloadUntil, v))
+}
+
+// OverloadUntilLT applies the LT predicate on the "overload_until" field.
+func OverloadUntilLT(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLT(FieldOverloadUntil, v))
+}
+
+// OverloadUntilLTE applies the LTE predicate on the "overload_until" field.
+func OverloadUntilLTE(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLTE(FieldOverloadUntil, v))
+}
+
+// OverloadUntilIsNil applies the IsNil predicate on the "overload_until" field.
+func OverloadUntilIsNil() predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIsNull(FieldOverloadUntil))
+}
+
+// OverloadUntilNotNil applies the NotNil predicate on the "overload_until" field.
+func OverloadUntilNotNil() predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotNull(FieldOverloadUntil))
+}
+
+// TempUnschedulableUntilEQ applies the EQ predicate on the "temp_unschedulable_until" field.
+func TempUnschedulableUntilEQ(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldTempUnschedulableUntil, v))
+}
+
+// TempUnschedulableUntilNEQ applies the NEQ predicate on the "temp_unschedulable_until" field.
+func TempUnschedulableUntilNEQ(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNEQ(FieldTempUnschedulableUntil, v))
+}
+
+// TempUnschedulableUntilIn applies the In predicate on the "temp_unschedulable_until" field.
+func TempUnschedulableUntilIn(vs ...time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIn(FieldTempUnschedulableUntil, vs...))
+}
+
+// TempUnschedulableUntilNotIn applies the NotIn predicate on the "temp_unschedulable_until" field.
+func TempUnschedulableUntilNotIn(vs ...time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotIn(FieldTempUnschedulableUntil, vs...))
+}
+
+// TempUnschedulableUntilGT applies the GT predicate on the "temp_unschedulable_until" field.
+func TempUnschedulableUntilGT(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGT(FieldTempUnschedulableUntil, v))
+}
+
+// TempUnschedulableUntilGTE applies the GTE predicate on the "temp_unschedulable_until" field.
+func TempUnschedulableUntilGTE(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGTE(FieldTempUnschedulableUntil, v))
+}
+
+// TempUnschedulableUntilLT applies the LT predicate on the "temp_unschedulable_until" field.
+func TempUnschedulableUntilLT(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLT(FieldTempUnschedulableUntil, v))
+}
+
+// TempUnschedulableUntilLTE applies the LTE predicate on the "temp_unschedulable_until" field.
+func TempUnschedulableUntilLTE(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLTE(FieldTempUnschedulableUntil, v))
+}
+
+// TempUnschedulableUntilIsNil applies the IsNil predicate on the "temp_unschedulable_until" field.
+func TempUnschedulableUntilIsNil() predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIsNull(FieldTempUnschedulableUntil))
+}
+
+// TempUnschedulableUntilNotNil applies the NotNil predicate on the "temp_unschedulable_until" field.
+func TempUnschedulableUntilNotNil() predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotNull(FieldTempUnschedulableUntil))
+}
+
+// TempUnschedulableReasonEQ applies the EQ predicate on the "temp_unschedulable_reason" field.
+func TempUnschedulableReasonEQ(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldTempUnschedulableReason, v))
+}
+
+// TempUnschedulableReasonNEQ applies the NEQ predicate on the "temp_unschedulable_reason" field.
+func TempUnschedulableReasonNEQ(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNEQ(FieldTempUnschedulableReason, v))
+}
+
+// TempUnschedulableReasonIn applies the In predicate on the "temp_unschedulable_reason" field.
+func TempUnschedulableReasonIn(vs ...string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIn(FieldTempUnschedulableReason, vs...))
+}
+
+// TempUnschedulableReasonNotIn applies the NotIn predicate on the "temp_unschedulable_reason" field.
+func TempUnschedulableReasonNotIn(vs ...string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotIn(FieldTempUnschedulableReason, vs...))
+}
+
+// TempUnschedulableReasonGT applies the GT predicate on the "temp_unschedulable_reason" field.
+func TempUnschedulableReasonGT(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGT(FieldTempUnschedulableReason, v))
+}
+
+// TempUnschedulableReasonGTE applies the GTE predicate on the "temp_unschedulable_reason" field.
+func TempUnschedulableReasonGTE(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGTE(FieldTempUnschedulableReason, v))
+}
+
+// TempUnschedulableReasonLT applies the LT predicate on the "temp_unschedulable_reason" field.
+func TempUnschedulableReasonLT(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLT(FieldTempUnschedulableReason, v))
+}
+
+// TempUnschedulableReasonLTE applies the LTE predicate on the "temp_unschedulable_reason" field.
+func TempUnschedulableReasonLTE(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLTE(FieldTempUnschedulableReason, v))
+}
+
+// TempUnschedulableReasonContains applies the Contains predicate on the "temp_unschedulable_reason" field.
+func TempUnschedulableReasonContains(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldContains(FieldTempUnschedulableReason, v))
+}
+
+// TempUnschedulableReasonHasPrefix applies the HasPrefix predicate on the "temp_unschedulable_reason" field.
+func TempUnschedulableReasonHasPrefix(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldHasPrefix(FieldTempUnschedulableReason, v))
+}
+
+// TempUnschedulableReasonHasSuffix applies the HasSuffix predicate on the "temp_unschedulable_reason" field.
+func TempUnschedulableReasonHasSuffix(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldHasSuffix(FieldTempUnschedulableReason, v))
+}
+
+// TempUnschedulableReasonEqualFold applies the EqualFold predicate on the "temp_unschedulable_reason" field.
+func TempUnschedulableReasonEqualFold(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEqualFold(FieldTempUnschedulableReason, v))
+}
+
+// TempUnschedulableReasonContainsFold applies the ContainsFold predicate on the "temp_unschedulable_reason" field.
+func TempUnschedulableReasonContainsFold(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldContainsFold(FieldTempUnschedulableReason, v))
+}
+
+// SessionWindowStartEQ applies the EQ predicate on the "session_window_start" field.
+func SessionWindowStartEQ(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldSessionWindowStart, v))
+}
+
+// SessionWindowStartNEQ applies the NEQ predicate on the "session_window_start" field.
+func SessionWindowStartNEQ(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNEQ(FieldSessionWindowStart, v))
+}
+
+// SessionWindowStartIn applies the In predicate on the "session_window_start" field.
+func SessionWindowStartIn(vs ...time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIn(FieldSessionWindowStart, vs...))
+}
+
+// SessionWindowStartNotIn applies the NotIn predicate on the "session_window_start" field.
+func SessionWindowStartNotIn(vs ...time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotIn(FieldSessionWindowStart, vs...))
+}
+
+// SessionWindowStartGT applies the GT predicate on the "session_window_start" field.
+func SessionWindowStartGT(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGT(FieldSessionWindowStart, v))
+}
+
+// SessionWindowStartGTE applies the GTE predicate on the "session_window_start" field.
+func SessionWindowStartGTE(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGTE(FieldSessionWindowStart, v))
+}
+
+// SessionWindowStartLT applies the LT predicate on the "session_window_start" field.
+func SessionWindowStartLT(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLT(FieldSessionWindowStart, v))
+}
+
+// SessionWindowStartLTE applies the LTE predicate on the "session_window_start" field.
+func SessionWindowStartLTE(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLTE(FieldSessionWindowStart, v))
+}
+
+// SessionWindowStartIsNil applies the IsNil predicate on the "session_window_start" field.
+func SessionWindowStartIsNil() predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIsNull(FieldSessionWindowStart))
+}
+
+// SessionWindowStartNotNil applies the NotNil predicate on the "session_window_start" field.
+func SessionWindowStartNotNil() predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotNull(FieldSessionWindowStart))
+}
+
+// SessionWindowEndEQ applies the EQ predicate on the "session_window_end" field.
+func SessionWindowEndEQ(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldSessionWindowEnd, v))
+}
+
+// SessionWindowEndNEQ applies the NEQ predicate on the "session_window_end" field.
+func SessionWindowEndNEQ(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNEQ(FieldSessionWindowEnd, v))
+}
+
+// SessionWindowEndIn applies the In predicate on the "session_window_end" field.
+func SessionWindowEndIn(vs ...time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIn(FieldSessionWindowEnd, vs...))
+}
+
+// SessionWindowEndNotIn applies the NotIn predicate on the "session_window_end" field.
+func SessionWindowEndNotIn(vs ...time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotIn(FieldSessionWindowEnd, vs...))
+}
+
+// SessionWindowEndGT applies the GT predicate on the "session_window_end" field.
+func SessionWindowEndGT(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGT(FieldSessionWindowEnd, v))
+}
+
+// SessionWindowEndGTE applies the GTE predicate on the "session_window_end" field.
+func SessionWindowEndGTE(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGTE(FieldSessionWindowEnd, v))
+}
+
+// SessionWindowEndLT applies the LT predicate on the "session_window_end" field.
+func SessionWindowEndLT(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLT(FieldSessionWindowEnd, v))
+}
+
+// SessionWindowEndLTE applies the LTE predicate on the "session_window_end" field.
+func SessionWindowEndLTE(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLTE(FieldSessionWindowEnd, v))
+}
+
+// SessionWindowEndIsNil applies the IsNil predicate on the "session_window_end" field.
+func SessionWindowEndIsNil() predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIsNull(FieldSessionWindowEnd))
+}
+
+// SessionWindowEndNotNil applies the NotNil predicate on the "session_window_end" field.
+func SessionWindowEndNotNil() predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotNull(FieldSessionWindowEnd))
+}
+
+// SessionWindowStatusEQ applies the EQ predicate on the "session_window_status" field.
+func SessionWindowStatusEQ(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldSessionWindowStatus, v))
+}
+
+// SessionWindowStatusNEQ applies the NEQ predicate on the "session_window_status" field.
+func SessionWindowStatusNEQ(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNEQ(FieldSessionWindowStatus, v))
+}
+
+// SessionWindowStatusIn applies the In predicate on the "session_window_status" field.
+func SessionWindowStatusIn(vs ...string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIn(FieldSessionWindowStatus, vs...))
+}
+
+// SessionWindowStatusNotIn applies the NotIn predicate on the "session_window_status" field.
+func SessionWindowStatusNotIn(vs ...string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotIn(FieldSessionWindowStatus, vs...))
+}
+
+// SessionWindowStatusGT applies the GT predicate on the "session_window_status" field.
+func SessionWindowStatusGT(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGT(FieldSessionWindowStatus, v))
+}
+
+// SessionWindowStatusGTE applies the GTE predicate on the "session_window_status" field.
+func SessionWindowStatusGTE(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGTE(FieldSessionWindowStatus, v))
+}
+
+// SessionWindowStatusLT applies the LT predicate on the "session_window_status" field.
+func SessionWindowStatusLT(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLT(FieldSessionWindowStatus, v))
+}
+
+// SessionWindowStatusLTE applies the LTE predicate on the "session_window_status" field.
+func SessionWindowStatusLTE(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLTE(FieldSessionWindowStatus, v))
+}
+
+// SessionWindowStatusContains applies the Contains predicate on the "session_window_status" field.
+func SessionWindowStatusContains(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldContains(FieldSessionWindowStatus, v))
+}
+
+// SessionWindowStatusHasPrefix applies the HasPrefix predicate on the "session_window_status" field.
+func SessionWindowStatusHasPrefix(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldHasPrefix(FieldSessionWindowStatus, v))
+}
+
+// SessionWindowStatusHasSuffix applies the HasSuffix predicate on the "session_window_status" field.
+func SessionWindowStatusHasSuffix(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldHasSuffix(FieldSessionWindowStatus, v))
+}
+
+// SessionWindowStatusEqualFold applies the EqualFold predicate on the "session_window_status" field.
+func SessionWindowStatusEqualFold(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEqualFold(FieldSessionWindowStatus, v))
+}
+
+// SessionWindowStatusContainsFold applies the ContainsFold predicate on the "session_window_status" field.
+func SessionWindowStatusContainsFold(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldContainsFold(FieldSessionWindowStatus, v))
+}
+
+// ExtraJSONIsNil applies the IsNil predicate on the "extra_json" field.
+func ExtraJSONIsNil() predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIsNull(FieldExtraJSON))
+}
+
+// ExtraJSONNotNil applies the NotNil predicate on the "extra_json" field.
+func ExtraJSONNotNil() predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotNull(FieldExtraJSON))
 }
 
 // TokenExpiresAtEQ applies the EQ predicate on the "token_expires_at" field.

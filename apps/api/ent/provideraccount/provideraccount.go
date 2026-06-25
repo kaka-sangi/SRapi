@@ -23,6 +23,8 @@ const (
 	FieldProviderID = "provider_id"
 	// FieldName holds the string denoting the name field in the database.
 	FieldName = "name"
+	// FieldPlatform holds the string denoting the platform field in the database.
+	FieldPlatform = "platform"
 	// FieldAccountType holds the string denoting the account_type field in the database.
 	FieldAccountType = "account_type"
 	// FieldRuntimeClass holds the string denoting the runtime_class field in the database.
@@ -45,6 +47,42 @@ const (
 	FieldRiskLevel = "risk_level"
 	// FieldMetadataJSON holds the string denoting the metadata_json field in the database.
 	FieldMetadataJSON = "metadata_json"
+	// FieldNotes holds the string denoting the notes field in the database.
+	FieldNotes = "notes"
+	// FieldConcurrency holds the string denoting the concurrency field in the database.
+	FieldConcurrency = "concurrency"
+	// FieldRateMultiplier holds the string denoting the rate_multiplier field in the database.
+	FieldRateMultiplier = "rate_multiplier"
+	// FieldLoadFactor holds the string denoting the load_factor field in the database.
+	FieldLoadFactor = "load_factor"
+	// FieldSchedulable holds the string denoting the schedulable field in the database.
+	FieldSchedulable = "schedulable"
+	// FieldErrorMessage holds the string denoting the error_message field in the database.
+	FieldErrorMessage = "error_message"
+	// FieldLastUsedAt holds the string denoting the last_used_at field in the database.
+	FieldLastUsedAt = "last_used_at"
+	// FieldExpiresAt holds the string denoting the expires_at field in the database.
+	FieldExpiresAt = "expires_at"
+	// FieldAutoPauseOnExpired holds the string denoting the auto_pause_on_expired field in the database.
+	FieldAutoPauseOnExpired = "auto_pause_on_expired"
+	// FieldRateLimitedAt holds the string denoting the rate_limited_at field in the database.
+	FieldRateLimitedAt = "rate_limited_at"
+	// FieldRateLimitResetAt holds the string denoting the rate_limit_reset_at field in the database.
+	FieldRateLimitResetAt = "rate_limit_reset_at"
+	// FieldOverloadUntil holds the string denoting the overload_until field in the database.
+	FieldOverloadUntil = "overload_until"
+	// FieldTempUnschedulableUntil holds the string denoting the temp_unschedulable_until field in the database.
+	FieldTempUnschedulableUntil = "temp_unschedulable_until"
+	// FieldTempUnschedulableReason holds the string denoting the temp_unschedulable_reason field in the database.
+	FieldTempUnschedulableReason = "temp_unschedulable_reason"
+	// FieldSessionWindowStart holds the string denoting the session_window_start field in the database.
+	FieldSessionWindowStart = "session_window_start"
+	// FieldSessionWindowEnd holds the string denoting the session_window_end field in the database.
+	FieldSessionWindowEnd = "session_window_end"
+	// FieldSessionWindowStatus holds the string denoting the session_window_status field in the database.
+	FieldSessionWindowStatus = "session_window_status"
+	// FieldExtraJSON holds the string denoting the extra_json field in the database.
+	FieldExtraJSON = "extra_json"
 	// FieldTokenExpiresAt holds the string denoting the token_expires_at field in the database.
 	FieldTokenExpiresAt = "token_expires_at"
 	// FieldLastRefreshedAt holds the string denoting the last_refreshed_at field in the database.
@@ -67,6 +105,7 @@ var Columns = []string{
 	FieldDeletedAt,
 	FieldProviderID,
 	FieldName,
+	FieldPlatform,
 	FieldAccountType,
 	FieldRuntimeClass,
 	FieldUpstreamClient,
@@ -78,6 +117,24 @@ var Columns = []string{
 	FieldWeight,
 	FieldRiskLevel,
 	FieldMetadataJSON,
+	FieldNotes,
+	FieldConcurrency,
+	FieldRateMultiplier,
+	FieldLoadFactor,
+	FieldSchedulable,
+	FieldErrorMessage,
+	FieldLastUsedAt,
+	FieldExpiresAt,
+	FieldAutoPauseOnExpired,
+	FieldRateLimitedAt,
+	FieldRateLimitResetAt,
+	FieldOverloadUntil,
+	FieldTempUnschedulableUntil,
+	FieldTempUnschedulableReason,
+	FieldSessionWindowStart,
+	FieldSessionWindowEnd,
+	FieldSessionWindowStatus,
+	FieldExtraJSON,
 	FieldTokenExpiresAt,
 	FieldLastRefreshedAt,
 	FieldNeedsReauthAt,
@@ -104,6 +161,8 @@ var (
 	UpdateDefaultUpdatedAt func() time.Time
 	// NameValidator is a validator for the "name" field. It is called by the builders before save.
 	NameValidator func(string) error
+	// DefaultPlatform holds the default value on creation for the "platform" field.
+	DefaultPlatform string
 	// DefaultAccountType holds the default value on creation for the "account_type" field.
 	DefaultAccountType string
 	// DefaultRuntimeClass holds the default value on creation for the "runtime_class" field.
@@ -118,6 +177,22 @@ var (
 	DefaultWeight float64
 	// DefaultRiskLevel holds the default value on creation for the "risk_level" field.
 	DefaultRiskLevel string
+	// DefaultNotes holds the default value on creation for the "notes" field.
+	DefaultNotes string
+	// DefaultConcurrency holds the default value on creation for the "concurrency" field.
+	DefaultConcurrency int
+	// DefaultRateMultiplier holds the default value on creation for the "rate_multiplier" field.
+	DefaultRateMultiplier float64
+	// DefaultSchedulable holds the default value on creation for the "schedulable" field.
+	DefaultSchedulable bool
+	// DefaultErrorMessage holds the default value on creation for the "error_message" field.
+	DefaultErrorMessage string
+	// DefaultAutoPauseOnExpired holds the default value on creation for the "auto_pause_on_expired" field.
+	DefaultAutoPauseOnExpired bool
+	// DefaultTempUnschedulableReason holds the default value on creation for the "temp_unschedulable_reason" field.
+	DefaultTempUnschedulableReason string
+	// DefaultSessionWindowStatus holds the default value on creation for the "session_window_status" field.
+	DefaultSessionWindowStatus string
 	// DefaultRefreshAttempts holds the default value on creation for the "refresh_attempts" field.
 	DefaultRefreshAttempts int
 	// DefaultRefreshLastError holds the default value on creation for the "refresh_last_error" field.
@@ -157,6 +232,11 @@ func ByProviderID(opts ...sql.OrderTermOption) OrderOption {
 // ByName orders the results by the name field.
 func ByName(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldName, opts...).ToFunc()
+}
+
+// ByPlatform orders the results by the platform field.
+func ByPlatform(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPlatform, opts...).ToFunc()
 }
 
 // ByAccountType orders the results by the account_type field.
@@ -202,6 +282,91 @@ func ByWeight(opts ...sql.OrderTermOption) OrderOption {
 // ByRiskLevel orders the results by the risk_level field.
 func ByRiskLevel(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRiskLevel, opts...).ToFunc()
+}
+
+// ByNotes orders the results by the notes field.
+func ByNotes(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldNotes, opts...).ToFunc()
+}
+
+// ByConcurrency orders the results by the concurrency field.
+func ByConcurrency(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldConcurrency, opts...).ToFunc()
+}
+
+// ByRateMultiplier orders the results by the rate_multiplier field.
+func ByRateMultiplier(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRateMultiplier, opts...).ToFunc()
+}
+
+// ByLoadFactor orders the results by the load_factor field.
+func ByLoadFactor(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLoadFactor, opts...).ToFunc()
+}
+
+// BySchedulable orders the results by the schedulable field.
+func BySchedulable(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSchedulable, opts...).ToFunc()
+}
+
+// ByErrorMessage orders the results by the error_message field.
+func ByErrorMessage(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldErrorMessage, opts...).ToFunc()
+}
+
+// ByLastUsedAt orders the results by the last_used_at field.
+func ByLastUsedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLastUsedAt, opts...).ToFunc()
+}
+
+// ByExpiresAt orders the results by the expires_at field.
+func ByExpiresAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldExpiresAt, opts...).ToFunc()
+}
+
+// ByAutoPauseOnExpired orders the results by the auto_pause_on_expired field.
+func ByAutoPauseOnExpired(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAutoPauseOnExpired, opts...).ToFunc()
+}
+
+// ByRateLimitedAt orders the results by the rate_limited_at field.
+func ByRateLimitedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRateLimitedAt, opts...).ToFunc()
+}
+
+// ByRateLimitResetAt orders the results by the rate_limit_reset_at field.
+func ByRateLimitResetAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRateLimitResetAt, opts...).ToFunc()
+}
+
+// ByOverloadUntil orders the results by the overload_until field.
+func ByOverloadUntil(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldOverloadUntil, opts...).ToFunc()
+}
+
+// ByTempUnschedulableUntil orders the results by the temp_unschedulable_until field.
+func ByTempUnschedulableUntil(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTempUnschedulableUntil, opts...).ToFunc()
+}
+
+// ByTempUnschedulableReason orders the results by the temp_unschedulable_reason field.
+func ByTempUnschedulableReason(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTempUnschedulableReason, opts...).ToFunc()
+}
+
+// BySessionWindowStart orders the results by the session_window_start field.
+func BySessionWindowStart(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSessionWindowStart, opts...).ToFunc()
+}
+
+// BySessionWindowEnd orders the results by the session_window_end field.
+func BySessionWindowEnd(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSessionWindowEnd, opts...).ToFunc()
+}
+
+// BySessionWindowStatus orders the results by the session_window_status field.
+func BySessionWindowStatus(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSessionWindowStatus, opts...).ToFunc()
 }
 
 // ByTokenExpiresAt orders the results by the token_expires_at field.

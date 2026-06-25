@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/config"
+	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	qualitycontract "github.com/srapi/srapi/apps/api/internal/modules/quality_eval/contract"
 	qualitymemory "github.com/srapi/srapi/apps/api/internal/modules/quality_eval/store/memory"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
@@ -33,7 +34,11 @@ func TestSchedulerRuntimeMetadataParsesHealthQuotaLatency(t *testing.T) {
 		"tpm_limit":           float64(1000),
 	}
 
-	state := schedulerRuntimeState(metadata)
+	acct := func(m map[string]any) accountcontract.ProviderAccount {
+		return accountcontract.ProviderAccount{Metadata: m}
+	}
+
+	state := schedulerRuntimeState(acct(metadata))
 	assertFloatPtrNear(t, state.HealthScore, 0.87)
 	assertFloatPtrNear(t, state.QuotaRemainingRatio, 0.42)
 	assertIntPtr(t, state.LatencyP95MS, 1250)
@@ -41,48 +46,53 @@ func TestSchedulerRuntimeMetadataParsesHealthQuotaLatency(t *testing.T) {
 		t.Fatalf("unexpected runtime counters: %+v", state)
 	}
 
-	limits := schedulerRuntimeLimits(metadata)
+	limits := schedulerRuntimeLimits(acct(metadata))
 	assertIntPtr(t, limits.MaxConcurrency, 4)
 	assertIntPtr(t, limits.RPMLimit, 30)
 	assertIntPtr(t, limits.TPMLimit, 1000)
 
-	aliasState := schedulerRuntimeState(map[string]any{
+	aliasState := schedulerRuntimeState(acct(map[string]any{
 		"quota_remaining_ratio": 0.75,
 		"p95_latency_ms":        "2400",
-	})
+	}))
 	assertFloatPtrNear(t, aliasState.QuotaRemainingRatio, 0.75)
 	assertIntPtr(t, aliasState.LatencyP95MS, 2400)
 
-	exhaustedState := schedulerRuntimeState(map[string]any{"remaining_ratio": 0})
+	exhaustedState := schedulerRuntimeState(acct(map[string]any{"remaining_ratio": 0}))
 	if !exhaustedState.QuotaExhausted {
 		t.Fatalf("expected zero remaining_ratio to mark quota exhausted, got %+v", exhaustedState)
 	}
 
-	resetState := schedulerRuntimeState(map[string]any{
+	resetState := schedulerRuntimeState(acct(map[string]any{
 		"quota_remaining_ratio": 0,
 		"quota_exhausted":       true,
 		"quota_reset_at":        time.Now().UTC().Add(-time.Minute).Format(time.RFC3339),
-	})
+	}))
 	if resetState.QuotaExhausted || resetState.QuotaRemainingRatio != nil {
 		t.Fatalf("expected reset quota metadata to be ignored, got %+v", resetState)
 	}
 
-	// Operator-initiated pause flows into RuntimeState.CooldownActive without
-	// depending on the probe-driven cooldown_until key — that way a probe
-	// success path (which clears cooldown_*) cannot silently lift the
-	// operator's pause.
-	manualState := schedulerRuntimeState(map[string]any{
+	// Test manual pause via legacy metadata key.
+	manualState := schedulerRuntimeState(acct(map[string]any{
 		"manual_pause_until": time.Now().UTC().Add(15 * time.Minute).Format(time.RFC3339),
-	})
+	}))
 	if !manualState.CooldownActive {
 		t.Fatalf("expected manual_pause_until in the future to mark CooldownActive, got %+v", manualState)
 	}
 
-	expiredManual := schedulerRuntimeState(map[string]any{
+	expiredManual := schedulerRuntimeState(acct(map[string]any{
 		"manual_pause_until": time.Now().UTC().Add(-time.Minute).Format(time.RFC3339),
-	})
+	}))
 	if expiredManual.CooldownActive {
 		t.Fatalf("expected expired manual_pause_until to NOT mark CooldownActive, got %+v", expiredManual)
+	}
+
+	// Test manual pause via the explicit TempUnschedulableUntil column.
+	futureTime := time.Now().UTC().Add(15 * time.Minute)
+	colPauseAcct := accountcontract.ProviderAccount{TempUnschedulableUntil: &futureTime}
+	colPauseState := schedulerRuntimeState(colPauseAcct)
+	if !colPauseState.CooldownActive {
+		t.Fatalf("expected TempUnschedulableUntil in the future to mark CooldownActive, got %+v", colPauseState)
 	}
 }
 

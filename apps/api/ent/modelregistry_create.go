@@ -48,20 +48,6 @@ func (_c *ModelRegistryCreate) SetNillableUpdatedAt(v *time.Time) *ModelRegistry
 	return _c
 }
 
-// SetDeletedAt sets the "deleted_at" field.
-func (_c *ModelRegistryCreate) SetDeletedAt(v time.Time) *ModelRegistryCreate {
-	_c.mutation.SetDeletedAt(v)
-	return _c
-}
-
-// SetNillableDeletedAt sets the "deleted_at" field if the given value is not nil.
-func (_c *ModelRegistryCreate) SetNillableDeletedAt(v *time.Time) *ModelRegistryCreate {
-	if v != nil {
-		_c.SetDeletedAt(*v)
-	}
-	return _c
-}
-
 // SetCanonicalName sets the "canonical_name" field.
 func (_c *ModelRegistryCreate) SetCanonicalName(v string) *ModelRegistryCreate {
 	_c.mutation.SetCanonicalName(v)
@@ -273,10 +259,6 @@ func (_c *ModelRegistryCreate) createSpec() (*ModelRegistry, *sqlgraph.CreateSpe
 	if value, ok := _c.mutation.UpdatedAt(); ok {
 		_spec.SetField(modelregistry.FieldUpdatedAt, field.TypeTime, value)
 		_node.UpdatedAt = value
-	}
-	if value, ok := _c.mutation.DeletedAt(); ok {
-		_spec.SetField(modelregistry.FieldDeletedAt, field.TypeTime, value)
-		_node.DeletedAt = &value
 	}
 	if value, ok := _c.mutation.CanonicalName(); ok {
 		_spec.SetField(modelregistry.FieldCanonicalName, field.TypeString, value)

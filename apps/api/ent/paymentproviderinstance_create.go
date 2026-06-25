@@ -48,20 +48,6 @@ func (_c *PaymentProviderInstanceCreate) SetNillableUpdatedAt(v *time.Time) *Pay
 	return _c
 }
 
-// SetDeletedAt sets the "deleted_at" field.
-func (_c *PaymentProviderInstanceCreate) SetDeletedAt(v time.Time) *PaymentProviderInstanceCreate {
-	_c.mutation.SetDeletedAt(v)
-	return _c
-}
-
-// SetNillableDeletedAt sets the "deleted_at" field if the given value is not nil.
-func (_c *PaymentProviderInstanceCreate) SetNillableDeletedAt(v *time.Time) *PaymentProviderInstanceCreate {
-	if v != nil {
-		_c.SetDeletedAt(*v)
-	}
-	return _c
-}
-
 // SetProvider sets the "provider" field.
 func (_c *PaymentProviderInstanceCreate) SetProvider(v string) *PaymentProviderInstanceCreate {
 	_c.mutation.SetProvider(v)
@@ -305,10 +291,6 @@ func (_c *PaymentProviderInstanceCreate) createSpec() (*PaymentProviderInstance,
 	if value, ok := _c.mutation.UpdatedAt(); ok {
 		_spec.SetField(paymentproviderinstance.FieldUpdatedAt, field.TypeTime, value)
 		_node.UpdatedAt = value
-	}
-	if value, ok := _c.mutation.DeletedAt(); ok {
-		_spec.SetField(paymentproviderinstance.FieldDeletedAt, field.TypeTime, value)
-		_node.DeletedAt = &value
 	}
 	if value, ok := _c.mutation.Provider(); ok {
 		_spec.SetField(paymentproviderinstance.FieldProvider, field.TypeString, value)

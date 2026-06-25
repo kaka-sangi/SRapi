@@ -273,6 +273,8 @@ function renderSheet() {
       capability_responses: false,
       capability_messages: true,
     },
+    concurrency: 4,
+    schedulable: true,
     created_at: "2026-06-10T00:00:00Z",
   };
 

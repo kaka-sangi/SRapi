@@ -276,7 +276,8 @@ func providerScopedCapabilityKeys() []string {
 	}
 }
 
-func schedulerRuntimeState(metadata map[string]any) schedulercontract.RuntimeState {
+func schedulerRuntimeState(account accountcontract.ProviderAccount) schedulercontract.RuntimeState {
+	metadata := account.Metadata
 	now := time.Now().UTC()
 	quotaRemainingRatio := metadataOptionalFloat(metadata, "remaining_ratio", "quota_remaining_ratio")
 	quotaExhausted := metadataBool(metadata, "quota_exhausted")
@@ -293,7 +294,7 @@ func schedulerRuntimeState(metadata map[string]any) schedulercontract.RuntimeSta
 		QuotaRemainingRatio: quotaRemainingRatio,
 		LatencyP95MS:        metadataOptionalInt(metadata, "latency_p95_ms", "p95_latency_ms", "latency_p95"),
 		CircuitOpen:         metadataBool(metadata, "circuit_open"),
-		CooldownActive:      metadataBool(metadata, "cooldown_active") || metadataCooldownActive(metadata, now),
+		CooldownActive:      metadataBool(metadata, "cooldown_active") || metadataCooldownActive(account, now),
 		CurrentConcurrency:  metadataInt(metadata, "current_concurrency"),
 		RPMUsed:             metadataInt(metadata, "rpm_used"),
 		TPMUsed:             metadataInt(metadata, "tpm_used"),
@@ -309,13 +310,23 @@ func metadataFloatValue(metadata map[string]any, keys ...string) float64 {
 	return 0
 }
 
-func schedulerRuntimeLimits(metadata map[string]any) schedulercontract.RuntimeLimits {
+func schedulerRuntimeLimits(account accountcontract.ProviderAccount) schedulercontract.RuntimeLimits {
 	return schedulercontract.RuntimeLimits{
-		MaxConcurrency:  metadataOptionalInt(metadata, "max_concurrency"),
-		RPMLimit:        metadataOptionalInt(metadata, "rpm_limit"),
-		TPMLimit:        metadataOptionalInt(metadata, "tpm_limit"),
-		CostWindowLimit: metadataOptionalFloat(metadata, "cost_window_limit"),
+		MaxConcurrency:  accountConcurrencyLimit(account),
+		RPMLimit:        metadataOptionalInt(account.Metadata, "rpm_limit"),
+		TPMLimit:        metadataOptionalInt(account.Metadata, "tpm_limit"),
+		CostWindowLimit: metadataOptionalFloat(account.Metadata, "cost_window_limit"),
 	}
+}
+
+// accountConcurrencyLimit returns the account-level concurrency ceiling,
+// preferring the explicit column over the legacy metadata key.
+func accountConcurrencyLimit(account accountcontract.ProviderAccount) *int {
+	if account.Concurrency > 0 {
+		v := account.Concurrency
+		return &v
+	}
+	return metadataOptionalInt(account.Metadata, "max_concurrency")
 }
 
 func metadataBool(metadata map[string]any, key string) bool {
@@ -346,19 +357,15 @@ func metadataOptionalFloat(metadata map[string]any, keys ...string) *float64 {
 	return metacoerce.OptionalFloat(metadata, keys...)
 }
 
-func metadataCooldownActive(metadata map[string]any, now time.Time) bool {
-	if metadata == nil {
-		return false
-	}
-	if metadataTimestampInFuture(metadata, "cooldown_until", now) {
+func metadataCooldownActive(account accountcontract.ProviderAccount, now time.Time) bool {
+	if metadataTimestampInFuture(account.Metadata, "cooldown_until", now) {
 		return true
 	}
-	// manual_pause_until is the operator-initiated sibling of cooldown_until.
-	// Health probes own cooldown_until and may clear it on success; operators
-	// own manual_pause_until and it only clears on explicit resume / expiry.
-	// Both flow into RuntimeState.CooldownActive so the scheduler skips the
-	// account during either window.
-	return metadataTimestampInFuture(metadata, "manual_pause_until", now)
+	// Check the explicit column first, fall back to legacy metadata key.
+	if account.TempUnschedulableUntil != nil && account.TempUnschedulableUntil.After(now) {
+		return true
+	}
+	return metadataTimestampInFuture(account.Metadata, "manual_pause_until", now)
 }
 
 // metadataTimestampInFuture parses a metadata RFC3339 string and reports

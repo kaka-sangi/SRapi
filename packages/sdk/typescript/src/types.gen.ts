@@ -2195,6 +2195,14 @@ export type AccountGroupMemberListResponse = {
 export type ProviderAccount = {
     id: Id;
     provider_id: Id;
+    /**
+     * Provider family denormalized for fast filtering (anthropic, openai, gemini, antigravity).
+     */
+    platform?: string;
+    /**
+     * Simplified auth type (apikey, oauth, setup-token, upstream, bedrock, service_account).
+     */
+    account_type?: string;
     name: string;
     runtime_class: RuntimeClass;
     upstream_client?: string | null;
@@ -2208,10 +2216,51 @@ export type ProviderAccount = {
     risk_level?: string | null;
     group_ids: Array<Id>;
     /**
-     * Free-form per-account configuration. Recognized convention keys (no schema migration; read at scheduling time): `base_url` (override the upstream base URL); `supported_models` (string array — exact-match inclusion whitelist of upstream model names this account may serve; absent = serve all); `excluded_models` (string array of `*` wildcard patterns — exclude any catalog or upstream model name matching a pattern; takes precedence over `supported_models` and hides the model from `/v1/models` when every serving account excludes it); `model_mapping` (object mapping a canonical catalog model name to a per-account upstream model name override).
+     * Operator-supplied freetext visible on the admin panel.
+     */
+    notes?: string;
+    /**
+     * Max concurrent upstream requests for this account.
+     */
+    concurrency: number;
+    /**
+     * Per-account billing multiplier.
+     */
+    rate_multiplier?: number;
+    /**
+     * Load distribution weight in the scheduler.
+     */
+    load_factor?: number | null;
+    /**
+     * Direct scheduling flag; false skips without status change.
+     */
+    schedulable: boolean;
+    /**
+     * Last error details for operator troubleshooting.
+     */
+    error_message?: string;
+    /**
+     * When this account last served a request.
+     */
+    last_used_at?: string | null;
+    /**
+     * Account-level expiry (NOT OAuth token expiry).
+     */
+    expires_at?: string | null;
+    /**
+     * Pause scheduling when expires_at is reached.
+     */
+    auto_pause_on_expired?: boolean;
+    /**
+     * Operational state metadata. Convention keys: `base_url`, `supported_models`, `excluded_models`, `model_mapping`.
      *
      */
     metadata?: JsonObject;
+    /**
+     * Per-account config separate from operational metadata.
+     *
+     */
+    extra?: JsonObject;
     /**
      * Wall-clock expiry of the OAuth access token, snapshotted from the credential after the last successful refresh. Null when the account has never been refreshed or the credential carries no expires_at. OAuth runtime classes only.
      *
@@ -2251,6 +2300,26 @@ export type CreateProviderAccountRequest = {
     weight?: number;
     risk_level?: 'normal' | 'medium' | 'high';
     metadata?: JsonObject;
+    extra?: JsonObject;
+    /**
+     * Operator-supplied freetext.
+     */
+    notes?: string;
+    /**
+     * Max concurrent upstream requests.
+     */
+    concurrency?: number;
+    rate_multiplier?: number;
+    load_factor?: number | null;
+    /**
+     * Bind to these account groups at creation time.
+     */
+    group_ids?: Array<number>;
+    /**
+     * Account-level expiry timestamp.
+     */
+    expires_at?: string | null;
+    auto_pause_on_expired?: boolean;
 };
 
 export type BatchCreateProviderAccountsRequest = {
@@ -2618,6 +2687,14 @@ export type UpdateProviderAccountRequest = {
     weight?: number;
     risk_level?: 'normal' | 'medium' | 'high';
     metadata?: JsonObject;
+    extra?: JsonObject;
+    notes?: string;
+    concurrency?: number;
+    rate_multiplier?: number;
+    load_factor?: number | null;
+    expires_at?: string | null;
+    auto_pause_on_expired?: boolean;
+    schedulable?: boolean;
 };
 
 export type BindProviderAccountProxyRequest = {
@@ -8310,6 +8387,26 @@ export type CreateProviderAccountRequestWritable = {
     weight?: number;
     risk_level?: 'normal' | 'medium' | 'high';
     metadata?: JsonObject;
+    extra?: JsonObject;
+    /**
+     * Operator-supplied freetext.
+     */
+    notes?: string;
+    /**
+     * Max concurrent upstream requests.
+     */
+    concurrency?: number;
+    rate_multiplier?: number;
+    load_factor?: number | null;
+    /**
+     * Bind to these account groups at creation time.
+     */
+    group_ids?: Array<number>;
+    /**
+     * Account-level expiry timestamp.
+     */
+    expires_at?: string | null;
+    auto_pause_on_expired?: boolean;
 };
 
 export type BatchCreateProviderAccountsRequestWritable = {
@@ -8372,6 +8469,14 @@ export type UpdateProviderAccountRequestWritable = {
     weight?: number;
     risk_level?: 'normal' | 'medium' | 'high';
     metadata?: JsonObject;
+    extra?: JsonObject;
+    notes?: string;
+    concurrency?: number;
+    rate_multiplier?: number;
+    load_factor?: number | null;
+    expires_at?: string | null;
+    auto_pause_on_expired?: boolean;
+    schedulable?: boolean;
 };
 
 export type ProviderAccountImportItemWritable = {

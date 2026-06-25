@@ -234,36 +234,53 @@ func toAPIModelProviderMapping(mapping modelcontract.ModelProviderMapping) apiop
 }
 
 func toAPIAccount(account accountcontract.ProviderAccount) apiopenapi.ProviderAccount {
+	platform := account.Platform
+	accountType := string(account.AccountType)
+	notes := account.Notes
+	errorMessage := account.ErrorMessage
+	rateMultiplier := float32(account.RateMultiplier)
+	autoPause := account.AutoPauseOnExpired
 	out := apiopenapi.ProviderAccount{
-		CreatedAt:        account.CreatedAt,
-		GroupIds:         []apiopenapi.Id{},
-		Id:               apiopenapi.Id(strconv.Itoa(account.ID)),
-		Metadata:         mapToJsonObjectPtr(sanitizedExportMetadata(account.Metadata)),
-		Name:             account.Name,
-		Priority:         account.Priority,
-		ProviderId:       apiopenapi.Id(strconv.Itoa(account.ProviderID)),
-		ProxyId:          account.ProxyID,
-		RiskLevel:        account.RiskLevel,
-		RuntimeClass:     apiopenapi.RuntimeClass(account.RuntimeClass),
-		Status:           apiopenapi.ProviderAccountStatus(account.Status),
-		UpstreamClient:   account.UpstreamClient,
-		Weight:           account.Weight,
-		RefreshAttempts:  &account.RefreshAttempts,
-		RefreshLastError: &account.RefreshLastError,
+		CreatedAt:          account.CreatedAt,
+		GroupIds:           []apiopenapi.Id{},
+		Id:                 apiopenapi.Id(strconv.Itoa(account.ID)),
+		Metadata:           mapToJsonObjectPtr(sanitizedExportMetadata(account.Metadata)),
+		Extra:              mapToJsonObjectPtr(account.Extra),
+		Name:               account.Name,
+		Platform:           &platform,
+		AccountType:        &accountType,
+		Priority:           account.Priority,
+		ProviderId:         apiopenapi.Id(strconv.Itoa(account.ProviderID)),
+		ProxyId:            account.ProxyID,
+		RiskLevel:          account.RiskLevel,
+		RuntimeClass:       apiopenapi.RuntimeClass(account.RuntimeClass),
+		Status:             apiopenapi.ProviderAccountStatus(account.Status),
+		UpstreamClient:     account.UpstreamClient,
+		Weight:             account.Weight,
+		Notes:              &notes,
+		Concurrency:        account.Concurrency,
+		RateMultiplier:     &rateMultiplier,
+		LoadFactor:         account.LoadFactor,
+		Schedulable:        account.Schedulable,
+		ErrorMessage:       &errorMessage,
+		AutoPauseOnExpired: &autoPause,
+		RefreshAttempts:    &account.RefreshAttempts,
+		RefreshLastError:   &account.RefreshLastError,
 	}
-	if account.TokenExpiresAt != nil {
-		ts := *account.TokenExpiresAt
-		out.TokenExpiresAt = &ts
-	}
-	if account.LastRefreshedAt != nil {
-		ts := *account.LastRefreshedAt
-		out.LastRefreshedAt = &ts
-	}
-	if account.NeedsReauthAt != nil {
-		ts := *account.NeedsReauthAt
-		out.NeedsReauthAt = &ts
-	}
+	out.LastUsedAt = cloneTimePtr(account.LastUsedAt)
+	out.ExpiresAt = cloneTimePtr(account.ExpiresAt)
+	out.TokenExpiresAt = cloneTimestampPtr(account.TokenExpiresAt)
+	out.LastRefreshedAt = cloneTimestampPtr(account.LastRefreshedAt)
+	out.NeedsReauthAt = cloneTimestampPtr(account.NeedsReauthAt)
 	return out
+}
+
+func cloneTimestampPtr(t *time.Time) *time.Time {
+	if t == nil {
+		return nil
+	}
+	ts := *t
+	return &ts
 }
 
 func apiStringPtr[T ~string](value *string) *T {

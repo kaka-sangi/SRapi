@@ -34,26 +34,6 @@ func (_u *ProxyUpdate) SetUpdatedAt(v time.Time) *ProxyUpdate {
 	return _u
 }
 
-// SetDeletedAt sets the "deleted_at" field.
-func (_u *ProxyUpdate) SetDeletedAt(v time.Time) *ProxyUpdate {
-	_u.mutation.SetDeletedAt(v)
-	return _u
-}
-
-// SetNillableDeletedAt sets the "deleted_at" field if the given value is not nil.
-func (_u *ProxyUpdate) SetNillableDeletedAt(v *time.Time) *ProxyUpdate {
-	if v != nil {
-		_u.SetDeletedAt(*v)
-	}
-	return _u
-}
-
-// ClearDeletedAt clears the value of the "deleted_at" field.
-func (_u *ProxyUpdate) ClearDeletedAt() *ProxyUpdate {
-	_u.mutation.ClearDeletedAt()
-	return _u
-}
-
 // SetName sets the "name" field.
 func (_u *ProxyUpdate) SetName(v string) *ProxyUpdate {
 	_u.mutation.SetName(v)
@@ -79,6 +59,87 @@ func (_u *ProxyUpdate) SetNillableType(v *string) *ProxyUpdate {
 	if v != nil {
 		_u.SetType(*v)
 	}
+	return _u
+}
+
+// SetProtocol sets the "protocol" field.
+func (_u *ProxyUpdate) SetProtocol(v string) *ProxyUpdate {
+	_u.mutation.SetProtocol(v)
+	return _u
+}
+
+// SetNillableProtocol sets the "protocol" field if the given value is not nil.
+func (_u *ProxyUpdate) SetNillableProtocol(v *string) *ProxyUpdate {
+	if v != nil {
+		_u.SetProtocol(*v)
+	}
+	return _u
+}
+
+// SetHost sets the "host" field.
+func (_u *ProxyUpdate) SetHost(v string) *ProxyUpdate {
+	_u.mutation.SetHost(v)
+	return _u
+}
+
+// SetNillableHost sets the "host" field if the given value is not nil.
+func (_u *ProxyUpdate) SetNillableHost(v *string) *ProxyUpdate {
+	if v != nil {
+		_u.SetHost(*v)
+	}
+	return _u
+}
+
+// SetPort sets the "port" field.
+func (_u *ProxyUpdate) SetPort(v int) *ProxyUpdate {
+	_u.mutation.ResetPort()
+	_u.mutation.SetPort(v)
+	return _u
+}
+
+// SetNillablePort sets the "port" field if the given value is not nil.
+func (_u *ProxyUpdate) SetNillablePort(v *int) *ProxyUpdate {
+	if v != nil {
+		_u.SetPort(*v)
+	}
+	return _u
+}
+
+// AddPort adds value to the "port" field.
+func (_u *ProxyUpdate) AddPort(v int) *ProxyUpdate {
+	_u.mutation.AddPort(v)
+	return _u
+}
+
+// SetUsername sets the "username" field.
+func (_u *ProxyUpdate) SetUsername(v string) *ProxyUpdate {
+	_u.mutation.SetUsername(v)
+	return _u
+}
+
+// SetNillableUsername sets the "username" field if the given value is not nil.
+func (_u *ProxyUpdate) SetNillableUsername(v *string) *ProxyUpdate {
+	if v != nil {
+		_u.SetUsername(*v)
+	}
+	return _u
+}
+
+// ClearUsername clears the value of the "username" field.
+func (_u *ProxyUpdate) ClearUsername() *ProxyUpdate {
+	_u.mutation.ClearUsername()
+	return _u
+}
+
+// SetPasswordCiphertext sets the "password_ciphertext" field.
+func (_u *ProxyUpdate) SetPasswordCiphertext(v []byte) *ProxyUpdate {
+	_u.mutation.SetPasswordCiphertext(v)
+	return _u
+}
+
+// ClearPasswordCiphertext clears the value of the "password_ciphertext" field.
+func (_u *ProxyUpdate) ClearPasswordCiphertext() *ProxyUpdate {
+	_u.mutation.ClearPasswordCiphertext()
 	return _u
 }
 
@@ -239,6 +300,27 @@ func (_u *ProxyUpdate) AddBackupProxyID(v int) *ProxyUpdate {
 // ClearBackupProxyID clears the value of the "backup_proxy_id" field.
 func (_u *ProxyUpdate) ClearBackupProxyID() *ProxyUpdate {
 	_u.mutation.ClearBackupProxyID()
+	return _u
+}
+
+// SetExpiryWarnDays sets the "expiry_warn_days" field.
+func (_u *ProxyUpdate) SetExpiryWarnDays(v int) *ProxyUpdate {
+	_u.mutation.ResetExpiryWarnDays()
+	_u.mutation.SetExpiryWarnDays(v)
+	return _u
+}
+
+// SetNillableExpiryWarnDays sets the "expiry_warn_days" field if the given value is not nil.
+func (_u *ProxyUpdate) SetNillableExpiryWarnDays(v *int) *ProxyUpdate {
+	if v != nil {
+		_u.SetExpiryWarnDays(*v)
+	}
+	return _u
+}
+
+// AddExpiryWarnDays adds value to the "expiry_warn_days" field.
+func (_u *ProxyUpdate) AddExpiryWarnDays(v int) *ProxyUpdate {
+	_u.mutation.AddExpiryWarnDays(v)
 	return _u
 }
 
@@ -406,17 +488,35 @@ func (_u *ProxyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(proxy.FieldUpdatedAt, field.TypeTime, value)
 	}
-	if value, ok := _u.mutation.DeletedAt(); ok {
-		_spec.SetField(proxy.FieldDeletedAt, field.TypeTime, value)
-	}
-	if _u.mutation.DeletedAtCleared() {
-		_spec.ClearField(proxy.FieldDeletedAt, field.TypeTime)
-	}
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(proxy.FieldName, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.GetType(); ok {
 		_spec.SetField(proxy.FieldType, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Protocol(); ok {
+		_spec.SetField(proxy.FieldProtocol, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Host(); ok {
+		_spec.SetField(proxy.FieldHost, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Port(); ok {
+		_spec.SetField(proxy.FieldPort, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedPort(); ok {
+		_spec.AddField(proxy.FieldPort, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.Username(); ok {
+		_spec.SetField(proxy.FieldUsername, field.TypeString, value)
+	}
+	if _u.mutation.UsernameCleared() {
+		_spec.ClearField(proxy.FieldUsername, field.TypeString)
+	}
+	if value, ok := _u.mutation.PasswordCiphertext(); ok {
+		_spec.SetField(proxy.FieldPasswordCiphertext, field.TypeBytes, value)
+	}
+	if _u.mutation.PasswordCiphertextCleared() {
+		_spec.ClearField(proxy.FieldPasswordCiphertext, field.TypeBytes)
 	}
 	if value, ok := _u.mutation.URLCiphertext(); ok {
 		_spec.SetField(proxy.FieldURLCiphertext, field.TypeBytes, value)
@@ -469,6 +569,12 @@ func (_u *ProxyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if _u.mutation.BackupProxyIDCleared() {
 		_spec.ClearField(proxy.FieldBackupProxyID, field.TypeInt)
 	}
+	if value, ok := _u.mutation.ExpiryWarnDays(); ok {
+		_spec.SetField(proxy.FieldExpiryWarnDays, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedExpiryWarnDays(); ok {
+		_spec.AddField(proxy.FieldExpiryWarnDays, field.TypeInt, value)
+	}
 	if value, ok := _u.mutation.LastProbedAt(); ok {
 		_spec.SetField(proxy.FieldLastProbedAt, field.TypeTime, value)
 	}
@@ -519,26 +625,6 @@ func (_u *ProxyUpdateOne) SetUpdatedAt(v time.Time) *ProxyUpdateOne {
 	return _u
 }
 
-// SetDeletedAt sets the "deleted_at" field.
-func (_u *ProxyUpdateOne) SetDeletedAt(v time.Time) *ProxyUpdateOne {
-	_u.mutation.SetDeletedAt(v)
-	return _u
-}
-
-// SetNillableDeletedAt sets the "deleted_at" field if the given value is not nil.
-func (_u *ProxyUpdateOne) SetNillableDeletedAt(v *time.Time) *ProxyUpdateOne {
-	if v != nil {
-		_u.SetDeletedAt(*v)
-	}
-	return _u
-}
-
-// ClearDeletedAt clears the value of the "deleted_at" field.
-func (_u *ProxyUpdateOne) ClearDeletedAt() *ProxyUpdateOne {
-	_u.mutation.ClearDeletedAt()
-	return _u
-}
-
 // SetName sets the "name" field.
 func (_u *ProxyUpdateOne) SetName(v string) *ProxyUpdateOne {
 	_u.mutation.SetName(v)
@@ -564,6 +650,87 @@ func (_u *ProxyUpdateOne) SetNillableType(v *string) *ProxyUpdateOne {
 	if v != nil {
 		_u.SetType(*v)
 	}
+	return _u
+}
+
+// SetProtocol sets the "protocol" field.
+func (_u *ProxyUpdateOne) SetProtocol(v string) *ProxyUpdateOne {
+	_u.mutation.SetProtocol(v)
+	return _u
+}
+
+// SetNillableProtocol sets the "protocol" field if the given value is not nil.
+func (_u *ProxyUpdateOne) SetNillableProtocol(v *string) *ProxyUpdateOne {
+	if v != nil {
+		_u.SetProtocol(*v)
+	}
+	return _u
+}
+
+// SetHost sets the "host" field.
+func (_u *ProxyUpdateOne) SetHost(v string) *ProxyUpdateOne {
+	_u.mutation.SetHost(v)
+	return _u
+}
+
+// SetNillableHost sets the "host" field if the given value is not nil.
+func (_u *ProxyUpdateOne) SetNillableHost(v *string) *ProxyUpdateOne {
+	if v != nil {
+		_u.SetHost(*v)
+	}
+	return _u
+}
+
+// SetPort sets the "port" field.
+func (_u *ProxyUpdateOne) SetPort(v int) *ProxyUpdateOne {
+	_u.mutation.ResetPort()
+	_u.mutation.SetPort(v)
+	return _u
+}
+
+// SetNillablePort sets the "port" field if the given value is not nil.
+func (_u *ProxyUpdateOne) SetNillablePort(v *int) *ProxyUpdateOne {
+	if v != nil {
+		_u.SetPort(*v)
+	}
+	return _u
+}
+
+// AddPort adds value to the "port" field.
+func (_u *ProxyUpdateOne) AddPort(v int) *ProxyUpdateOne {
+	_u.mutation.AddPort(v)
+	return _u
+}
+
+// SetUsername sets the "username" field.
+func (_u *ProxyUpdateOne) SetUsername(v string) *ProxyUpdateOne {
+	_u.mutation.SetUsername(v)
+	return _u
+}
+
+// SetNillableUsername sets the "username" field if the given value is not nil.
+func (_u *ProxyUpdateOne) SetNillableUsername(v *string) *ProxyUpdateOne {
+	if v != nil {
+		_u.SetUsername(*v)
+	}
+	return _u
+}
+
+// ClearUsername clears the value of the "username" field.
+func (_u *ProxyUpdateOne) ClearUsername() *ProxyUpdateOne {
+	_u.mutation.ClearUsername()
+	return _u
+}
+
+// SetPasswordCiphertext sets the "password_ciphertext" field.
+func (_u *ProxyUpdateOne) SetPasswordCiphertext(v []byte) *ProxyUpdateOne {
+	_u.mutation.SetPasswordCiphertext(v)
+	return _u
+}
+
+// ClearPasswordCiphertext clears the value of the "password_ciphertext" field.
+func (_u *ProxyUpdateOne) ClearPasswordCiphertext() *ProxyUpdateOne {
+	_u.mutation.ClearPasswordCiphertext()
 	return _u
 }
 
@@ -724,6 +891,27 @@ func (_u *ProxyUpdateOne) AddBackupProxyID(v int) *ProxyUpdateOne {
 // ClearBackupProxyID clears the value of the "backup_proxy_id" field.
 func (_u *ProxyUpdateOne) ClearBackupProxyID() *ProxyUpdateOne {
 	_u.mutation.ClearBackupProxyID()
+	return _u
+}
+
+// SetExpiryWarnDays sets the "expiry_warn_days" field.
+func (_u *ProxyUpdateOne) SetExpiryWarnDays(v int) *ProxyUpdateOne {
+	_u.mutation.ResetExpiryWarnDays()
+	_u.mutation.SetExpiryWarnDays(v)
+	return _u
+}
+
+// SetNillableExpiryWarnDays sets the "expiry_warn_days" field if the given value is not nil.
+func (_u *ProxyUpdateOne) SetNillableExpiryWarnDays(v *int) *ProxyUpdateOne {
+	if v != nil {
+		_u.SetExpiryWarnDays(*v)
+	}
+	return _u
+}
+
+// AddExpiryWarnDays adds value to the "expiry_warn_days" field.
+func (_u *ProxyUpdateOne) AddExpiryWarnDays(v int) *ProxyUpdateOne {
+	_u.mutation.AddExpiryWarnDays(v)
 	return _u
 }
 
@@ -921,17 +1109,35 @@ func (_u *ProxyUpdateOne) sqlSave(ctx context.Context) (_node *Proxy, err error)
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(proxy.FieldUpdatedAt, field.TypeTime, value)
 	}
-	if value, ok := _u.mutation.DeletedAt(); ok {
-		_spec.SetField(proxy.FieldDeletedAt, field.TypeTime, value)
-	}
-	if _u.mutation.DeletedAtCleared() {
-		_spec.ClearField(proxy.FieldDeletedAt, field.TypeTime)
-	}
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(proxy.FieldName, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.GetType(); ok {
 		_spec.SetField(proxy.FieldType, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Protocol(); ok {
+		_spec.SetField(proxy.FieldProtocol, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Host(); ok {
+		_spec.SetField(proxy.FieldHost, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Port(); ok {
+		_spec.SetField(proxy.FieldPort, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedPort(); ok {
+		_spec.AddField(proxy.FieldPort, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.Username(); ok {
+		_spec.SetField(proxy.FieldUsername, field.TypeString, value)
+	}
+	if _u.mutation.UsernameCleared() {
+		_spec.ClearField(proxy.FieldUsername, field.TypeString)
+	}
+	if value, ok := _u.mutation.PasswordCiphertext(); ok {
+		_spec.SetField(proxy.FieldPasswordCiphertext, field.TypeBytes, value)
+	}
+	if _u.mutation.PasswordCiphertextCleared() {
+		_spec.ClearField(proxy.FieldPasswordCiphertext, field.TypeBytes)
 	}
 	if value, ok := _u.mutation.URLCiphertext(); ok {
 		_spec.SetField(proxy.FieldURLCiphertext, field.TypeBytes, value)
@@ -983,6 +1189,12 @@ func (_u *ProxyUpdateOne) sqlSave(ctx context.Context) (_node *Proxy, err error)
 	}
 	if _u.mutation.BackupProxyIDCleared() {
 		_spec.ClearField(proxy.FieldBackupProxyID, field.TypeInt)
+	}
+	if value, ok := _u.mutation.ExpiryWarnDays(); ok {
+		_spec.SetField(proxy.FieldExpiryWarnDays, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedExpiryWarnDays(); ok {
+		_spec.AddField(proxy.FieldExpiryWarnDays, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.LastProbedAt(); ok {
 		_spec.SetField(proxy.FieldLastProbedAt, field.TypeTime, value)

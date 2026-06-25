@@ -7809,15 +7809,32 @@ type CreatePromoCodeRequest struct {
 
 // CreateProviderAccountRequest defines model for CreateProviderAccountRequest.
 type CreateProviderAccountRequest struct {
+	AutoPauseOnExpired *bool `json:"auto_pause_on_expired,omitempty"`
+
+	// Concurrency Max concurrent upstream requests.
+	Concurrency *int `json:"concurrency,omitempty"`
+
 	// Credential Write-only credential payload. It must be encrypted before persistence.
 	Credential *map[string]interface{} `json:"credential,omitempty"`
-	Metadata   *JsonObject             `json:"metadata,omitempty"`
-	Name       string                  `json:"name"`
-	Priority   *int                    `json:"priority,omitempty"`
-	ProviderId Id                      `json:"provider_id"`
+
+	// ExpiresAt Account-level expiry timestamp.
+	ExpiresAt *time.Time  `json:"expires_at,omitempty"`
+	Extra     *JsonObject `json:"extra,omitempty"`
+
+	// GroupIds Bind to these account groups at creation time.
+	GroupIds   *[]int      `json:"group_ids,omitempty"`
+	LoadFactor *int        `json:"load_factor,omitempty"`
+	Metadata   *JsonObject `json:"metadata,omitempty"`
+	Name       string      `json:"name"`
+
+	// Notes Operator-supplied freetext.
+	Notes      *string `json:"notes,omitempty"`
+	Priority   *int    `json:"priority,omitempty"`
+	ProviderId Id      `json:"provider_id"`
 
 	// ProxyId Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first.
 	ProxyId        *string                                `json:"proxy_id,omitempty"`
+	RateMultiplier *float32                               `json:"rate_multiplier,omitempty"`
 	RiskLevel      *CreateProviderAccountRequestRiskLevel `json:"risk_level,omitempty"`
 	RuntimeClass   RuntimeClass                           `json:"runtime_class"`
 	Status         *ProviderAccountStatus                 `json:"status,omitempty"`
@@ -10777,33 +10794,68 @@ type Provider struct {
 
 // ProviderAccount defines model for ProviderAccount.
 type ProviderAccount struct {
-	CreatedAt Timestamp `json:"created_at"`
-	GroupIds  []Id      `json:"group_ids"`
-	Id        Id        `json:"id"`
+	// AccountType Simplified auth type (apikey, oauth, setup-token, upstream, bedrock, service_account).
+	AccountType *string `json:"account_type,omitempty"`
+
+	// AutoPauseOnExpired Pause scheduling when expires_at is reached.
+	AutoPauseOnExpired *bool `json:"auto_pause_on_expired,omitempty"`
+
+	// Concurrency Max concurrent upstream requests for this account.
+	Concurrency int       `json:"concurrency"`
+	CreatedAt   Timestamp `json:"created_at"`
+
+	// ErrorMessage Last error details for operator troubleshooting.
+	ErrorMessage *string `json:"error_message,omitempty"`
+
+	// ExpiresAt Account-level expiry (NOT OAuth token expiry).
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+
+	// Extra Per-account config separate from operational metadata.
+	Extra    *JsonObject `json:"extra,omitempty"`
+	GroupIds []Id        `json:"group_ids"`
+	Id       Id          `json:"id"`
 
 	// LastRefreshedAt Time of the most recent successful OAuth refresh.
 	LastRefreshedAt *Timestamp `json:"last_refreshed_at,omitempty"`
 
-	// Metadata Free-form per-account configuration. Recognized convention keys (no schema migration; read at scheduling time): `base_url` (override the upstream base URL); `supported_models` (string array — exact-match inclusion whitelist of upstream model names this account may serve; absent = serve all); `excluded_models` (string array of `*` wildcard patterns — exclude any catalog or upstream model name matching a pattern; takes precedence over `supported_models` and hides the model from `/v1/models` when every serving account excludes it); `model_mapping` (object mapping a canonical catalog model name to a per-account upstream model name override).
+	// LastUsedAt When this account last served a request.
+	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
+
+	// LoadFactor Load distribution weight in the scheduler.
+	LoadFactor *int `json:"load_factor,omitempty"`
+
+	// Metadata Operational state metadata. Convention keys: `base_url`, `supported_models`, `excluded_models`, `model_mapping`.
 	Metadata *JsonObject `json:"metadata,omitempty"`
 	Name     string      `json:"name"`
 
 	// NeedsReauthAt Set when refresh has become hopeless (permanent OAuth error such as invalid_grant, OR refresh_attempts >= 5). The proactive refresh worker skips accounts with this set so the upstream is not hammered; an operator must re-bind the account to clear it.
 	NeedsReauthAt *Timestamp `json:"needs_reauth_at,omitempty"`
-	Priority      int        `json:"priority"`
-	ProviderId    Id         `json:"provider_id"`
+
+	// Notes Operator-supplied freetext visible on the admin panel.
+	Notes *string `json:"notes,omitempty"`
+
+	// Platform Provider family denormalized for fast filtering (anthropic, openai, gemini, antigravity).
+	Platform   *string `json:"platform,omitempty"`
+	Priority   int     `json:"priority"`
+	ProviderId Id      `json:"provider_id"`
 
 	// ProxyId Registered proxy definition id when this account is bound to one.
 	ProxyId *string `json:"proxy_id,omitempty"`
+
+	// RateMultiplier Per-account billing multiplier.
+	RateMultiplier *float32 `json:"rate_multiplier,omitempty"`
 
 	// RefreshAttempts Consecutive refresh-failure count; reset to 0 on a success.
 	RefreshAttempts *int `json:"refresh_attempts,omitempty"`
 
 	// RefreshLastError Most recent refresh error message (truncated to 500 chars).
-	RefreshLastError *string               `json:"refresh_last_error,omitempty"`
-	RiskLevel        *string               `json:"risk_level,omitempty"`
-	RuntimeClass     RuntimeClass          `json:"runtime_class"`
-	Status           ProviderAccountStatus `json:"status"`
+	RefreshLastError *string      `json:"refresh_last_error,omitempty"`
+	RiskLevel        *string      `json:"risk_level,omitempty"`
+	RuntimeClass     RuntimeClass `json:"runtime_class"`
+
+	// Schedulable Direct scheduling flag; false skips without status change.
+	Schedulable bool                  `json:"schedulable"`
+	Status      ProviderAccountStatus `json:"status"`
 
 	// TokenExpiresAt Wall-clock expiry of the OAuth access token, snapshotted from the credential after the last successful refresh. Null when the account has never been refreshed or the credential carries no expires_at. OAuth runtime classes only.
 	TokenExpiresAt *Timestamp `json:"token_expires_at,omitempty"`
@@ -12572,16 +12624,25 @@ type UpdatePromoCodeRequest = CreatePromoCodeRequest
 
 // UpdateProviderAccountRequest defines model for UpdateProviderAccountRequest.
 type UpdateProviderAccountRequest struct {
+	AutoPauseOnExpired *bool `json:"auto_pause_on_expired,omitempty"`
+	Concurrency        *int  `json:"concurrency,omitempty"`
+
 	// Credential Write-only replacement credential payload. It must be encrypted before persistence.
 	Credential *map[string]interface{} `json:"credential,omitempty"`
+	ExpiresAt  *time.Time              `json:"expires_at,omitempty"`
+	Extra      *JsonObject             `json:"extra,omitempty"`
+	LoadFactor *int                    `json:"load_factor,omitempty"`
 	Metadata   *JsonObject             `json:"metadata,omitempty"`
 	Name       *string                 `json:"name,omitempty"`
+	Notes      *string                 `json:"notes,omitempty"`
 	Priority   *int                    `json:"priority,omitempty"`
 
 	// ProxyId Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first. Set null or an empty string to clear proxy binding.
 	ProxyId        *string                                `json:"proxy_id,omitempty"`
+	RateMultiplier *float32                               `json:"rate_multiplier,omitempty"`
 	RiskLevel      *UpdateProviderAccountRequestRiskLevel `json:"risk_level,omitempty"`
 	RuntimeClass   *RuntimeClass                          `json:"runtime_class,omitempty"`
+	Schedulable    *bool                                  `json:"schedulable,omitempty"`
 	Status         *ProviderAccountStatus                 `json:"status,omitempty"`
 	UpstreamClient *string                                `json:"upstream_client,omitempty"`
 	Weight         *float32                               `json:"weight,omitempty"`
