@@ -72,10 +72,15 @@ var registry = map[string]ModelPreset{
 	"claude-haiku-4-5":  {DisplayName: "Claude Haiku 4.5", Family: "claude", ContextWindow: 200000, MaxOutputTokens: 8192, QualityTier: "economy", Capabilities: capsClaude},
 
 	// OpenAI — source: developers.openai.com/api/docs/models
+	"gpt-5":        {DisplayName: "GPT-5", Family: "gpt", ContextWindow: 128000, MaxOutputTokens: 16384, QualityTier: "standard", Capabilities: capsOpenAI},
+	"gpt-5-mini":   {DisplayName: "GPT-5 Mini", Family: "gpt", ContextWindow: 128000, MaxOutputTokens: 16384, QualityTier: "economy", Capabilities: capsOpenAI},
+	"gpt-5.1":      {DisplayName: "GPT-5.1", Family: "gpt", ContextWindow: 128000, MaxOutputTokens: 32768, QualityTier: "standard", Capabilities: capsOpenAI},
 	"gpt-5.5":      {DisplayName: "GPT-5.5", Family: "gpt", ContextWindow: 1050000, MaxOutputTokens: 128000, QualityTier: "premium", Capabilities: capsOpenAI},
 	"gpt-5.4":      {DisplayName: "GPT-5.4", Family: "gpt", ContextWindow: 1000000, MaxOutputTokens: 128000, QualityTier: "premium", Capabilities: capsOpenAI},
 	"gpt-5.4-mini": {DisplayName: "GPT-5.4 Mini", Family: "gpt", ContextWindow: 1000000, MaxOutputTokens: 128000, QualityTier: "economy", Capabilities: capsOpenAI},
 	"gpt-5.4-nano": {DisplayName: "GPT-5.4 Nano", Family: "gpt", ContextWindow: 1000000, MaxOutputTokens: 128000, QualityTier: "economy", Capabilities: capsOpenAI},
+	"gpt-5.3":      {DisplayName: "GPT-5.3", Family: "gpt", ContextWindow: 400000, MaxOutputTokens: 128000, QualityTier: "standard", Capabilities: capsOpenAI},
+	"gpt-5.3-mini": {DisplayName: "GPT-5.3 Mini", Family: "gpt", ContextWindow: 200000, MaxOutputTokens: 128000, QualityTier: "economy", Capabilities: capsOpenAI},
 	"gpt-5.2":      {DisplayName: "GPT-5.2", Family: "gpt", ContextWindow: 400000, MaxOutputTokens: 128000, QualityTier: "standard", Capabilities: capsOpenAI},
 	"gpt-4.1":      {DisplayName: "GPT-4.1", Family: "gpt", ContextWindow: 1000000, MaxOutputTokens: 32000, QualityTier: "standard", Capabilities: capsOpenAI},
 	"gpt-4.1-mini": {DisplayName: "GPT-4.1 Mini", Family: "gpt", ContextWindow: 1000000, MaxOutputTokens: 32000, QualityTier: "economy", Capabilities: capsOpenAI},
