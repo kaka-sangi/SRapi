@@ -13,7 +13,10 @@ import (
 	"strings"
 	"time"
 
+	"regexp"
+
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
+	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
@@ -126,6 +129,9 @@ func (rt *runtimeState) discoverAccountModels(ctx context.Context, provider prov
 		}
 		if _, err := rt.accounts.Update(ctx, account.ID, accountcontract.UpdateRequest{Metadata: &metadata}); err != nil {
 			return apiopenapi.AccountModelDiscovery{}, err
+		}
+		if source == modelDiscoveryChatGPTWeb {
+			rt.ensureDiscoveredModelsRegistered(ctx, provider, modelIDs)
 		}
 	}
 
@@ -600,6 +606,54 @@ func normalizeDiscoveredModelID(value string) string {
 	id = strings.TrimPrefix(id, "models/")
 	id = strings.TrimSpace(id)
 	return id
+}
+
+// ensureDiscoveredModelsRegistered creates Model records and ModelProviderMappings
+// for web slugs discovered from ChatGPT's /backend-api/models. Each slug (e.g.
+// "gpt-5-2") is converted to a canonical name (e.g. "gpt-5.2") for the Model
+// record, and the original slug is preserved as UpstreamModelName in the mapping.
+func (rt *runtimeState) ensureDiscoveredModelsRegistered(ctx context.Context, provider providercontract.Provider, slugs []string) {
+	for _, slug := range slugs {
+		slug = strings.TrimSpace(slug)
+		if slug == "" || slug == "auto" || slug == "research" {
+			continue
+		}
+		canonical := chatGPTWebSlugToCanonical(slug)
+		model, err := rt.models.FindByCanonicalName(ctx, canonical)
+		if err != nil {
+			model, err = rt.models.Create(ctx, modelcontract.CreateRequest{
+				CanonicalName: canonical,
+				DisplayName:   canonical,
+			})
+			if err != nil {
+				model, _ = rt.models.FindByCanonicalName(ctx, canonical)
+			}
+		}
+		if model.ID == 0 {
+			continue
+		}
+		rt.models.CreateMapping(ctx, model.ID, modelcontract.CreateMappingRequest{
+			ProviderID:        provider.ID,
+			UpstreamModelName: slug,
+		})
+	}
+}
+
+// chatGPTWebSlugToCanonical converts a ChatGPT Web slug to the canonical
+// model name used by SRapi. The web UI uses dashes (gpt-5-2) while the API
+// uses dots (gpt-5.2) for the version separator.
+//
+//	gpt-5-2       → gpt-5.2
+//	gpt-5-4-t-mini → gpt-5.4-t-mini
+//	gpt-5-mini    → gpt-5-mini    (no minor version digit, kept as-is)
+//	auto          → auto
+var chatGPTWebVersionPattern = regexp.MustCompile(`^(gpt-\d+)-(\d+)(.*)$`)
+
+func chatGPTWebSlugToCanonical(slug string) string {
+	if m := chatGPTWebVersionPattern.FindStringSubmatch(slug); m != nil {
+		return m[1] + "." + m[2] + m[3]
+	}
+	return slug
 }
 
 func chatGPTWebModelDiscoveryHeaders(headers http.Header, provider providercontract.Provider, account accountcontract.ProviderAccount) {
