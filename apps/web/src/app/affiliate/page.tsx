@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Coins, Link2, UserPlus, WalletCards, Wallet, TrendingUp } from "lucide-react";
+import { Coins, Link2, UserPlus, Wallet, TrendingUp } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { AdminListView, type Column } from "@/components/admin/admin-list-view";
 import { SectionHero } from "@/components/visual/section-hero";
@@ -10,7 +10,6 @@ import {
   useAffiliateInviteCodes,
   useAffiliateLedger,
   useCreateAffiliateInviteCode,
-  useRequestAffiliateWithdrawal,
   useTransferToBalance,
 } from "@/hooks/queries";
 import { useLanguage } from "@/context/LanguageContext";
@@ -44,17 +43,12 @@ function AffiliateContent() {
   const ledger = useAffiliateLedger();
   const transferMut = useTransferToBalance();
   const createInviteMut = useCreateAffiliateInviteCode();
-  const withdrawMut = useRequestAffiliateWithdrawal();
-
   const primary = affiliate.data?.balances?.[0];
   const codes = affiliate.data?.invite_codes?.length
     ? affiliate.data.invite_codes
     : inviteCodes.data?.data ?? [];
   const [amount, setAmount] = useState("");
-  const [withdrawAmount, setWithdrawAmount] = useState("");
-  const [withdrawDestination, setWithdrawDestination] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [withdrawError, setWithdrawError] = useState<string | null>(null);
 
   async function transfer(event: React.FormEvent) {
     event.preventDefault();
@@ -77,23 +71,6 @@ function AffiliateContent() {
       toast({ title: t("feedback.created"), tone: "success" });
     } catch (err) {
       toast({ title: meErrorMessage(err), tone: "error" });
-    }
-  }
-
-  async function requestWithdrawal(event: React.FormEvent) {
-    event.preventDefault();
-    setWithdrawError(null);
-    try {
-      await withdrawMut.mutateAsync({
-        amount: withdrawAmount.trim(),
-        currency: primary?.currency,
-        destination: withdrawDestination.trim() || undefined,
-      });
-      toast({ title: t("feedback.created"), tone: "success" });
-      setWithdrawAmount("");
-      setWithdrawDestination("");
-    } catch (err) {
-      setWithdrawError(meErrorMessage(err));
     }
   }
 
@@ -221,97 +198,48 @@ function AffiliateContent() {
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardContent className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-semibold tracking-tight text-srapi-text-primary">
-                  {t("affiliate.inviteCodes")}
-                </h3>
-                <p className="mt-1 text-sm text-srapi-text-secondary">
-                  {t("affiliate.invitedCount", { count: affiliate.data?.invited_count ?? 0 })}
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="primary"
-                size="sm"
-                loading={createInviteMut.isPending}
-                onClick={createInviteCode}
-              >
-                ＋ {t("affiliate.generateInviteCode")}
-              </Button>
-            </div>
-
-            {inviteCodes.isLoading && !affiliate.data ? (
-              <Skeleton className="h-16 w-full" />
-            ) : codes.length > 0 ? (
-              <div className="space-y-2">
-                {codes.slice(0, 5).map((code) => (
-                  <InviteCodeRow key={code.id} code={code} />
-                ))}
-              </div>
-            ) : (
-              <div className="flex min-h-28 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-srapi-border/70 bg-srapi-card-muted/40 px-4 py-6 text-center">
-                <IconBubble tone="accent">
-                  <UserPlus aria-hidden />
-                </IconBubble>
-                <p className="text-sm text-srapi-text-secondary">
-                  {t("affiliate.emptyInviteCodes")}
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent>
-            <form onSubmit={requestWithdrawal} className="space-y-4">
+      <Card>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
               <h3 className="text-lg font-semibold tracking-tight text-srapi-text-primary">
-                {t("affiliate.withdraw")}
+                {t("affiliate.inviteCodes")}
               </h3>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <Label htmlFor="withdraw-amount">{t("affiliate.withdrawAmount")}</Label>
-                  <Input
-                    id="withdraw-amount"
-                    inputMode="decimal"
-                    value={withdrawAmount}
-                    onChange={(e) => setWithdrawAmount(e.target.value)}
-                    disabled={withdrawMut.isPending}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="withdraw-destination">
-                    {t("affiliate.withdrawDestination")}
-                  </Label>
-                  <Input
-                    id="withdraw-destination"
-                    value={withdrawDestination}
-                    onChange={(e) => setWithdrawDestination(e.target.value)}
-                    disabled={withdrawMut.isPending}
-                  />
-                </div>
-              </div>
-              {withdrawError ? (
-                <p role="alert" className="text-sm text-srapi-error">
-                  {withdrawError}
-                </p>
-              ) : null}
-              <Button
-                type="submit"
-                variant="outline"
-                loading={withdrawMut.isPending}
-                disabled={!withdrawAmount.trim() || !primary}
-              >
-                <WalletCards className="size-4" aria-hidden />
-                {t("affiliate.withdraw")}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
+              <p className="mt-1 text-sm text-srapi-text-secondary">
+                {t("affiliate.invitedCount", { count: affiliate.data?.invited_count ?? 0 })}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              loading={createInviteMut.isPending}
+              onClick={createInviteCode}
+            >
+              ＋ {t("affiliate.generateInviteCode")}
+            </Button>
+          </div>
+
+          {inviteCodes.isLoading && !affiliate.data ? (
+            <Skeleton className="h-16 w-full" />
+          ) : codes.length > 0 ? (
+            <div className="space-y-2">
+              {codes.slice(0, 5).map((code) => (
+                <InviteCodeRow key={code.id} code={code} />
+              ))}
+            </div>
+          ) : (
+            <div className="flex min-h-28 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-srapi-border/70 bg-srapi-card-muted/40 px-4 py-6 text-center">
+              <IconBubble tone="accent">
+                <UserPlus aria-hidden />
+              </IconBubble>
+              <p className="text-sm text-srapi-text-secondary">
+                {t("affiliate.emptyInviteCodes")}
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <AdminListView
         query={ledger}
