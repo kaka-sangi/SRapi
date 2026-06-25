@@ -3722,6 +3722,7 @@ export const zh: Messages = {
     fieldAccountGroup: "账号组",
     fieldAccountGroupHint: "副驾驶每轮随机选取组内一个账号，实现负载分散。",
     selectAccountGroup: "选择账号组",
+    noAccountGroups: "暂无账号组，请先在账号页面创建。",
     fieldProtocol: "协议",
     protocolOpenAI: "OpenAI 兼容",
     protocolAnthropic: "Anthropic 兼容",

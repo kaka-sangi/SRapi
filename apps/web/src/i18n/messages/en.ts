@@ -3773,6 +3773,7 @@ export const en = {
     fieldAccountGroup: "Account group",
     fieldAccountGroupHint: "The copilot randomly picks an account from this group each turn for load distribution.",
     selectAccountGroup: "Select an account group",
+    noAccountGroups: "No account groups available. Create one in the Accounts page first.",
     fieldProtocol: "Protocol",
     protocolOpenAI: "OpenAI-compatible",
     protocolAnthropic: "Anthropic-compatible",

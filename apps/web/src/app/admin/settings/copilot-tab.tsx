@@ -115,24 +115,28 @@ export function CopilotTab({
           <p className="mt-1 text-xs text-srapi-text-tertiary">{t("copilot.fieldModelsHint")}</p>
         </div>
 
-        {value.source === "account" && groupOptions.length > 0 ? (
+        {value.source === "account" ? (
           <div>
             <Label>{t("copilot.fieldAccountGroup")}</Label>
-            <Select
-              value={value.provider_account_id ? String(value.provider_account_id) : ""}
-              onValueChange={(v) => v && onField("provider_account_id", Number(v))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t("copilot.selectAccountGroup")} />
-              </SelectTrigger>
-              <SelectContent>
-                {groupOptions.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {groupOptions.length > 0 ? (
+              <Select
+                value={value.provider_account_id ? String(value.provider_account_id) : ""}
+                onValueChange={(v) => v && onField("provider_account_id", Number(v))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t("copilot.selectAccountGroup")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {groupOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <p className="mt-1.5 text-xs text-srapi-text-tertiary">{t("copilot.noAccountGroups")}</p>
+            )}
             <p className="mt-1 text-xs text-srapi-text-tertiary">{t("copilot.fieldAccountGroupHint")}</p>
           </div>
         ) : (
