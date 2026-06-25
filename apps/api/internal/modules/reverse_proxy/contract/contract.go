@@ -13,6 +13,7 @@ const (
 	CodexOAuthClientID       = "app_EMoamEEZ73f0CkXaXp7hrann"
 	CodexOAuthAuthorizeScope = "openid profile email offline_access"
 	CodexOAuthRefreshScope   = "openid profile email"
+	ChatGPTWebOAuthClientID  = "app_2SKx67EdpoN0G6j64rFvigXD"
 	ClaudeCodeOAuthTokenURL  = "https://api.anthropic.com/v1/oauth/token"
 	ClaudeCodeOAuthClientID  = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
 	AntigravityOAuthTokenURL = "https://oauth2.googleapis.com/token"

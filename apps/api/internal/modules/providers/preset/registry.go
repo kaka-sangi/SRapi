@@ -502,11 +502,11 @@ func chatGPTWebPreset() Preset {
 			"quota_credits_limit_path":     "account_plan.subscription_plan.limit",
 		},
 		OAuthConfig: &OAuthConfig{
-			ClientID:           reverseproxycontract.CodexOAuthClientID,
+			ClientID:           reverseproxycontract.ChatGPTWebOAuthClientID,
 			AuthorizeURL:       reverseproxycontract.CodexOAuthAuthorizeURL,
 			TokenURL:           reverseproxycontract.CodexOAuthTokenURL,
 			DeviceAuthorizeURL: "https://auth.openai.com/oauth/device/code",
-			RedirectURI:        "http://localhost:1455/auth/callback",
+			RedirectURI:        "com.openai.chat://auth0.openai.com/ios/com.openai.chat/callback",
 			Scopes:             strings.Fields(reverseproxycontract.CodexOAuthAuthorizeScope),
 			UsePKCE:            true,
 		},

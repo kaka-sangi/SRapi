@@ -1076,12 +1076,22 @@ func oauthRefreshSettings(account contract.AccountRuntime) oauthRefreshConfig {
 		config.ClientSecret = credentialString(account.Credential, "client_secret")
 	}
 	switch {
-	case upstreamClientIs(account, "codex_cli") || upstreamClientIs(account, "chatgpt_web"):
+	case upstreamClientIs(account, "codex_cli"):
 		if config.TokenEndpoint == "" {
 			config.TokenEndpoint = contract.CodexOAuthTokenURL
 		}
 		if config.ClientID == "" {
 			config.ClientID = contract.CodexOAuthClientID
+		}
+		if config.Scope == "" {
+			config.Scope = contract.CodexOAuthRefreshScope
+		}
+	case upstreamClientIs(account, "chatgpt_web"):
+		if config.TokenEndpoint == "" {
+			config.TokenEndpoint = contract.CodexOAuthTokenURL
+		}
+		if config.ClientID == "" {
+			config.ClientID = contract.ChatGPTWebOAuthClientID
 		}
 		if config.Scope == "" {
 			config.Scope = contract.CodexOAuthRefreshScope
