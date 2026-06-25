@@ -9,7 +9,7 @@ import (
 
 const (
 	CodexOAuthTokenURL       = "https://auth.openai.com/oauth/token"
-	CodexOAuthAuthorizeURL   = "https://auth.openai.com/oauth/authorize?codex_cli_simplified_flow=true&id_token_add_organizations=true&prompt=login"
+	CodexOAuthAuthorizeURL   = "https://auth.openai.com/oauth/authorize?codex_cli_simplified_flow=true&id_token_add_organizations=true"
 	CodexOAuthClientID       = "app_EMoamEEZ73f0CkXaXp7hrann"
 	CodexOAuthAuthorizeScope = "openid profile email offline_access"
 	CodexOAuthRefreshScope   = "openid profile email"
