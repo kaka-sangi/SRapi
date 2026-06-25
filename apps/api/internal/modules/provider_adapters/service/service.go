@@ -111,6 +111,9 @@ func (s *Service) InvokeConversation(ctx context.Context, req contract.Conversat
 		if isCodexReverseProxy(req) {
 			return s.invokeReverseProxyCodexResponses(ctx, req, baseURL)
 		}
+		if isChatGPTWebReverseProxy(req) {
+			return s.invokeReverseProxyChatGPTWebConversation(ctx, req, baseURL)
+		}
 		if isAntigravityReverseProxy(req) {
 			return s.invokeReverseProxyAntigravity(ctx, req, baseURL)
 		}

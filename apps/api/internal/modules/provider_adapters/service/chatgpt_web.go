@@ -101,9 +101,10 @@ type chatGPTWebSentinelRequirements struct {
 }
 
 type chatGPTWebRequirementsResponse struct {
-	Token       string `json:"token"`
-	SOToken     string `json:"so_token"`
-	ProofOfWork struct {
+	Token        string `json:"token"`
+	SOToken      string `json:"so_token"`
+	PrepareToken string `json:"prepare_token"`
+	ProofOfWork  struct {
 		Required   bool   `json:"required"`
 		Seed       string `json:"seed"`
 		Difficulty string `json:"difficulty"`
@@ -576,26 +577,87 @@ func (s *Service) fetchChatGPTWebRequirements(ctx context.Context, req contract.
 			return chatGPTWebSentinelRequirements{}, contract.ProviderError{Class: "challenge_required", StatusCode: http.StatusForbidden, Message: "chatgpt web legacy requirements proof token challenge not solved within budget"}
 		}
 	}
-	raw, err := json.Marshal(map[string]string{"p": legacyToken})
+
+	// Step 1: prepare
+	basePath := chatGPTWebRequirementsPath(req)
+	preparePath := basePath + "/prepare"
+	prepareBody, err := json.Marshal(map[string]string{"p": legacyToken})
 	if err != nil {
 		return chatGPTWebSentinelRequirements{}, err
 	}
-	path := chatGPTWebRequirementsPath(req)
-	requirementsResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
+	prepareResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
 		Account: chatGPTWebReverseProxyAccount(req),
 		Method:  http.MethodPost,
-		URL:     strings.TrimRight(origin, "/") + path,
-		Headers: chatGPTWebJSONHeaders(req, baseURL, path),
-		Body:    raw,
+		URL:     strings.TrimRight(origin, "/") + preparePath,
+		Headers: chatGPTWebJSONHeaders(req, baseURL, preparePath),
+		Body:    prepareBody,
 	})
 	if err != nil {
 		return chatGPTWebSentinelRequirements{}, providerErrorFromReverseProxy(err)
 	}
-	var decoded chatGPTWebRequirementsResponse
-	if err := json.Unmarshal(requirementsResp.Body, &decoded); err != nil {
-		return chatGPTWebSentinelRequirements{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "chatgpt web requirements returned invalid json"}
+	var prepareDecoded chatGPTWebRequirementsResponse
+	if err := json.Unmarshal(prepareResp.Body, &prepareDecoded); err != nil {
+		return chatGPTWebSentinelRequirements{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "chatgpt web requirements prepare returned invalid json"}
 	}
-	return chatGPTWebBuildRequirements(req, decoded, legacyToken, powSources, dataBuild)
+	if prepareDecoded.Arkose.Required {
+		return chatGPTWebSentinelRequirements{}, contract.ProviderError{Class: "challenge_required", StatusCode: http.StatusForbidden, Message: "chatgpt web requirements require arkose challenge"}
+	}
+
+	// Solve PoW if required
+	proofToken := ""
+	if prepareDecoded.ProofOfWork.Required {
+		proofToken, err = chatGPTWebProofToken(req, prepareDecoded.ProofOfWork.Seed, prepareDecoded.ProofOfWork.Difficulty, powSources, dataBuild)
+		if err != nil {
+			return chatGPTWebSentinelRequirements{}, err
+		}
+	}
+
+	// Solve turnstile if required
+	turnstileToken := requestSetting(req, "chatgpt_turnstile_token", "openai_sentinel_turnstile_token", "sentinel_turnstile_token")
+	if prepareDecoded.Turnstile.Required && turnstileToken == "" && prepareDecoded.Turnstile.DX != "" {
+		// Dump dx and p for debugging
+		turnstileToken = solveTurnstileToken(prepareDecoded.Turnstile.DX, legacyToken)
+	}
+	// chatgpt2api sends finalize even with empty turnstile_token — OpenAI
+	// may accept it. Do NOT block here.
+
+	// Step 2: finalize
+	finalizePath := basePath + "/finalize"
+	finalizeBody, err := json.Marshal(map[string]any{
+		"prepare_token":   prepareDecoded.PrepareToken,
+		"proof_token":     proofToken,
+		"turnstile_token": turnstileToken,
+	})
+	if err != nil {
+		return chatGPTWebSentinelRequirements{}, err
+	}
+	finalizeResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
+		Account: chatGPTWebReverseProxyAccount(req),
+		Method:  http.MethodPost,
+		URL:     strings.TrimRight(origin, "/") + finalizePath,
+		Headers: chatGPTWebJSONHeaders(req, baseURL, finalizePath),
+		Body:    finalizeBody,
+	})
+	if err != nil {
+		return chatGPTWebSentinelRequirements{}, providerErrorFromReverseProxy(err)
+	}
+	var finalizeDecoded struct {
+		Token   string `json:"token"`
+		SOToken string `json:"so_token"`
+	}
+	if err := json.Unmarshal(finalizeResp.Body, &finalizeDecoded); err != nil {
+		return chatGPTWebSentinelRequirements{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "chatgpt web requirements finalize returned invalid json"}
+	}
+	if strings.TrimSpace(finalizeDecoded.Token) == "" {
+		return chatGPTWebSentinelRequirements{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "chatgpt web requirements finalize response contained no token"}
+	}
+
+	return chatGPTWebSentinelRequirements{
+		Token:          strings.TrimSpace(finalizeDecoded.Token),
+		ProofToken:     proofToken,
+		TurnstileToken: turnstileToken,
+		SOToken:        strings.TrimSpace(finalizeDecoded.SOToken),
+	}, nil
 }
 
 func chatGPTWebBuildRequirements(req contract.ConversationRequest, decoded chatGPTWebRequirementsResponse, legacyToken string, powSources []string, dataBuild string) (chatGPTWebSentinelRequirements, error) {
