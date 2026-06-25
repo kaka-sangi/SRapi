@@ -276,6 +276,25 @@ func providerScopedCapabilityKeys() []string {
 	}
 }
 
+// accountEffectiveMetadata returns a merged view of metadata + extra_json
+// so gateway code can read platform-specific config (openai_capabilities,
+// openai_ws_mode, mixed_scheduling, etc.) from a single map.
+func accountEffectiveMetadata(account accountcontract.ProviderAccount) map[string]any {
+	if len(account.Extra) == 0 {
+		return account.Metadata
+	}
+	merged := make(map[string]any, len(account.Metadata)+len(account.Extra))
+	for k, v := range account.Metadata {
+		merged[k] = v
+	}
+	for k, v := range account.Extra {
+		if _, exists := merged[k]; !exists {
+			merged[k] = v
+		}
+	}
+	return merged
+}
+
 func schedulerRuntimeState(account accountcontract.ProviderAccount) schedulercontract.RuntimeState {
 	metadata := account.Metadata
 	now := time.Now().UTC()

@@ -10,6 +10,8 @@ import { TempUnschedRules } from "@/components/admin/account-config/temp-unsched
 import { ModelSelector } from "@/components/admin/account-config/model-selector";
 import { PoolMode } from "@/components/admin/account-config/pool-mode";
 import { AllowedClients } from "@/components/admin/account-config/allowed-clients";
+import { OpenAICapabilities } from "@/components/admin/account-config/openai-capabilities";
+import { AntigravityConfig } from "@/components/admin/account-config/antigravity-config";
 import {
   AccountOAuthAuthorizeDialog,
   type AccountOAuthFlowMode,
@@ -1065,6 +1067,12 @@ export function AccountFormDialog({
                   <PoolMode extra={extraJson} onExtraChange={setExtraJson} disabled={busy} />
                   <TempUnschedRules extra={extraJson} onExtraChange={setExtraJson} disabled={busy} />
                   <AllowedClients metadata={metadata} onMetadataChange={setMetadata} disabled={busy} />
+                  {platformChoice === "openai" ? (
+                    <OpenAICapabilities extra={extraJson} onExtraChange={setExtraJson} disabled={busy} />
+                  ) : null}
+                  {platformChoice === "antigravity" ? (
+                    <AntigravityConfig extra={extraJson} onExtraChange={setExtraJson} disabled={busy} />
+                  ) : null}
 
                   <div>
                     <div className="flex items-center gap-2">
