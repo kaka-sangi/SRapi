@@ -115,7 +115,7 @@ func (s *Service) invokeReverseProxyChatGPTWebImages(ctx context.Context, req co
 			return contract.ImageGenerationResponse{}, err
 		}
 		if len(batch) == 0 && conversationID != "" {
-			batch, err = s.chatGPTWebImagesFromConversationDetail(ctx, req, origin, conversationID)
+			batch, err = s.chatGPTWebPollImageResults(ctx, req, origin, conversationID)
 			if err != nil {
 				return contract.ImageGenerationResponse{}, err
 			}
@@ -233,6 +233,9 @@ func (s *Service) chatGPTWebRunImageConversation(ctx context.Context, req contra
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, "", classifyProviderHTTPErrorWithHeaders(resp.StatusCode, resp.Headers, resp.Body)
 	}
+	if len(resp.Body) < 2000 {
+	} else {
+	}
 	conversationID, refs, err := chatGPTWebImageRefsFromSSE(resp.Body)
 	if err != nil {
 		return nil, "", err
@@ -349,6 +352,32 @@ func (s *Service) chatGPTWebImagesFromConversationDetail(ctx context.Context, re
 	refs := make([]chatGPTWebImageReference, 0)
 	chatGPTWebCollectImageRefs(payload, &conversationID, &refs)
 	return s.chatGPTWebDownloadImages(ctx, req, origin, conversationID, refs)
+}
+
+func (s *Service) chatGPTWebPollImageResults(ctx context.Context, req contract.ImageGenerationRequest, origin string, conversationID string) ([]contract.Image, error) {
+	// ChatGPT returns resume_with_websockets=true in SSE — image data arrives
+	// asynchronously. Poll the conversation document until image refs appear,
+	// matching chatgpt2api's _poll_image_results (10s initial wait, 10s interval,
+	// 120s total timeout).
+	deadline := time.Now().Add(120 * time.Second)
+	time.Sleep(10 * time.Second)
+	for {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		if time.Now().After(deadline) {
+			return nil, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "chatgpt web image generation timed out waiting for results"}
+		}
+		batch, err := s.chatGPTWebImagesFromConversationDetail(ctx, req, origin, conversationID)
+		if err != nil {
+			time.Sleep(10 * time.Second)
+			continue
+		}
+		if len(batch) > 0 {
+			return batch, nil
+		}
+		time.Sleep(10 * time.Second)
+	}
 }
 
 func (s *Service) chatGPTWebDownloadImages(ctx context.Context, req contract.ImageGenerationRequest, origin string, conversationID string, refs []chatGPTWebImageReference) ([]contract.Image, error) {
