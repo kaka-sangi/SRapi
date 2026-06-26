@@ -426,6 +426,7 @@ func runtimeHTTPOptions(cfg config.Config, logger *slog.Logger, dbClient *platfo
 		options = append(options, httpserver.WithDatabasePinger(notRequiredPinger{}))
 	} else {
 		options = append(options, httpserver.WithDatabasePinger(dbClient))
+		options = append(options, httpserver.WithDBStats(dbClient))
 	}
 	realtimeStore, err := realtimeSlotStore(context.Background(), cfg, logger, redisClient)
 	if err != nil {

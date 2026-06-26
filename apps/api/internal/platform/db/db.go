@@ -115,6 +115,15 @@ func (c *Client) dropObsoleteSchemaArtifacts(ctx context.Context) error {
 	return err
 }
 
+// Stats returns the underlying connection pool statistics for monitoring.
+// Callers can check InUse vs MaxOpenConnections to detect saturation.
+func (c *Client) Stats() sql.DBStats {
+	if c == nil || c.db == nil {
+		return sql.DBStats{}
+	}
+	return c.db.Stats()
+}
+
 func (c *Client) Close() error {
 	if c == nil {
 		return nil

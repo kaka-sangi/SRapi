@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -75,6 +76,10 @@ type Server struct {
 
 type dependencyPinger interface {
 	Ping(context.Context) error
+}
+
+type dbStatsProvider interface {
+	Stats() sql.DBStats
 }
 
 // backupSnapshotsTrigger is the worker hand-off used by the admin "Snapshot
@@ -167,6 +172,7 @@ type runtimeOptions struct {
 	proxyProbeMetrics      ProxyProbeMetricsProvider
 	tokenRefreshMetrics    TokenRefreshMetricsProvider
 	redisCmd               redis.Cmdable
+	dbStats                dbStatsProvider
 }
 
 func WithAdminControlStore(store admincontrolcontract.Store) Option {
@@ -466,6 +472,12 @@ func WithBackgroundDrainHook(sink *func(context.Context)) Option {
 func WithUsageAggregator(agg usageAggregator) Option {
 	return func(opts *runtimeOptions) {
 		opts.usageAggregator = agg
+	}
+}
+
+func WithDBStats(provider dbStatsProvider) Option {
+	return func(opts *runtimeOptions) {
+		opts.dbStats = provider
 	}
 }
 

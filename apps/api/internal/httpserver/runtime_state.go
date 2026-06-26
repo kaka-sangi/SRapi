@@ -239,6 +239,7 @@ type runtimeState struct {
 	capabilities            []capabilitiescontract.Definition
 	databaseProbe           dependencyPinger
 	redisProbe              dependencyPinger
+	dbClient                dbStatsProvider
 	// credentialRefreshGroup coalesces concurrent OAuth refreshes per account so
 	// rotating refresh tokens are never consumed twice in parallel (which would
 	// invalidate the session and park the account).
@@ -1131,6 +1132,7 @@ func assembleRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOp
 		capabilities:         seedCapabilities(),
 		databaseProbe:        opts.database,
 		redisProbe:           opts.redis,
+		dbClient:             opts.dbStats,
 		accountBreakers:      make(map[int]*circuitbreaker.Breaker),
 		concurrencySlots:     concurrencyslotsservice.New(),
 		rateLimitCooldown: func() *ratelimitcooldownservice.Service {

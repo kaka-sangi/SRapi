@@ -75,6 +75,10 @@ type runtimeMetricDescs struct {
 	opsErrorLogProcessed          *prometheus.Desc
 	opsErrorLogDropped            *prometheus.Desc
 	opsErrorLogWriteFailures      *prometheus.Desc
+	dbPoolOpenConns               *prometheus.Desc
+	dbPoolInUseConns              *prometheus.Desc
+	dbPoolWaitCount               *prometheus.Desc
+	dbPoolWaitDuration            *prometheus.Desc
 }
 
 func newRuntimeMetricsCollector(ctx context.Context, rt *runtimeState) *runtimeMetricsCollector {
@@ -92,7 +96,31 @@ func newRuntimeMetricDescs() runtimeMetricDescs {
 	initProviderMetricDescs(&descs)
 	initWorkerMetricDescs(&descs)
 	initOpsErrorLogMetricDescs(&descs)
+	initDBPoolMetricDescs(&descs)
 	return descs
+}
+
+func initDBPoolMetricDescs(descs *runtimeMetricDescs) {
+	descs.dbPoolOpenConns = prometheus.NewDesc(
+		"srapi_db_pool_open_connections",
+		"Number of open database connections (in use + idle).",
+		nil, nil,
+	)
+	descs.dbPoolInUseConns = prometheus.NewDesc(
+		"srapi_db_pool_in_use_connections",
+		"Number of database connections currently in use.",
+		nil, nil,
+	)
+	descs.dbPoolWaitCount = prometheus.NewDesc(
+		"srapi_db_pool_wait_total",
+		"Total number of connections waited for due to pool exhaustion.",
+		nil, nil,
+	)
+	descs.dbPoolWaitDuration = prometheus.NewDesc(
+		"srapi_db_pool_wait_duration_seconds_total",
+		"Total time blocked waiting for a new connection.",
+		nil, nil,
+	)
 }
 
 func initGatewayMetricDescs(descs *runtimeMetricDescs) {
@@ -408,6 +436,18 @@ func (c *runtimeMetricsCollector) Collect(ch chan<- prometheus.Metric) {
 	c.collectProviderProbeMetrics(ch, emitted)
 	c.collectWorkerMetrics(ch, emitted)
 	c.collectBaselineMetrics(ch, emitted)
+	c.collectDBPoolMetrics(ch, emitted)
+}
+
+func (c *runtimeMetricsCollector) collectDBPoolMetrics(ch chan<- prometheus.Metric, emitted map[string]bool) {
+	if c.rt.dbClient == nil {
+		return
+	}
+	stats := c.rt.dbClient.Stats()
+	emitConstMetric(ch, emitted, "srapi_db_pool_open_connections", c.descs.dbPoolOpenConns, prometheus.GaugeValue, float64(stats.OpenConnections))
+	emitConstMetric(ch, emitted, "srapi_db_pool_in_use_connections", c.descs.dbPoolInUseConns, prometheus.GaugeValue, float64(stats.InUse))
+	emitConstMetric(ch, emitted, "srapi_db_pool_wait_total", c.descs.dbPoolWaitCount, prometheus.CounterValue, float64(stats.WaitCount))
+	emitConstMetric(ch, emitted, "srapi_db_pool_wait_duration_seconds_total", c.descs.dbPoolWaitDuration, prometheus.CounterValue, stats.WaitDuration.Seconds())
 }
 
 func (c *runtimeMetricsCollector) collectWorkerMetrics(ch chan<- prometheus.Metric, emitted map[string]bool) {
