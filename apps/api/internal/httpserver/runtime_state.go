@@ -1287,6 +1287,12 @@ func NewMemorySessionAffinityStore() sessionaffinitycontract.Store {
 	return sessionaffinitymemory.New()
 }
 
+func NewMemorySessionAffinityStoreWithGC(ctx context.Context) sessionaffinitycontract.Store {
+	store := sessionaffinitymemory.New()
+	store.StartGC(ctx, 30*time.Minute)
+	return store
+}
+
 func sessionAffinityStoreForRuntime(opts runtimeOptions, allowMemoryStores bool) sessionaffinitycontract.Store {
 	if opts.sessionAffinity != nil {
 		return opts.sessionAffinity

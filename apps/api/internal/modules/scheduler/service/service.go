@@ -1263,18 +1263,45 @@ func quotaScore(candidate contract.Candidate) float64 {
 		return 1
 	}
 	ratio := clamp01(*candidate.RuntimeState.QuotaRemainingRatio)
+	var score float64
 	switch {
 	case ratio >= 0.70:
-		return 1.00
+		score = 1.00
 	case ratio >= 0.30:
-		return 0.70
+		score = 0.70
 	case ratio >= 0.10:
-		return 0.35
+		score = 0.35
 	case ratio > 0:
-		return 0.10
+		score = 0.10
 	default:
 		return 0
 	}
+	// Use-it-or-lose-it: prefer accounts whose quota window resets sooner.
+	// A window resetting in 1 hour should be drained before one resetting in
+	// 5 hours — ported from sub2api's filterBySoonestReset. Applied as a
+	// score bonus rather than a hard filter so the scheduler still picks the
+	// healthiest account when reset times are similar.
+	if resetAt := quotaResetTime(candidate); !resetAt.IsZero() {
+		hoursUntilReset := time.Until(resetAt).Hours()
+		if hoursUntilReset > 0 && hoursUntilReset < 12 {
+			score = clamp01(score + 0.15*(1-hoursUntilReset/12))
+		}
+	}
+	return score
+}
+
+func quotaResetTime(candidate contract.Candidate) time.Time {
+	if candidate.Account.SessionWindowEnd != nil && !candidate.Account.SessionWindowEnd.IsZero() {
+		return *candidate.Account.SessionWindowEnd
+	}
+	if raw, ok := candidate.Account.Metadata["quota_reset_at"]; ok {
+		if ts, isStr := raw.(string); isStr {
+			if parsed, err := time.Parse(time.RFC3339, ts); err == nil {
+				return parsed
+			}
+		}
+	}
+	return time.Time{}
 }
 
 func latencyScore(candidate contract.Candidate) float64 {

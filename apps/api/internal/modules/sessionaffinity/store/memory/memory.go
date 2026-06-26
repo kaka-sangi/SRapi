@@ -153,6 +153,48 @@ func (s *Store) Release(_ context.Context, scope, sessionKey string) error {
 	return nil
 }
 
+// StartGC launches a background goroutine that sweeps expired entries at the
+// given interval. Ported from CLIProxyAPI's session cleanup goroutine that
+// runs at ttl/2. Stops when ctx is canceled.
+func (s *Store) StartGC(ctx context.Context, interval time.Duration) {
+	if interval <= 0 {
+		interval = 30 * time.Minute
+	}
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				s.gc()
+			}
+		}
+	}()
+}
+
+func (s *Store) gc() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := s.now()
+	for key, value := range s.bindings {
+		if !value.expiresAt.IsZero() && now.After(value.expiresAt) {
+			delete(s.bindings, key)
+		}
+	}
+	for accountID, sessions := range s.accountSessions {
+		for id, exp := range sessions {
+			if now.After(exp) {
+				delete(sessions, id)
+			}
+		}
+		if len(sessions) == 0 {
+			delete(s.accountSessions, accountID)
+		}
+	}
+}
+
 // evictExpiredLocked opportunistically drops expired entries so the map does
 // not grow without bound. Callers must hold s.mu.
 func (s *Store) evictExpiredLocked(now time.Time) {

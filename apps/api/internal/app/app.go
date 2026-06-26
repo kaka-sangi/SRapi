@@ -449,8 +449,8 @@ func runtimeHTTPOptions(cfg config.Config, logger *slog.Logger, dbClient *platfo
 	if sessionAffinity != nil {
 		options = append(options, httpserver.WithSessionAffinityStore(sessionAffinity))
 	} else {
-		// No Redis: fall back to per-instance in-memory stickiness (best-effort).
-		options = append(options, httpserver.WithSessionAffinityStore(httpserver.NewMemorySessionAffinityStore()))
+		memAffinity := httpserver.NewMemorySessionAffinityStoreWithGC(context.Background())
+		options = append(options, httpserver.WithSessionAffinityStore(memAffinity))
 	}
 	rateLimiterOption, err := gatewayRateLimiterOption(context.Background(), cfg, logger, redisClient)
 	if err != nil {
