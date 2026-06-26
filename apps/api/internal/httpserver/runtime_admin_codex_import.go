@@ -700,6 +700,9 @@ func codexImportUpstreamClientForProvider(provider providercontract.Provider) st
 			return strings.TrimSpace(uc)
 		}
 	}
+	if strings.Contains(strings.ToLower(provider.AdapterType), "chatgpt-web") {
+		return "chatgpt_web"
+	}
 	return codexImportUpstreamClient
 }
 
