@@ -1561,13 +1561,14 @@ func gatewayShouldFailover(errorClass string, upstreamStatus int, attemptNo int,
 		return false
 	}
 	if upstreamStatus == http.StatusTooManyRequests ||
+		upstreamStatus == http.StatusPaymentRequired ||
 		upstreamStatus == http.StatusGatewayTimeout ||
 		upstreamStatus == http.StatusRequestTimeout ||
 		upstreamStatus >= http.StatusInternalServerError {
 		return true
 	}
 	switch errorClass {
-	case "rate_limit", "quota_exhausted", "timeout", "network_error", "provider_5xx", "model_unavailable", "configuration_error", "credential_error", "auth_failed", "auth_error", "permission_denied", "session_invalid", "account_locked", "account_banned", "abuse_detected", "device_unrecognized", "stream_interrupted", "empty_completion", "invalid_response":
+	case "rate_limit", "quota_exhausted", "timeout", "network_error", "provider_5xx", "model_unavailable", "configuration_error", "credential_error", "credential_invalid", "auth_failed", "auth_error", "permission_denied", "session_invalid", "account_locked", "account_banned", "abuse_detected", "device_unrecognized", "stream_interrupted", "empty_completion", "invalid_response", "account_deactivated", "validation_required":
 		return true
 	default:
 		return false

@@ -1079,6 +1079,9 @@ func rejectReason(candidate contract.Candidate, req contract.ScheduleRequest) st
 	default:
 		return "account_disabled"
 	}
+	if candidate.Account.Weight <= 0 {
+		return "weight_zero"
+	}
 	if candidate.Account.ExpiresAt != nil && !candidate.Account.ExpiresAt.IsZero() && candidate.Account.ExpiresAt.Before(time.Now().UTC()) {
 		return "account_expired"
 	}

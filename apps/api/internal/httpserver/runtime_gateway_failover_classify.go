@@ -158,6 +158,13 @@ func classifyUpstreamErrorWithHeader(statusCode int, headers http.Header, errBod
 				ShouldFailover: true,
 			}
 		}
+		if bodyClass == "account_deactivated" || bodyClass == "credential_invalid" || bodyClass == "validation_required" {
+			return UpstreamFailoverDecision{
+				Class:           "account_bad",
+				ShouldFailover:  true,
+				ShouldBlacklist: true,
+			}
+		}
 		return UpstreamFailoverDecision{
 			Class:          "client_bad",
 			ShouldFailover: false,
@@ -385,15 +392,19 @@ func classifyUpstreamErrorBody(body []byte) string {
 	msg := strings.ToLower(strings.TrimSpace(envelope.Error.Message))
 
 	switch {
-	case code == "insufficient_quota" || strings.Contains(msg, "insufficient_quota") || strings.Contains(msg, "billing_hard_limit"):
+	case code == "insufficient_quota" || strings.Contains(msg, "insufficient_quota") || strings.Contains(msg, "billing_hard_limit") || strings.Contains(msg, "credit balance"):
 		return "quota_exhausted"
 	case code == "rate_limit_exceeded" || code == "rate_limit" || strings.Contains(code, "usage_limit"):
 		return "rate_limit"
 	case code == "content_policy_violation" || strings.Contains(code, "content_policy") || strings.Contains(code, "content_moderation"):
 		return "content_policy"
-	case code == "account_deactivated" || strings.Contains(msg, "account deactivated") || strings.Contains(msg, "account has been disabled"):
+	case code == "account_deactivated" || strings.Contains(msg, "account deactivated") || strings.Contains(msg, "account has been disabled") || strings.Contains(msg, "organization has been disabled") || strings.Contains(msg, "deactivated_workspace"):
 		return "account_deactivated"
-	case typ == "overloaded_error" || strings.Contains(msg, "overloaded"):
+	case code == "token_invalidated" || code == "token_revoked":
+		return "credential_invalid"
+	case strings.Contains(msg, "identity verification") || strings.Contains(msg, "verify your account") || code == "validation_required":
+		return "validation_required"
+	case typ == "overloaded_error" || strings.Contains(msg, "overloaded") || strings.Contains(msg, "selected model is at capacity") || strings.Contains(msg, "an error occurred while processing your request"):
 		return "overloaded"
 	case strings.Contains(msg, "safety") || strings.Contains(msg, "safety_system"):
 		return "content_policy"
