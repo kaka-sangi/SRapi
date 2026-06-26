@@ -559,12 +559,22 @@ func (s *Service) chatGPTWebRequirements(ctx context.Context, req contract.Conve
 
 func (s *Service) fetchChatGPTWebRequirements(ctx context.Context, req contract.ConversationRequest, baseURL string) (chatGPTWebSentinelRequirements, error) {
 	origin := chatGPTWebOrigin(baseURL)
-	bootstrapResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
-		Account: chatGPTWebReverseProxyAccount(req),
-		Method:  http.MethodGet,
-		URL:     strings.TrimRight(origin, "/") + "/",
-		Headers: chatGPTWebBootstrapHeaders(req, origin),
-	})
+	var bootstrapResp reverseproxycontract.Response
+	var err error
+	for attempt := 0; attempt < 3; attempt++ {
+		bootstrapResp, err = s.reverseProxy.Do(ctx, reverseproxycontract.Request{
+			Account: chatGPTWebReverseProxyAccount(req),
+			Method:  http.MethodGet,
+			URL:     strings.TrimRight(origin, "/") + "/",
+			Headers: chatGPTWebBootstrapHeaders(req, origin),
+		})
+		if err == nil && bootstrapResp.StatusCode >= 200 && bootstrapResp.StatusCode < 300 && len(bootstrapResp.Body) > 1000 {
+			break
+		}
+		if ctx.Err() != nil {
+			break
+		}
+	}
 	if err != nil {
 		return chatGPTWebSentinelRequirements{}, providerErrorFromReverseProxy(err)
 	}

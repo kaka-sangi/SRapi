@@ -400,6 +400,9 @@ func (w *Worker) keepAliveEligible(account accountcontract.ProviderAccount, now 
 	if account.NeedsReauthAt != nil {
 		return false
 	}
+	if metadataBoolValue(account.Metadata, "skip_keepalive") {
+		return false
+	}
 	// Skip accounts whose token is about to expire — the normal refresh
 	// pass already picks them up, so a keepalive would be redundant.
 	if account.TokenExpiresAt != nil && !account.TokenExpiresAt.After(refreshDeadline) {
@@ -530,4 +533,18 @@ func refreshJitter(dueCount int) time.Duration {
 		return 0
 	}
 	return time.Duration(rand.Int64N(int64(2 * time.Second)))
+}
+
+func metadataBoolValue(metadata map[string]any, key string) bool {
+	if metadata == nil {
+		return false
+	}
+	switch v := metadata[key].(type) {
+	case bool:
+		return v
+	case string:
+		return v == "true" || v == "1"
+	default:
+		return false
+	}
 }

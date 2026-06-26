@@ -24,7 +24,19 @@ import (
 const (
 	chatGPTWebImagePreparePath      = "/backend-api/f/conversation/prepare"
 	chatGPTWebImageConversationPath = "/backend-api/f/conversation"
+	chatGPTWebImageDefaultModelSlug = "auto"
 )
+
+func chatGPTWebImageModelSlug(upstreamModel string) string {
+	model := strings.ToLower(strings.TrimSpace(upstreamModel))
+	if strings.HasPrefix(model, "gpt-image-") {
+		return chatGPTWebImageDefaultModelSlug
+	}
+	if model == "" || model == "auto" {
+		return "auto"
+	}
+	return upstreamModel
+}
 
 type chatGPTWebImageReference struct {
 	FileID    string
@@ -160,7 +172,7 @@ func (s *Service) chatGPTWebPrepareImageConversation(ctx context.Context, req co
 		"action":                "next",
 		"fork_from_shared_post": false,
 		"parent_message_id":     chatGPTWebStableID(chatGPTWebConversationRequestFromImage(req, nil), "image-prepare-parent"),
-		"model":                 req.Mapping.UpstreamModelName,
+		"model":                 chatGPTWebImageModelSlug(req.Mapping.UpstreamModelName),
 		"client_prepare_state":  "success",
 		"timezone_offset_min":   chatGPTWebImageIntSetting(req, chatGPTWebDefaultTimezoneOffsetMinutes, "chatgpt_timezone_offset_min", "timezone_offset_min"),
 		"timezone":              chatGPTWebImageStringSetting(req, chatGPTWebDefaultTimezone, "chatgpt_timezone", "timezone"),
@@ -238,7 +250,7 @@ func chatGPTWebImageConversationPayload(req contract.ImageGenerationRequest, ass
 		"action":                               "next",
 		"messages":                             []any{chatGPTWebImageUserMessage(req, assets)},
 		"parent_message_id":                    chatGPTWebStableID(conversationReq, "image-parent"),
-		"model":                                req.Mapping.UpstreamModelName,
+		"model":                                chatGPTWebImageModelSlug(req.Mapping.UpstreamModelName),
 		"client_prepare_state":                 "sent",
 		"timezone_offset_min":                  chatGPTWebImageIntSetting(req, chatGPTWebDefaultTimezoneOffsetMinutes, "chatgpt_timezone_offset_min", "timezone_offset_min"),
 		"timezone":                             chatGPTWebImageStringSetting(req, chatGPTWebDefaultTimezone, "chatgpt_timezone", "timezone"),
