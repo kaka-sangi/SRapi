@@ -23,7 +23,7 @@ func TestClassifyUpstreamError_StatusCodes(t *testing.T) {
 		wantFailover  bool
 		wantBlacklist bool
 	}{
-		{"401 unauthorized", 401, "account_bad", true, true},
+		{"401 unauthorized", 401, "account_bad", true, false},
 		{"403 forbidden", 403, "account_bad", true, true},
 		{"429 too many requests", 429, "transient", true, false},
 		{"408 request timeout", 408, "transient", true, false},
@@ -49,6 +49,19 @@ func TestClassifyUpstreamError_StatusCodes(t *testing.T) {
 				t.Fatalf("ShouldBlacklist = %v, want %v", got.ShouldBlacklist, tc.wantBlacklist)
 			}
 		})
+	}
+}
+
+func TestClassifyUpstreamError_401_UsesCooldownNotBlacklist(t *testing.T) {
+	got := ClassifyUpstreamError(401, nil, nil)
+	if got.ShouldBlacklist {
+		t.Fatal("401 should NOT set ShouldBlacklist; use cooldown instead")
+	}
+	if got.RetryAfterMs != authErrorCooldownMs {
+		t.Fatalf("RetryAfterMs = %d, want %d (30-min cooldown)", got.RetryAfterMs, authErrorCooldownMs)
+	}
+	if !got.ShouldFailover {
+		t.Fatal("401 should still failover to the next candidate")
 	}
 }
 

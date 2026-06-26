@@ -33,6 +33,13 @@ type UpstreamFailoverDecision struct {
 	RetryAfterMs int
 }
 
+// authErrorCooldownMs is the cooldown duration in milliseconds applied to
+// accounts that receive a 401 Unauthorized. Instead of permanently blacklisting
+// (NeedsReauth), the account is temporarily cooled down for 30 minutes so
+// transient credential issues can self-heal (token rotation, eventual
+// consistency, etc.). Matches CLIProxyAPI's 2-30 minute cooldown policy.
+const authErrorCooldownMs = 30 * 60 * 1000 // 30 minutes
+
 // upstreamFailoverTransientNetworkMarkers are case-insensitive substrings that
 // indicate a transient network-layer blip — match sub2api's
 // classifyOpenAITransportError "transient" inverse set (timeouts, EOFs, resets).
@@ -65,7 +72,8 @@ var upstreamFailoverPersistentNetworkMarkers = []string{
 //   - networkErr: the transport error returned by Do() (nil when HTTP status received).
 //
 // Decision policy (matches the user directive verbatim):
-//   - 401 / 403       -> "account_bad",  Blacklist=true,  Failover=true
+//   - 401             -> "account_bad",  Failover=true,   30-min cooldown (no blacklist)
+//   - 403             -> "account_bad",  Blacklist=true,  Failover=true
 //   - 429             -> "transient",    Failover=true,   RetryAfterMs parsed
 //   - 5xx             -> "server_bad",   Failover=true,   RetryAfterMs parsed for 503
 //   - 408 / EOF / net timeout / context.DeadlineExceeded -> "transient", Failover=true
@@ -88,7 +96,17 @@ func classifyUpstreamErrorWithHeader(statusCode int, headers http.Header, _ []by
 	}
 
 	switch {
-	case statusCode == http.StatusUnauthorized, statusCode == http.StatusForbidden:
+	case statusCode == http.StatusUnauthorized:
+		// 401 uses a time-limited cooldown (30 minutes) instead of permanent
+		// blacklisting. The account stays schedulable after the cooldown
+		// expires. Permanent NeedsReauth is only applied after 5+ consecutive
+		// auth failures (tracked by applyProviderAccountProtection).
+		return UpstreamFailoverDecision{
+			Class:          "account_bad",
+			ShouldFailover: true,
+			RetryAfterMs:   authErrorCooldownMs,
+		}
+	case statusCode == http.StatusForbidden:
 		return UpstreamFailoverDecision{
 			Class:           "account_bad",
 			ShouldFailover:  true,

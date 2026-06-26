@@ -1252,6 +1252,20 @@ func (s *Server) handleCreateAdminAccount(w http.ResponseWriter, r *http.Request
 		Data:      s.apiAccount(r.Context(), account),
 		RequestId: requestID,
 	})
+	// Async model discovery for reverse-proxy providers that support it.
+	// Runs in background so it doesn't block the create response.
+	go func() {
+		if provider.AdapterType == "" {
+			return
+		}
+		source, ok := modelDiscoverySourceForProvider(provider)
+		if !ok {
+			return
+		}
+		_ = source // just need to confirm discovery is supported
+		boolTrue := true
+		_, _ = s.runtime.discoverAccountModels(context.Background(), provider, account, apiopenapi.DiscoverAccountModelsRequest{Persist: &boolTrue})
+	}()
 }
 
 // handleBatchCreateAdminAccount bulk-creates provider accounts in one call
@@ -1389,6 +1403,26 @@ func (s *Server) handleBatchCreateAdminAccount(w http.ResponseWriter, r *http.Re
 		},
 		RequestId: requestID,
 	})
+	// Async model discovery for reverse-proxy providers that support it.
+	// Runs in background so it doesn't block the batch create response.
+	if provider.AdapterType != "" {
+		if _, ok := modelDiscoverySourceForProvider(provider); ok {
+			for _, row := range results {
+				if row.AccountID == nil || row.Error != "" {
+					continue
+				}
+				accountID := *row.AccountID
+				go func() {
+					acct, err := s.runtime.accounts.FindByID(context.Background(), accountID)
+					if err != nil {
+						return
+					}
+					boolTrue := true
+					_, _ = s.runtime.discoverAccountModels(context.Background(), provider, acct, apiopenapi.DiscoverAccountModelsRequest{Persist: &boolTrue})
+				}()
+			}
+		}
+	}
 }
 
 func (s *Server) handleExportAdminAccounts(w http.ResponseWriter, r *http.Request) {
@@ -1536,6 +1570,9 @@ func (s *Server) handleBatchActionAdminAccounts(w http.ResponseWriter, r *http.R
 	updatedIDs := make([]apiopenapi.Id, 0, len(result.Updated))
 	for _, updated := range result.Updated {
 		updatedIDs = append(updatedIDs, apiopenapi.Id(strconv.Itoa(updated.ID)))
+		// Reset the per-account circuit breaker so the scheduler immediately
+		// re-considers recovered/cleared accounts.
+		s.runtime.resetAccountBreaker(updated.ID)
 	}
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.batch_action", "provider_account", "bulk", nil, map[string]any{
 		"action":        string(body.Action),
@@ -1844,6 +1881,9 @@ func (s *Server) handleRecoverAdminAccount(w http.ResponseWriter, r *http.Reques
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to recover account", requestID)
 		return
 	}
+	// Reset the per-account circuit breaker so the scheduler immediately
+	// re-considers this account instead of waiting for the breaker to close.
+	s.runtime.resetAccountBreaker(account.ID)
 	s.runtime.recordAccountRecoverySnapshot(r.Context(), account)
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.recover", "provider_account", strconv.Itoa(account.ID), accountAuditSnapshot(before), accountAuditSnapshot(account)))
 	writeJSONAny(w, http.StatusOK, apiopenapi.ProviderAccountResponse{
@@ -1966,6 +2006,9 @@ func (s *Server) handleClearAdminAccountError(w http.ResponseWriter, r *http.Req
 		writeAccountServiceError(w, err, requestID)
 		return
 	}
+	// Reset the per-account circuit breaker so the scheduler immediately
+	// re-considers this account instead of waiting for the breaker to close.
+	s.runtime.resetAccountBreaker(account.ID)
 	s.runtime.recordAccountRecoverySnapshot(r.Context(), account)
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.clear_error", "provider_account", strconv.Itoa(account.ID), accountAuditSnapshot(before), accountAuditSnapshot(account)))
 	writeJSONAny(w, http.StatusOK, apiopenapi.ProviderAccountResponse{

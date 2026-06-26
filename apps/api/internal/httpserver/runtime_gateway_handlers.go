@@ -123,6 +123,12 @@ func (s *Server) serveChatCompletion(w http.ResponseWriter, r *http.Request, aut
 		return
 	}
 	model := modelResolution.Model
+	if redirect := gatewayImageModelRedirect(model.CanonicalName, sourceEndpoint); redirect != "" {
+		if redirectResolution, rerr := s.runtime.resolveModelCached(r.Context(), redirect); rerr == nil {
+			modelResolution = redirectResolution
+			model = redirectResolution.Model
+		}
+	}
 	if !apiKeyAllowsModelReference(authed.Key.AllowedModels, modelResolution) {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
@@ -310,6 +316,12 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	model := modelResolution.Model
+	if redirect := gatewayImageModelRedirect(model.CanonicalName, sourceEndpoint); redirect != "" {
+		if redirectResolution, rerr := s.runtime.resolveModelCached(r.Context(), redirect); rerr == nil {
+			modelResolution = redirectResolution
+			model = redirectResolution.Model
+		}
+	}
 	if !apiKeyAllowsModelReference(authed.Key.AllowedModels, modelResolution) {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
@@ -638,6 +650,12 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	model := modelResolution.Model
+	if redirect := gatewayImageModelRedirect(model.CanonicalName, sourceEndpoint); redirect != "" {
+		if redirectResolution, rerr := s.runtime.resolveModelCached(r.Context(), redirect); rerr == nil {
+			modelResolution = redirectResolution
+			model = redirectResolution.Model
+		}
+	}
 	if !apiKeyAllowsModelReference(authed.Key.AllowedModels, modelResolution) {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,

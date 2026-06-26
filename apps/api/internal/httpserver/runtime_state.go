@@ -273,6 +273,12 @@ type runtimeState struct {
 
 	modelResolutionCache *localcache.Cache[modelcontract.ModelResolution]
 
+	// authFailureCounters tracks consecutive 401-class failures per account
+	// so the gateway can escalate to NeedsReauth only after a sustained
+	// streak (default 5). Keys are account IDs, values are *int32 counters.
+	// A success or non-auth failure resets the counter.
+	authFailureCounters sync.Map
+
 	eventHub *eventsub.Hub
 
 	// usageSem bounds the number of in-flight asynchronous gateway usage / billing
@@ -1232,6 +1238,18 @@ func (rt *runtimeState) accountBreaker(accountID int) *circuitbreaker.Breaker {
 	})
 	rt.accountBreakers[accountID] = b
 	return b
+}
+
+// resetAccountBreaker removes the per-account circuit breaker so the
+// scheduler immediately re-considers this account instead of waiting for
+// the breaker to close on its own.
+func (rt *runtimeState) resetAccountBreaker(accountID int) {
+	if rt == nil {
+		return
+	}
+	rt.accountBreakersMu.Lock()
+	delete(rt.accountBreakers, accountID)
+	rt.accountBreakersMu.Unlock()
 }
 
 func runtimeMetricsFromOptions(opts runtimeOptions) *runtimeMetricsState {

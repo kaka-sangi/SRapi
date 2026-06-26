@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
@@ -1668,7 +1669,61 @@ func (rt *runtimeState) applyProviderAccountProtection(ctx context.Context, acco
 	if !gatewayAccountFailureStatusHandled(account.Metadata, &providerErr.StatusCode) {
 		return
 	}
+	// 401 auth errors use a time-limited cooldown (applied by
+	// recordGatewayCooldownForUpstreamFailure via ClassifyUpstreamError) instead
+	// of immediately flipping the account to NeedsReauth. Only escalate to
+	// permanent protection after consecutiveAuthFailureThreshold consecutive 401
+	// failures across different requests — this prevents a transient credential
+	// glitch from permanently parking the account while still catching truly
+	// revoked credentials that don't carry the session_invalid markers.
+	if providerErr.StatusCode == http.StatusUnauthorized && isAuthErrorClass(providerErr.Class) {
+		count := rt.incrementAuthFailureCounter(account.ID)
+		if count < consecutiveAuthFailureThreshold {
+			rt.logger.Info("auth failure recorded, using cooldown",
+				"account_id", account.ID,
+				"consecutive_failures", count,
+				"threshold", consecutiveAuthFailureThreshold,
+				"trace_id", traceIDFromContext(ctx),
+			)
+			return
+		}
+		rt.logger.Warn("auth failure threshold exceeded, escalating to NeedsReauth",
+			"account_id", account.ID,
+			"consecutive_failures", count,
+			"trace_id", traceIDFromContext(ctx),
+		)
+		rt.resetAuthFailureCounter(account.ID)
+		rt.protectProviderAccountForClass(ctx, account, "session_invalid")
+		return
+	}
+	// Non-auth failure resets the consecutive auth failure counter.
+	rt.resetAuthFailureCounter(account.ID)
 	rt.protectProviderAccountForClass(ctx, account, providerErr.Class)
+}
+
+// consecutiveAuthFailureThreshold is the number of consecutive 401 failures
+// an account must accumulate before being permanently parked as NeedsReauth.
+// Below this threshold, 401s apply only a time-limited cooldown (30 minutes).
+const consecutiveAuthFailureThreshold = 5
+
+// isAuthErrorClass reports whether the provider error class represents a
+// transient authentication failure (not a permanent session revocation).
+func isAuthErrorClass(class string) bool {
+	switch strings.TrimSpace(class) {
+	case "auth_failed", "auth_error", "credential_error":
+		return true
+	}
+	return false
+}
+
+func (rt *runtimeState) incrementAuthFailureCounter(accountID int) int32 {
+	val, _ := rt.authFailureCounters.LoadOrStore(accountID, new(int32))
+	counter := val.(*int32)
+	return atomic.AddInt32(counter, 1)
+}
+
+func (rt *runtimeState) resetAuthFailureCounter(accountID int) {
+	rt.authFailureCounters.Delete(accountID)
 }
 
 // logUpstreamFailoverDecision records the structured ClassifyUpstreamError

@@ -721,6 +721,7 @@ NextCandidate:
 			if err == nil {
 				breakerDone(true)
 				releaseConcurrencySlotOnce()
+				s.runtime.resetAuthFailureCounter(result.Candidate.Account.ID)
 				s.runtime.bindGatewaySessionAffinity(ctx, scheduleReq.APIKeyID, scheduleReq.SessionAffinityKey, result.Candidate.Account.ID)
 				if conversationResp, ok := any(response).(provideradaptercontract.ConversationResponse); ok {
 					s.runtime.bindGatewayPreviousResponseAffinity(ctx, scheduleReq.APIKeyID, conversationResp.ID, result.Candidate.Account.ID)
