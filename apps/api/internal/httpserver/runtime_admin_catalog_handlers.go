@@ -1600,6 +1600,17 @@ func (s *Server) handleUpdateAdminAccount(w http.ResponseWriter, r *http.Request
 		proxyID = body.ProxyId
 	}
 	if credential != nil {
+		existing, decryptErr := s.runtime.accounts.DecryptCredential(r.Context(), before.ID)
+		if decryptErr == nil && len(existing) > 0 {
+			merged := make(map[string]any, len(existing)+len(*credential))
+			for k, v := range existing {
+				merged[k] = v
+			}
+			for k, v := range *credential {
+				merged[k] = v
+			}
+			credential = &merged
+		}
 		effectiveMetadata := mergeAccountMetadata(before.Metadata, metadata)
 		refreshed, err := s.refreshImportCredential(r.Context(), runtimeClass, upstreamClient, effectiveMetadata, proxyID, *credential)
 		if err != nil {
@@ -1744,7 +1755,7 @@ func (s *Server) handleDeleteAdminAccount(w http.ResponseWriter, r *http.Request
 		}
 		return
 	}
-	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "account.delete", "account", strconv.Itoa(accountID), accountAuditSnapshot(before), nil))
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.delete", "provider_account", strconv.Itoa(accountID), accountAuditSnapshot(before), nil))
 	writeJSONAny(w, http.StatusOK, deleteResponse(true, requestID))
 }
 
