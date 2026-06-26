@@ -47,18 +47,66 @@ func ShouldRefreshOAuthCredential(account ProviderAccount, credential map[string
 	if metadataBool(account.Metadata, "force_refresh") || metadataBool(account.Metadata, "access_token_expired") {
 		return true
 	}
-	expiresAt := metadataString(credential, "expires_at")
-	if expiresAt == "" {
+	parsed, ok := ParseCredentialTime(credential, "expires_at")
+	if !ok {
 		return metadataString(credential, "access_token") == ""
-	}
-	parsed, err := time.Parse(time.RFC3339, expiresAt)
-	if err != nil {
-		return false
 	}
 	if now.IsZero() {
 		now = time.Now().UTC()
 	}
 	return now.UTC().After(parsed.Add(-30 * time.Second))
+}
+
+// ParseCredentialTime extracts a time value from a credential map, handling
+// RFC3339 strings, numeric Unix timestamps (float64/int from JSON), and
+// time.Time values.
+func ParseCredentialTime(credential map[string]any, key string) (time.Time, bool) {
+	if credential == nil {
+		return time.Time{}, false
+	}
+	raw, ok := credential[key]
+	if !ok || raw == nil {
+		return time.Time{}, false
+	}
+	switch value := raw.(type) {
+	case string:
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			return time.Time{}, false
+		}
+		if parsed, err := time.Parse(time.RFC3339, trimmed); err == nil {
+			return parsed.UTC(), true
+		}
+		if parsed, err := time.Parse(time.RFC3339Nano, trimmed); err == nil {
+			return parsed.UTC(), true
+		}
+		if parsed, err := time.Parse("2006-01-02T15:04:05", trimmed); err == nil {
+			return parsed.UTC(), true
+		}
+		if ts, err := strconv.ParseFloat(trimmed, 64); err == nil && ts > 1e9 && ts < 1e13 {
+			return time.Unix(int64(ts), 0).UTC(), true
+		}
+		return time.Time{}, false
+	case float64:
+		if value > 1e9 && value < 1e13 {
+			return time.Unix(int64(value), 0).UTC(), true
+		}
+		return time.Time{}, false
+	case int64:
+		if value > 1e9 && value < 1e13 {
+			return time.Unix(value, 0).UTC(), true
+		}
+		return time.Time{}, false
+	case int:
+		if int64(value) > 1e9 && int64(value) < 1e13 {
+			return time.Unix(int64(value), 0).UTC(), true
+		}
+		return time.Time{}, false
+	case time.Time:
+		return value.UTC(), true
+	default:
+		return time.Time{}, false
+	}
 }
 
 type GroupStatus string

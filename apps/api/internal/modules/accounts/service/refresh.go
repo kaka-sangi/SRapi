@@ -243,11 +243,13 @@ func (s *Service) applyRefreshFailure(ctx context.Context, account contract.Prov
 		class = RefreshOutcomePermanentError
 		if !withinGracePeriod && !atStillValid {
 			account.NeedsReauthAt = timePtr(now)
+			account.Status = contract.StatusNeedsReauth
 		}
 	case account.RefreshAttempts >= refreshFailureThreshold:
 		class = RefreshOutcomeThresholdExceeded
 		if !withinGracePeriod && !atStillValid {
 			account.NeedsReauthAt = timePtr(now)
+			account.Status = contract.StatusNeedsReauth
 		}
 	}
 	if _, updateErr := s.persistAccount(ctx, account); updateErr != nil {
@@ -280,29 +282,7 @@ func truncateRefreshError(message string) string {
 }
 
 func parseCredentialExpiresAt(credential map[string]any) (time.Time, bool) {
-	if credential == nil {
-		return time.Time{}, false
-	}
-	raw, ok := credential["expires_at"]
-	if !ok || raw == nil {
-		return time.Time{}, false
-	}
-	switch value := raw.(type) {
-	case string:
-		trimmed := strings.TrimSpace(value)
-		if trimmed == "" {
-			return time.Time{}, false
-		}
-		parsed, err := time.Parse(time.RFC3339, trimmed)
-		if err != nil {
-			return time.Time{}, false
-		}
-		return parsed.UTC(), true
-	case time.Time:
-		return value.UTC(), true
-	default:
-		return time.Time{}, false
-	}
+	return contract.ParseCredentialTime(credential, "expires_at")
 }
 
 func timePtr(value time.Time) *time.Time {

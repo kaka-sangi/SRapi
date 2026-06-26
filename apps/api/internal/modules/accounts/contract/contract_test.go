@@ -51,6 +51,24 @@ func TestShouldRefreshOAuthCredential(t *testing.T) {
 			credential: map[string]any{"access_token": "fresh", "expires_at": now.Add(time.Hour).Format(time.RFC3339)},
 			want:       true,
 		},
+		{
+			name:       "numeric unix timestamp expired",
+			account:    oauthAccount,
+			credential: map[string]any{"access_token": "old", "expires_at": float64(now.Add(-time.Minute).Unix())},
+			want:       true,
+		},
+		{
+			name:       "numeric unix timestamp valid",
+			account:    oauthAccount,
+			credential: map[string]any{"access_token": "fresh", "expires_at": float64(now.Add(time.Hour).Unix())},
+			want:       false,
+		},
+		{
+			name:       "numeric string unix timestamp expired",
+			account:    oauthAccount,
+			credential: map[string]any{"access_token": "old", "expires_at": "1717898400"},
+			want:       true,
+		},
 	}
 
 	for _, tt := range tests {
