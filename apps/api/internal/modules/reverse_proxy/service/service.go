@@ -1080,9 +1080,7 @@ func oauthRefreshSettings(account contract.AccountRuntime) oauthRefreshConfig {
 		if config.TokenEndpoint == "" {
 			config.TokenEndpoint = contract.CodexOAuthTokenURL
 		}
-		if config.ClientID == "" {
-			config.ClientID = contract.CodexOAuthClientID
-		}
+		config.ClientID = contract.CodexOAuthClientID
 		if config.Scope == "" {
 			config.Scope = contract.CodexOAuthRefreshScope
 		}
@@ -1090,9 +1088,7 @@ func oauthRefreshSettings(account contract.AccountRuntime) oauthRefreshConfig {
 		if config.TokenEndpoint == "" {
 			config.TokenEndpoint = contract.CodexOAuthTokenURL
 		}
-		if config.ClientID == "" {
-			config.ClientID = contract.ChatGPTWebOAuthClientID
-		}
+		config.ClientID = contract.ChatGPTWebOAuthClientID
 		if config.Scope == "" {
 			config.Scope = contract.CodexOAuthRefreshScope
 		}

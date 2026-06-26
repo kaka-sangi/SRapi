@@ -56,6 +56,7 @@ func (s *Server) handleImportAdminAccounts(w http.ResponseWriter, r *http.Reques
 			continue
 		}
 		credential := derefMap(item.Credential)
+		delete(credential, "client_id")
 		if len(credential) == 0 {
 			failed++
 			message := fmt.Sprintf("accounts[%d].credential required", idx)
