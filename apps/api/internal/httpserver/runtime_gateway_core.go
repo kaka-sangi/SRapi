@@ -772,7 +772,7 @@ func (rt *runtimeState) gatewayCandidates(ctx context.Context, modelID int, forc
 	}
 	mappings = activeModelMappings(mappings)
 	providerIDs := providerIDsForMappings(mappings)
-	accounts, err := rt.accounts.ListActiveByProviderIDs(ctx, providerIDs)
+	accounts, err := rt.candidateCache.ListActiveByProviderIDs(ctx, providerIDs)
 	if err != nil {
 		return nil, err
 	}

@@ -263,6 +263,11 @@ type runtimeState struct {
 	// accounts to the excluded list.
 	rateLimitCooldown *ratelimitcooldownservice.Service
 
+	// candidateCache coalesces concurrent ListActiveByProviderIDs reads under
+	// burst traffic so N concurrent requests for the same model share one DB
+	// roundtrip instead of N identical queries.
+	candidateCache *candidateAccountCache
+
 	// accountMetaLocks serializes read-modify-write updates to a provider
 	// account's metadata (cooldown escalation and runtime-quota snapshots) so
 	// concurrent gateway-side writes for the same account — now that the usage
@@ -1098,6 +1103,7 @@ func assembleRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOp
 		realtime:             assembly.realtimeSvc,
 		reverseProxy:         assembly.reverseProxySvc,
 		accounts:             assembly.accountsSvc,
+		candidateCache:       newCandidateAccountCache(assembly.accountsSvc),
 		adminControl:         assembly.adminControlSvc,
 		qualityEval:          assembly.qualityEvalSvc,
 		scheduler:            assembly.schedulerSvc,
