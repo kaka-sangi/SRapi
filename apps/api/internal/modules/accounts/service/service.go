@@ -1304,10 +1304,13 @@ func (s *Service) ClearErrorState(ctx context.Context, id int) (contract.Provide
 	if status == contract.StatusDead || status == contract.StatusNeedsReauth || status == contract.StatusSuspended {
 		status = contract.StatusActive
 	}
-	return s.Update(ctx, id, contract.UpdateRequest{
-		Status:   &status,
-		Metadata: &metadata,
-	})
+	account.NeedsReauthAt = nil
+	account.RefreshAttempts = 0
+	account.RefreshLastError = ""
+	account.Status = status
+	account.Metadata = metadata
+	account.UpdatedAt = s.clock.Now()
+	return s.persistAccount(ctx, account)
 }
 
 func (s *Service) RPMStatus(ctx context.Context, accountID int) (contract.RPMStatus, error) {
@@ -1481,16 +1484,22 @@ func (s *Service) Recover(ctx context.Context, id int) (contract.ProviderAccount
 		"cooldown_last_at",
 		"circuit_open",
 		"last_error_class",
+		"last_error_at",
+		"last_error_message",
+		"needs_reauth_reason",
 		"quota_exhausted",
 	} {
 		delete(metadata, key)
 	}
 	metadata["last_recovered_at"] = s.clock.Now().Format(time.RFC3339)
+	account.NeedsReauthAt = nil
+	account.RefreshAttempts = 0
+	account.RefreshLastError = ""
 	status := contract.StatusActive
-	return s.Update(ctx, id, contract.UpdateRequest{
-		Status:   &status,
-		Metadata: &metadata,
-	})
+	account.Status = status
+	account.Metadata = metadata
+	account.UpdatedAt = s.clock.Now()
+	return s.persistAccount(ctx, account)
 }
 
 func (s *Service) RecordHealthSnapshot(ctx context.Context, snapshot contract.AccountHealthSnapshot) (contract.AccountHealthSnapshot, error) {
