@@ -45,7 +45,7 @@ func (s *Server) handleAdminAccountResetQuota(w http.ResponseWriter, r *http.Req
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to reset quota state", requestID)
 		return
 	}
-	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "account.quota_reset", "account", strconv.Itoa(accountID), nil, map[string]any{
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.quota_reset", "provider_account", strconv.Itoa(accountID), nil, map[string]any{
 		"previous_status": account.Status,
 		"status":          updated.Status,
 	}))
@@ -112,7 +112,7 @@ func (s *Server) handleAdminAccountQuotaFetch(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "account.quota_fetch", "account", strconv.Itoa(accountID), nil, map[string]any{
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.quota_fetch", "provider_account", strconv.Itoa(accountID), nil, map[string]any{
 		"supported": report.Supported,
 		"source":    report.Source,
 		"plan":      report.Plan,

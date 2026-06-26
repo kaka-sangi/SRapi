@@ -268,7 +268,7 @@ func (s *Server) handleDeleteAdminProvider(w http.ResponseWriter, r *http.Reques
 	}
 	inUse := 0
 	for _, account := range accounts {
-		if account.ProviderID == providerID && account.Status != accountcontract.StatusArchived {
+		if account.ProviderID == providerID && account.Status != accountcontract.StatusArchived && account.Status != accountcontract.StatusDead {
 			inUse++
 		}
 	}
@@ -1925,7 +1925,7 @@ func (s *Server) handleRefreshAdminAccount(w http.ResponseWriter, r *http.Reques
 	if refreshErr != nil {
 		auditOutcome["error"] = refreshErr.Error()
 	}
-	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "account.refresh_token", "provider_account", strconv.Itoa(accountID), accountAuditSnapshot(before), auditOutcome))
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.refresh_token", "provider_account", strconv.Itoa(accountID), accountAuditSnapshot(before), auditOutcome))
 	if refreshErr != nil {
 		// The accounts service has already persisted the failure (incremented
 		// refresh_attempts, captured the error, flipped needs_reauth_at when
