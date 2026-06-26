@@ -279,6 +279,66 @@ func (s *Store) ListActiveByProviderIDs(_ context.Context, providerIDs []int) ([
 	return out, nil
 }
 
+func (s *Store) ListOAuthDueForRefresh(_ context.Context, deadline time.Time) ([]contract.ProviderAccount, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]contract.ProviderAccount, 0)
+	for _, account := range s.byID {
+		if account.Status != contract.StatusActive {
+			continue
+		}
+		if account.RuntimeClass != contract.RuntimeClassOauthRefresh && account.RuntimeClass != contract.RuntimeClassOauthDeviceCode {
+			continue
+		}
+		if account.NeedsReauthAt != nil {
+			continue
+		}
+		if account.TokenExpiresAt == nil {
+			continue
+		}
+		if account.TokenExpiresAt.After(deadline) {
+			continue
+		}
+		out = append(out, cloneAccount(account))
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+
+func (s *Store) ListOAuthKeepaliveCandidates(_ context.Context, staleBefore time.Time, refreshDeadline time.Time, batchSize int) ([]contract.ProviderAccount, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]contract.ProviderAccount, 0)
+	for _, account := range s.byID {
+		if account.Status != contract.StatusActive {
+			continue
+		}
+		if account.RuntimeClass != contract.RuntimeClassOauthRefresh && account.RuntimeClass != contract.RuntimeClassOauthDeviceCode {
+			continue
+		}
+		if account.NeedsReauthAt != nil {
+			continue
+		}
+		if account.TokenExpiresAt != nil && !account.TokenExpiresAt.After(refreshDeadline) {
+			continue
+		}
+		if account.LastRefreshedAt != nil {
+			if !account.LastRefreshedAt.Before(staleBefore) {
+				continue
+			}
+		} else {
+			if account.CreatedAt.IsZero() || !account.CreatedAt.Before(staleBefore) {
+				continue
+			}
+		}
+		out = append(out, cloneAccount(account))
+		if batchSize > 0 && len(out) >= batchSize {
+			break
+		}
+	}
+	return out, nil
+}
+
 func (s *Store) ListGroupIDsByAccount(_ context.Context, accountID int) ([]int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

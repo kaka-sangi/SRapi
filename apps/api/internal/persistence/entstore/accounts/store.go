@@ -352,6 +352,71 @@ func (s *Store) ListActiveByProviderIDs(ctx context.Context, providerIDs []int) 
 	return out, nil
 }
 
+func (s *Store) ListOAuthDueForRefresh(ctx context.Context, deadline time.Time) ([]contract.ProviderAccount, error) {
+	rows, err := s.client.ProviderAccount.Query().
+		Where(
+			entaccount.DeletedAtIsNil(),
+			entaccount.StatusEQ(string(contract.StatusActive)),
+			entaccount.RuntimeClassIn(
+				string(contract.RuntimeClassOauthRefresh),
+				string(contract.RuntimeClassOauthDeviceCode),
+			),
+			entaccount.NeedsReauthAtIsNil(),
+			entaccount.TokenExpiresAtNotNil(),
+			entaccount.TokenExpiresAtLTE(deadline),
+		).
+		Order(entaccount.ByTokenExpiresAt()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.ProviderAccount, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toAccount(row))
+	}
+	return out, nil
+}
+
+func (s *Store) ListOAuthKeepaliveCandidates(ctx context.Context, staleBefore time.Time, refreshDeadline time.Time, batchSize int) ([]contract.ProviderAccount, error) {
+	query := s.client.ProviderAccount.Query().
+		Where(
+			entaccount.DeletedAtIsNil(),
+			entaccount.StatusEQ(string(contract.StatusActive)),
+			entaccount.RuntimeClassIn(
+				string(contract.RuntimeClassOauthRefresh),
+				string(contract.RuntimeClassOauthDeviceCode),
+			),
+			entaccount.NeedsReauthAtIsNil(),
+			entaccount.Or(
+				entaccount.TokenExpiresAtIsNil(),
+				entaccount.TokenExpiresAtGT(refreshDeadline),
+			),
+			entaccount.Or(
+				entaccount.And(
+					entaccount.LastRefreshedAtNotNil(),
+					entaccount.LastRefreshedAtLT(staleBefore),
+				),
+				entaccount.And(
+					entaccount.LastRefreshedAtIsNil(),
+					entaccount.CreatedAtLT(staleBefore),
+				),
+			),
+		).
+		Order(entaccount.ByLastRefreshedAt())
+	if batchSize > 0 {
+		query = query.Limit(batchSize)
+	}
+	rows, err := query.All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.ProviderAccount, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toAccount(row))
+	}
+	return out, nil
+}
+
 func (s *Store) ListGroupIDsByAccount(ctx context.Context, accountID int) ([]int, error) {
 	rows, err := s.client.AccountGroupMember.Query().
 		Where(entaccountgroupmember.AccountIDEQ(accountID)).

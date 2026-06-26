@@ -967,6 +967,21 @@ type Store interface {
 	Delete(ctx context.Context, id int) error
 }
 
+// RefreshCandidateReader is an optional Store capability that pushes the
+// token-refresh worker's eligibility predicates down to SQL instead of
+// loading the entire provider_accounts table into Go memory on every pass.
+// Stores that do not implement it fall back to List + in-process filter.
+type RefreshCandidateReader interface {
+	// ListOAuthDueForRefresh returns active oauth accounts whose
+	// token_expires_at <= deadline AND needs_reauth_at IS NULL.
+	ListOAuthDueForRefresh(ctx context.Context, deadline time.Time) ([]ProviderAccount, error)
+	// ListOAuthKeepaliveCandidates returns active oauth accounts whose
+	// last_refreshed_at < staleBefore (or last_refreshed_at IS NULL and
+	// created_at < staleBefore) AND token_expires_at > refreshDeadline,
+	// limited to batchSize.
+	ListOAuthKeepaliveCandidates(ctx context.Context, staleBefore time.Time, refreshDeadline time.Time, batchSize int) ([]ProviderAccount, error)
+}
+
 // BatchSnapshotReader is an optional Store capability that resolves the latest
 // health and quota snapshots for many accounts in a constant number of
 // queries. The gateway scheduling hot path uses it to assemble candidate

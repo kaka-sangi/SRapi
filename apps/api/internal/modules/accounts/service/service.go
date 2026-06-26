@@ -599,6 +599,77 @@ func (s *Service) List(ctx context.Context) ([]contract.ProviderAccount, error) 
 	return out, nil
 }
 
+// ListOAuthDueForRefresh returns active oauth accounts whose token expires
+// within the deadline. Uses the store's RefreshCandidateReader when available;
+// falls back to List + in-process filter for stores that don't implement it.
+func (s *Service) ListOAuthDueForRefresh(ctx context.Context, deadline time.Time) ([]contract.ProviderAccount, error) {
+	if reader, ok := s.store.(contract.RefreshCandidateReader); ok {
+		return reader.ListOAuthDueForRefresh(ctx, deadline)
+	}
+	all, err := s.store.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.ProviderAccount, 0)
+	for _, a := range all {
+		if a.Status != contract.StatusActive {
+			continue
+		}
+		if a.RuntimeClass != contract.RuntimeClassOauthRefresh && a.RuntimeClass != contract.RuntimeClassOauthDeviceCode {
+			continue
+		}
+		if a.NeedsReauthAt != nil || a.TokenExpiresAt == nil {
+			continue
+		}
+		if !a.TokenExpiresAt.After(deadline) {
+			out = append(out, a)
+		}
+	}
+	return out, nil
+}
+
+// ListOAuthKeepaliveCandidates returns active oauth accounts eligible for
+// proactive keepalive refresh. Uses the store's RefreshCandidateReader when
+// available; falls back to List + in-process filter.
+func (s *Service) ListOAuthKeepaliveCandidates(ctx context.Context, staleBefore time.Time, refreshDeadline time.Time, batchSize int) ([]contract.ProviderAccount, error) {
+	if reader, ok := s.store.(contract.RefreshCandidateReader); ok {
+		return reader.ListOAuthKeepaliveCandidates(ctx, staleBefore, refreshDeadline, batchSize)
+	}
+	all, err := s.store.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.ProviderAccount, 0)
+	for _, a := range all {
+		if a.Status != contract.StatusActive {
+			continue
+		}
+		if a.RuntimeClass != contract.RuntimeClassOauthRefresh && a.RuntimeClass != contract.RuntimeClassOauthDeviceCode {
+			continue
+		}
+		if a.NeedsReauthAt != nil {
+			continue
+		}
+		if a.TokenExpiresAt != nil && !a.TokenExpiresAt.After(refreshDeadline) {
+			continue
+		}
+		if a.LastRefreshedAt != nil {
+			if !a.LastRefreshedAt.Before(staleBefore) {
+				continue
+			}
+		} else {
+			if a.CreatedAt.IsZero() || !a.CreatedAt.Before(staleBefore) {
+				continue
+			}
+		}
+		out = append(out, a)
+		if batchSize > 0 && len(out) >= batchSize {
+			break
+		}
+	}
+	return out, nil
+}
+
 // ListPage delegates the admin-list read to the store's PageReader so the
 // (filter, count, slice) trio executes against SQL instead of pulling every
 // row into Go memory. Stores that omit PageReader (mostly test doubles) get a

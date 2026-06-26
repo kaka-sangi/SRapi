@@ -287,20 +287,13 @@ func (w *Worker) refreshAndLog(ctx context.Context) {
 }
 
 func (w *Worker) refreshPass(ctx context.Context) (Result, error) {
-	accounts, err := w.accounts.List(ctx)
+	now := time.Now().UTC()
+	deadline := now.Add(w.refreshThreshold)
+	due, err := w.accounts.ListOAuthDueForRefresh(ctx, deadline)
 	if err != nil {
 		return Result{}, err
 	}
-	now := time.Now().UTC()
-	deadline := now.Add(w.refreshThreshold)
-	var due []accountcontract.ProviderAccount
-	for _, account := range accounts {
-		if !w.eligibleForRefresh(account, deadline) {
-			continue
-		}
-		due = append(due, account)
-	}
-	result := Result{Selected: len(due), Skipped: len(accounts) - len(due)}
+	result := Result{Selected: len(due)}
 	if len(due) == 0 {
 		return result, nil
 	}
@@ -441,12 +434,21 @@ func (w *Worker) RunKeepalivePass(ctx context.Context) (int, error) {
 	if w == nil {
 		return 0, nil
 	}
-	accounts, err := w.accounts.List(ctx)
+	now := time.Now().UTC()
+	staleBefore := now.Add(-defaultKeepAliveInterval)
+	refreshDeadline := now.Add(w.refreshThreshold)
+	candidates, err := w.accounts.ListOAuthKeepaliveCandidates(ctx, staleBefore, refreshDeadline, defaultKeepAliveBatch)
 	if err != nil {
 		return 0, err
 	}
-	now := time.Now().UTC()
-	candidates := w.keepAliveCandidates(accounts, now)
+	// Filter out accounts with skip_keepalive metadata (can't push this to SQL).
+	filtered := candidates[:0]
+	for _, account := range candidates {
+		if !metadataBoolValue(account.Metadata, "skip_keepalive") {
+			filtered = append(filtered, account)
+		}
+	}
+	candidates = filtered
 	if len(candidates) == 0 {
 		return 0, nil
 	}
