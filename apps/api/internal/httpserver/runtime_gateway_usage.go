@@ -590,8 +590,18 @@ func (rt *runtimeState) recordGatewayMaterializedCosts(ctx context.Context, rec 
 }
 
 func (rt *runtimeState) gatewayAccountRateMultiplier(ctx context.Context, accountID *int, apiKeyGroupIDs []int) string {
-	if rt == nil || rt.accounts == nil || accountID == nil || *accountID <= 0 {
+	if rt == nil || rt.accounts == nil {
 		return "1.00000000"
+	}
+	// Admission-time path: no account selected yet. Use the API key's group
+	// multiplier as a best-effort estimate so the balance gate uses the
+	// channel's rate rather than a flat 1.0 (which under-estimates for
+	// groups with multiplier > 1.0 and allows overdraft).
+	if accountID == nil || *accountID <= 0 {
+		if len(apiKeyGroupIDs) == 0 {
+			return "1.00000000"
+		}
+		return rt.maxGroupRateMultiplier(ctx, apiKeyGroupIDs)
 	}
 	accountGroupIDs, err := rt.accounts.ListGroupIDsByAccount(ctx, *accountID)
 	if err != nil || len(accountGroupIDs) == 0 {
@@ -639,6 +649,32 @@ func (rt *runtimeState) gatewayAccountRateMultiplier(ctx context.Context, accoun
 		return money.FormatRatFixed(rate, 8)
 	}
 	return "1.00000000"
+}
+
+// maxGroupRateMultiplier returns the highest active rate multiplier among
+// the given group IDs. Used at admission time when no account is selected
+// to conservatively estimate the cost.
+func (rt *runtimeState) maxGroupRateMultiplier(ctx context.Context, groupIDs []int) string {
+	groups, err := rt.accounts.FindGroupsByID(ctx, groupIDs)
+	if err != nil || len(groups) == 0 {
+		return "1.00000000"
+	}
+	best := "1.00000000"
+	bestRat, _ := money.DecimalRat(best)
+	for _, group := range groups {
+		if group.Status != accountcontract.GroupStatusActive {
+			continue
+		}
+		rate, ok := money.DecimalRat(group.RateMultiplier)
+		if !ok || rate.Sign() < 0 {
+			continue
+		}
+		if rate.Cmp(bestRat) > 0 {
+			bestRat = rate
+			best = money.FormatRatFixed(rate, 8)
+		}
+	}
+	return best
 }
 
 func (rt *runtimeState) warnDefaultZeroGatewayPricing(rec gatewayUsageRecord, model string, pricing gatewayPricingEvidence) {

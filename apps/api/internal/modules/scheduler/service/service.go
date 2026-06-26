@@ -1216,25 +1216,38 @@ func healthScore(candidate contract.Candidate) float64 {
 	// degrades the score progressively; at 10000ms the penalty is ~0.99.
 	if candidate.RuntimeState.LatencyP95MS != nil && *candidate.RuntimeState.LatencyP95MS > 0 {
 		latency := float64(*candidate.RuntimeState.LatencyP95MS)
-		// sigmoid: 1 / (1 + exp((latency - 5000) / 1000))
 		penalty := 1.0 / (1.0 + math.Exp((latency-5000)/1000))
 		score *= penalty
 	}
 
-	// Exponential decay on consecutive probe failures stored in account
-	// metadata by the health-probe worker.
+	// Time-decayed failure penalty: recent failures weigh more than old ones.
+	// Half-life ~4h means a failure from 8 hours ago contributes only 25% of
+	// its original penalty. Ported from CLIProxyAPI's progressive BackoffLevel
+	// decay, adapted to SRapi's probe-failure counter model.
 	if failures, ok := metacoerce.Int(candidate.Account.Metadata["consecutive_probe_failures"]); ok && failures > 0 {
-		score *= math.Exp(-float64(failures) / 3.0)
+		failureRecency := 1.0
+		if raw, ok := candidate.Account.Metadata["last_error_at"]; ok {
+			if ts, isStr := raw.(string); isStr {
+				if errTime, err := time.Parse(time.RFC3339, ts); err == nil {
+					failureRecency = math.Exp(-time.Since(errTime).Hours() / 6.0)
+				}
+			}
+		}
+		effectiveFailures := float64(failures) * failureRecency
+		score *= math.Exp(-effectiveFailures / 3.0)
 	}
 
-	// Penalize stale health data: if the last probe is older than 24 hours
-	// the score is reduced by 20%.
+	// Continuous staleness decay: fresh probes get full weight, stale probes
+	// decay exponentially with a half-life of ~8 hours. Replaces the binary
+	// 24h cutoff with a smooth curve so a 12-hour-old probe contributes more
+	// than a 23-hour-old one (instead of both getting the same 1.0 factor
+	// until the cliff at 24h).
 	if raw, exists := candidate.Account.Metadata["last_probe_at"]; exists {
 		if ts, ok := raw.(string); ok {
 			if probeTime, err := time.Parse(time.RFC3339, ts); err == nil {
-				if time.Since(probeTime) > 24*time.Hour {
-					score *= 0.80
-				}
+				staleness := time.Since(probeTime).Hours()
+				freshness := math.Exp(-staleness / 12.0)
+				score *= 0.60 + 0.40*freshness
 			}
 		}
 	}

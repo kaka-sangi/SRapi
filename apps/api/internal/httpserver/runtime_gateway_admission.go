@@ -59,10 +59,17 @@ func (rt *runtimeState) prepareGatewayAdmissionWithOptions(ctx context.Context, 
 			},
 		}, nil
 	}
-	// Admission runs before scheduling picks an account, so accountID is nil
-	// here — multiplier falls back to 1.0x. This is intentionally conservative
-	// for the balance gate; the real multiplier is applied when the per-call
-	// pricing handler runs after the upstream response (post-dispatch).
+	// Admission runs before scheduling picks an account, so accountID is nil.
+	// Resolve the API key's group IDs so the multiplier reflects the user's
+	// channel rate — without this, multiplier > 1.0 under-estimates cost and
+	// allows overdraft. The real per-account multiplier is still applied
+	// post-dispatch for billing accuracy.
+	var admissionGroupIDs []int
+	if canonical.APIKeyID > 0 {
+		if earlyKey, err := rt.apiKeyByID(ctx, canonical.UserID, canonical.APIKeyID); err == nil {
+			admissionGroupIDs = earlyKey.GroupIDs
+		}
+	}
 	pricing := rt.gatewayPricing(ctx, billingcontract.PricingRequest{
 		ModelID:      modelID,
 		ModelFamily:  optionalStringValue(resolution.Model.Family),
@@ -70,7 +77,7 @@ func (rt *runtimeState) prepareGatewayAdmissionWithOptions(ctx context.Context, 
 		InputTokens:  estimatedUsage.InputTokens,
 		OutputTokens: estimatedUsage.OutputTokens,
 		At:           time.Now().UTC(),
-	}, nil, nil, true)
+	}, nil, admissionGroupIDs, true)
 	now := time.Now().UTC()
 	periodUsage, err := rt.gatewayUserPeriodUsage(ctx, canonical.UserID, now)
 	if err != nil {
