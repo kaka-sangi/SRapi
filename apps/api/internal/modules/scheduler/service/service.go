@@ -1082,9 +1082,6 @@ func rejectReason(candidate contract.Candidate, req contract.ScheduleRequest) st
 	if candidate.Account.ExpiresAt != nil && !candidate.Account.ExpiresAt.IsZero() && candidate.Account.ExpiresAt.Before(time.Now().UTC()) {
 		return "account_expired"
 	}
-	if candidate.Account.NeedsReauthAt != nil {
-		return "needs_reauth"
-	}
 	if candidate.Mapping.Status != "active" {
 		return "model_not_supported"
 	}

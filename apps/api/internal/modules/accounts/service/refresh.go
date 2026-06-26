@@ -234,15 +234,19 @@ func (s *Service) applyRefreshFailure(ctx context.Context, account contract.Prov
 	age := now.Sub(account.CreatedAt)
 	withinGracePeriod := !account.CreatedAt.IsZero() && age >= 0 && age < newAccountGracePeriod
 
+	// Only flag needs_reauth when the access token is also expired or missing.
+	// A dead refresh_token with a still-valid access_token should NOT block
+	// scheduling — the account can still serve requests until the AT expires.
+	atStillValid := account.TokenExpiresAt != nil && account.TokenExpiresAt.After(now)
 	switch {
 	case isPermanentRefreshError(refreshErr):
 		class = RefreshOutcomePermanentError
-		if !withinGracePeriod {
+		if !withinGracePeriod && !atStillValid {
 			account.NeedsReauthAt = timePtr(now)
 		}
 	case account.RefreshAttempts >= refreshFailureThreshold:
 		class = RefreshOutcomeThresholdExceeded
-		if !withinGracePeriod {
+		if !withinGracePeriod && !atStillValid {
 			account.NeedsReauthAt = timePtr(now)
 		}
 	}
