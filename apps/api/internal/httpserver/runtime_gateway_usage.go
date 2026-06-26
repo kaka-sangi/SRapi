@@ -619,7 +619,12 @@ func (rt *runtimeState) gatewayAccountRateMultiplier(ctx context.Context, accoun
 	if err != nil || len(groups) == 0 {
 		return "1.00000000"
 	}
-	// Use the FIRST matching active group's multiplier (not the product of all).
+	// Use the FIRST matching active group's multiplier. If the account belongs
+	// to multiple groups with different multipliers (misconfiguration), warn and
+	// use the first — the operator should assign each account to one billing group.
+	if len(groups) > 1 && rt.logger != nil {
+		rt.logger.Warn("account in multiple groups with potentially different rate multipliers; using first match", "account_id", *accountID, "matching_groups", len(groups))
+	}
 	for _, group := range groups {
 		if group.Status != accountcontract.GroupStatusActive {
 			continue
