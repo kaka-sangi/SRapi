@@ -1325,6 +1325,7 @@ func (s *Server) handleBatchCreateAdminAccount(w http.ResponseWriter, r *http.Re
 		if item.Credential != nil {
 			credential = *item.Credential
 		}
+		credential, _ = s.refreshImportCredential(r.Context(), runtimeClass, defaults.UpstreamClient, defaultsMetadata, defaults.ProxyID, credential)
 		items = append(items, accountcontract.BatchAccountItem{
 			Name:       item.Name,
 			Credential: credential,

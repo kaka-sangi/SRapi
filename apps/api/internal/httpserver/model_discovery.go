@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -190,10 +191,10 @@ func modelDiscoveryRequest(source modelDiscoverySource, provider providercontrac
 func (rt *runtimeState) executeModelDiscoveryRequest(ctx context.Context, account accountcontract.ProviderAccount, credential map[string]any, req modelDiscoveryHTTPRequest) ([]byte, error) {
 	if req.ViaReverseProxy {
 		if err := rt.materializeProviderProxy(ctx, &account); err != nil {
-			return nil, errModelDiscoveryUpstream
+			return nil, fmt.Errorf("%w: proxy setup failed: %v", errModelDiscoveryUpstream, err)
 		}
 		if refreshed, ok, err := rt.refreshReverseProxyCredential(ctx, account, credential); err != nil {
-			return nil, errModelDiscoveryUpstream
+			return nil, fmt.Errorf("%w: credential refresh failed: %v", errModelDiscoveryUpstream, err)
 		} else if ok {
 			credential = refreshed
 		}
@@ -205,10 +206,14 @@ func (rt *runtimeState) executeModelDiscoveryRequest(ctx context.Context, accoun
 			Body:    req.Body,
 		})
 		if err != nil {
-			return nil, errModelDiscoveryUpstream
+			return nil, fmt.Errorf("%w: reverse proxy request failed: %v", errModelDiscoveryUpstream, err)
 		}
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			return nil, errModelDiscoveryUpstream
+			preview := string(resp.Body)
+			if len(preview) > 256 {
+				preview = preview[:256]
+			}
+			return nil, fmt.Errorf("%w: upstream returned HTTP %d: %s", errModelDiscoveryUpstream, resp.StatusCode, preview)
 		}
 		return resp.Body, nil
 	}
