@@ -40,7 +40,7 @@ import {
   getAdminAccountQuota,
   getAdminAccountRpmStatus,
   importAdminAccounts,
-  importAdminCodexSession,
+  importAdminSession,
   listAdminAccountGroups,
   listAdminAccountGroupMembers,
   listAdminAccounts,
@@ -88,9 +88,9 @@ import type {
   BatchUpdateAdminAccountCredentialsResult,
   BatchUpdateAccountsResult,
   Id,
-  CodexSessionImportResult,
+  SessionImportResult,
   ImportAdminAccountsData,
-  ImportAdminCodexSessionData,
+  ImportAdminSessionData,
   ListAdminAccountsData,
   ProviderAccount,
   ProviderAccountExportItem,
@@ -115,8 +115,8 @@ export const accountsApi = {
     return unwrapData(() => importAdminAccounts({ body, throwOnError: true }));
   },
 
-  importCodexSession(body: ImportAdminCodexSessionData["body"]): Promise<CodexSessionImportResult> {
-    return unwrapData(() => importAdminCodexSession({ body, throwOnError: true }));
+  importSession(body: ImportAdminSessionData["body"]): Promise<SessionImportResult> {
+    return unwrapData(() => importAdminSession({ body, throwOnError: true }));
   },
 
   batchUpdateAccounts(body: Parameters<typeof batchUpdateAdminAccounts>[0]["body"]): Promise<BatchUpdateAccountsResult> {

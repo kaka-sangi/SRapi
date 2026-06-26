@@ -27,16 +27,16 @@ import {
 } from "@/components/ui/select";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
-import { useImportCodexSession } from "@/hooks/admin-queries";
+import { useImportSession } from "@/hooks/admin-queries";
 import { adminErrorMessage } from "@/lib/admin-api";
-import type { CodexSessionImportResult, Id } from "@/lib/sdk-types";
+import type { SessionImportResult, Id } from "@/lib/sdk-types";
 
 /**
- * Paste a Codex/ChatGPT desktop session blob (session JSON, a raw access token,
- * or an NDJSON batch) to onboard upstream codex_cli accounts. Decodes the
- * embedded JWT server-side; the browser never sees minted tokens.
+ * Paste a session blob (session JSON, a raw access token, or an NDJSON batch)
+ * to onboard upstream accounts. Decodes the embedded JWT server-side; the
+ * browser never sees minted tokens.
  */
-function CodexSessionImportDialog({
+function SessionImportDialog({
   open,
   onOpenChange,
   providerOptions,
@@ -49,14 +49,14 @@ function CodexSessionImportDialog({
 }) {
   const { t } = useLanguage();
   const { toast } = useToast();
-  const importMut = useImportCodexSession();
+  const importMut = useImportSession();
 
   const [providerId, setProviderId] = useState<string>(defaultProviderId);
   const [content, setContent] = useState<string>("");
   const [name, setName] = useState<string>("");
   const [updateExisting, setUpdateExisting] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<CodexSessionImportResult | null>(null);
+  const [result, setResult] = useState<SessionImportResult | null>(null);
   const [fileNames, setFileNames] = useState<string[]>([]);
 
   // Each drop replaces the staged content. Appending (the original
@@ -83,11 +83,11 @@ function CodexSessionImportDialog({
   async function submit() {
     setError(null);
     if (!providerId) {
-      setError(t("codexImport.providerRequired"));
+      setError(t("sessionImport.providerRequired"));
       return;
     }
     if (!content.trim()) {
-      setError(t("codexImport.contentRequired"));
+      setError(t("sessionImport.contentRequired"));
       return;
     }
     try {
@@ -98,14 +98,14 @@ function CodexSessionImportDialog({
         update_existing: updateExisting,
       });
       setResult(data);
-      const summary = t("codexImport.doneSummary", {
+      const summary = t("sessionImport.doneSummary", {
         created: data.created,
         updated: data.updated,
         skipped: data.skipped,
         failed: data.failed,
       });
       toast({
-        title: t("codexImport.done"),
+        title: t("sessionImport.done"),
         description: summary,
         tone: data.failed > 0 ? "error" : "success",
       });
@@ -124,16 +124,16 @@ function CodexSessionImportDialog({
     >
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>{t("codexImport.title")}</DialogTitle>
-          <DialogDescription>{t("codexImport.subtitle")}</DialogDescription>
+          <DialogTitle>{t("sessionImport.title")}</DialogTitle>
+          <DialogDescription>{t("sessionImport.subtitle")}</DialogDescription>
         </DialogHeader>
 
         <div className="mt-2 space-y-4">
           <div>
-            <Label htmlFor="codex-import-provider">{t("codexImport.provider")}</Label>
+            <Label htmlFor="session-import-provider">{t("sessionImport.provider")}</Label>
             <Select value={providerId} onValueChange={setProviderId} disabled={importMut.isPending}>
-              <SelectTrigger id="codex-import-provider">
-                <SelectValue placeholder={t("codexImport.providerPlaceholder")} />
+              <SelectTrigger id="session-import-provider">
+                <SelectValue placeholder={t("sessionImport.providerPlaceholder")} />
               </SelectTrigger>
               <SelectContent>
                 {providerOptions.map((opt) => (
@@ -146,35 +146,35 @@ function CodexSessionImportDialog({
           </div>
 
           <div>
-            <Label htmlFor="codex-import-content">{t("codexImport.content")}</Label>
+            <Label htmlFor="session-import-content">{t("sessionImport.content")}</Label>
             <FileDropZone
               accept=".json,.txt,.ndjson"
               multiple
               disabled={importMut.isPending}
-              hint={t("codexImport.dropHint")}
+              hint={t("sessionImport.dropHint")}
               onFiles={(files) => void handleFiles(files)}
               fileNames={fileNames}
               onClearFiles={() => { setFileNames([]); setContent(""); }}
               className="mb-2"
             />
             <Textarea
-              id="codex-import-content"
+              id="session-import-content"
               rows={8}
               spellCheck={false}
               className="font-mono text-xs"
-              placeholder={t("codexImport.contentPlaceholder")}
+              placeholder={t("sessionImport.contentPlaceholder")}
               value={content}
               onChange={(e) => setContent(e.target.value)}
               disabled={importMut.isPending}
             />
-            <p className="mt-1 text-xs text-srapi-text-tertiary">{t("codexImport.contentHint")}</p>
+            <p className="mt-1 text-xs text-srapi-text-tertiary">{t("sessionImport.contentHint")}</p>
           </div>
 
           <div>
-            <Label htmlFor="codex-import-name">{t("codexImport.name")}</Label>
+            <Label htmlFor="session-import-name">{t("sessionImport.name")}</Label>
             <Input
-              id="codex-import-name"
-              placeholder={t("codexImport.namePlaceholder")}
+              id="session-import-name"
+              placeholder={t("sessionImport.namePlaceholder")}
               value={name}
               onChange={(e) => setName(e.target.value)}
               disabled={importMut.isPending}
@@ -183,20 +183,20 @@ function CodexSessionImportDialog({
 
           <div className="flex items-center justify-between rounded-md border border-srapi-border px-3 py-2">
             <div>
-              <Label htmlFor="codex-import-update" className="cursor-pointer">
-                {t("codexImport.updateExisting")}
+              <Label htmlFor="session-import-update" className="cursor-pointer">
+                {t("sessionImport.updateExisting")}
               </Label>
-              <p className="text-xs text-srapi-text-tertiary">{t("codexImport.updateExistingHint")}</p>
+              <p className="text-xs text-srapi-text-tertiary">{t("sessionImport.updateExistingHint")}</p>
             </div>
             <Switch
-              id="codex-import-update"
+              id="session-import-update"
               checked={updateExisting}
               onCheckedChange={setUpdateExisting}
               disabled={importMut.isPending}
             />
           </div>
 
-          {result ? <CodexImportResultPanel result={result} /> : null}
+          {result ? <SessionImportResultPanel result={result} /> : null}
 
           {error ? (
             <div role="alert" className="log-row rounded-lg" data-sev="error">
@@ -220,7 +220,7 @@ function CodexSessionImportDialog({
             loading={importMut.isPending}
             onClick={() => void submit()}
           >
-            {t("codexImport.submit")}
+            {t("sessionImport.submit")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -228,29 +228,29 @@ function CodexSessionImportDialog({
   );
 }
 
-export function CodexImportResultPanel({ result }: { result: CodexSessionImportResult }) {
+export function SessionImportResultPanel({ result }: { result: SessionImportResult }) {
   const { t } = useLanguage();
   const total = result.created + result.updated + result.skipped + result.failed;
   return (
     <div className="space-y-3 rounded-xl border border-srapi-border bg-srapi-card-muted p-3.5">
       <div className="grid grid-cols-4 gap-2 text-center">
-        <CodexStat
-          label={t("codexImport.created")}
+        <SessionStat
+          label={t("sessionImport.created")}
           value={result.created}
           tone="success"
           tier="primary"
           tooltip={{
             rows: [
-              { label: t("codexImport.updated"), value: result.updated },
-              { label: t("codexImport.skipped"), value: result.skipped },
-              { label: t("codexImport.failed"), value: result.failed },
-              { label: t("codexImport.total") ?? "Total", value: total },
+              { label: t("sessionImport.updated"), value: result.updated },
+              { label: t("sessionImport.skipped"), value: result.skipped },
+              { label: t("sessionImport.failed"), value: result.failed },
+              { label: t("sessionImport.total") ?? "Total", value: total },
             ],
           }}
         />
-        <CodexStat label={t("codexImport.updated")} value={result.updated} />
-        <CodexStat label={t("codexImport.skipped")} value={result.skipped} tier="tertiary" />
-        <CodexStat label={t("codexImport.failed")} value={result.failed} tone="error" />
+        <SessionStat label={t("sessionImport.updated")} value={result.updated} />
+        <SessionStat label={t("sessionImport.skipped")} value={result.skipped} tier="tertiary" />
+        <SessionStat label={t("sessionImport.failed")} value={result.failed} tone="error" />
       </div>
       {result.errors.length > 0 ? (
         <ul className="space-y-1.5">
@@ -291,7 +291,7 @@ export function CodexImportResultPanel({ result }: { result: CodexSessionImportR
   );
 }
 
-function CodexStat({
+function SessionStat({
   label,
   value,
   tone,

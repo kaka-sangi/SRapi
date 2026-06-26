@@ -14,10 +14,10 @@ import (
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
-// codexTestJWT builds an unsigned (signature placeholder) JWT whose payload
+// sessionImportTestJWT builds an unsigned (signature placeholder) JWT whose payload
 // carries the OpenAI auth claims the importer extracts. The handler decodes the
 // payload only and never verifies the signature.
-func codexTestJWT(t *testing.T, claims map[string]any) string {
+func sessionImportTestJWT(t *testing.T, claims map[string]any) string {
 	t.Helper()
 	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none","typ":"JWT"}`))
 	payloadJSON, err := json.Marshal(claims)
@@ -28,26 +28,26 @@ func codexTestJWT(t *testing.T, claims map[string]any) string {
 	return header + "." + payload + ".sig"
 }
 
-func mustImportCodexSession(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrfToken, body string) (apiopenapi.CodexSessionImportResponse, string) {
+func mustImportSession(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrfToken, body string) (apiopenapi.SessionImportResponse, string) {
 	t.Helper()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/import/codex-session", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/import/session", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.AddCookie(sessionCookie)
 	req.Header.Set("X-CSRF-Token", csrfToken)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("expected codex session import 200, got %d body=%s", rec.Code, rec.Body.String())
+		t.Fatalf("expected session import 200, got %d body=%s", rec.Code, rec.Body.String())
 	}
 	raw := rec.Body.String()
-	var resp apiopenapi.CodexSessionImportResponse
+	var resp apiopenapi.SessionImportResponse
 	if err := json.NewDecoder(strings.NewReader(raw)).Decode(&resp); err != nil {
-		t.Fatalf("decode codex session import response: %v", err)
+		t.Fatalf("decode session import response: %v", err)
 	}
 	return resp, raw
 }
 
-func TestAdminImportCodexSessionFromFullSessionJSON(t *testing.T) {
+func TestAdminImportSessionFromFullSessionJSON(t *testing.T) {
 	var tokenCalls int
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/oauth/token" {
@@ -58,7 +58,7 @@ func TestAdminImportCodexSessionFromFullSessionJSON(t *testing.T) {
 			t.Fatalf("parse token form: %v", err)
 		}
 		if r.PostForm.Get("refresh_token") != "session-refresh" || r.PostForm.Get("client_id") != codexOAuthClientIDForTest {
-			t.Fatalf("unexpected codex import refresh form: %v", r.PostForm)
+			t.Fatalf("unexpected session import refresh form: %v", r.PostForm)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"access_token":"minted-access","refresh_token":"session-refresh-rotated","expires_in":3600}`)
@@ -67,9 +67,9 @@ func TestAdminImportCodexSessionFromFullSessionJSON(t *testing.T) {
 
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
-	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"codex-session-import-provider","display_name":"Codex Session Import","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"session-import-provider","display_name":"Session Import","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
 
-	accessJWT := codexTestJWT(t, map[string]any{
+	accessJWT := sessionImportTestJWT(t, map[string]any{
 		"sub":   "auth0|user-123",
 		"email": "ada@example.com",
 		"exp":   time.Now().Add(time.Hour).Unix(),
@@ -97,9 +97,9 @@ func TestAdminImportCodexSessionFromFullSessionJSON(t *testing.T) {
 		t.Fatalf("escape content: %v", err)
 	}
 
-	body := `{"provider_id":"` + string(providerResp.Data.Id) + `","content":` + string(contentEscaped) + `,"name":"Ada Codex"}`
+	body := `{"provider_id":"` + string(providerResp.Data.Id) + `","content":` + string(contentEscaped) + `,"name":"Ada Session"}`
 
-	resp, raw := mustImportCodexSession(t, handler, sessionCookie, loginResp.Data.CsrfToken, body)
+	resp, raw := mustImportSession(t, handler, sessionCookie, loginResp.Data.CsrfToken, body)
 	if resp.Data.Total != 1 || resp.Data.Created != 1 || resp.Data.Updated != 0 || resp.Data.Failed != 0 || resp.Data.Skipped != 0 {
 		t.Fatalf("unexpected counts: %+v", resp.Data)
 	}
@@ -109,9 +109,9 @@ func TestAdminImportCodexSessionFromFullSessionJSON(t *testing.T) {
 		t.Fatalf("import must not mint a token eagerly when an access token is present, got %d", tokenCalls)
 	}
 	if strings.Contains(raw, "session-refresh") || strings.Contains(raw, "minted-access") || strings.Contains(raw, accessJWT) {
-		t.Fatalf("codex import response leaked credential: %s", raw)
+		t.Fatalf("session import response leaked credential: %s", raw)
 	}
-	if len(resp.Data.Items) != 1 || resp.Data.Items[0].Action != apiopenapi.CodexSessionImportItemActionCreated || resp.Data.Items[0].AccountId == nil {
+	if len(resp.Data.Items) != 1 || resp.Data.Items[0].Action != apiopenapi.SessionImportItemActionCreated || resp.Data.Items[0].AccountId == nil {
 		t.Fatalf("unexpected created item: %+v", resp.Data.Items)
 	}
 
@@ -131,7 +131,7 @@ func TestAdminImportCodexSessionFromFullSessionJSON(t *testing.T) {
 		t.Fatalf("expected account metadata")
 	}
 	metadata := *getResp.Data.Metadata
-	// Backend canonicalizes metadata at write time — Codex aliases land under
+	// Backend canonicalizes metadata at write time — aliases land under
 	// canonical keys (email / plan_type / organization_id / upstream_account_id).
 	if metadata["upstream_account_id"] != "acct-abc" || metadata["email"] != "ada@example.com" || metadata["plan_type"] != "pro" || metadata["organization_id"] != "org-default" {
 		t.Fatalf("unexpected canonical metadata: %+v", metadata)
@@ -139,18 +139,18 @@ func TestAdminImportCodexSessionFromFullSessionJSON(t *testing.T) {
 
 	// Re-importing the same identity updates the existing account (no skip).
 	tokenCalls = 0
-	resp2, _ := mustImportCodexSession(t, handler, sessionCookie, loginResp.Data.CsrfToken, body)
+	resp2, _ := mustImportSession(t, handler, sessionCookie, loginResp.Data.CsrfToken, body)
 	if resp2.Data.Updated != 1 || resp2.Data.Created != 0 {
 		t.Fatalf("expected update on re-import, got %+v", resp2.Data)
 	}
 }
 
-func TestAdminImportCodexSessionRawAccessTokenBatch(t *testing.T) {
+func TestAdminImportSessionRawAccessTokenBatch(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
-	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"codex-raw-batch-provider","display_name":"Codex Raw Batch","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"session-raw-batch-provider","display_name":"Session Raw Batch","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
 
-	jwtA := codexTestJWT(t, map[string]any{
+	jwtA := sessionImportTestJWT(t, map[string]any{
 		"email": "alice@example.com",
 		"exp":   time.Now().Add(time.Hour).Unix(),
 		"https://api.openai.com/auth": map[string]any{
@@ -158,7 +158,7 @@ func TestAdminImportCodexSessionRawAccessTokenBatch(t *testing.T) {
 			"chatgpt_user_id":    "user-A",
 		},
 	})
-	jwtB := codexTestJWT(t, map[string]any{
+	jwtB := sessionImportTestJWT(t, map[string]any{
 		"email": "bob@example.com",
 		"exp":   time.Now().Add(time.Hour).Unix(),
 		"https://api.openai.com/auth": map[string]any{
@@ -174,7 +174,7 @@ func TestAdminImportCodexSessionRawAccessTokenBatch(t *testing.T) {
 	}
 	body := `{"provider_id":"` + string(providerResp.Data.Id) + `","content":` + string(contentEscaped) + `}`
 
-	resp, raw := mustImportCodexSession(t, handler, sessionCookie, loginResp.Data.CsrfToken, body)
+	resp, raw := mustImportSession(t, handler, sessionCookie, loginResp.Data.CsrfToken, body)
 	if resp.Data.Total != 3 || resp.Data.Created != 2 || resp.Data.Skipped != 1 || resp.Data.Failed != 0 {
 		t.Fatalf("unexpected raw batch counts: %+v", resp.Data)
 	}
@@ -187,13 +187,13 @@ func TestAdminImportCodexSessionRawAccessTokenBatch(t *testing.T) {
 	}
 }
 
-func TestAdminImportCodexSessionNoRefreshTokenRequiresValidExpiry(t *testing.T) {
+func TestAdminImportSessionNoRefreshTokenRequiresValidExpiry(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
-	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"codex-no-refresh-provider","display_name":"Codex No Refresh","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"session-no-refresh-provider","display_name":"Session No Refresh","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
 
 	// Expired access token (no refresh token) must fail the item.
-	expiredJWT := codexTestJWT(t, map[string]any{
+	expiredJWT := sessionImportTestJWT(t, map[string]any{
 		"email": "stale@example.com",
 		"exp":   time.Now().Add(-time.Hour).Unix(),
 		"https://api.openai.com/auth": map[string]any{
@@ -205,7 +205,7 @@ func TestAdminImportCodexSessionNoRefreshTokenRequiresValidExpiry(t *testing.T) 
 		t.Fatalf("escape expired jwt: %v", err)
 	}
 	expiredBody := `{"provider_id":"` + string(providerResp.Data.Id) + `","content":` + string(expiredEscaped) + `}`
-	expiredResp, _ := mustImportCodexSession(t, handler, sessionCookie, loginResp.Data.CsrfToken, expiredBody)
+	expiredResp, _ := mustImportSession(t, handler, sessionCookie, loginResp.Data.CsrfToken, expiredBody)
 	if expiredResp.Data.Failed != 1 || expiredResp.Data.Created != 0 {
 		t.Fatalf("expected expired no-refresh import to fail, got %+v", expiredResp.Data)
 	}
@@ -215,7 +215,7 @@ func TestAdminImportCodexSessionNoRefreshTokenRequiresValidExpiry(t *testing.T) 
 
 	// Valid (future expiry) access token with no refresh token imports and is
 	// recorded with auto-pause-on-expiry metadata.
-	validJWT := codexTestJWT(t, map[string]any{
+	validJWT := sessionImportTestJWT(t, map[string]any{
 		"email": "fresh@example.com",
 		"exp":   time.Now().Add(time.Hour).Unix(),
 		"https://api.openai.com/auth": map[string]any{
@@ -227,7 +227,7 @@ func TestAdminImportCodexSessionNoRefreshTokenRequiresValidExpiry(t *testing.T) 
 		t.Fatalf("escape valid jwt: %v", err)
 	}
 	validBody := `{"provider_id":"` + string(providerResp.Data.Id) + `","content":` + string(validEscaped) + `}`
-	validResp, _ := mustImportCodexSession(t, handler, sessionCookie, loginResp.Data.CsrfToken, validBody)
+	validResp, _ := mustImportSession(t, handler, sessionCookie, loginResp.Data.CsrfToken, validBody)
 	if validResp.Data.Created != 1 || validResp.Data.Failed != 0 {
 		t.Fatalf("expected valid no-refresh import to succeed, got %+v", validResp.Data)
 	}
@@ -251,23 +251,23 @@ func TestAdminImportCodexSessionNoRefreshTokenRequiresValidExpiry(t *testing.T) 
 	}
 }
 
-// TestAdminImportCodexSessionEnvelopeSeedsBaseURL covers two regressions at once:
+// TestAdminImportSessionEnvelopeSeedsBaseURL covers two regressions at once:
 //  1. An exported "snapshot" envelope {exported_at, proxies, accounts:[{name,
 //     credentials:{access_token,...}}]} must unwrap into one entry per account
 //     (reading tokens from the nested `credentials` object) instead of failing
 //     as a single "missing access_token".
-//  2. Each imported account must be seeded with the codex provider/preset
+//  2. Each imported account must be seeded with the provider/preset
 //     default base_url when the session blob carries none, so it is not dead on
 //     arrival ("reverse proxy upstream base url missing").
-func TestAdminImportCodexSessionEnvelopeSeedsBaseURL(t *testing.T) {
+func TestAdminImportSessionEnvelopeSeedsBaseURL(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 	// Provider created WITHOUT a config_schema base_url (mirrors a manually
-	// created / legacy codex provider), so the seed must come from the preset.
-	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"codex-envelope-provider","display_name":"Codex Envelope","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
+	// created / legacy provider), so the seed must come from the preset.
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"session-envelope-provider","display_name":"Session Envelope","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
 
 	makeJWT := func(acct, user string) string {
-		return codexTestJWT(t, map[string]any{
+		return sessionImportTestJWT(t, map[string]any{
 			"sub":   "auth0|" + user,
 			"email": user + "@example.com",
 			"exp":   time.Now().Add(time.Hour).Unix(),
@@ -314,7 +314,7 @@ func TestAdminImportCodexSessionEnvelopeSeedsBaseURL(t *testing.T) {
 	}
 	body := `{"provider_id":"` + string(providerResp.Data.Id) + `","content":` + string(contentEscaped) + `}`
 
-	resp, raw := mustImportCodexSession(t, handler, sessionCookie, loginResp.Data.CsrfToken, body)
+	resp, raw := mustImportSession(t, handler, sessionCookie, loginResp.Data.CsrfToken, body)
 	if resp.Data.Total != 2 || resp.Data.Created != 2 || resp.Data.Failed != 0 {
 		t.Fatalf("expected envelope to import 2 accounts, got %+v (raw=%s)", resp.Data, raw)
 	}
@@ -341,14 +341,14 @@ func TestAdminImportCodexSessionEnvelopeSeedsBaseURL(t *testing.T) {
 
 // TestAdminCreateAccountSeedsProviderTemplateBaseURL covers Root-cause A: the
 // plain create path must apply the provider preset's AccountTemplate default
-// metadata (base_url) the same way quick-setup does, so a codex account created
+// metadata (base_url) the same way quick-setup does, so an account created
 // via the form/API without a base_url is not dead on arrival.
 func TestAdminCreateAccountSeedsProviderTemplateBaseURL(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
-	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"codex-template-create-provider","display_name":"Codex Template Create","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"template-create-provider","display_name":"Template Create","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
 	acctResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"tmpl-seeded","runtime_class":"cli_client_token","upstream_client":"codex_cli","credential":{"cli_client_token":"tok"},"status":"active"}`)
 	if acctResp.Data.Metadata == nil || (*acctResp.Data.Metadata)["base_url"] != "https://chatgpt.com/backend-api/codex" {
-		t.Fatalf("expected create to seed codex base_url from preset template, got %+v", acctResp.Data.Metadata)
+		t.Fatalf("expected create to seed base_url from preset template, got %+v", acctResp.Data.Metadata)
 	}
 }

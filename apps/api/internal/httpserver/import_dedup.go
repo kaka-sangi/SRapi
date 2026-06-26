@@ -57,7 +57,7 @@ func firstImportIdentityValue(metadata map[string]any, fields []string) string {
 	return ""
 }
 
-func buildCodexIdentityKeys(accountID, userID, email, accessToken string) []string {
+func buildSessionIdentityKeys(accountID, userID, email, accessToken string) []string {
 	metadata := map[string]any{
 		"upstream_account_id": strings.TrimSpace(accountID),
 		"upstream_user_id":    strings.TrimSpace(userID),

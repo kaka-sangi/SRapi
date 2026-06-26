@@ -31,8 +31,8 @@ func (s *Server) handleImportAdminAccounts(w http.ResponseWriter, r *http.Reques
 	createdIDs := make([]apiopenapi.Id, 0)
 	updatedIDs := make([]apiopenapi.Id, 0)
 	importErrors := make([]string, 0)
-	items := make([]apiopenapi.CodexSessionImportItem, 0, len(body.Accounts))
-	warnings := make([]apiopenapi.CodexSessionImportMessage, 0)
+	items := make([]apiopenapi.SessionImportItem, 0, len(body.Accounts))
+	warnings := make([]apiopenapi.SessionImportMessage, 0)
 	skipped := 0
 	failed := 0
 	seen := map[string]int{}
@@ -44,7 +44,7 @@ func (s *Server) handleImportAdminAccounts(w http.ResponseWriter, r *http.Reques
 			failed++
 			message := fmt.Sprintf("accounts[%d].provider_id invalid", idx)
 			importErrors = append(importErrors, message)
-			items = append(items, importResultItem(index, item.Name, apiopenapi.CodexSessionImportItemActionFailed, nil, message))
+			items = append(items, importResultItem(index, item.Name, apiopenapi.SessionImportItemActionFailed, nil, message))
 			continue
 		}
 		provider, err := s.runtime.providers.FindByID(r.Context(), providerID)
@@ -52,7 +52,7 @@ func (s *Server) handleImportAdminAccounts(w http.ResponseWriter, r *http.Reques
 			failed++
 			message := fmt.Sprintf("accounts[%d].provider_id not found", idx)
 			importErrors = append(importErrors, message)
-			items = append(items, importResultItem(index, item.Name, apiopenapi.CodexSessionImportItemActionFailed, nil, message))
+			items = append(items, importResultItem(index, item.Name, apiopenapi.SessionImportItemActionFailed, nil, message))
 			continue
 		}
 		credential := derefMap(item.Credential)
@@ -60,7 +60,7 @@ func (s *Server) handleImportAdminAccounts(w http.ResponseWriter, r *http.Reques
 			failed++
 			message := fmt.Sprintf("accounts[%d].credential required", idx)
 			importErrors = append(importErrors, message)
-			items = append(items, importResultItem(index, item.Name, apiopenapi.CodexSessionImportItemActionFailed, nil, message))
+			items = append(items, importResultItem(index, item.Name, apiopenapi.SessionImportItemActionFailed, nil, message))
 			continue
 		}
 		metadata := jsonObjectToMap(item.Metadata)
@@ -69,8 +69,8 @@ func (s *Server) handleImportAdminAccounts(w http.ResponseWriter, r *http.Reques
 		if dup, ok := firstSeenImportIdentity(seen, identityKeys); ok {
 			message := fmt.Sprintf("duplicate of import entry #%d; skipped", dup)
 			skipped++
-			items = append(items, importResultItem(index, item.Name, apiopenapi.CodexSessionImportItemActionSkipped, nil, message))
-			warnings = append(warnings, apiopenapi.CodexSessionImportMessage{Index: index, Name: ptrString(item.Name), Message: message})
+			items = append(items, importResultItem(index, item.Name, apiopenapi.SessionImportItemActionSkipped, nil, message))
+			warnings = append(warnings, apiopenapi.SessionImportMessage{Index: index, Name: ptrString(item.Name), Message: message})
 			continue
 		}
 		markImportIdentitySeen(seen, identityKeys, index)
@@ -80,7 +80,7 @@ func (s *Server) handleImportAdminAccounts(w http.ResponseWriter, r *http.Reques
 				failed++
 				message := fmt.Sprintf("accounts[%d] oauth refresh failed", idx)
 				importErrors = append(importErrors, message)
-				items = append(items, importResultItem(index, item.Name, apiopenapi.CodexSessionImportItemActionFailed, nil, message))
+				items = append(items, importResultItem(index, item.Name, apiopenapi.SessionImportItemActionFailed, nil, message))
 				continue
 			}
 			updated, err := s.updateImportedAccount(r.Context(), existingID, item, metadata, credential)
@@ -88,13 +88,13 @@ func (s *Server) handleImportAdminAccounts(w http.ResponseWriter, r *http.Reques
 				failed++
 				message := fmt.Sprintf("accounts[%d] update failed", idx)
 				importErrors = append(importErrors, message)
-				items = append(items, importResultItem(index, item.Name, apiopenapi.CodexSessionImportItemActionFailed, idPtr(existingID), message))
+				items = append(items, importResultItem(index, item.Name, apiopenapi.SessionImportItemActionFailed, idPtr(existingID), message))
 				continue
 			}
 			updatedID := apiopenapi.Id(strconv.Itoa(updated.ID))
 			updatedIDs = append(updatedIDs, updatedID)
 			existing.add(updated.ID, buildImportIdentityKeys(updated.ProviderID, updated.Name, updated.RuntimeClass, updated.UpstreamClient, updated.Metadata, nil))
-			items = append(items, importResultItem(index, item.Name, apiopenapi.CodexSessionImportItemActionUpdated, &updatedID, ""))
+			items = append(items, importResultItem(index, item.Name, apiopenapi.SessionImportItemActionUpdated, &updatedID, ""))
 			s.addImportedAccountGroups(r.Context(), idx, index, item, updated.ID, &importErrors, &warnings)
 			continue
 		}
@@ -103,7 +103,7 @@ func (s *Server) handleImportAdminAccounts(w http.ResponseWriter, r *http.Reques
 			failed++
 			message := fmt.Sprintf("accounts[%d] oauth refresh failed", idx)
 			importErrors = append(importErrors, message)
-			items = append(items, importResultItem(index, item.Name, apiopenapi.CodexSessionImportItemActionFailed, nil, message))
+			items = append(items, importResultItem(index, item.Name, apiopenapi.SessionImportItemActionFailed, nil, message))
 			continue
 		}
 		account, err := s.runtime.accounts.Create(r.Context(), accountcontract.CreateRequest{
@@ -123,13 +123,13 @@ func (s *Server) handleImportAdminAccounts(w http.ResponseWriter, r *http.Reques
 			failed++
 			message := fmt.Sprintf("accounts[%d] create failed", idx)
 			importErrors = append(importErrors, message)
-			items = append(items, importResultItem(index, item.Name, apiopenapi.CodexSessionImportItemActionFailed, nil, message))
+			items = append(items, importResultItem(index, item.Name, apiopenapi.SessionImportItemActionFailed, nil, message))
 			continue
 		}
 		createdID := apiopenapi.Id(strconv.Itoa(account.ID))
 		createdIDs = append(createdIDs, createdID)
 		existing.add(account.ID, identityKeys)
-		items = append(items, importResultItem(index, item.Name, apiopenapi.CodexSessionImportItemActionCreated, &createdID, ""))
+		items = append(items, importResultItem(index, item.Name, apiopenapi.SessionImportItemActionCreated, &createdID, ""))
 		s.addImportedAccountGroups(r.Context(), idx, index, item, account.ID, &importErrors, &warnings)
 	}
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.import", "provider_account", "bulk", nil, map[string]any{
@@ -175,25 +175,25 @@ func (s *Server) updateImportedAccount(ctx context.Context, accountID int, item 
 	})
 }
 
-func (s *Server) addImportedAccountGroups(ctx context.Context, idx int, index int, item apiopenapi.ProviderAccountImportItem, accountID int, importErrors *[]string, warnings *[]apiopenapi.CodexSessionImportMessage) {
+func (s *Server) addImportedAccountGroups(ctx context.Context, idx int, index int, item apiopenapi.ProviderAccountImportItem, accountID int, importErrors *[]string, warnings *[]apiopenapi.SessionImportMessage) {
 	groupIDs, err := apiIDsToInts(item.GroupIds)
 	if err != nil {
 		message := fmt.Sprintf("accounts[%d].group_ids invalid", idx)
 		*importErrors = append(*importErrors, message)
-		*warnings = append(*warnings, apiopenapi.CodexSessionImportMessage{Index: index, Name: ptrString(item.Name), Message: message})
+		*warnings = append(*warnings, apiopenapi.SessionImportMessage{Index: index, Name: ptrString(item.Name), Message: message})
 		return
 	}
 	for _, groupID := range groupIDs {
 		if _, err := s.runtime.accounts.AddAccountToGroup(ctx, accountID, groupID); err != nil {
 			message := fmt.Sprintf("accounts[%d].group_ids[%d] add failed", idx, groupID)
 			*importErrors = append(*importErrors, message)
-			*warnings = append(*warnings, apiopenapi.CodexSessionImportMessage{Index: index, Name: ptrString(item.Name), Message: message})
+			*warnings = append(*warnings, apiopenapi.SessionImportMessage{Index: index, Name: ptrString(item.Name), Message: message})
 		}
 	}
 }
 
-func importResultItem(index int, name string, action apiopenapi.CodexSessionImportItemAction, accountID *apiopenapi.Id, message string) apiopenapi.CodexSessionImportItem {
-	item := apiopenapi.CodexSessionImportItem{Index: index, Action: action, AccountId: accountID}
+func importResultItem(index int, name string, action apiopenapi.SessionImportItemAction, accountID *apiopenapi.Id, message string) apiopenapi.SessionImportItem {
+	item := apiopenapi.SessionImportItem{Index: index, Action: action, AccountId: accountID}
 	if strings.TrimSpace(name) != "" {
 		item.Name = ptrString(name)
 	}

@@ -992,30 +992,6 @@ func (e ChatMessageRole) Valid() bool {
 	}
 }
 
-// Defines values for CodexSessionImportItemAction.
-const (
-	CodexSessionImportItemActionCreated CodexSessionImportItemAction = "created"
-	CodexSessionImportItemActionFailed  CodexSessionImportItemAction = "failed"
-	CodexSessionImportItemActionSkipped CodexSessionImportItemAction = "skipped"
-	CodexSessionImportItemActionUpdated CodexSessionImportItemAction = "updated"
-)
-
-// Valid indicates whether the value is a known member of the CodexSessionImportItemAction enum.
-func (e CodexSessionImportItemAction) Valid() bool {
-	switch e {
-	case CodexSessionImportItemActionCreated:
-		return true
-	case CodexSessionImportItemActionFailed:
-		return true
-	case CodexSessionImportItemActionSkipped:
-		return true
-	case CodexSessionImportItemActionUpdated:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for ContentBlockType.
 const (
 	ContentBlockTypeImageUrl   ContentBlockType = "image_url"
@@ -3701,6 +3677,30 @@ func (e SchedulerStrategyStatus) Valid() bool {
 	case SchedulerStrategyStatusDeprecated:
 		return true
 	case SchedulerStrategyStatusDraft:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SessionImportItemAction.
+const (
+	SessionImportItemActionCreated SessionImportItemAction = "created"
+	SessionImportItemActionFailed  SessionImportItemAction = "failed"
+	SessionImportItemActionSkipped SessionImportItemAction = "skipped"
+	SessionImportItemActionUpdated SessionImportItemAction = "updated"
+)
+
+// Valid indicates whether the value is a known member of the SessionImportItemAction enum.
+func (e SessionImportItemAction) Valid() bool {
+	switch e {
+	case SessionImportItemActionCreated:
+		return true
+	case SessionImportItemActionFailed:
+		return true
+	case SessionImportItemActionSkipped:
+		return true
+	case SessionImportItemActionUpdated:
 		return true
 	default:
 		return false
@@ -7262,61 +7262,6 @@ type CodexClientModel struct {
 // CodexClientModelList defines model for CodexClientModelList.
 type CodexClientModelList struct {
 	Models []CodexClientModel `json:"models"`
-}
-
-// CodexSessionImportItem defines model for CodexSessionImportItem.
-type CodexSessionImportItem struct {
-	AccountId *Id                          `json:"account_id,omitempty"`
-	Action    CodexSessionImportItemAction `json:"action"`
-	Index     int                          `json:"index"`
-	Message   *string                      `json:"message,omitempty"`
-	Name      *string                      `json:"name,omitempty"`
-}
-
-// CodexSessionImportItemAction defines model for CodexSessionImportItem.Action.
-type CodexSessionImportItemAction string
-
-// CodexSessionImportMessage defines model for CodexSessionImportMessage.
-type CodexSessionImportMessage struct {
-	Index   int     `json:"index"`
-	Message string  `json:"message"`
-	Name    *string `json:"name,omitempty"`
-}
-
-// CodexSessionImportRequest defines model for CodexSessionImportRequest.
-type CodexSessionImportRequest struct {
-	// Content Raw session payload. Accepts a Codex/ChatGPT session JSON object, a single raw access token, a JSON array of either, or newline-delimited (NDJSON) entries mixing the above.
-	Content  string `json:"content"`
-	GroupIds *[]Id  `json:"group_ids,omitempty"`
-
-	// Name Optional base account name. When multiple sessions are imported a "#N" suffix is appended; when omitted the email/account id from the session is used.
-	Name       *string `json:"name,omitempty"`
-	ProviderId Id      `json:"provider_id"`
-
-	// ProxyId Registered active proxy definition id to bind to imported accounts. Raw proxy URLs are rejected; create and enable a proxy definition first.
-	ProxyId *string                `json:"proxy_id,omitempty"`
-	Status  *ProviderAccountStatus `json:"status,omitempty"`
-
-	// UpdateExisting When an account with a matching identity already exists, update its credential instead of skipping. Defaults to true.
-	UpdateExisting *bool `json:"update_existing,omitempty"`
-}
-
-// CodexSessionImportResponse defines model for CodexSessionImportResponse.
-type CodexSessionImportResponse struct {
-	Data      CodexSessionImportResult `json:"data"`
-	RequestId RequestId                `json:"request_id"`
-}
-
-// CodexSessionImportResult defines model for CodexSessionImportResult.
-type CodexSessionImportResult struct {
-	Created  int                         `json:"created"`
-	Errors   []CodexSessionImportMessage `json:"errors"`
-	Failed   int                         `json:"failed"`
-	Items    []CodexSessionImportItem    `json:"items"`
-	Skipped  int                         `json:"skipped"`
-	Total    int                         `json:"total"`
-	Updated  int                         `json:"updated"`
-	Warnings []CodexSessionImportMessage `json:"warnings"`
 }
 
 // CompleteSetupRequest defines model for CompleteSetupRequest.
@@ -10929,16 +10874,16 @@ type ProviderAccountImportResponse struct {
 
 // ProviderAccountImportResult defines model for ProviderAccountImportResult.
 type ProviderAccountImportResult struct {
-	CreatedCount int                         `json:"created_count"`
-	CreatedIds   []Id                        `json:"created_ids"`
-	Errors       []string                    `json:"errors"`
-	FailedCount  int                         `json:"failed_count"`
-	Items        []CodexSessionImportItem    `json:"items"`
-	SkippedCount int                         `json:"skipped_count"`
-	TotalCount   int                         `json:"total_count"`
-	UpdatedCount int                         `json:"updated_count"`
-	UpdatedIds   []Id                        `json:"updated_ids"`
-	Warnings     []CodexSessionImportMessage `json:"warnings"`
+	CreatedCount int                    `json:"created_count"`
+	CreatedIds   []Id                   `json:"created_ids"`
+	Errors       []string               `json:"errors"`
+	FailedCount  int                    `json:"failed_count"`
+	Items        []SessionImportItem    `json:"items"`
+	SkippedCount int                    `json:"skipped_count"`
+	TotalCount   int                    `json:"total_count"`
+	UpdatedCount int                    `json:"updated_count"`
+	UpdatedIds   []Id                   `json:"updated_ids"`
+	Warnings     []SessionImportMessage `json:"warnings"`
 }
 
 // ProviderAccountListResponse defines model for ProviderAccountListResponse.
@@ -12130,6 +12075,61 @@ type SessionData struct {
 	CsrfToken string    `json:"csrf_token"`
 	ExpiresAt Timestamp `json:"expires_at"`
 	User      User      `json:"user"`
+}
+
+// SessionImportItem defines model for SessionImportItem.
+type SessionImportItem struct {
+	AccountId *Id                     `json:"account_id,omitempty"`
+	Action    SessionImportItemAction `json:"action"`
+	Index     int                     `json:"index"`
+	Message   *string                 `json:"message,omitempty"`
+	Name      *string                 `json:"name,omitempty"`
+}
+
+// SessionImportItemAction defines model for SessionImportItem.Action.
+type SessionImportItemAction string
+
+// SessionImportMessage defines model for SessionImportMessage.
+type SessionImportMessage struct {
+	Index   int     `json:"index"`
+	Message string  `json:"message"`
+	Name    *string `json:"name,omitempty"`
+}
+
+// SessionImportRequest defines model for SessionImportRequest.
+type SessionImportRequest struct {
+	// Content Raw session payload. Accepts a session JSON object (ChatGPT Web, Codex CLI, Claude Code, Antigravity, etc.), a single raw access token, a JSON array of either, or newline-delimited (NDJSON) entries mixing the above.
+	Content  string `json:"content"`
+	GroupIds *[]Id  `json:"group_ids,omitempty"`
+
+	// Name Optional base account name. When multiple sessions are imported a "#N" suffix is appended; when omitted the email/account id from the session is used.
+	Name       *string `json:"name,omitempty"`
+	ProviderId Id      `json:"provider_id"`
+
+	// ProxyId Registered active proxy definition id to bind to imported accounts. Raw proxy URLs are rejected; create and enable a proxy definition first.
+	ProxyId *string                `json:"proxy_id,omitempty"`
+	Status  *ProviderAccountStatus `json:"status,omitempty"`
+
+	// UpdateExisting When an account with a matching identity already exists, update its credential instead of skipping. Defaults to true.
+	UpdateExisting *bool `json:"update_existing,omitempty"`
+}
+
+// SessionImportResponse defines model for SessionImportResponse.
+type SessionImportResponse struct {
+	Data      SessionImportResult `json:"data"`
+	RequestId RequestId           `json:"request_id"`
+}
+
+// SessionImportResult defines model for SessionImportResult.
+type SessionImportResult struct {
+	Created  int                    `json:"created"`
+	Errors   []SessionImportMessage `json:"errors"`
+	Failed   int                    `json:"failed"`
+	Items    []SessionImportItem    `json:"items"`
+	Skipped  int                    `json:"skipped"`
+	Total    int                    `json:"total"`
+	Updated  int                    `json:"updated"`
+	Warnings []SessionImportMessage `json:"warnings"`
 }
 
 // SetUserAttributeValueRequest defines model for SetUserAttributeValueRequest.
@@ -14645,8 +14645,8 @@ type BulkUpdateAdminAccountsJSONRequestBody = BulkUpdateProviderAccountsRequest
 // ImportAdminAccountsJSONRequestBody defines body for ImportAdminAccounts for application/json ContentType.
 type ImportAdminAccountsJSONRequestBody = ProviderAccountImportRequest
 
-// ImportAdminCodexSessionJSONRequestBody defines body for ImportAdminCodexSession for application/json ContentType.
-type ImportAdminCodexSessionJSONRequestBody = CodexSessionImportRequest
+// ImportAdminSessionJSONRequestBody defines body for ImportAdminSession for application/json ContentType.
+type ImportAdminSessionJSONRequestBody = SessionImportRequest
 
 // StartAdminAccountOAuthAuthorizeUrlJSONRequestBody defines body for StartAdminAccountOAuthAuthorizeUrl for application/json ContentType.
 type StartAdminAccountOAuthAuthorizeUrlJSONRequestBody = AccountOAuthAuthorizeUrlRequest
@@ -23213,9 +23213,9 @@ type ServerInterface interface {
 	// Import provider account metadata and write-only credentials.
 	// (POST /api/v1/admin/accounts/import)
 	ImportAdminAccounts(w http.ResponseWriter, r *http.Request)
-	// Import Codex/ChatGPT desktop session blobs as upstream accounts.
-	// (POST /api/v1/admin/accounts/import/codex-session)
-	ImportAdminCodexSession(w http.ResponseWriter, r *http.Request)
+	// Import desktop session blobs as upstream accounts.
+	// (POST /api/v1/admin/accounts/import/session)
+	ImportAdminSession(w http.ResponseWriter, r *http.Request)
 	// Begin an interactive OAuth authorization-code provisioning flow.
 	// (POST /api/v1/admin/accounts/oauth/authorize-url)
 	StartAdminAccountOAuthAuthorizeUrl(w http.ResponseWriter, r *http.Request)
@@ -26015,8 +26015,8 @@ func (siw *ServerInterfaceWrapper) ImportAdminAccounts(w http.ResponseWriter, r 
 	handler.ServeHTTP(w, r)
 }
 
-// ImportAdminCodexSession operation middleware
-func (siw *ServerInterfaceWrapper) ImportAdminCodexSession(w http.ResponseWriter, r *http.Request) {
+// ImportAdminSession operation middleware
+func (siw *ServerInterfaceWrapper) ImportAdminSession(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
@@ -26027,7 +26027,7 @@ func (siw *ServerInterfaceWrapper) ImportAdminCodexSession(w http.ResponseWriter
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ImportAdminCodexSession(w, r)
+		siw.Handler.ImportAdminSession(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -40987,7 +40987,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/export", wrapper.ExportAdminAccounts)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/health-summary", wrapper.GetAdminAccountsHealthSummary)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/import", wrapper.ImportAdminAccounts)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/import/codex-session", wrapper.ImportAdminCodexSession)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/import/session", wrapper.ImportAdminSession)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/oauth/authorize-url", wrapper.StartAdminAccountOAuthAuthorizeUrl)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/oauth/device-code/poll", wrapper.PollAdminAccountOAuthDeviceCode)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/oauth/device-code/start", wrapper.StartAdminAccountOAuthDeviceCode)

@@ -33,7 +33,7 @@ func TestAdminAccountImportChatGPTWebEnrichesIdentityFromIDToken(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	idToken := codexTestJWT(t, map[string]any{
+	idToken := sessionImportTestJWT(t, map[string]any{
 		"email": "import-chatgpt@example.test",
 		"https://api.openai.com/auth": map[string]any{
 			"chatgpt_account_id":                "chatgpt-import-account",

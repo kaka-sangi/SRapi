@@ -269,10 +269,10 @@ export function useImportAccounts() {
     queryKeys.admin.gatewayResources(),
   );
 }
-/** Import Codex/ChatGPT desktop session blobs as upstream codex_cli accounts. */
-export function useImportCodexSession() {
+/** Import session blobs as upstream accounts. */
+export function useImportSession() {
   return useAdminMutation(
-    (body: P<typeof adminApi.importCodexSession>) => adminApi.importCodexSession(body),
+    (body: P<typeof adminApi.importSession>) => adminApi.importSession(body),
     ["admin", "accounts"],
     queryKeys.admin.gatewayResources(),
   );

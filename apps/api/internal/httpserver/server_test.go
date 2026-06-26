@@ -11104,7 +11104,7 @@ func TestGatewayChatGPTWebRefreshTokenOnlyCreateCanRequestConversation(t *testin
 	var tokenForm url.Values
 	var conversationAuthorization string
 	var conversationAccountID string
-	idToken := codexTestJWT(t, map[string]any{
+	idToken := sessionImportTestJWT(t, map[string]any{
 		"email": "chatgpt-create@example.test",
 		"https://api.openai.com/auth": map[string]any{
 			"chatgpt_account_id": "chatgpt-created-account",

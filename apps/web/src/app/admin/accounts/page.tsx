@@ -1762,7 +1762,7 @@ function AccountsContent() {
         open={importOpen}
         onOpenChange={setImportOpen}
         providerOptions={providerOptions}
-        codexProviderOptions={providerOptions
+        sessionProviderOptions={providerOptions
           .filter((o) => o.adapterType === "reverse-proxy-codex-cli")
           .map((o) => ({ value: o.value, label: o.label }))}
         defaultProviderId={providers.data?.data?.[0]?.id ?? ""}

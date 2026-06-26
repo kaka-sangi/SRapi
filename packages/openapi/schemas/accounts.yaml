@@ -1414,12 +1414,12 @@ ProviderAccountImportResult:
     items:
       type: array
       items:
-        $ref: "#/CodexSessionImportItem"
+        $ref: "#/SessionImportItem"
       default: []
     warnings:
       type: array
       items:
-        $ref: "#/CodexSessionImportMessage"
+        $ref: "#/SessionImportMessage"
       default: []
     errors:
       type: array
@@ -1437,7 +1437,7 @@ ProviderAccountImportResponse:
     request_id:
       $ref: "common.yaml#/RequestId"
 
-CodexSessionImportRequest:
+SessionImportRequest:
   type: object
   required:
     - provider_id
@@ -1449,9 +1449,10 @@ CodexSessionImportRequest:
       type: string
       minLength: 1
       description: >-
-        Raw session payload. Accepts a Codex/ChatGPT session JSON object, a
-        single raw access token, a JSON array of either, or newline-delimited
-        (NDJSON) entries mixing the above.
+        Raw session payload. Accepts a session JSON object (ChatGPT Web,
+        Codex CLI, Claude Code, Antigravity, etc.), a single raw access
+        token, a JSON array of either, or newline-delimited (NDJSON)
+        entries mixing the above.
     name:
       type: string
       nullable: true
@@ -1477,7 +1478,7 @@ CodexSessionImportRequest:
     status:
       $ref: "#/ProviderAccountStatus"
 
-CodexSessionImportItem:
+SessionImportItem:
   type: object
   required:
     - index
@@ -1500,7 +1501,7 @@ CodexSessionImportItem:
     message:
       type: string
 
-CodexSessionImportMessage:
+SessionImportMessage:
   type: object
   required:
     - index
@@ -1514,7 +1515,7 @@ CodexSessionImportMessage:
     message:
       type: string
 
-CodexSessionImportResult:
+SessionImportResult:
   type: object
   required:
     - total
@@ -1544,24 +1545,24 @@ CodexSessionImportResult:
     items:
       type: array
       items:
-        $ref: "#/CodexSessionImportItem"
+        $ref: "#/SessionImportItem"
     warnings:
       type: array
       items:
-        $ref: "#/CodexSessionImportMessage"
+        $ref: "#/SessionImportMessage"
     errors:
       type: array
       items:
-        $ref: "#/CodexSessionImportMessage"
+        $ref: "#/SessionImportMessage"
 
-CodexSessionImportResponse:
+SessionImportResponse:
   type: object
   required:
     - data
     - request_id
   properties:
     data:
-      $ref: "#/CodexSessionImportResult"
+      $ref: "#/SessionImportResult"
     request_id:
       $ref: "common.yaml#/RequestId"
 

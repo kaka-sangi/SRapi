@@ -132,5 +132,5 @@ export type {
   UsageModelShare,
   UsageTrendPoint,
   UsageCacheMetrics,
-  CodexSessionImportResult,
+  SessionImportResult,
 } from "../../../../packages/sdk/typescript/src/types.gen";

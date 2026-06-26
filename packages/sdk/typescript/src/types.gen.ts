@@ -2759,8 +2759,8 @@ export type ProviderAccountImportResult = {
     total_count: number;
     created_ids: Array<Id>;
     updated_ids: Array<Id>;
-    items: Array<CodexSessionImportItem>;
-    warnings: Array<CodexSessionImportMessage>;
+    items: Array<SessionImportItem>;
+    warnings: Array<SessionImportMessage>;
     errors: Array<string>;
 };
 
@@ -2769,10 +2769,10 @@ export type ProviderAccountImportResponse = {
     request_id: RequestId;
 };
 
-export type CodexSessionImportRequest = {
+export type SessionImportRequest = {
     provider_id: Id;
     /**
-     * Raw session payload. Accepts a Codex/ChatGPT session JSON object, a single raw access token, a JSON array of either, or newline-delimited (NDJSON) entries mixing the above.
+     * Raw session payload. Accepts a session JSON object (ChatGPT Web, Codex CLI, Claude Code, Antigravity, etc.), a single raw access token, a JSON array of either, or newline-delimited (NDJSON) entries mixing the above.
      */
     content: string;
     /**
@@ -2791,7 +2791,7 @@ export type CodexSessionImportRequest = {
     status?: ProviderAccountStatus;
 };
 
-export type CodexSessionImportItem = {
+export type SessionImportItem = {
     index: number;
     name?: string;
     action: 'created' | 'updated' | 'skipped' | 'failed';
@@ -2799,25 +2799,25 @@ export type CodexSessionImportItem = {
     message?: string;
 };
 
-export type CodexSessionImportMessage = {
+export type SessionImportMessage = {
     index: number;
     name?: string;
     message: string;
 };
 
-export type CodexSessionImportResult = {
+export type SessionImportResult = {
     total: number;
     created: number;
     updated: number;
     skipped: number;
     failed: number;
-    items: Array<CodexSessionImportItem>;
-    warnings: Array<CodexSessionImportMessage>;
-    errors: Array<CodexSessionImportMessage>;
+    items: Array<SessionImportItem>;
+    warnings: Array<SessionImportMessage>;
+    errors: Array<SessionImportMessage>;
 };
 
-export type CodexSessionImportResponse = {
-    data: CodexSessionImportResult;
+export type SessionImportResponse = {
+    data: SessionImportResult;
     request_id: RequestId;
 };
 
@@ -13998,14 +13998,14 @@ export type GetAdminAccountOAuthPendingResponses = {
 
 export type GetAdminAccountOAuthPendingResponse = GetAdminAccountOAuthPendingResponses[keyof GetAdminAccountOAuthPendingResponses];
 
-export type ImportAdminCodexSessionData = {
-    body: CodexSessionImportRequest;
+export type ImportAdminSessionData = {
+    body: SessionImportRequest;
     path?: never;
     query?: never;
-    url: '/api/v1/admin/accounts/import/codex-session';
+    url: '/api/v1/admin/accounts/import/session';
 };
 
-export type ImportAdminCodexSessionErrors = {
+export type ImportAdminSessionErrors = {
     /**
      * Request validation failed.
      */
@@ -14024,16 +14024,16 @@ export type ImportAdminCodexSessionErrors = {
     default: ErrorResponse;
 };
 
-export type ImportAdminCodexSessionError = ImportAdminCodexSessionErrors[keyof ImportAdminCodexSessionErrors];
+export type ImportAdminSessionError = ImportAdminSessionErrors[keyof ImportAdminSessionErrors];
 
-export type ImportAdminCodexSessionResponses = {
+export type ImportAdminSessionResponses = {
     /**
-     * Codex session import result.
+     * Session import result.
      */
-    200: CodexSessionImportResponse;
+    200: SessionImportResponse;
 };
 
-export type ImportAdminCodexSessionResponse = ImportAdminCodexSessionResponses[keyof ImportAdminCodexSessionResponses];
+export type ImportAdminSessionResponse = ImportAdminSessionResponses[keyof ImportAdminSessionResponses];
 
 export type BatchDeleteAdminAccountsData = {
     body: BatchDeleteProviderAccountsRequest;

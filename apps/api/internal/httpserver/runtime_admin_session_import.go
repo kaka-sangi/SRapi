@@ -18,22 +18,22 @@ import (
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
-// codexImportClockSkew tolerates minor clock drift when validating token expiry.
-const codexImportClockSkew = 120 * time.Second
+// sessionImportClockSkew tolerates minor clock drift when validating token expiry.
+const sessionImportClockSkew = 120 * time.Second
 
-// codexImportUpstreamClient is the upstream client tag that selects the codex_cli
+// sessionImportDefaultUpstreamClient is the upstream client tag that selects the codex_cli
 // reverse-proxy runtime + the refresh-token-only credential path.
-const codexImportUpstreamClient = "codex_cli"
+const sessionImportDefaultUpstreamClient = "codex_cli"
 
-// codexImportEntry is one parsed session blob with its 1-based position.
-type codexImportEntry struct {
+// sessionImportEntry is one parsed session blob with its 1-based position.
+type sessionImportEntry struct {
 	index int
 	value any
 }
 
-// codexImportAccount is the normalized identity + credential extracted from a
-// single session blob, ready to become a codex_cli account.
-type codexImportAccount struct {
+// sessionImportAccount is the normalized identity + credential extracted from a
+// single session blob, ready to become an upstream account.
+type sessionImportAccount struct {
 	name           string
 	accessToken    string
 	refreshToken   string
@@ -50,29 +50,29 @@ type codexImportAccount struct {
 	warnings       []string
 }
 
-// codexJWTClaims captures the subset of the access/id-token JWT payload we read.
-type codexJWTClaims struct {
-	Sub        string             `json:"sub"`
-	Email      string             `json:"email"`
-	Exp        int64              `json:"exp"`
-	OpenAIAuth *codexJWTAuthClaim `json:"https://api.openai.com/auth,omitempty"`
+// sessionImportJWTClaims captures the subset of the access/id-token JWT payload we read.
+type sessionImportJWTClaims struct {
+	Sub        string                      `json:"sub"`
+	Email      string                      `json:"email"`
+	Exp        int64                       `json:"exp"`
+	OpenAIAuth *sessionImportJWTAuthClaim  `json:"https://api.openai.com/auth,omitempty"`
 }
 
-type codexJWTAuthClaim struct {
-	ChatGPTAccountID string                 `json:"chatgpt_account_id"`
-	ChatGPTUserID    string                 `json:"chatgpt_user_id"`
-	ChatGPTPlanType  string                 `json:"chatgpt_plan_type"`
-	UserID           string                 `json:"user_id"`
-	POID             string                 `json:"poid"`
-	Organizations    []codexJWTOrganization `json:"organizations"`
+type sessionImportJWTAuthClaim struct {
+	ChatGPTAccountID string                        `json:"chatgpt_account_id"`
+	ChatGPTUserID    string                        `json:"chatgpt_user_id"`
+	ChatGPTPlanType  string                        `json:"chatgpt_plan_type"`
+	UserID           string                        `json:"user_id"`
+	POID             string                        `json:"poid"`
+	Organizations    []sessionImportJWTOrganization `json:"organizations"`
 }
 
-type codexJWTOrganization struct {
+type sessionImportJWTOrganization struct {
 	ID        string `json:"id"`
 	IsDefault bool   `json:"is_default"`
 }
 
-func (s *Server) handleImportAdminCodexSession(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleImportAdminSession(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	session, err := s.requireAdminSession(r)
 	if err != nil {
@@ -83,9 +83,9 @@ func (s *Server) handleImportAdminCodexSession(w http.ResponseWriter, r *http.Re
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
 		return
 	}
-	var body apiopenapi.CodexSessionImportRequest
+	var body apiopenapi.SessionImportRequest
 	if err := s.decodeJSONBody(w, r, &body); err != nil {
-		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid codex session import request", requestID)
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid session import request", requestID)
 		return
 	}
 	providerID, err := strconv.Atoi(string(body.ProviderId))
@@ -98,20 +98,20 @@ func (s *Server) handleImportAdminCodexSession(w http.ResponseWriter, r *http.Re
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "provider_id not found", requestID)
 		return
 	}
-	entries, err := parseCodexSessionImportEntries(body.Content)
+	entries, err := parseSessionImportEntries(body.Content)
 	if err != nil {
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, err.Error(), requestID)
 		return
 	}
 	if len(entries) == 0 {
-		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "no access token or codex session content found", requestID)
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "no access token or session content found", requestID)
 		return
 	}
 
-	upstreamClient := codexImportUpstreamClientForProvider(provider)
-	result := s.importCodexSessions(r.Context(), providerID, codexImportDefaultBaseURL(provider), upstreamClient, body, entries)
+	upstreamClient := sessionImportUpstreamClientForProvider(provider)
+	result := s.importSessions(r.Context(), providerID, sessionImportDefaultBaseURL(provider), upstreamClient, body, entries)
 
-	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.import_codex_session", "provider_account", "bulk", nil, map[string]any{
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.session_import", "provider_account", "bulk", nil, map[string]any{
 		"provider_id":   providerID,
 		"total_count":   result.Total,
 		"created_count": result.Created,
@@ -120,25 +120,25 @@ func (s *Server) handleImportAdminCodexSession(w http.ResponseWriter, r *http.Re
 		"failed_count":  result.Failed,
 		"warning_count": len(result.Warnings),
 	}))
-	writeJSONAny(w, http.StatusOK, apiopenapi.CodexSessionImportResponse{
+	writeJSONAny(w, http.StatusOK, apiopenapi.SessionImportResponse{
 		Data:      result,
 		RequestId: requestID,
 	})
 }
 
-func (s *Server) importCodexSessions(ctx context.Context, providerID int, defaultBaseURL string, upstreamClient string, body apiopenapi.CodexSessionImportRequest, entries []codexImportEntry) apiopenapi.CodexSessionImportResult {
-	result := apiopenapi.CodexSessionImportResult{
+func (s *Server) importSessions(ctx context.Context, providerID int, defaultBaseURL string, upstreamClient string, body apiopenapi.SessionImportRequest, entries []sessionImportEntry) apiopenapi.SessionImportResult {
+	result := apiopenapi.SessionImportResult{
 		Total:    len(entries),
-		Items:    make([]apiopenapi.CodexSessionImportItem, 0, len(entries)),
-		Warnings: make([]apiopenapi.CodexSessionImportMessage, 0),
-		Errors:   make([]apiopenapi.CodexSessionImportMessage, 0),
+		Items:    make([]apiopenapi.SessionImportItem, 0, len(entries)),
+		Warnings: make([]apiopenapi.SessionImportMessage, 0),
+		Errors:   make([]apiopenapi.SessionImportMessage, 0),
 	}
 
 	updateExisting := true
 	if body.UpdateExisting != nil {
 		updateExisting = *body.UpdateExisting
 	}
-	existing := s.buildCodexAccountIndex(ctx, providerID)
+	existing := s.buildSessionAccountIndex(ctx, providerID)
 	groupIDs, _ := apiIDsToInts(body.GroupIds)
 	baseName := ""
 	if body.Name != nil {
@@ -148,21 +148,21 @@ func (s *Server) importCodexSessions(ctx context.Context, providerID int, defaul
 
 	provider, providerErr := s.runtime.providers.FindByID(ctx, providerID)
 	if providerErr == nil {
-		if catalog := codexImportModelCatalog(provider); len(catalog) > 0 {
+		if catalog := sessionImportModelCatalog(provider); len(catalog) > 0 {
 			s.quickMapModels(ctx, provider, catalog, nil)
 		}
 	}
 
 	seen := map[string]int{}
 	for _, entry := range entries {
-		item, err := normalizeCodexImportEntry(entry)
+		item, err := normalizeSessionImportEntry(entry)
 		if err != nil {
-			recordCodexFailure(&result, entry.index, "", err.Error())
+			recordSessionFailure(&result, entry.index, "", err.Error())
 			continue
 		}
-		accountName := buildCodexCreateAccountName(baseName, item, entry.index, len(entries))
+		accountName := buildSessionCreateAccountName(baseName, item, entry.index, len(entries))
 		for _, warning := range item.warnings {
-			result.Warnings = append(result.Warnings, apiopenapi.CodexSessionImportMessage{
+			result.Warnings = append(result.Warnings, apiopenapi.SessionImportMessage{
 				Index: entry.index, Name: ptrString(accountName), Message: warning,
 			})
 		}
@@ -170,19 +170,19 @@ func (s *Server) importCodexSessions(ctx context.Context, providerID int, defaul
 		if dup, ok := firstSeenImportIdentity(seen, item.identityKeys); ok {
 			message := fmt.Sprintf("duplicate of import entry #%d; skipped", dup)
 			result.Skipped++
-			result.Items = append(result.Items, apiopenapi.CodexSessionImportItem{
-				Index: entry.index, Name: ptrString(accountName), Action: apiopenapi.CodexSessionImportItemActionSkipped, Message: ptrString(message),
+			result.Items = append(result.Items, apiopenapi.SessionImportItem{
+				Index: entry.index, Name: ptrString(accountName), Action: apiopenapi.SessionImportItemActionSkipped, Message: ptrString(message),
 			})
-			result.Warnings = append(result.Warnings, apiopenapi.CodexSessionImportMessage{
+			result.Warnings = append(result.Warnings, apiopenapi.SessionImportMessage{
 				Index: entry.index, Name: ptrString(accountName), Message: message,
 			})
 			continue
 		}
 		markImportIdentitySeen(seen, item.identityKeys, entry.index)
 
-		credential, metadata, status, expiryErr := s.resolveCodexImportTarget(item, defaultBaseURL, requestStatus)
+		credential, metadata, status, expiryErr := s.resolveSessionImportTarget(item, defaultBaseURL, requestStatus)
 		if expiryErr != nil {
-			recordCodexFailure(&result, entry.index, accountName, expiryErr.Error())
+			recordSessionFailure(&result, entry.index, accountName, expiryErr.Error())
 			continue
 		}
 
@@ -190,25 +190,25 @@ func (s *Server) importCodexSessions(ctx context.Context, providerID int, defaul
 			if !updateExisting {
 				message := "matching account already exists; skipped"
 				result.Skipped++
-				result.Items = append(result.Items, apiopenapi.CodexSessionImportItem{
-					Index: entry.index, Name: ptrString(accountName), Action: apiopenapi.CodexSessionImportItemActionSkipped, AccountId: idPtr(existingID), Message: ptrString(message),
+				result.Items = append(result.Items, apiopenapi.SessionImportItem{
+					Index: entry.index, Name: ptrString(accountName), Action: apiopenapi.SessionImportItemActionSkipped, AccountId: idPtr(existingID), Message: ptrString(message),
 				})
 				continue
 			}
-			s.applyCodexUpdate(ctx, &result, entry.index, accountName, existingID, credential, metadata, status, body.ProxyId, upstreamClient)
+			s.applySessionUpdate(ctx, &result, entry.index, accountName, existingID, credential, metadata, status, body.ProxyId, upstreamClient)
 			continue
 		}
 
-		s.applyCodexCreate(ctx, &result, entry.index, accountName, providerID, credential, metadata, status, body.ProxyId, groupIDs, existing, item, upstreamClient)
+		s.applySessionCreate(ctx, &result, entry.index, accountName, providerID, credential, metadata, status, body.ProxyId, groupIDs, existing, item, upstreamClient)
 	}
 
 	return result
 }
 
-func (s *Server) applyCodexCreate(ctx context.Context, result *apiopenapi.CodexSessionImportResult, index int, name string, providerID int, credential, metadata map[string]any, status *accountcontract.Status, proxyID *string, groupIDs []int, existing *codexAccountIndex, item *codexImportAccount, upstreamClient string) {
+func (s *Server) applySessionCreate(ctx context.Context, result *apiopenapi.SessionImportResult, index int, name string, providerID int, credential, metadata map[string]any, status *accountcontract.Status, proxyID *string, groupIDs []int, existing *sessionAccountIndex, item *sessionImportAccount, upstreamClient string) {
 	refreshed, err := s.refreshImportCredential(ctx, accountcontract.RuntimeClassOauthRefresh, ptrString(upstreamClient), metadata, proxyID, credential)
 	if err != nil {
-		recordCodexFailure(result, index, name, "oauth refresh failed")
+		recordSessionFailure(result, index, name, "oauth refresh failed")
 		return
 	}
 	account, err := s.runtime.accounts.Create(ctx, accountcontract.CreateRequest{
@@ -222,27 +222,27 @@ func (s *Server) applyCodexCreate(ctx context.Context, result *apiopenapi.CodexS
 		UpstreamClient: ptrString(upstreamClient),
 	})
 	if err != nil {
-		recordCodexFailure(result, index, name, "create failed")
+		recordSessionFailure(result, index, name, "create failed")
 		return
 	}
 	existing.add(account.ID, item.identityKeys)
 	for _, groupID := range groupIDs {
 		if _, err := s.runtime.accounts.AddAccountToGroup(ctx, account.ID, groupID); err != nil {
-			result.Warnings = append(result.Warnings, apiopenapi.CodexSessionImportMessage{
+			result.Warnings = append(result.Warnings, apiopenapi.SessionImportMessage{
 				Index: index, Name: ptrString(name), Message: fmt.Sprintf("failed to bind group %d", groupID),
 			})
 		}
 	}
 	result.Created++
-	result.Items = append(result.Items, apiopenapi.CodexSessionImportItem{
-		Index: index, Name: ptrString(name), Action: apiopenapi.CodexSessionImportItemActionCreated, AccountId: idPtr(account.ID),
+	result.Items = append(result.Items, apiopenapi.SessionImportItem{
+		Index: index, Name: ptrString(name), Action: apiopenapi.SessionImportItemActionCreated, AccountId: idPtr(account.ID),
 	})
 }
 
-func (s *Server) applyCodexUpdate(ctx context.Context, result *apiopenapi.CodexSessionImportResult, index int, name string, accountID int, credential, metadata map[string]any, status *accountcontract.Status, proxyID *string, upstreamClient string) {
+func (s *Server) applySessionUpdate(ctx context.Context, result *apiopenapi.SessionImportResult, index int, name string, accountID int, credential, metadata map[string]any, status *accountcontract.Status, proxyID *string, upstreamClient string) {
 	refreshed, err := s.refreshImportCredential(ctx, accountcontract.RuntimeClassOauthRefresh, ptrString(upstreamClient), metadata, proxyID, credential)
 	if err != nil {
-		recordCodexFailure(result, index, name, "oauth refresh failed")
+		recordSessionFailure(result, index, name, "oauth refresh failed")
 		return
 	}
 	credentialCopy := refreshed
@@ -257,21 +257,21 @@ func (s *Server) applyCodexUpdate(ctx context.Context, result *apiopenapi.CodexS
 		update.ProxyID = &proxyPtr
 	}
 	if _, err := s.runtime.accounts.Update(ctx, accountID, update); err != nil {
-		recordCodexFailure(result, index, name, "update failed")
+		recordSessionFailure(result, index, name, "update failed")
 		return
 	}
 	result.Updated++
-	result.Items = append(result.Items, apiopenapi.CodexSessionImportItem{
-		Index: index, Name: ptrString(name), Action: apiopenapi.CodexSessionImportItemActionUpdated, AccountId: idPtr(accountID),
+	result.Items = append(result.Items, apiopenapi.SessionImportItem{
+		Index: index, Name: ptrString(name), Action: apiopenapi.SessionImportItemActionUpdated, AccountId: idPtr(accountID),
 	})
 }
 
-// resolveCodexImportTarget builds the credential + metadata maps and resolves
+// resolveSessionImportTarget builds the credential + metadata maps and resolves
 // the account status. Refresh-token-less sessions require a valid (non-expired)
 // access token and are marked for auto-pause-on-expiry.
-func (s *Server) resolveCodexImportTarget(item *codexImportAccount, defaultBaseURL string, requestStatus *accountcontract.Status) (map[string]any, map[string]any, *accountcontract.Status, error) {
+func (s *Server) resolveSessionImportTarget(item *sessionImportAccount, defaultBaseURL string, requestStatus *accountcontract.Status) (map[string]any, map[string]any, *accountcontract.Status, error) {
 	// Keep the imported access token when present so the import never depends on a
-	// blocking/failing OAuth refresh at import time: an unreachable codex auth
+	// blocking/failing OAuth refresh at import time: an unreachable auth
 	// endpoint would otherwise make every account fail ("oauth refresh failed").
 	// The runtime refreshes lazily via the refresh_token when the access token
 	// nears expiry, which is the normal OauthRefresh behavior.
@@ -285,42 +285,42 @@ func (s *Server) resolveCodexImportTarget(item *codexImportAccount, defaultBaseU
 	if item.idToken != "" {
 		credential["id_token"] = item.idToken
 	}
-	setCodexCredentialIfNotEmpty(credential, "email", item.email)
-	setCodexCredentialIfNotEmpty(credential, "chatgpt_account_id", item.accountID)
-	setCodexCredentialIfNotEmpty(credential, "chatgpt_user_id", item.userID)
-	setCodexCredentialIfNotEmpty(credential, "organization_id", item.organizationID)
-	setCodexCredentialIfNotEmpty(credential, "plan_type", item.planType)
+	setSessionCredentialIfNotEmpty(credential, "email", item.email)
+	setSessionCredentialIfNotEmpty(credential, "chatgpt_account_id", item.accountID)
+	setSessionCredentialIfNotEmpty(credential, "chatgpt_user_id", item.userID)
+	setSessionCredentialIfNotEmpty(credential, "organization_id", item.organizationID)
+	setSessionCredentialIfNotEmpty(credential, "plan_type", item.planType)
 	if item.tokenExpiresAt != nil {
 		credential["expires_at"] = item.tokenExpiresAt.UTC().Format(time.RFC3339)
 	}
 
 	metadata := map[string]any{
-		"import_source": "codex_session",
+		"import_source": "session_import",
 		"imported_at":   time.Now().UTC().Format(time.RFC3339),
 	}
-	setCodexMetadataIfNotEmpty(metadata, "email", item.email)
-	setCodexMetadataIfNotEmpty(metadata, "upstream_account_id", item.accountID)
-	setCodexMetadataIfNotEmpty(metadata, "upstream_user_id", item.userID)
-	setCodexMetadataIfNotEmpty(metadata, "plan_type", item.planType)
-	setCodexMetadataIfNotEmpty(metadata, "organization_id", item.organizationID)
+	setSessionMetadataIfNotEmpty(metadata, "email", item.email)
+	setSessionMetadataIfNotEmpty(metadata, "upstream_account_id", item.accountID)
+	setSessionMetadataIfNotEmpty(metadata, "upstream_user_id", item.userID)
+	setSessionMetadataIfNotEmpty(metadata, "plan_type", item.planType)
+	setSessionMetadataIfNotEmpty(metadata, "organization_id", item.organizationID)
 	// Upstream-endpoint hints. Prefer a base_url carried by the session blob
 	// (e.g. a desktop session pointed at a proxy); otherwise seed the
-	// provider/preset default. The codex reverse-proxy adapter has NO implicit
+	// provider/preset default. The reverse-proxy adapter has NO implicit
 	// default and hard-fails every request with "reverse proxy upstream base url
 	// missing" when this key is absent, so an imported account without it is dead
 	// on arrival.
-	setCodexMetadataIfNotEmpty(metadata, "base_url", item.baseURL)
+	setSessionMetadataIfNotEmpty(metadata, "base_url", item.baseURL)
 	if mapString(metadata, "base_url") == "" {
-		setCodexMetadataIfNotEmpty(metadata, "base_url", defaultBaseURL)
+		setSessionMetadataIfNotEmpty(metadata, "base_url", defaultBaseURL)
 	}
-	setCodexMetadataIfNotEmpty(metadata, "oauth_token_url", item.tokenURL)
+	setSessionMetadataIfNotEmpty(metadata, "oauth_token_url", item.tokenURL)
 
 	status := requestStatus
 	if item.refreshToken == "" {
 		if item.tokenExpiresAt == nil {
 			return nil, nil, nil, errors.New("session has no refresh_token and no parseable access_token expiry; cannot import")
 		}
-		if item.tokenExpiresAt.Add(codexImportClockSkew).Before(time.Now().UTC()) {
+		if item.tokenExpiresAt.Add(sessionImportClockSkew).Before(time.Now().UTC()) {
 			return nil, nil, nil, fmt.Errorf("access_token already expired at %s", item.tokenExpiresAt.UTC().Format(time.RFC3339))
 		}
 		metadata["auto_pause_on_expired"] = true
@@ -331,51 +331,51 @@ func (s *Server) resolveCodexImportTarget(item *codexImportAccount, defaultBaseU
 
 // --- parsing ---------------------------------------------------------------
 
-func parseCodexSessionImportEntries(content string) ([]codexImportEntry, error) {
-	values, err := parseCodexSessionImportContent(content)
+func parseSessionImportEntries(content string) ([]sessionImportEntry, error) {
+	values, err := parseSessionImportContent(content)
 	if err != nil {
 		return nil, err
 	}
-	entries := make([]codexImportEntry, 0, len(values))
+	entries := make([]sessionImportEntry, 0, len(values))
 	for _, value := range values {
-		entries = append(entries, codexImportEntry{index: len(entries) + 1, value: value})
+		entries = append(entries, sessionImportEntry{index: len(entries) + 1, value: value})
 	}
 	return entries, nil
 }
 
-func parseCodexSessionImportContent(content string) ([]any, error) {
+func parseSessionImportContent(content string) ([]any, error) {
 	trimmed := strings.TrimSpace(content)
 	if trimmed == "" {
 		return nil, nil
 	}
-	if codexLooksLikeJSON(trimmed) {
-		values, err := decodeCodexJSONStream(trimmed)
+	if sessionImportLooksLikeJSON(trimmed) {
+		values, err := decodeSessionImportJSONStream(trimmed)
 		if err != nil {
 			if strings.Contains(trimmed, "\n") {
-				if lineValues, lineErr := parseCodexSessionImportLines(trimmed); lineErr == nil {
+				if lineValues, lineErr := parseSessionImportLines(trimmed); lineErr == nil {
 					return lineValues, nil
 				}
 			}
 			return nil, fmt.Errorf("failed to parse session JSON: %w", err)
 		}
-		return flattenCodexImportValues(values), nil
+		return flattenSessionImportValues(values), nil
 	}
-	return parseCodexSessionImportLines(trimmed)
+	return parseSessionImportLines(trimmed)
 }
 
-func parseCodexSessionImportLines(content string) ([]any, error) {
+func parseSessionImportLines(content string) ([]any, error) {
 	values := make([]any, 0)
 	for _, line := range strings.Split(content, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
-		if codexLooksLikeJSON(line) {
-			lineValues, err := decodeCodexJSONStream(line)
+		if sessionImportLooksLikeJSON(line) {
+			lineValues, err := decodeSessionImportJSONStream(line)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse JSON on line %d: %w", len(values)+1, err)
 			}
-			values = append(values, flattenCodexImportValues(lineValues)...)
+			values = append(values, flattenSessionImportValues(lineValues)...)
 			continue
 		}
 		values = append(values, line)
@@ -383,7 +383,7 @@ func parseCodexSessionImportLines(content string) ([]any, error) {
 	return values, nil
 }
 
-func decodeCodexJSONStream(content string) ([]any, error) {
+func decodeSessionImportJSONStream(content string) ([]any, error) {
 	decoder := json.NewDecoder(strings.NewReader(content))
 	decoder.UseNumber()
 	values := make([]any, 0, 1)
@@ -404,7 +404,7 @@ func decodeCodexJSONStream(content string) ([]any, error) {
 	return values, nil
 }
 
-func flattenCodexImportValues(values []any) []any {
+func flattenSessionImportValues(values []any) []any {
 	out := make([]any, 0, len(values))
 	var appendValue func(any)
 	appendValue = func(value any) {
@@ -415,7 +415,7 @@ func flattenCodexImportValues(values []any) []any {
 			return
 		}
 		if obj, ok := value.(map[string]any); ok {
-			if inner, ok := codexImportEnvelopeArray(obj); ok {
+			if inner, ok := sessionImportEnvelopeArray(obj); ok {
 				for _, item := range inner {
 					appendValue(item)
 				}
@@ -430,12 +430,12 @@ func flattenCodexImportValues(values []any) []any {
 	return out
 }
 
-// codexImportEnvelopeArray detects an export wrapper such as
+// sessionImportEnvelopeArray detects an export wrapper such as
 // {exported_at, proxies, accounts:[...]} (or sessions/items) and returns the
 // inner array so each element becomes its own session entry. It only unwraps
 // when the object does NOT itself carry a token field, so a genuine single
 // session that merely happens to have an unrelated array key is never split.
-func codexImportEnvelopeArray(obj map[string]any) ([]any, bool) {
+func sessionImportEnvelopeArray(obj map[string]any) ([]any, bool) {
 	for _, key := range []string{"access_token", "accessToken", "token", "refresh_token", "id_token", "tokens", "credentials"} {
 		if _, ok := obj[key]; ok {
 			return nil, false
@@ -449,7 +449,7 @@ func codexImportEnvelopeArray(obj map[string]any) ([]any, bool) {
 	return nil, false
 }
 
-func codexLooksLikeJSON(content string) bool {
+func sessionImportLooksLikeJSON(content string) bool {
 	if content == "" {
 		return false
 	}
@@ -463,46 +463,46 @@ func codexLooksLikeJSON(content string) bool {
 
 // --- normalization ---------------------------------------------------------
 
-func normalizeCodexImportEntry(entry codexImportEntry) (*codexImportAccount, error) {
+func normalizeSessionImportEntry(entry sessionImportEntry) (*sessionImportAccount, error) {
 	now := time.Now().UTC()
-	item := &codexImportAccount{}
+	item := &sessionImportAccount{}
 
 	switch raw := entry.value.(type) {
 	case string:
 		item.accessToken = strings.TrimSpace(raw)
 	case map[string]any:
-		item.accessToken = firstCodexString(raw,
+		item.accessToken = firstSessionImportString(raw,
 			[]string{"tokens", "access_token"}, []string{"tokens", "accessToken"},
 			[]string{"credentials", "access_token"}, []string{"credentials", "accessToken"},
 			[]string{"access_token"}, []string{"accessToken"}, []string{"token"})
-		item.refreshToken = firstCodexString(raw,
+		item.refreshToken = firstSessionImportString(raw,
 			[]string{"tokens", "refresh_token"}, []string{"tokens", "refreshToken"},
 			[]string{"credentials", "refresh_token"}, []string{"credentials", "refreshToken"},
 			[]string{"refresh_token"}, []string{"refreshToken"})
-		item.idToken = firstCodexString(raw,
+		item.idToken = firstSessionImportString(raw,
 			[]string{"tokens", "id_token"}, []string{"tokens", "idToken"},
 			[]string{"credentials", "id_token"}, []string{"credentials", "idToken"},
 			[]string{"id_token"}, []string{"idToken"})
-		item.email = firstCodexString(raw, []string{"email"}, []string{"credentials", "email"}, []string{"user", "email"})
-		item.accountID = firstCodexString(raw,
+		item.email = firstSessionImportString(raw, []string{"email"}, []string{"credentials", "email"}, []string{"user", "email"})
+		item.accountID = firstSessionImportString(raw,
 			[]string{"chatgpt_account_id"}, []string{"chatgptAccountId"},
 			[]string{"credentials", "chatgpt_account_id"}, []string{"credentials", "chatgptAccountId"},
 			[]string{"account_id"}, []string{"accountId"}, []string{"account", "id"},
 			[]string{"account", "account_id"}, []string{"account", "chatgpt_account_id"})
-		item.userID = firstCodexString(raw,
+		item.userID = firstSessionImportString(raw,
 			[]string{"chatgpt_user_id"}, []string{"chatgptUserId"},
 			[]string{"credentials", "chatgpt_user_id"}, []string{"credentials", "chatgptUserId"},
 			[]string{"user_id"}, []string{"userId"}, []string{"user", "id"})
-		item.planType = firstCodexString(raw,
+		item.planType = firstSessionImportString(raw,
 			[]string{"plan_type"}, []string{"planType"},
 			[]string{"account", "plan_type"}, []string{"account", "planType"})
-		item.organizationID = firstCodexString(raw,
+		item.organizationID = firstSessionImportString(raw,
 			[]string{"organization_id"}, []string{"organizationId"},
 			[]string{"org_id"}, []string{"orgId"})
-		item.name = firstCodexString(raw, []string{"name"}, []string{"user", "name"})
-		item.baseURL = firstCodexString(raw, []string{"base_url"}, []string{"baseUrl"})
-		item.tokenURL = firstCodexString(raw, []string{"oauth_token_url"}, []string{"token_url"}, []string{"tokenUrl"})
-		if expiresAt, ok := firstCodexTime(raw,
+		item.name = firstSessionImportString(raw, []string{"name"}, []string{"user", "name"})
+		item.baseURL = firstSessionImportString(raw, []string{"base_url"}, []string{"baseUrl"})
+		item.tokenURL = firstSessionImportString(raw, []string{"oauth_token_url"}, []string{"token_url"}, []string{"tokenUrl"})
+		if expiresAt, ok := firstSessionImportTime(raw,
 			[]string{"tokens", "expires_at"}, []string{"tokens", "expiresAt"},
 			[]string{"credentials", "expires_at"}, []string{"credentials", "expiresAt"},
 			[]string{"expires_at"}, []string{"expiresAt"}); ok {
@@ -517,9 +517,9 @@ func normalizeCodexImportEntry(entry codexImportEntry) (*codexImportAccount, err
 		return nil, errors.New("missing access_token")
 	}
 	if item.idToken != "" {
-		_ = enrichCodexImportFromJWT(item, item.idToken, false, now)
+		_ = enrichSessionImportFromJWT(item, item.idToken, false, now)
 	}
-	if err := enrichCodexImportFromJWT(item, item.accessToken, true, now); err != nil {
+	if err := enrichSessionImportFromJWT(item, item.accessToken, true, now); err != nil {
 		return nil, err
 	}
 	if item.tokenExpiresAt == nil {
@@ -529,13 +529,13 @@ func normalizeCodexImportEntry(entry codexImportEntry) (*codexImportAccount, err
 		item.warnings = append(item.warnings, "session has no refresh_token; access_token cannot auto-renew after expiry")
 	}
 
-	item.identityKeys = buildCodexIdentityKeys(item.accountID, item.userID, item.email, item.accessToken)
-	item.name = buildCodexImportAccountName(item, entry.index)
+	item.identityKeys = buildSessionIdentityKeys(item.accountID, item.userID, item.email, item.accessToken)
+	item.name = buildSessionImportAccountName(item, entry.index)
 	return item, nil
 }
 
-func enrichCodexImportFromJWT(item *codexImportAccount, token string, validateExpiry bool, now time.Time) error {
-	claims, err := decodeCodexJWTClaims(token)
+func enrichSessionImportFromJWT(item *sessionImportAccount, token string, validateExpiry bool, now time.Time) error {
+	claims, err := decodeSessionImportJWTClaims(token)
 	if err != nil {
 		if validateExpiry {
 			item.warnings = append(item.warnings, "access_token is not a parseable JWT; cannot validate expiry or identity")
@@ -543,7 +543,7 @@ func enrichCodexImportFromJWT(item *codexImportAccount, token string, validateEx
 		return nil
 	}
 	if validateExpiry && claims.Exp > 0 {
-		if now.Unix() > claims.Exp+int64(codexImportClockSkew.Seconds()) {
+		if now.Unix() > claims.Exp+int64(sessionImportClockSkew.Seconds()) {
 			return fmt.Errorf("access_token already expired at %s", time.Unix(claims.Exp, 0).UTC().Format(time.RFC3339))
 		}
 		expiresAt := time.Unix(claims.Exp, 0).UTC()
@@ -591,23 +591,23 @@ func enrichCodexImportFromJWT(item *codexImportAccount, token string, validateEx
 	return nil
 }
 
-func decodeCodexJWTClaims(token string) (*codexJWTClaims, error) {
+func decodeSessionImportJWTClaims(token string) (*sessionImportJWTClaims, error) {
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
 		return nil, errors.New("invalid JWT format")
 	}
-	payload, err := decodeCodexJWTSegment(parts[1])
+	payload, err := decodeSessionImportJWTSegment(parts[1])
 	if err != nil {
 		return nil, err
 	}
-	var claims codexJWTClaims
+	var claims sessionImportJWTClaims
 	if err := json.Unmarshal(payload, &claims); err != nil {
 		return nil, err
 	}
 	return &claims, nil
 }
 
-func decodeCodexJWTSegment(segment string) ([]byte, error) {
+func decodeSessionImportJWTSegment(segment string) ([]byte, error) {
 	if decoded, err := base64.RawURLEncoding.DecodeString(segment); err == nil {
 		return decoded, nil
 	}
@@ -626,16 +626,16 @@ func decodeCodexJWTSegment(segment string) ([]byte, error) {
 
 // --- naming + identity -----------------------------------------------------
 
-func buildCodexImportAccountName(item *codexImportAccount, index int) string {
+func buildSessionImportAccountName(item *sessionImportAccount, index int) string {
 	for _, candidate := range []string{item.name, item.email, item.accountID, item.userID} {
 		if candidate = strings.TrimSpace(candidate); candidate != "" {
 			return candidate
 		}
 	}
-	return fmt.Sprintf("Codex import %d", index)
+	return fmt.Sprintf("Session import %d", index)
 }
 
-func buildCodexCreateAccountName(base string, item *codexImportAccount, index, total int) string {
+func buildSessionCreateAccountName(base string, item *sessionImportAccount, index, total int) string {
 	base = strings.TrimSpace(base)
 	if base == "" {
 		return item.name
@@ -648,9 +648,9 @@ func buildCodexCreateAccountName(base string, item *codexImportAccount, index, t
 
 // --- existing-account index (plaintext metadata only) ----------------------
 
-type codexAccountIndex = importIdentityIndex
+type sessionAccountIndex = importIdentityIndex
 
-func (s *Server) buildCodexAccountIndex(ctx context.Context, providerID int) *codexAccountIndex {
+func (s *Server) buildSessionAccountIndex(ctx context.Context, providerID int) *sessionAccountIndex {
 	index := newImportIdentityIndex()
 	accounts, err := s.runtime.accounts.List(ctx)
 	if err != nil {
@@ -660,7 +660,7 @@ func (s *Server) buildCodexAccountIndex(ctx context.Context, providerID int) *co
 		if account.ProviderID != providerID {
 			continue
 		}
-		keys := buildCodexIdentityKeys(
+		keys := buildSessionIdentityKeys(
 			mapString(account.Metadata, "upstream_account_id"),
 			mapString(account.Metadata, "upstream_user_id"),
 			mapString(account.Metadata, "email"),
@@ -673,28 +673,28 @@ func (s *Server) buildCodexAccountIndex(ctx context.Context, providerID int) *co
 
 // --- small helpers ---------------------------------------------------------
 
-func recordCodexFailure(result *apiopenapi.CodexSessionImportResult, index int, name, message string) {
+func recordSessionFailure(result *apiopenapi.SessionImportResult, index int, name, message string) {
 	result.Failed++
 	var namePtr *string
 	if strings.TrimSpace(name) != "" {
 		namePtr = ptrString(name)
 	}
-	result.Items = append(result.Items, apiopenapi.CodexSessionImportItem{
-		Index: index, Name: namePtr, Action: apiopenapi.CodexSessionImportItemActionFailed, Message: ptrString(message),
+	result.Items = append(result.Items, apiopenapi.SessionImportItem{
+		Index: index, Name: namePtr, Action: apiopenapi.SessionImportItemActionFailed, Message: ptrString(message),
 	})
-	result.Errors = append(result.Errors, apiopenapi.CodexSessionImportMessage{
+	result.Errors = append(result.Errors, apiopenapi.SessionImportMessage{
 		Index: index, Name: namePtr, Message: message,
 	})
 }
 
-// codexImportDefaultBaseURL resolves the upstream base URL to seed onto imported
-// Codex accounts when the session blob carries none. It prefers the provider's
+// sessionImportDefaultBaseURL resolves the upstream base URL to seed onto imported
+// accounts when the session blob carries none. It prefers the provider's
 // own configured base_url (present when the provider was installed from a
 // preset), then falls back to the built-in codex-cli preset default. Without
-// this seed the codex reverse-proxy adapter rejects every request with "reverse
+// this seed the reverse-proxy adapter rejects every request with "reverse
 // proxy upstream base url missing", so the import would silently create dead
 // accounts.
-func codexImportUpstreamClientForProvider(provider providercontract.Provider) string {
+func sessionImportUpstreamClientForProvider(provider providercontract.Provider) string {
 	if at, ok := provider.ConfigSchema["account_template"].(map[string]any); ok {
 		if uc, ok := at["upstream_client"].(string); ok && strings.TrimSpace(uc) != "" {
 			return strings.TrimSpace(uc)
@@ -703,10 +703,10 @@ func codexImportUpstreamClientForProvider(provider providercontract.Provider) st
 	if strings.Contains(strings.ToLower(provider.AdapterType), "chatgpt-web") {
 		return "chatgpt_web"
 	}
-	return codexImportUpstreamClient
+	return sessionImportDefaultUpstreamClient
 }
 
-func codexImportDefaultBaseURL(provider providercontract.Provider) string {
+func sessionImportDefaultBaseURL(provider providercontract.Provider) string {
 	if bu := mapString(provider.ConfigSchema, "base_url"); bu != "" {
 		return bu
 	}
@@ -722,7 +722,7 @@ func codexImportDefaultBaseURL(provider providercontract.Provider) string {
 	return preset.DefaultBaseURL
 }
 
-func codexImportModelCatalog(provider providercontract.Provider) []string {
+func sessionImportModelCatalog(provider providercontract.Provider) []string {
 	at, ok := provider.ConfigSchema["account_template"].(map[string]any)
 	if !ok {
 		return nil
@@ -740,13 +740,13 @@ func codexImportModelCatalog(provider providercontract.Provider) []string {
 	return catalog
 }
 
-func setCodexCredentialIfNotEmpty(credential map[string]any, key, value string) {
+func setSessionCredentialIfNotEmpty(credential map[string]any, key, value string) {
 	if value = strings.TrimSpace(value); value != "" {
 		credential[key] = value
 	}
 }
 
-func setCodexMetadataIfNotEmpty(metadata map[string]any, key, value string) {
+func setSessionMetadataIfNotEmpty(metadata map[string]any, key, value string) {
 	if value = strings.TrimSpace(value); value != "" {
 		metadata[key] = value
 	}
@@ -757,10 +757,10 @@ func idPtr(id int) *apiopenapi.Id {
 	return &value
 }
 
-func firstCodexString(obj map[string]any, paths ...[]string) string {
+func firstSessionImportString(obj map[string]any, paths ...[]string) string {
 	for _, path := range paths {
-		if value, ok := codexPathValue(obj, path); ok {
-			if str := codexStringValue(value); str != "" {
+		if value, ok := sessionImportPathValue(obj, path); ok {
+			if str := sessionImportStringValue(value); str != "" {
 				return str
 			}
 		}
@@ -768,10 +768,10 @@ func firstCodexString(obj map[string]any, paths ...[]string) string {
 	return ""
 }
 
-func firstCodexTime(obj map[string]any, paths ...[]string) (time.Time, bool) {
+func firstSessionImportTime(obj map[string]any, paths ...[]string) (time.Time, bool) {
 	for _, path := range paths {
-		if value, ok := codexPathValue(obj, path); ok {
-			if parsed, ok := parseCodexTimeValue(value); ok {
+		if value, ok := sessionImportPathValue(obj, path); ok {
+			if parsed, ok := parseSessionImportTimeValue(value); ok {
 				return parsed, true
 			}
 		}
@@ -779,7 +779,7 @@ func firstCodexTime(obj map[string]any, paths ...[]string) (time.Time, bool) {
 	return time.Time{}, false
 }
 
-func codexPathValue(obj map[string]any, path []string) (any, bool) {
+func sessionImportPathValue(obj map[string]any, path []string) (any, bool) {
 	var current any = obj
 	for _, key := range path {
 		currentObj, ok := current.(map[string]any)
@@ -795,7 +795,7 @@ func codexPathValue(obj map[string]any, path []string) (any, bool) {
 	return current, true
 }
 
-func codexStringValue(value any) string {
+func sessionImportStringValue(value any) string {
 	switch v := value.(type) {
 	case string:
 		return strings.TrimSpace(v)
@@ -812,7 +812,7 @@ func codexStringValue(value any) string {
 	}
 }
 
-func parseCodexTimeValue(value any) (time.Time, bool) {
+func parseSessionImportTimeValue(value any) (time.Time, bool) {
 	switch v := value.(type) {
 	case string:
 		v = strings.TrimSpace(v)
@@ -823,24 +823,24 @@ func parseCodexTimeValue(value any) (time.Time, bool) {
 			return parsed.UTC(), true
 		}
 		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
-			return codexUnixTime(n), true
+			return sessionImportUnixTime(n), true
 		}
 	case json.Number:
 		if n, err := v.Int64(); err == nil {
-			return codexUnixTime(n), true
+			return sessionImportUnixTime(n), true
 		}
 		if f, err := v.Float64(); err == nil {
-			return codexUnixTime(int64(f)), true
+			return sessionImportUnixTime(int64(f)), true
 		}
 	case float64:
-		return codexUnixTime(int64(v)), true
+		return sessionImportUnixTime(int64(v)), true
 	case int64:
-		return codexUnixTime(v), true
+		return sessionImportUnixTime(v), true
 	}
 	return time.Time{}, false
 }
 
-func codexUnixTime(value int64) time.Time {
+func sessionImportUnixTime(value int64) time.Time {
 	if value > 1_000_000_000_000 {
 		return time.UnixMilli(value).UTC()
 	}

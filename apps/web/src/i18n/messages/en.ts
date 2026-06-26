@@ -1276,15 +1276,15 @@ export const en = {
     existingAccounts: "Existing accounts",
     done: "Synced: {created} created, {failed} failed",
   },
-  codexImport: {
-    action: "Import Codex session",
-    title: "Import Codex / ChatGPT session",
+  sessionImport: {
+    action: "Import session",
+    title: "Import session",
     subtitle:
-      "Paste a Codex desktop session to onboard upstream codex_cli accounts. The embedded token is decoded server-side.",
+      "Paste a session to onboard upstream accounts. The embedded token is decoded server-side.",
     dialogHint:
-      "Paste a Codex / ChatGPT session (JSON object, an exported {accounts:[…]} snapshot, a raw access token, or a JSON array) to create ready-to-use codex_cli accounts. Credentials are imported here.",
+      "Paste a session (JSON object, exported snapshot, raw access token, or JSON array) to create accounts. Credentials are imported here.",
     provider: "Provider",
-    providerPlaceholder: "Select a Codex provider",
+    providerPlaceholder: "Select provider",
     providerRequired: "Select a provider.",
     content: "Session content",
     contentPlaceholder: "Paste session JSON, a raw access token, or one entry per line…",
@@ -1297,7 +1297,7 @@ export const en = {
     updateExistingHint: "Refresh the credential of an existing account instead of skipping it.",
     dropHint: "Drop .json files here, or click to browse",
     submit: "Import",
-    done: "Codex import complete",
+    done: "Session import complete",
     doneSummary: "Created {created} · Updated {updated} · Skipped {skipped} · Failed {failed}",
     created: "Created",
     updated: "Updated",

@@ -4844,17 +4844,18 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
-  /api/v1/admin/accounts/import/codex-session:
+  /api/v1/admin/accounts/import/session:
     post:
       tags:
         - AdminAccounts
-      operationId: importAdminCodexSession
-      summary: Import Codex/ChatGPT desktop session blobs as upstream accounts.
+      operationId: importAdminSession
+      summary: Import desktop session blobs as upstream accounts.
       description: >-
-        Parses a pasted Codex/ChatGPT session JSON, raw access token, or NDJSON
-        batch, decodes the embedded JWT to extract identity claims
+        Parses a pasted session JSON (ChatGPT Web, Codex CLI, Claude Code,
+        Antigravity, etc.), raw access token, or NDJSON batch, decodes the
+        embedded JWT to extract identity claims
         (chatgpt_account_id/user_id/plan_type/organization_id/email/expiry),
-        deduplicates by identity, and creates or updates codex_cli accounts under
+        deduplicates by identity, and creates or updates accounts under
         the target provider. Accounts with a refresh token mint a fresh access
         token; refresh-token-less sessions require a valid (non-expired) access
         token and are recorded with auto-pause-on-expiry metadata.
@@ -4869,17 +4870,17 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CodexSessionImportRequest"
+              $ref: "#/components/schemas/SessionImportRequest"
       responses:
         "200":
-          description: Codex session import result.
+          description: Session import result.
           headers:
             X-Request-ID:
               $ref: "#/components/headers/RequestIdHeader"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CodexSessionImportResponse"
+                $ref: "#/components/schemas/SessionImportResponse"
         "400":
           $ref: "#/components/responses/ValidationError"
         "401":
@@ -18581,16 +18582,16 @@ components:
       $ref: "schemas/accounts.yaml#/ProviderAccountImportResult"
     ProviderAccountImportResponse:
       $ref: "schemas/accounts.yaml#/ProviderAccountImportResponse"
-    CodexSessionImportRequest:
-      $ref: "schemas/accounts.yaml#/CodexSessionImportRequest"
-    CodexSessionImportItem:
-      $ref: "schemas/accounts.yaml#/CodexSessionImportItem"
-    CodexSessionImportMessage:
-      $ref: "schemas/accounts.yaml#/CodexSessionImportMessage"
-    CodexSessionImportResult:
-      $ref: "schemas/accounts.yaml#/CodexSessionImportResult"
-    CodexSessionImportResponse:
-      $ref: "schemas/accounts.yaml#/CodexSessionImportResponse"
+    SessionImportRequest:
+      $ref: "schemas/accounts.yaml#/SessionImportRequest"
+    SessionImportItem:
+      $ref: "schemas/accounts.yaml#/SessionImportItem"
+    SessionImportMessage:
+      $ref: "schemas/accounts.yaml#/SessionImportMessage"
+    SessionImportResult:
+      $ref: "schemas/accounts.yaml#/SessionImportResult"
+    SessionImportResponse:
+      $ref: "schemas/accounts.yaml#/SessionImportResponse"
     BatchUpdateAccountsRequest:
       $ref: "schemas/accounts.yaml#/BatchUpdateAccountsRequest"
     BulkUpdateProviderAccountsRequest:

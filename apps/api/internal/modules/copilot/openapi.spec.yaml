@@ -4692,13 +4692,13 @@ paths:
           $ref: '#/components/responses/NotFound'
         default:
           $ref: '#/components/responses/StandardError'
-  /api/v1/admin/accounts/import/codex-session:
+  /api/v1/admin/accounts/import/session:
     post:
       tags:
         - AdminAccounts
-      operationId: importAdminCodexSession
-      summary: Import Codex/ChatGPT desktop session blobs as upstream accounts.
-      description: Parses a pasted Codex/ChatGPT session JSON, raw access token, or NDJSON batch, decodes the embedded JWT to extract identity claims (chatgpt_account_id/user_id/plan_type/organization_id/email/expiry), deduplicates by identity, and creates or updates codex_cli accounts under the target provider. Accounts with a refresh token mint a fresh access token; refresh-token-less sessions require a valid (non-expired) access token and are recorded with auto-pause-on-expiry metadata.
+      operationId: importAdminSession
+      summary: Import desktop session blobs as upstream accounts.
+      description: Parses a pasted session JSON (ChatGPT Web, Codex CLI, Claude Code, Antigravity, etc.), raw access token, or NDJSON batch, decodes the embedded JWT to extract identity claims (chatgpt_account_id/user_id/plan_type/organization_id/email/expiry), deduplicates by identity, and creates or updates accounts under the target provider. Accounts with a refresh token mint a fresh access token; refresh-token-less sessions require a valid (non-expired) access token and are recorded with auto-pause-on-expiry metadata.
       security:
         - cookieAuth: []
           csrfHeader: []
@@ -4710,17 +4710,17 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CodexSessionImportRequest'
+              $ref: '#/components/schemas/SessionImportRequest'
       responses:
         '200':
-          description: Codex session import result.
+          description: Session import result.
           headers:
             X-Request-ID:
               $ref: '#/components/headers/RequestIdHeader'
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CodexSessionImportResponse'
+                $ref: '#/components/schemas/SessionImportResponse'
         '400':
           $ref: '#/components/responses/ValidationError'
         '401':
@@ -23416,12 +23416,12 @@ components:
         items:
           type: array
           items:
-            $ref: '#/components/schemas/CodexSessionImportItem'
+            $ref: '#/components/schemas/SessionImportItem'
           default: []
         warnings:
           type: array
           items:
-            $ref: '#/components/schemas/CodexSessionImportMessage'
+            $ref: '#/components/schemas/SessionImportMessage'
           default: []
         errors:
           type: array
@@ -23437,7 +23437,7 @@ components:
           $ref: '#/components/schemas/ProviderAccountImportResult'
         request_id:
           $ref: '#/components/schemas/RequestId'
-    CodexSessionImportRequest:
+    SessionImportRequest:
       type: object
       required:
         - provider_id
@@ -23448,7 +23448,7 @@ components:
         content:
           type: string
           minLength: 1
-          description: Raw session payload. Accepts a Codex/ChatGPT session JSON object, a single raw access token, a JSON array of either, or newline-delimited (NDJSON) entries mixing the above.
+          description: Raw session payload. Accepts a session JSON object (ChatGPT Web, Codex CLI, Claude Code, Antigravity, etc.), a single raw access token, a JSON array of either, or newline-delimited (NDJSON) entries mixing the above.
         name:
           type: string
           nullable: true
@@ -23468,7 +23468,7 @@ components:
           description: Registered active proxy definition id to bind to imported accounts. Raw proxy URLs are rejected; create and enable a proxy definition first.
         status:
           $ref: '#/components/schemas/ProviderAccountStatus'
-    CodexSessionImportItem:
+    SessionImportItem:
       type: object
       required:
         - index
@@ -23490,7 +23490,7 @@ components:
           $ref: '#/components/schemas/Id'
         message:
           type: string
-    CodexSessionImportMessage:
+    SessionImportMessage:
       type: object
       required:
         - index
@@ -23503,7 +23503,7 @@ components:
           type: string
         message:
           type: string
-    CodexSessionImportResult:
+    SessionImportResult:
       type: object
       required:
         - total
@@ -23533,23 +23533,23 @@ components:
         items:
           type: array
           items:
-            $ref: '#/components/schemas/CodexSessionImportItem'
+            $ref: '#/components/schemas/SessionImportItem'
         warnings:
           type: array
           items:
-            $ref: '#/components/schemas/CodexSessionImportMessage'
+            $ref: '#/components/schemas/SessionImportMessage'
         errors:
           type: array
           items:
-            $ref: '#/components/schemas/CodexSessionImportMessage'
-    CodexSessionImportResponse:
+            $ref: '#/components/schemas/SessionImportMessage'
+    SessionImportResponse:
       type: object
       required:
         - data
         - request_id
       properties:
         data:
-          $ref: '#/components/schemas/CodexSessionImportResult'
+          $ref: '#/components/schemas/SessionImportResult'
         request_id:
           $ref: '#/components/schemas/RequestId'
     BatchUpdateAccountsRequest:

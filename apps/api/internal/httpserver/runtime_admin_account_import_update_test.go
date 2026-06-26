@@ -26,7 +26,7 @@ func TestAdminAccountImportUpdatesExistingGenericAccount(t *testing.T) {
 	if importResp.Data.UpdatedIds[0] != accountResp.Data.Id {
 		t.Fatalf("expected updated id %s, got %s", accountResp.Data.Id, importResp.Data.UpdatedIds[0])
 	}
-	if len(importResp.Data.Items) != 1 || importResp.Data.Items[0].Action != apiopenapi.CodexSessionImportItemActionUpdated {
+	if len(importResp.Data.Items) != 1 || importResp.Data.Items[0].Action != apiopenapi.SessionImportItemActionUpdated {
 		t.Fatalf("expected updated import item, got %+v", importResp.Data.Items)
 	}
 
@@ -70,7 +70,7 @@ func TestAdminAccountImportDoesNotCollapseSharedChatGPTAccountID(t *testing.T) {
 		t.Fatalf("expected three created ids/items, got %+v", importResp.Data)
 	}
 	for _, item := range importResp.Data.Items {
-		if item.Action != apiopenapi.CodexSessionImportItemActionCreated || item.AccountId == nil {
+		if item.Action != apiopenapi.SessionImportItemActionCreated || item.AccountId == nil {
 			t.Fatalf("expected created item with account id, got %+v", item)
 		}
 	}

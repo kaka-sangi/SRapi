@@ -10,7 +10,7 @@ import {
   type AccountOAuthFlowMode,
   type ProvisionedTokens,
 } from "@/components/admin/account-oauth-authorize-dialog";
-import { CodexImportResultPanel } from "@/components/admin/codex-session-import-dialog";
+import { SessionImportResultPanel } from "@/components/admin/session-import-dialog";
 import {
   Dialog,
   DialogContent,
@@ -33,7 +33,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useCreateAccount, useImportAccounts, useImportCodexSession } from "@/hooks/admin-queries";
+import { useCreateAccount, useImportAccounts, useImportSession } from "@/hooks/admin-queries";
 import { buildImportAccountsBody } from "@/lib/admin-account-form";
 import { adminApi, adminErrorMessage } from "@/lib/admin-api";
 import {
@@ -44,7 +44,7 @@ import type { CRSPreviewResult, CRSSyncResult } from "@/lib/admin-api";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import type {
-  CodexSessionImportResult,
+  SessionImportResult,
   Id,
   ProviderAccountImportResult,
   RuntimeClass,
@@ -54,40 +54,40 @@ export function AccountImportDialog({
   open,
   onOpenChange,
   providerOptions,
-  codexProviderOptions,
+  sessionProviderOptions,
   defaultProviderId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   providerOptions: AccountProviderOption[];
-  // Codex/ChatGPT sessions can only be imported into a codex-cli reverse-proxy
-  // provider. When provided, the "Import Codex session" tab is restricted to
-  // these (vs. listing every provider, which would let an operator pick an
-  // incompatible one and fail confusingly). Falls back to all providers.
-  codexProviderOptions?: { value: string; label: string }[];
+  // Session imports can only target a compatible reverse-proxy provider. When
+  // provided, the "Import session" tab is restricted to these (vs. listing
+  // every provider, which would let an operator pick an incompatible one and
+  // fail confusingly). Falls back to all providers.
+  sessionProviderOptions?: { value: string; label: string }[];
   defaultProviderId: string;
 }) {
   const { t } = useLanguage();
   const { toast } = useToast();
-  const codexOptions =
-    codexProviderOptions && codexProviderOptions.length > 0 ? codexProviderOptions : providerOptions;
-  const defaultCodexProviderId = codexOptions[0]?.value ?? defaultProviderId;
+  const sessionOptions =
+    sessionProviderOptions && sessionProviderOptions.length > 0 ? sessionProviderOptions : providerOptions;
+  const defaultSessionProviderId = sessionOptions[0]?.value ?? defaultProviderId;
   const importMut = useImportAccounts();
-  const codexImportMut = useImportCodexSession();
+  const sessionImportMut = useImportSession();
   const createAccountMut = useCreateAccount();
-  const [tab, setTab] = useState<"json" | "codex" | "oauth" | "batch" | "crs">("batch");
+  const [tab, setTab] = useState<"json" | "session" | "oauth" | "batch" | "crs">("batch");
   const [json, setJson] = useState("");
   const [jsonProviderId, setJsonProviderId] = useState<string>(defaultProviderId);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ProviderAccountImportResult | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
-  const [codexProviderId, setCodexProviderId] = useState<string>(defaultCodexProviderId);
-  const [codexContent, setCodexContent] = useState("");
-  const [codexName, setCodexName] = useState("");
-  const [codexUpdateExisting, setCodexUpdateExisting] = useState(true);
-  const [codexAlsoChatGPTWeb, setCodexAlsoChatGPTWeb] = useState(true);
-  const [codexResult, setCodexResult] = useState<CodexSessionImportResult | null>(null);
-  const [codexFileNames, setCodexFileNames] = useState<string[]>([]);
+  const [sessionProviderId, setSessionProviderId] = useState<string>(defaultSessionProviderId);
+  const [sessionContent, setSessionContent] = useState("");
+  const [sessionName, setSessionName] = useState("");
+  const [sessionUpdateExisting, setSessionUpdateExisting] = useState(true);
+  const [sessionAlsoChatGPTWeb, setSessionAlsoChatGPTWeb] = useState(true);
+  const [sessionResult, setSessionResult] = useState<SessionImportResult | null>(null);
+  const [sessionFileNames, setSessionFileNames] = useState<string[]>([]);
   const [oauthProviderId, setOAuthProviderId] = useState<string>(defaultProviderId);
   const [oauthName, setOAuthName] = useState("");
   const [oauthMode, setOAuthMode] = useState<AccountOAuthFlowMode>("authorization_code");
@@ -116,13 +116,13 @@ export function AccountImportDialog({
     setFileName(files[0].name);
   }, []);
 
-  const handleCodexFiles = useCallback(async (files: File[]) => {
+  const handleSessionFiles = useCallback(async (files: File[]) => {
     const texts = await Promise.all(files.map((f) => f.text()));
     // Replace on each drop (combining only the files in this drop) rather than
     // appending across drops — dropping a corrected file should not silently
     // concatenate it onto the previous (wrong) one.
-    setCodexContent(texts.join("\n"));
-    setCodexFileNames(files.map((f) => f.name));
+    setSessionContent(texts.join("\n"));
+    setSessionFileNames(files.map((f) => f.name));
   }, []);
 
   function reset() {
@@ -132,12 +132,12 @@ export function AccountImportDialog({
     setError(null);
     setResult(null);
     setFileName(null);
-    setCodexProviderId(defaultCodexProviderId);
-    setCodexContent("");
-    setCodexName("");
-    setCodexUpdateExisting(true);
-    setCodexResult(null);
-    setCodexFileNames([]);
+    setSessionProviderId(defaultSessionProviderId);
+    setSessionContent("");
+    setSessionName("");
+    setSessionUpdateExisting(true);
+    setSessionResult(null);
+    setSessionFileNames([]);
     setOAuthProviderId(defaultProviderId);
     setOAuthName("");
     setOAuthMode("authorization_code");
@@ -190,43 +190,43 @@ export function AccountImportDialog({
     }
   }
 
-  async function submitCodex() {
+  async function submitSession() {
     setError(null);
-    if (!codexProviderId) {
-      setError(t("codexImport.providerRequired"));
+    if (!sessionProviderId) {
+      setError(t("sessionImport.providerRequired"));
       return;
     }
-    if (!codexContent.trim()) {
-      setError(t("codexImport.contentRequired"));
+    if (!sessionContent.trim()) {
+      setError(t("sessionImport.contentRequired"));
       return;
     }
     try {
-      const data = await codexImportMut.mutateAsync({
-        provider_id: codexProviderId as Id,
-        content: codexContent,
-        name: codexName.trim() ? codexName.trim() : undefined,
-        update_existing: codexUpdateExisting,
+      const data = await sessionImportMut.mutateAsync({
+        provider_id: sessionProviderId as Id,
+        content: sessionContent,
+        name: sessionName.trim() ? sessionName.trim() : undefined,
+        update_existing: sessionUpdateExisting,
       });
-      setCodexResult(data);
+      setSessionResult(data);
 
       // Create paired chatgpt-web accounts: re-import the same content
       // into the chatgpt-web provider. The backend resolves upstream_client
       // and base_url from the provider preset, so the accounts get the
       // correct chatgpt_web settings.
-      if (codexAlsoChatGPTWeb && data.created > 0) {
+      if (sessionAlsoChatGPTWeb && data.created > 0) {
         const chatgptWebProvider = providerOptions.find(
           (o) => o.adapterType === "reverse-proxy-chatgpt-web",
         );
         if (chatgptWebProvider) {
           try {
-            const webName = codexName.trim()
-              ? codexName.trim().replace(/codex/gi, "chatgpt-web")
+            const webName = sessionName.trim()
+              ? sessionName.trim().replace(/codex/gi, "chatgpt-web")
               : "chatgpt-web";
-            await codexImportMut.mutateAsync({
+            await sessionImportMut.mutateAsync({
               provider_id: chatgptWebProvider.value as Id,
-              content: codexContent,
+              content: sessionContent,
               name: webName,
-              update_existing: codexUpdateExisting,
+              update_existing: sessionUpdateExisting,
             });
             toast({ title: t("adminAccounts.chatgptWebCreated"), tone: "success" });
           } catch {
@@ -236,8 +236,8 @@ export function AccountImportDialog({
       }
 
       toast({
-        title: t("codexImport.done"),
-        description: t("codexImport.doneSummary", {
+        title: t("sessionImport.done"),
+        description: t("sessionImport.doneSummary", {
           created: data.created,
           updated: data.updated,
           skipped: data.skipped,
@@ -256,7 +256,7 @@ export function AccountImportDialog({
   async function applyProvisionedTokens(tokens: ProvisionedTokens) {
     setError(null);
     if (!oauthProviderId) {
-      setError(t("codexImport.providerRequired"));
+      setError(t("sessionImport.providerRequired"));
       return;
     }
     const credential: Record<string, string> = {};
@@ -283,7 +283,7 @@ export function AccountImportDialog({
     setError(null);
     setBatchResult(null);
     if (!batchProviderId) {
-      setError(t("codexImport.providerRequired"));
+      setError(t("sessionImport.providerRequired"));
       return;
     }
     const rawLines = batchLines
@@ -349,7 +349,7 @@ export function AccountImportDialog({
   }
 
   const busy =
-    importMut.isPending || codexImportMut.isPending || createAccountMut.isPending;
+    importMut.isPending || sessionImportMut.isPending || createAccountMut.isPending;
 
   return (
     <>
@@ -371,7 +371,7 @@ export function AccountImportDialog({
         <DialogHeader>
           <DialogTitle>{t("adminAccounts.importTitle")}</DialogTitle>
           <DialogDescription>
-            {tab === "codex" ? t("codexImport.dialogHint") : t("adminAccounts.importHint")}
+            {tab === "session" ? t("sessionImport.dialogHint") : t("adminAccounts.importHint")}
           </DialogDescription>
         </DialogHeader>
 
@@ -380,7 +380,7 @@ export function AccountImportDialog({
             <TabsTrigger value="batch">{t("batchAdd.tab")}</TabsTrigger>
             <TabsTrigger value="crs">{t("crsSync.tab")}</TabsTrigger>
             <TabsTrigger value="json">{t("adminAccounts.importJson")}</TabsTrigger>
-            <TabsTrigger value="codex">{t("codexImport.action")}</TabsTrigger>
+            <TabsTrigger value="session">{t("sessionImport.action")}</TabsTrigger>
             <TabsTrigger value="oauth">{t("accountOAuth.authorizeAccount")}</TabsTrigger>
           </TabsList>
 
@@ -390,7 +390,7 @@ export function AccountImportDialog({
                 <Label htmlFor="batch-provider">{t("adminAccounts.provider")}</Label>
                 <Select value={batchProviderId} onValueChange={setBatchProviderId} disabled={busy}>
                   <SelectTrigger id="batch-provider">
-                    <SelectValue placeholder={t("codexImport.providerPlaceholder")} />
+                    <SelectValue placeholder={t("sessionImport.providerPlaceholder")} />
                   </SelectTrigger>
                   <SelectContent>
                     {providerOptions.map((opt) => (
@@ -471,26 +471,26 @@ export function AccountImportDialog({
                 <div className="space-y-3 rounded-xl border border-srapi-border bg-srapi-card-muted p-3.5">
                   <div className="grid grid-cols-2 gap-2 text-center">
                     <ImportStat
-                      label={t("codexImport.created")}
+                      label={t("sessionImport.created")}
                       value={batchResult.created}
                       tone="success"
                       tier="primary"
                       tooltip={{
                         rows: [
-                          { label: t("codexImport.failed"), value: batchResult.failed },
+                          { label: t("sessionImport.failed"), value: batchResult.failed },
                           {
-                            label: t("codexImport.total") ?? "Total",
+                            label: t("sessionImport.total") ?? "Total",
                             value: batchResult.created + batchResult.failed,
                           },
                         ],
                       }}
                     />
                     <ImportStat
-                      label={t("codexImport.failed")}
+                      label={t("sessionImport.failed")}
                       value={batchResult.failed}
                       tone="error"
                       tooltip={{
-                        rows: [{ label: t("codexImport.created"), value: batchResult.created }],
+                        rows: [{ label: t("sessionImport.created"), value: batchResult.created }],
                       }}
                     />
                   </div>
@@ -621,21 +621,21 @@ export function AccountImportDialog({
                 <div className="space-y-3 rounded-xl border border-srapi-border bg-srapi-card-muted p-3.5">
                   <div className="grid grid-cols-4 gap-2 text-center">
                     <ImportStat
-                      label={t("codexImport.created")}
+                      label={t("sessionImport.created")}
                       value={crsResult.created}
                       tone="success"
                       tier="primary"
                       tooltip={{
                         rows: [
-                          { label: t("codexImport.updated"), value: crsResult.updated },
-                          { label: t("codexImport.skipped"), value: crsResult.skipped },
-                          { label: t("codexImport.failed"), value: crsResult.failed },
+                          { label: t("sessionImport.updated"), value: crsResult.updated },
+                          { label: t("sessionImport.skipped"), value: crsResult.skipped },
+                          { label: t("sessionImport.failed"), value: crsResult.failed },
                         ],
                       }}
                     />
-                    <ImportStat label={t("codexImport.updated")} value={crsResult.updated} />
-                    <ImportStat label={t("codexImport.skipped")} value={crsResult.skipped} tier="tertiary" />
-                    <ImportStat label={t("codexImport.failed")} value={crsResult.failed} tone="error" />
+                    <ImportStat label={t("sessionImport.updated")} value={crsResult.updated} />
+                    <ImportStat label={t("sessionImport.skipped")} value={crsResult.skipped} tier="tertiary" />
+                    <ImportStat label={t("sessionImport.failed")} value={crsResult.failed} tone="error" />
                   </div>
                 </div>
               )}
@@ -648,7 +648,7 @@ export function AccountImportDialog({
                 <Label htmlFor="import-json-provider">{t("adminAccounts.importTargetProvider")}</Label>
                 <Select value={jsonProviderId} onValueChange={setJsonProviderId} disabled={busy}>
                   <SelectTrigger id="import-json-provider">
-                    <SelectValue placeholder={t("codexImport.providerPlaceholder")} />
+                    <SelectValue placeholder={t("sessionImport.providerPlaceholder")} />
                   </SelectTrigger>
                   <SelectContent>
                     {providerOptions.map((opt) => (
@@ -691,16 +691,16 @@ export function AccountImportDialog({
             </div>
           </TabsContent>
 
-          <TabsContent value="codex">
+          <TabsContent value="session">
             <div className="space-y-4">
               <div>
-                <Label htmlFor="codex-import-provider">{t("codexImport.provider")}</Label>
-                <Select value={codexProviderId} onValueChange={setCodexProviderId} disabled={busy}>
-                  <SelectTrigger id="codex-import-provider">
-                    <SelectValue placeholder={t("codexImport.providerPlaceholder")} />
+                <Label htmlFor="session-import-provider">{t("sessionImport.provider")}</Label>
+                <Select value={sessionProviderId} onValueChange={setSessionProviderId} disabled={busy}>
+                  <SelectTrigger id="session-import-provider">
+                    <SelectValue placeholder={t("sessionImport.providerPlaceholder")} />
                   </SelectTrigger>
                   <SelectContent>
-                    {codexOptions.map((opt) => (
+                    {sessionOptions.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>
                         {opt.label}
                       </SelectItem>
@@ -709,81 +709,81 @@ export function AccountImportDialog({
                 </Select>
               </div>
               <div>
-                <Label htmlFor="codex-import-content">{t("codexImport.content")}</Label>
+                <Label htmlFor="session-import-content">{t("sessionImport.content")}</Label>
                 <FileDropZone
                   accept=".json,.txt,.ndjson"
                   multiple
                   disabled={busy}
-                  hint={t("codexImport.dropHint")}
-                  onFiles={(files) => void handleCodexFiles(files)}
-                  fileNames={codexFileNames}
+                  hint={t("sessionImport.dropHint")}
+                  onFiles={(files) => void handleSessionFiles(files)}
+                  fileNames={sessionFileNames}
                   onClearFiles={() => {
-                    setCodexFileNames([]);
-                    setCodexContent("");
+                    setSessionFileNames([]);
+                    setSessionContent("");
                   }}
                   className="mb-2"
                 />
                 <Textarea
-                  id="codex-import-content"
+                  id="session-import-content"
                   rows={8}
                   spellCheck={false}
                   className="font-mono text-xs"
-                  placeholder={t("codexImport.contentPlaceholder")}
-                  value={codexContent}
-                  onChange={(e) => setCodexContent(e.target.value)}
+                  placeholder={t("sessionImport.contentPlaceholder")}
+                  value={sessionContent}
+                  onChange={(e) => setSessionContent(e.target.value)}
                   disabled={busy}
                 />
-                <p className="mt-1 text-xs text-srapi-text-tertiary">{t("codexImport.contentHint")}</p>
+                <p className="mt-1 text-xs text-srapi-text-tertiary">{t("sessionImport.contentHint")}</p>
               </div>
               <div>
-                <Label htmlFor="codex-import-name">{t("codexImport.name")}</Label>
+                <Label htmlFor="session-import-name">{t("sessionImport.name")}</Label>
                 <Input
-                  id="codex-import-name"
-                  placeholder={t("codexImport.namePlaceholder")}
-                  value={codexName}
-                  onChange={(e) => setCodexName(e.target.value)}
+                  id="session-import-name"
+                  placeholder={t("sessionImport.namePlaceholder")}
+                  value={sessionName}
+                  onChange={(e) => setSessionName(e.target.value)}
                   disabled={busy}
                 />
               </div>
               <div className="flex items-center justify-between rounded-md border border-srapi-border px-3 py-2">
                 <div>
-                  <Label htmlFor="codex-import-update" className="cursor-pointer">
-                    {t("codexImport.updateExisting")}
+                  <Label htmlFor="session-import-update" className="cursor-pointer">
+                    {t("sessionImport.updateExisting")}
                   </Label>
-                  <p className="text-xs text-srapi-text-tertiary">{t("codexImport.updateExistingHint")}</p>
+                  <p className="text-xs text-srapi-text-tertiary">{t("sessionImport.updateExistingHint")}</p>
                 </div>
                 <Switch
-                  id="codex-import-update"
-                  checked={codexUpdateExisting}
-                  onCheckedChange={setCodexUpdateExisting}
+                  id="session-import-update"
+                  checked={sessionUpdateExisting}
+                  onCheckedChange={setSessionUpdateExisting}
                   disabled={busy}
                 />
               </div>
               <div className="flex items-center justify-between rounded-md border border-srapi-border px-3 py-2">
                 <div>
-                  <Label htmlFor="codex-import-chatgpt-web" className="cursor-pointer">
+                  <Label htmlFor="session-import-chatgpt-web" className="cursor-pointer">
                     {t("adminAccounts.alsoCreateChatGPTWeb")}
                   </Label>
                   <p className="text-xs text-srapi-text-tertiary">{t("adminAccounts.alsoCreateChatGPTWebHint")}</p>
                 </div>
                 <Switch
-                  id="codex-import-chatgpt-web"
-                  checked={codexAlsoChatGPTWeb}
-                  onCheckedChange={setCodexAlsoChatGPTWeb}
+                  id="session-import-chatgpt-web"
+                  checked={sessionAlsoChatGPTWeb}
+                  onCheckedChange={setSessionAlsoChatGPTWeb}
                   disabled={busy}
                 />
               </div>
-              {codexResult ? <CodexImportResultPanel result={codexResult} /> : null}
+              {sessionResult ? <SessionImportResultPanel result={sessionResult} /> : null}
             </div>
           </TabsContent>
 
           <TabsContent value="oauth">
             <div className="space-y-4">
               <div>
-                <Label htmlFor="oauth-import-provider">{t("codexImport.provider")}</Label>
+                <Label htmlFor="oauth-import-provider">{t("sessionImport.provider")}</Label>
                 <Select value={oauthProviderId} onValueChange={setOAuthProviderId} disabled={busy}>
                   <SelectTrigger id="oauth-import-provider">
-                    <SelectValue placeholder={t("codexImport.providerPlaceholder")} />
+                    <SelectValue placeholder={t("sessionImport.providerPlaceholder")} />
                   </SelectTrigger>
                   <SelectContent>
                     {providerOptions.map((opt) => (
@@ -795,10 +795,10 @@ export function AccountImportDialog({
                 </Select>
               </div>
               <div>
-                <Label htmlFor="oauth-import-name">{t("codexImport.name")}</Label>
+                <Label htmlFor="oauth-import-name">{t("sessionImport.name")}</Label>
                 <Input
                   id="oauth-import-name"
-                  placeholder={t("codexImport.namePlaceholder")}
+                  placeholder={t("sessionImport.namePlaceholder")}
                   value={oauthName}
                   onChange={(e) => setOAuthName(e.target.value)}
                   disabled={busy}
@@ -867,15 +867,15 @@ export function AccountImportDialog({
             >
               {t("adminAccounts.importSubmit")}
             </Button>
-          ) : tab === "codex" ? (
+          ) : tab === "session" ? (
             <Button
               type="button"
               variant="primary"
-              loading={codexImportMut.isPending}
-              disabled={!codexContent.trim() || !codexProviderId || busy}
-              onClick={() => void submitCodex()}
+              loading={sessionImportMut.isPending}
+              disabled={!sessionContent.trim() || !sessionProviderId || busy}
+              onClick={() => void submitSession()}
             >
-              {t("codexImport.submit")}
+              {t("sessionImport.submit")}
             </Button>
           ) : tab === "crs" ? (
             crsStep === "input" ? (
@@ -952,22 +952,22 @@ function ProviderImportResultPanel({ result }: { result: ProviderAccountImportRe
     <div className="space-y-3 rounded-xl border border-srapi-border bg-srapi-card-muted p-3.5">
       <div className="grid grid-cols-4 gap-2 text-center">
         <ImportStat
-          label={t("codexImport.created")}
+          label={t("sessionImport.created")}
           value={result.created_count}
           tone="success"
           tier="primary"
           tooltip={{
             rows: [
-              { label: t("codexImport.updated"), value: result.updated_count },
-              { label: t("codexImport.skipped"), value: result.skipped_count },
-              { label: t("codexImport.failed"), value: result.failed_count },
-              { label: t("codexImport.total") ?? "Total", value: total },
+              { label: t("sessionImport.updated"), value: result.updated_count },
+              { label: t("sessionImport.skipped"), value: result.skipped_count },
+              { label: t("sessionImport.failed"), value: result.failed_count },
+              { label: t("sessionImport.total") ?? "Total", value: total },
             ],
           }}
         />
-        <ImportStat label={t("codexImport.updated")} value={result.updated_count} />
-        <ImportStat label={t("codexImport.skipped")} value={result.skipped_count} tier="tertiary" />
-        <ImportStat label={t("codexImport.failed")} value={result.failed_count} tone="error" />
+        <ImportStat label={t("sessionImport.updated")} value={result.updated_count} />
+        <ImportStat label={t("sessionImport.skipped")} value={result.skipped_count} tier="tertiary" />
+        <ImportStat label={t("sessionImport.failed")} value={result.failed_count} tone="error" />
       </div>
       {result.errors.length > 0 ? (
         <div>

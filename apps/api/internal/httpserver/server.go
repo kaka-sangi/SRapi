@@ -993,7 +993,8 @@ func (s *Server) registerCapabilityAdminRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/v1/admin/group-rate-limits/{groupId}", s.handleDeleteAdminGroupRateLimit)
 	mux.HandleFunc("GET /api/v1/admin/config-snapshot", s.handleAdminConfigSnapshot)
 	mux.HandleFunc("POST /api/v1/admin/config-snapshot/import", s.handleAdminConfigImport)
-	mux.HandleFunc("POST /api/v1/admin/accounts/import/codex-session", s.handleImportAdminCodexSession)
+	mux.HandleFunc("POST /api/v1/admin/accounts/import/session", s.handleImportAdminSession)
+	mux.HandleFunc("POST /api/v1/admin/accounts/import/codex-session", s.handleImportAdminSession) // backward-compat alias
 }
 
 func (s *Server) registerCurrentUserRoutes(mux *http.ServeMux) {
