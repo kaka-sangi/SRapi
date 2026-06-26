@@ -83,7 +83,7 @@ func TestRunWebSearchEmptyQueryErrors(t *testing.T) {
 }
 
 func TestEngineOffersAndRunsWebSearch(t *testing.T) {
-	eng := NewEngine(mustCatalog(t))
+	eng := NewEngine(mustCatalog(t), nil)
 	var toolNames []string
 	searched := ""
 	llm := func(_ context.Context, _ string, _ []provideradaptercontract.ConversationMessage, tools []map[string]any, _ func(string, string)) (provideradaptercontract.ConversationResponse, error) {
@@ -128,7 +128,7 @@ func TestEngineOffersAndRunsWebSearch(t *testing.T) {
 }
 
 func TestEngineOmitsWebSearchWhenNil(t *testing.T) {
-	eng := NewEngine(mustCatalog(t))
+	eng := NewEngine(mustCatalog(t), nil)
 	var toolNames []string
 	llm := func(_ context.Context, _ string, _ []provideradaptercontract.ConversationMessage, tools []map[string]any, _ func(string, string)) (provideradaptercontract.ConversationResponse, error) {
 		for _, tl := range tools {

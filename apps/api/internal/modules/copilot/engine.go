@@ -38,17 +38,20 @@ type DispatchFunc func(ctx context.Context, method, path string, body []byte) (i
 // round-trips the conversation history.
 type Engine struct {
 	catalog *Catalog
+	skills  *SkillRegistry
 }
 
-// NewEngine constructs an Engine over the admin operation catalog.
-func NewEngine(catalog *Catalog) *Engine { return &Engine{catalog: catalog} }
+// NewEngine constructs an Engine over the admin operation catalog and skill registry.
+func NewEngine(catalog *Catalog, skills *SkillRegistry) *Engine {
+	return &Engine{catalog: catalog, skills: skills}
+}
 
 // Run executes one copilot turn, streaming events via emit. It returns the
 // updated history. When a mutation needs approval it emits a pending_action and
 // returns without a done event; the caller's client resumes by re-sending the
 // history plus an Approval.
 func (e *Engine) Run(ctx context.Context, settings Settings, history []Message, approval *Approval, llm LLMFunc, dispatch DispatchFunc, search SearchFunc, emit func(Event)) ([]Message, error) {
-	system := SystemPrompt(e.catalog, settings.AutoRunReads, search != nil, settings.SystemSummary)
+	system := SystemPrompt(e.catalog, e.skills, settings.AutoRunReads, search != nil, settings.SystemSummary)
 	tools := MetaToolSchemas()
 	if search != nil {
 		tools = append(tools, webSearchToolSchema())
@@ -103,7 +106,7 @@ func (e *Engine) Run(ctx context.Context, settings Settings, history []Message, 
 		// Answer the pending tool calls in order.
 		for _, tc := range pending {
 			switch tc.Name {
-			case toolGetOperationDetail, toolGetSchema:
+			case toolGetOperationDetail, toolGetSchema, toolGetSkill:
 				content, isErr := e.executeLocalTool(tc)
 				history = appendToolResult(history, tc, 0, content, isErr)
 				emit(Event{Type: EventToolResult, Data: ToolResultData{ToolCallID: tc.ID, Name: tc.Name, Content: content, IsError: isErr}})
@@ -205,9 +208,35 @@ func (e *Engine) executeLocalTool(tc ToolCall) (string, bool) {
 			return fmt.Sprintf("unknown schema %q", args.Name), true
 		}
 		return marshalJSON(schema), false
+	case toolGetSkill:
+		var args struct {
+			Name string `json:"name"`
+		}
+		if err := json.Unmarshal([]byte(orEmptyJSON(tc.ArgumentsJSON)), &args); err != nil {
+			return "invalid arguments: " + err.Error(), true
+		}
+		if e.skills == nil {
+			return "no skills loaded", true
+		}
+		skill, ok := e.skills.Get(strings.TrimSpace(args.Name))
+		if !ok {
+			return fmt.Sprintf("unknown skill %q — available skills: %s", args.Name, e.skillNames()), true
+		}
+		return skill.Body, false
 	default:
 		return "unknown tool", true
 	}
+}
+
+func (e *Engine) skillNames() string {
+	if e.skills == nil {
+		return "(none)"
+	}
+	names := make([]string, 0, len(e.skills.List()))
+	for _, s := range e.skills.List() {
+		names = append(names, s.Name)
+	}
+	return strings.Join(names, ", ")
 }
 
 func (e *Engine) summarize(method, path string) string {

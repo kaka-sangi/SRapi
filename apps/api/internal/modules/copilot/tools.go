@@ -9,6 +9,7 @@ const (
 	toolGetSchema          = "get_schema"
 	toolCallAdminAPI       = "call_admin_api"
 	toolWebSearch          = "web_search"
+	toolGetSkill           = "get_skill"
 )
 
 // MetaToolSchemas returns the OpenAI-function-shaped tool definitions handed to
@@ -53,6 +54,23 @@ func MetaToolSchemas() []map[string]any {
 		{
 			"type": "function",
 			"function": map[string]any{
+				"name":        toolGetSkill,
+				"description": "Load a predefined skill's step-by-step instructions. Call this BEFORE executing a task when a matching skill exists in the skill catalog. The skill instructions tell you exactly which APIs to call and in what order — follow them precisely.",
+				"parameters": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"name": map[string]any{
+							"type":        "string",
+							"description": "Skill name from the skill catalog.",
+						},
+					},
+					"required": []any{"name"},
+				},
+			},
+		},
+		{
+			"type": "function",
+			"function": map[string]any{
 				"name":        toolCallAdminAPI,
 				"description": "Execute an admin API call. GET/read calls run immediately; mutating calls (POST/PUT/PATCH/DELETE) are shown to the administrator for approval before they run. Use the exact method and path from the catalog, substituting concrete values for {path} parameters.",
 				"parameters": map[string]any{
@@ -82,13 +100,13 @@ func MetaToolSchemas() []map[string]any {
 // SystemPrompt builds the instructions, embedding the compact operation catalog.
 // webSearch enables guidance for the web_search tool (only offered when a search
 // backend is configured for the turn).
-func SystemPrompt(catalog *Catalog, autoRunReads, webSearch bool, systemSummary string) string {
+func SystemPrompt(catalog *Catalog, skills *SkillRegistry, autoRunReads, webSearch bool, systemSummary string) string {
 	var b strings.Builder
 	b.WriteString(`You are 小r (xiǎo r), the SRapi Admin Copilot — a specialized AI operator embedded in the admin console. You execute admin operations on behalf of the signed-in administrator through the admin HTTP API. Every call runs with their session, permissions, and audit trail.
 
 Identity: You are 小r, friendly and efficient. When greeted, introduce yourself briefly. You speak the user's language (Chinese if they write in Chinese, English if in English, etc.).
 
-Tools: get_operation_detail, get_schema, call_admin_api`)
+Tools: get_operation_detail, get_schema, get_skill, call_admin_api`)
 	if webSearch {
 		b.WriteString(`, web_search (for external/public-web lookups — cite source URLs)`)
 	}
@@ -156,6 +174,12 @@ SRapi is an AI gateway / API management platform. Key concepts:
 - Modify system settings (general, security, features, email, backup, etc.)
 
 `)
+	if skills != nil && len(skills.List()) > 0 {
+		b.WriteString("## Skills\nWhen the user's request matches a skill below, call get_skill(name) FIRST and follow its instructions step by step. Do not improvise — the skill defines the exact API sequence.\n\n")
+		b.WriteString(skills.CatalogText())
+		b.WriteString("\n")
+	}
+
 	b.WriteString("Operation catalog (METHOD path  operationId — summary):\n\n")
 	b.WriteString(catalog.CompactText())
 

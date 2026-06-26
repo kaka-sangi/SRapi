@@ -772,7 +772,11 @@ func (rt *runtimeState) buildCapabilityServices(cfg config.Config, opts runtimeO
 	if catalog, err := copilot.LoadCatalog(); err != nil {
 		rt.logger.Error("failed to load admin copilot catalog", "error", err)
 	} else {
-		rt.copilotEngine = copilot.NewEngine(catalog)
+		skills, skillErr := copilot.LoadSkills()
+		if skillErr != nil {
+			rt.logger.Error("failed to load copilot skills", "error", skillErr)
+		}
+		rt.copilotEngine = copilot.NewEngine(catalog, skills)
 	}
 	return nil
 }

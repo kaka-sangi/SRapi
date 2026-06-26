@@ -67,7 +67,7 @@ func toolUseResponse(id, name, args string) provideradaptercontract.Conversation
 
 func TestSystemPromptIncludesOperationalGuidance(t *testing.T) {
 	cat := mustCatalog(t)
-	prompt := SystemPrompt(cat, true, false, "")
+	prompt := SystemPrompt(cat, nil, true, false, "")
 	for _, want := range []string{
 		"get_operation_detail",
 		"Never invent IDs",
@@ -80,7 +80,7 @@ func TestSystemPromptIncludesOperationalGuidance(t *testing.T) {
 	if strings.Contains(prompt, "web_search") {
 		t.Fatalf("web_search guidance must be absent when search is disabled")
 	}
-	if !strings.Contains(SystemPrompt(cat, true, true, ""), "web_search") {
+	if !strings.Contains(SystemPrompt(cat, nil, true, true, ""), "web_search") {
 		t.Fatalf("web_search guidance must appear when search is enabled")
 	}
 }
@@ -94,7 +94,7 @@ func collectTypes(events []Event) []string {
 }
 
 func TestEngineReadFlowAutoRuns(t *testing.T) {
-	eng := NewEngine(mustCatalog(t))
+	eng := NewEngine(mustCatalog(t), nil)
 	calls := 0
 	llm := func(_ context.Context, _ string, _ []provideradaptercontract.ConversationMessage, _ []map[string]any, _ func(string, string)) (provideradaptercontract.ConversationResponse, error) {
 		calls++
@@ -134,7 +134,7 @@ func TestEngineReadFlowAutoRuns(t *testing.T) {
 }
 
 func TestEngineWriteFlowRequiresApproval(t *testing.T) {
-	eng := NewEngine(mustCatalog(t))
+	eng := NewEngine(mustCatalog(t), nil)
 	llm := func(_ context.Context, _ string, _ []provideradaptercontract.ConversationMessage, _ []map[string]any, _ func(string, string)) (provideradaptercontract.ConversationResponse, error) {
 		return toolUseResponse("w1", toolCallAdminAPI, `{"method":"POST","path":"/api/v1/admin/users","body":{"email":"a@b.co"}}`), nil
 	}
@@ -187,7 +187,7 @@ func TestEngineWriteFlowRequiresApproval(t *testing.T) {
 }
 
 func TestEngineWriteFlowDenied(t *testing.T) {
-	eng := NewEngine(mustCatalog(t))
+	eng := NewEngine(mustCatalog(t), nil)
 	llm := func(_ context.Context, _ string, _ []provideradaptercontract.ConversationMessage, _ []map[string]any, _ func(string, string)) (provideradaptercontract.ConversationResponse, error) {
 		return toolUseResponse("d1", toolCallAdminAPI, `{"method":"DELETE","path":"/api/v1/admin/announcements/3"}`), nil
 	}
