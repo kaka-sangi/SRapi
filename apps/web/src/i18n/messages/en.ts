@@ -233,7 +233,7 @@ export const en = {
     adminAnnouncements: "Announcements",
     adminUsage: "Usage records",
     adminOrdersPlans: "Plans",
-    adminChannelsPricing: "Channel pricing",
+    adminChannelsPricing: "Model pricing",
     adminPaymentProviders: "Payment providers",
     adminPromoCodes: "Promo codes",
     adminRedeem: "Redeem codes",
@@ -3894,7 +3894,7 @@ export const en = {
     on100: "On $100",
   },
   adminPricing: {
-    title: "Channel pricing",
+    title: "Model pricing",
     subtitle:
       "Per-model upstream pricing rules. A rule applies only when its (model, provider, effective_at) matches the dispatched request — if traffic falls through to default-zero, check Gateway resources for the unmatched routes.",
     coverageDiagnosticLink: "Open coverage diagnostics →",

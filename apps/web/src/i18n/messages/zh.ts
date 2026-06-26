@@ -234,7 +234,7 @@ export const zh: Messages = {
     adminAnnouncements: "公告",
     adminUsage: "用量记录",
     adminOrdersPlans: "套餐",
-    adminChannelsPricing: "渠道定价",
+    adminChannelsPricing: "模型定价",
     adminPaymentProviders: "支付渠道",
     adminPromoCodes: "优惠码",
     adminRedeem: "兑换码",
@@ -3841,9 +3841,9 @@ export const zh: Messages = {
     on100: "按 $100",
   },
   adminPricing: {
-    title: "渠道定价",
+    title: "模型定价",
     subtitle:
-      "按模型的上游定价规则。只有当规则的（模型、服务商、生效时间）与实际分派的请求一致时才会计费；若流量落到 default-zero（未计费），请到“网关资源”页面查看哪些路由没有匹配上。",
+      "按模型设置的定价规则。只有当规则的（模型、服务商、生效时间）与实际分派的请求一致时才会计费；若流量落到 default-zero（未计费），请到“网关资源”页面查看哪些路由没有匹配上。",
     coverageDiagnosticLink: "查看覆盖诊断 →",
     model: "模型",
     provider: "服务商",
