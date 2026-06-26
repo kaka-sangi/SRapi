@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net"
@@ -89,24 +90,39 @@ func ClassifyUpstreamError(statusCode int, errBody []byte, networkErr error) Ups
 // when the caller has access to the upstream response headers (preferred over
 // scraping errBody for Retry-After). Kept separate so the public API stays
 // minimal until the header path is wired through.
-func classifyUpstreamErrorWithHeader(statusCode int, headers http.Header, _ []byte, networkErr error) UpstreamFailoverDecision {
+func classifyUpstreamErrorWithHeader(statusCode int, headers http.Header, errBody []byte, networkErr error) UpstreamFailoverDecision {
 	// Network failure preempts status code — no HTTP round-trip completed.
 	if statusCode == 0 && networkErr != nil {
 		return classifyNetworkError(networkErr)
 	}
 
+	// Parse upstream error body for provider-specific error codes (OpenAI,
+	// Anthropic, etc.) that refine the HTTP-status-only classification.
+	bodyClass := classifyUpstreamErrorBody(errBody)
+
 	switch {
 	case statusCode == http.StatusUnauthorized:
-		// 401 uses a time-limited cooldown (30 minutes) instead of permanent
-		// blacklisting. The account stays schedulable after the cooldown
-		// expires. Permanent NeedsReauth is only applied after 5+ consecutive
-		// auth failures (tracked by applyProviderAccountProtection).
 		return UpstreamFailoverDecision{
 			Class:          "account_bad",
 			ShouldFailover: true,
 			RetryAfterMs:   authErrorCooldownMs,
 		}
 	case statusCode == http.StatusForbidden:
+		// Distinguish quota exhaustion from permanent bans. OpenAI returns
+		// 403 for both "insufficient_quota" and "account_deactivated".
+		if bodyClass == "quota_exhausted" || bodyClass == "rate_limit" {
+			return UpstreamFailoverDecision{
+				Class:          "transient",
+				ShouldFailover: true,
+				RetryAfterMs:   authErrorCooldownMs,
+			}
+		}
+		if bodyClass == "content_policy" {
+			return UpstreamFailoverDecision{
+				Class:          "client_bad",
+				ShouldFailover: false,
+			}
+		}
 		return UpstreamFailoverDecision{
 			Class:           "account_bad",
 			ShouldFailover:  true,
@@ -332,4 +348,43 @@ func parseRetryAfterMillis(headers http.Header) int {
 		ms = maxRetryAfterMillis
 	}
 	return ms
+}
+
+// classifyUpstreamErrorBody parses the JSON error body returned by upstream
+// providers (OpenAI, Anthropic, etc.) and returns a refined error class.
+// Returns "" when the body is empty, unparseable, or contains no recognized
+// error code. This lets the status-code-level classifier refine its decision.
+func classifyUpstreamErrorBody(body []byte) string {
+	if len(body) == 0 {
+		return ""
+	}
+	var envelope struct {
+		Error struct {
+			Code    string `json:"code"`
+			Type    string `json:"type"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(body, &envelope) != nil {
+		return ""
+	}
+	code := strings.ToLower(strings.TrimSpace(envelope.Error.Code))
+	typ := strings.ToLower(strings.TrimSpace(envelope.Error.Type))
+	msg := strings.ToLower(strings.TrimSpace(envelope.Error.Message))
+
+	switch {
+	case code == "insufficient_quota" || strings.Contains(msg, "insufficient_quota") || strings.Contains(msg, "billing_hard_limit"):
+		return "quota_exhausted"
+	case code == "rate_limit_exceeded" || code == "rate_limit" || strings.Contains(code, "usage_limit"):
+		return "rate_limit"
+	case code == "content_policy_violation" || strings.Contains(code, "content_policy") || strings.Contains(code, "content_moderation"):
+		return "content_policy"
+	case code == "account_deactivated" || strings.Contains(msg, "account deactivated") || strings.Contains(msg, "account has been disabled"):
+		return "account_deactivated"
+	case typ == "overloaded_error" || strings.Contains(msg, "overloaded"):
+		return "overloaded"
+	case strings.Contains(msg, "safety") || strings.Contains(msg, "safety_system"):
+		return "content_policy"
+	}
+	return ""
 }
