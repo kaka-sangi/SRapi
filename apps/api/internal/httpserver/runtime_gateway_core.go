@@ -1210,6 +1210,13 @@ func (rt *runtimeState) invokeProviderConversation(ctx context.Context, req prov
 	req.Credential = dispatch.credential
 	if req.Stream {
 		streamed, streamErr := rt.adapters.StreamConversation(ctx, req)
+		if streamErr == nil && streamed.StreamBody != nil {
+			if peeked, peekErr := bootstrapPeekStream(streamed.StreamBody); peekErr != nil {
+				streamErr = peekErr
+			} else {
+				streamed.StreamBody = peeked
+			}
+		}
 		if streamErr == nil {
 			// Cross-protocol streaming: wrap the live upstream body in a reader that
 			// transcodes it into the client's protocol on the fly, and route the
