@@ -1,6 +1,7 @@
 ---
 name: batch-account-status
 description: 当用户要求批量启用、禁用、或变更多个上游账号状态时使用。包括按供应商、按分组、按状态筛选后批量操作。
+triggers: 批量启用账号,批量禁用账号,批量账号,批量变更状态,batch enable account,batch disable account,启用所有账号,禁用所有账号
 ---
 # 批量变更账号状态
 

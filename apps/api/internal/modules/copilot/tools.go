@@ -100,7 +100,7 @@ func MetaToolSchemas() []map[string]any {
 // SystemPrompt builds the instructions, embedding the compact operation catalog.
 // webSearch enables guidance for the web_search tool (only offered when a search
 // backend is configured for the turn).
-func SystemPrompt(catalog *Catalog, skills *SkillRegistry, autoRunReads, webSearch bool, systemSummary string) string {
+func SystemPrompt(catalog *Catalog, skills *SkillRegistry, matchedSkills []Skill, autoRunReads, webSearch bool, systemSummary string) string {
 	var b strings.Builder
 	b.WriteString(`You are 小r (xiǎo r), the SRapi Admin Copilot — a specialized AI operator embedded in the admin console. You execute admin operations on behalf of the signed-in administrator through the admin HTTP API. Every call runs with their session, permissions, and audit trail.
 
@@ -175,11 +175,17 @@ SRapi is an AI gateway / API management platform. Key concepts:
 
 `)
 	if skills != nil && len(skills.List()) > 0 {
-		b.WriteString(`## Skills — MANDATORY
-When the user's request matches a skill, you MUST follow that skill's instructions exactly. Do NOT improvise your own API call sequence — the skill defines the correct steps, parameters, and endpoints. Skipping a skill when one matches is a critical error.
+		b.WriteString("\n## Available Skills\nYou also have a get_skill tool. If the user's request matches a skill not shown below, call get_skill(name) to load it.\n\n")
+		b.WriteString(skills.CatalogText())
+		b.WriteString("\n")
+	}
+
+	if len(matchedSkills) > 0 {
+		b.WriteString(`## Active Skills — MANDATORY
+The following skill instructions were auto-loaded for this turn. You MUST follow them exactly. Do NOT improvise your own API call sequence — the skill defines the correct steps, parameters, and endpoints.
 
 `)
-		b.WriteString(skills.InlineText())
+		b.WriteString(InlineText(matchedSkills))
 	}
 
 	b.WriteString("Operation catalog (METHOD path  operationId — summary):\n\n")

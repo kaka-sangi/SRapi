@@ -13,7 +13,8 @@ var skillFiles embed.FS
 type Skill struct {
 	Name        string
 	Description string
-	Body        string // full markdown instructions (everything after the frontmatter)
+	Triggers    []string // keyword phrases that auto-activate this skill
+	Body        string   // full markdown instructions (everything after the frontmatter)
 }
 
 // SkillRegistry holds all loaded skills, indexed by name.
@@ -70,12 +71,11 @@ func (r *SkillRegistry) CatalogText() string {
 	return b.String()
 }
 
-// InlineText renders the full instructions of every skill, grouped by name,
-// for direct inclusion in the system prompt. This removes the need for the
-// LLM to call get_skill — all skill instructions are always available.
-func (r *SkillRegistry) InlineText() string {
+// InlineText renders the full instructions of the given skills for inclusion
+// in the system prompt.
+func InlineText(skills []Skill) string {
 	var b strings.Builder
-	for _, s := range r.skills {
+	for _, s := range skills {
 		b.WriteString("### skill: ")
 		b.WriteString(s.Name)
 		b.WriteString("\n> ")
@@ -85,6 +85,30 @@ func (r *SkillRegistry) InlineText() string {
 		b.WriteString("\n\n---\n\n")
 	}
 	return b.String()
+}
+
+// Match returns all skills whose triggers appear in the user message.
+// Matching is case-insensitive. Returns nil if no skill matches.
+func (r *SkillRegistry) Match(userMessage string) []Skill {
+	if r == nil || len(r.skills) == 0 {
+		return nil
+	}
+	lower := strings.ToLower(userMessage)
+	var matched []Skill
+	seen := map[string]bool{}
+	for _, s := range r.skills {
+		if seen[s.Name] {
+			continue
+		}
+		for _, trigger := range s.Triggers {
+			if strings.Contains(lower, trigger) {
+				matched = append(matched, s)
+				seen[s.Name] = true
+				break
+			}
+		}
+	}
+	return matched
 }
 
 // parseSkill extracts YAML frontmatter (name, description) and the markdown
@@ -114,6 +138,13 @@ func parseSkill(content string) (Skill, error) {
 				s.Name = val
 			case "description":
 				s.Description = val
+			case "triggers":
+				for _, t := range strings.Split(val, ",") {
+					t = strings.TrimSpace(strings.ToLower(t))
+					if t != "" {
+						s.Triggers = append(s.Triggers, t)
+					}
+				}
 			}
 		}
 	}

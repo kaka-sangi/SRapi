@@ -1,6 +1,7 @@
 ---
 name: update-settings
 description: 当用户要求修改系统设置（通用设置、安全设置、功能开关、邮件配置等）时使用。
+triggers: 修改设置,更新设置,系统设置,update settings,change settings,功能开关,邮件配置,安全设置
 ---
 # 安全更新系统设置
 

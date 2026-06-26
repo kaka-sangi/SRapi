@@ -1,6 +1,7 @@
 ---
 name: usage-audit
 description: 当用户要求查看用量统计、账单、消费情况、某个用户或某个模型的使用量时使用。
+triggers: 用量统计,查看用量,消费情况,账单,usage,audit,使用量,花了多少,费用
 ---
 # 查看用量与审计
 

@@ -1,6 +1,7 @@
 ---
 name: manage-api-keys
 description: 当用户要求查看、吊销、启用 API 密钥，或检查某个用户的密钥时使用。
+triggers: api密钥,api key,吊销密钥,revoke key,查看密钥,密钥管理,key管理
 ---
 # 管理 API 密钥
 

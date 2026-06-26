@@ -1,6 +1,7 @@
 ---
 name: batch-refresh-tokens
 description: 当用户要求批量刷新 OAuth 令牌、批量续期账号时使用。
+triggers: 批量刷新,刷新令牌,刷新token,续期,batch refresh,refresh token
 ---
 # 批量刷新 OAuth 令牌
 

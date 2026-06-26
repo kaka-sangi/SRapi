@@ -1,6 +1,7 @@
 ---
 name: setup-provider
 description: 当用户要求新建供应商（provider）并配置账号时使用，包括从零开始接入一个新的 AI 平台。
+triggers: 新建供应商,添加供应商,接入供应商,setup provider,add provider,new provider,接入平台
 ---
 # 新建供应商并配置
 

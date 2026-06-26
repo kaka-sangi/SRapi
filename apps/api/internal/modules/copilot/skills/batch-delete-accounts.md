@@ -1,6 +1,7 @@
 ---
 name: batch-delete-accounts
 description: 当用户要求批量删除上游账号时使用。
+triggers: 批量删除账号,删除所有账号,batch delete account,清理账号
 ---
 # 批量删除账号
 

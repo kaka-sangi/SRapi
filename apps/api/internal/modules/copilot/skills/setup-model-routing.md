@@ -1,6 +1,7 @@
 ---
 name: setup-model-routing
 description: 当用户要求新建模型、添加模型别名、或配置模型到供应商的映射时使用。
+triggers: 新建模型,添加模型,模型别名,模型映射,add model,new model,model alias,model mapping,配置路由
 ---
 # 配置模型路由
 

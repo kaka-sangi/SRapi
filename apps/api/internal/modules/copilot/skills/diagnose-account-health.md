@@ -1,6 +1,7 @@
 ---
 name: diagnose-account-health
 description: 当用户要求检查账号健康状态、排查账号故障、查看哪些账号异常时使用。
+triggers: 账号健康,健康检查,排查故障,账号异常,account health,diagnose,哪些账号有问题,账号状态
 ---
 # 诊断账号健康
 

@@ -1,6 +1,7 @@
 ---
 name: credential-rotation
 description: 当用户要求批量更新账号凭证（API key、access token、密码等）时使用。
+triggers: 批量更新凭证,轮换凭证,更换密钥,credential rotation,batch credential,更新api key,换key
 ---
 # 批量凭证轮换
 

@@ -51,7 +51,8 @@ func NewEngine(catalog *Catalog, skills *SkillRegistry) *Engine {
 // returns without a done event; the caller's client resumes by re-sending the
 // history plus an Approval.
 func (e *Engine) Run(ctx context.Context, settings Settings, history []Message, approval *Approval, llm LLMFunc, dispatch DispatchFunc, search SearchFunc, emit func(Event)) ([]Message, error) {
-	system := SystemPrompt(e.catalog, e.skills, settings.AutoRunReads, search != nil, settings.SystemSummary)
+	matched := e.skills.Match(lastUserMessage(history))
+	system := SystemPrompt(e.catalog, e.skills, matched, settings.AutoRunReads, search != nil, settings.SystemSummary)
 	tools := MetaToolSchemas()
 	if search != nil {
 		tools = append(tools, webSearchToolSchema())
@@ -414,6 +415,17 @@ func marshalJSON(v any) string {
 		return fmt.Sprintf("failed to encode: %v", err)
 	}
 	return string(b)
+}
+
+// lastUserMessage returns the content of the most recent user message in the
+// conversation history. Used for skill trigger matching.
+func lastUserMessage(history []Message) string {
+	for i := len(history) - 1; i >= 0; i-- {
+		if history[i].Role == RoleUser && history[i].Content != "" {
+			return history[i].Content
+		}
+	}
+	return ""
 }
 
 func llmErrorMessage(err error) string {

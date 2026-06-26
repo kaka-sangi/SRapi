@@ -1,6 +1,7 @@
 ---
 name: group-membership
 description: 当用户要求批量添加或移除账号分组成员时使用。
+triggers: 批量添加分组,批量移除分组,分组成员,添加到分组,从分组移除,group member,batch member,加入分组
 ---
 # 批量管理分组成员
 
