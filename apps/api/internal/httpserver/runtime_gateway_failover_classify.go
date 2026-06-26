@@ -139,6 +139,12 @@ func classifyUpstreamErrorWithHeader(statusCode int, headers http.Header, errBod
 			Class:          "transient",
 			ShouldFailover: true,
 		}
+	case statusCode == 529:
+		return UpstreamFailoverDecision{
+			Class:          "server_bad",
+			ShouldFailover: true,
+			RetryAfterMs:   parseRetryAfterMillis(headers),
+		}
 	case statusCode >= http.StatusInternalServerError && statusCode <= 599:
 		return UpstreamFailoverDecision{
 			Class:          "server_bad",
@@ -146,6 +152,12 @@ func classifyUpstreamErrorWithHeader(statusCode int, headers http.Header, errBod
 			RetryAfterMs:   parseRetryAfterMillis(headers),
 		}
 	case statusCode >= 400 && statusCode < 500:
+		if bodyClass == "overloaded" {
+			return UpstreamFailoverDecision{
+				Class:          "server_bad",
+				ShouldFailover: true,
+			}
+		}
 		return UpstreamFailoverDecision{
 			Class:          "client_bad",
 			ShouldFailover: false,
