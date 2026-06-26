@@ -108,6 +108,10 @@ function ModelsContent() {
 
   const [formTarget, setFormTarget] = useState<Model | "new" | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkDisableOpen, setBulkDisableOpen] = useState(false);
+  const [bulkArchiveOpen, setBulkArchiveOpen] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
   async function toggleStatus(m: Model) {
     if (togglingId === m.id) return;
@@ -122,6 +126,56 @@ function ModelsContent() {
       setTogglingId(null);
     }
   }
+  async function applyBulkStatus(status: Model["status"]) {
+    const ids = [...list.selected];
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    try {
+      const results = await Promise.allSettled(
+        ids.map((id) => updateMut.mutateAsync({ id, body: { status } })),
+      );
+      list.clearSelection();
+      const succeeded = results.filter((r) => r.status === "fulfilled").length;
+      const failed = results.length - succeeded;
+      if (failed > 0 && succeeded > 0) {
+        toast({ title: t("feedback.batchPartial", { succeeded, failed }), tone: "warning" });
+      } else if (failed > 0) {
+        toast({ title: t("feedback.batchAllFailed", { count: ids.length }), tone: "error" });
+      } else {
+        toast({ title: t("feedback.batchAllSucceeded", { count: succeeded }), tone: "success" });
+      }
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  async function applyBulkDelete() {
+    const ids = [...list.selected];
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    try {
+      const results = await Promise.allSettled(
+        ids.map((id) => deleteMut.mutateAsync(id)),
+      );
+      list.clearSelection();
+      const succeeded = results.filter((r) => r.status === "fulfilled").length;
+      const failed = results.length - succeeded;
+      if (failed > 0 && succeeded > 0) {
+        toast({ title: t("feedback.batchPartial", { succeeded, failed }), tone: "warning" });
+      } else if (failed > 0) {
+        toast({ title: t("feedback.batchAllFailed", { count: ids.length }), tone: "error" });
+      } else {
+        toast({ title: t("feedback.batchAllSucceeded", { count: succeeded }), tone: "success" });
+      }
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
   const [rateLimitTarget, setRateLimitTarget] = useState<Model | null>(null);
   const [aliasTarget, setAliasTarget] = useState<Model | null>(null);
   const [mappingTarget, setMappingTarget] = useState<Model | null>(null);
@@ -370,6 +424,33 @@ function ModelsContent() {
         getRowId={(m) => m.id}
         emptyIcon={Cpu}
         rowSeverity={(m) => (m.status === "disabled" || m.status === "archived" ? "warning" : undefined)}
+        selection={{
+          selected: list.selected,
+          onToggle: list.toggle,
+          onTogglePage: list.togglePage,
+          bulkActions: (
+            <>
+              <Button variant="outline" size="sm" loading={bulkBusy} onClick={() => void applyBulkStatus("active")}>
+                {t("adminModels.bulkEnable")}
+              </Button>
+              <Button variant="outline" size="sm" loading={bulkBusy} onClick={() => setBulkDisableOpen(true)}>
+                {t("adminModels.bulkDisable")}
+              </Button>
+              <Button variant="outline" size="sm" loading={bulkBusy} onClick={() => setBulkArchiveOpen(true)}>
+                {t("adminModels.bulkArchive")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                loading={bulkBusy}
+                onClick={() => setBulkDeleteOpen(true)}
+                className="border-srapi-error/40 text-srapi-error hover:bg-srapi-error/10"
+              >
+                {t("adminModels.bulkDelete")}
+              </Button>
+            </>
+          ),
+        }}
         expandRow={(m) => <ModelDetailRow model={m} />}
         emptyTitle={t("adminModels.emptyTitle")}
         emptyBody={t("adminModels.emptyBody")}
@@ -447,6 +528,36 @@ function ModelsContent() {
         onConfirm={async () => {
           if (deleteTarget) await deleteMut.mutateAsync(deleteTarget.id);
         }}
+      />
+
+      <ConfirmDialog
+        open={bulkDisableOpen}
+        onOpenChange={setBulkDisableOpen}
+        title={t("adminModels.bulkDisableTitle", { count: list.selected.size })}
+        body={t("adminModels.bulkDisableBody")}
+        confirmLabel={t("adminModels.bulkDisable")}
+        isPending={bulkBusy}
+        onConfirm={() => applyBulkStatus("disabled")}
+      />
+
+      <ConfirmDialog
+        open={bulkArchiveOpen}
+        onOpenChange={setBulkArchiveOpen}
+        title={t("adminModels.bulkArchiveTitle", { count: list.selected.size })}
+        body={t("adminModels.bulkArchiveBody")}
+        confirmLabel={t("adminModels.bulkArchive")}
+        isPending={bulkBusy}
+        onConfirm={() => applyBulkStatus("archived")}
+      />
+
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        title={t("adminModels.bulkDeleteTitle", { count: list.selected.size })}
+        body={t("adminModels.bulkDeleteBody")}
+        confirmLabel={t("adminModels.bulkDelete")}
+        isPending={bulkBusy}
+        onConfirm={() => applyBulkDelete()}
       />
 
       {formTarget === "new" ? (
