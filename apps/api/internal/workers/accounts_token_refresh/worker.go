@@ -408,9 +408,12 @@ func (w *Worker) keepAliveEligible(account accountcontract.ProviderAccount, now 
 	if account.TokenExpiresAt != nil && !account.TokenExpiresAt.After(refreshDeadline) {
 		return false
 	}
-	// Never refreshed, or refreshed more than keepAliveInterval ago.
+	// Never refreshed: only eligible if the account is older than 10 minutes.
+	// Brand-new accounts may have incomplete credentials (missing token_url,
+	// upstream_client, etc.) and attempting a premature refresh can permanently
+	// consume a one-time refresh_token before the operator finishes setup.
 	if account.LastRefreshedAt == nil {
-		return true
+		return !account.CreatedAt.IsZero() && now.Sub(account.CreatedAt) >= 10*time.Minute
 	}
 	return account.LastRefreshedAt.Before(now.Add(-defaultKeepAliveInterval))
 }

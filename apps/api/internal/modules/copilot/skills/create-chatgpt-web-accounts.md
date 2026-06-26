@@ -1,0 +1,59 @@
+---
+name: create-chatgpt-web-accounts
+description: 当用户要求创建 ChatGPT Web 账号、导入 ChatGPT 账号、添加 chatgpt_web 类型的账号时使用。
+triggers: chatgpt,chatgpt web,chatgpt-web,chatgpt_web,gpt账号,chatgpt账号,导入chatgpt
+---
+# 创建 ChatGPT Web 账号
+
+## 关键警告
+ChatGPT Web 账号使用**一次性 refresh_token**。如果创建时配置不完整，系统可能自动尝试刷新并消耗旧 RT，导致 RT 永久丢失。**必须**一次性提供完整凭证。
+
+## 前置检查
+
+1. **确认供应商存在** — `GET /api/v1/admin/providers?q=chatgpt`
+   - 如果没有 chatgpt-web 供应商，先用 `setup-provider` skill 创建
+
+2. **确认模型映射存在** — `GET /api/v1/admin/models` 并检查是否有映射到 chatgpt-web 供应商的模型
+   - 如果没有，先用 `setup-model-routing` skill 创建映射
+   - 常见模型：gpt-5.5, gpt-5.4, gpt-5.4-mini, gpt-image-2
+
+## 创建步骤
+
+1. **收集信息** — 向用户索要以下**全部**字段（缺一不可）：
+   - `refresh_token`（必须）
+   - `client_id`（必须，通常为固定值）
+   - GPT 密码 / 邮箱密码（可选，存入 notes）
+
+2. **确认 operationId 格式** — `get_operation_detail("createAdminAccount")` 确认请求体字段
+
+3. **逐个创建账号** — refresh_token 很长，批量接口可能超出大小限制，使用单条创建：
+   ```
+   POST /api/v1/admin/accounts
+   {
+     "provider_id": {chatgpt-web供应商ID},
+     "name": "{用户给的名称}",
+     "runtime_class": "oauth_refresh",
+     "upstream_client": "chatgpt_web",
+     "status": "active",
+     "credentials": {
+       "refresh_token": "{用户提供的RT}",
+       "client_id": "{用户提供的client_id}",
+       "token_url": "https://auth.openai.com/oauth/token",
+       "redirect_uri": "com.openai.chat://auth0.openai.com/ios/com.openai.chat/callback"
+     }
+   }
+   ```
+
+4. **创建后立即刷新** — 确认凭证正确：
+   ```
+   POST /api/v1/admin/accounts/{新账号ID}/refresh
+   ```
+
+5. **验证** — `GET /api/v1/admin/accounts/{id}` 确认 status=active 且无错误
+
+## 注意事项
+- **不要分步创建**（先建空账号再 PATCH 凭证）——创建和凭证必须一次到位
+- `upstream_client: "chatgpt_web"` 是必填字段，缺少会导致 missing_requirements 错误
+- `token_url` 和 `redirect_uri` 是 OAuth 刷新必需的，缺少会导致 "oauth refresh configuration missing"
+- refresh_token 很长（200+ 字符），一次只创建一个账号避免请求体超限
+- 如果用户提供了 GPT 密码或邮箱密码，写入 `notes` 字段保存
