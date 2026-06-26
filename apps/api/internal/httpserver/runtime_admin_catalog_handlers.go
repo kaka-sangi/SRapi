@@ -1527,8 +1527,11 @@ func (s *Server) handleBatchActionAdminAccounts(w http.ResponseWriter, r *http.R
 	switch body.Action {
 	case apiopenapi.Recover:
 		result = s.runtime.accounts.BatchRecover(r.Context(), accountIDs)
-	default:
+	case apiopenapi.ClearError:
 		result = s.runtime.accounts.BatchClearErrorState(r.Context(), accountIDs)
+	default:
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "unsupported batch action: "+string(body.Action), requestID)
+		return
 	}
 	updatedIDs := make([]apiopenapi.Id, 0, len(result.Updated))
 	for _, updated := range result.Updated {
@@ -1624,11 +1627,12 @@ func (s *Server) handleUpdateAdminAccount(w http.ResponseWriter, r *http.Request
 		v := float64(*body.RateMultiplier)
 		updateRateMultiplier = &v
 	}
+	mergedMeta := mergeAccountMetadataPtr(before.Metadata, metadata)
 	account, err := s.runtime.accounts.Update(r.Context(), accountID, accountcontract.UpdateRequest{
 		Name:               body.Name,
 		RuntimeClass:       toAccountRuntimeClassPtr(body.RuntimeClass),
 		Credential:         credential,
-		Metadata:           metadata,
+		Metadata:           mergedMeta,
 		Extra:              jsonObjectToMapPtr(body.Extra),
 		ProxyID:            optionalNullableString(body.ProxyId),
 		Status:             toAccountStatusPtr(body.Status),
@@ -1705,6 +1709,14 @@ func supportsRefreshTokenOnlyImport(upstreamClient *string) bool {
 	default:
 		return false
 	}
+}
+
+func mergeAccountMetadataPtr(existing map[string]any, incoming *map[string]any) *map[string]any {
+	if incoming == nil {
+		return nil
+	}
+	merged := mergeAccountMetadata(existing, incoming)
+	return &merged
 }
 
 func mergeAccountMetadata(existing map[string]any, incoming *map[string]any) map[string]any {

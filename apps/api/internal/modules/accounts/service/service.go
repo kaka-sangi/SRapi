@@ -1129,7 +1129,14 @@ func (s *Service) Update(ctx context.Context, id int, req contract.UpdateRequest
 		account.CredentialVersion = credentialVersionV1
 	}
 	if req.Metadata != nil {
-		account.Metadata = cloneMap(*req.Metadata)
+		merged := cloneMap(account.Metadata)
+		if merged == nil {
+			merged = map[string]any{}
+		}
+		for k, v := range *req.Metadata {
+			merged[k] = v
+		}
+		account.Metadata = merged
 	}
 	if req.ProxyID != nil {
 		proxyID, err := s.normalizeAvailableProxyID(ctx, *req.ProxyID)
