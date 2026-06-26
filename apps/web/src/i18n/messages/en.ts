@@ -2089,6 +2089,13 @@ export const en = {
     statsRedeemed: "Redeemed",
     statsDisabled: "Disabled",
     statsExpired: "Expired",
+    bulkEnable: "Enable selected",
+    bulkDisable: "Disable selected",
+    bulkDelete: "Delete selected",
+    bulkDisableTitle: "Disable {count} promo codes?",
+    bulkDisableBody: "Selected promo codes will no longer be redeemable until re-enabled.",
+    bulkDeleteTitle: "Delete {count} promo codes?",
+    bulkDeleteBody: "Selected promo codes will be permanently removed. This cannot be undone.",
   },
   adminPromo: {
     type: "Type",
@@ -2749,6 +2756,10 @@ export const en = {
     emptyTitle: "No API keys",
     emptyBody:
       "This is a read-only audit view. Create keys from your workspace API keys page; keys created by any user appear here.",
+    bulkEnable: "Enable selected",
+    bulkRevoke: "Revoke selected",
+    bulkRevokeTitle: "Revoke {count} API keys?",
+    bulkRevokeBody: "Selected keys will be disabled immediately. They can be re-enabled later.",
   },
   adminUserQuota: {
     title: "Platform spend quotas",
@@ -2921,6 +2932,13 @@ export const en = {
     readStatusUser: "User",
     readStatusTime: "Read at",
     readStatusEmpty: "No one has read this yet.",
+    bulkPublish: "Publish selected",
+    bulkArchive: "Archive selected",
+    bulkDelete: "Delete selected",
+    bulkArchiveTitle: "Archive {count} announcements?",
+    bulkArchiveBody: "Archived announcements are hidden from users.",
+    bulkDeleteTitle: "Delete {count} announcements?",
+    bulkDeleteBody: "Selected announcements will be permanently removed. This cannot be undone.",
   },
   adminOps: {
     title: "Operations",

@@ -69,6 +69,33 @@ function ApiKeysContent() {
   const [revokeTarget, setRevokeTarget] = useState<ApiKey | null>(null);
   const [resetUsageTarget, setResetUsageTarget] = useState<ApiKey | null>(null);
   const [usageTarget, setUsageTarget] = useState<ApiKey | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkRevokeOpen, setBulkRevokeOpen] = useState(false);
+
+  async function applyBulkStatus(status: "active" | "disabled") {
+    const ids = [...list.selected];
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    try {
+      const results = await Promise.allSettled(
+        ids.map((id) => updateMut.mutateAsync({ id, body: { status } })),
+      );
+      list.clearSelection();
+      const succeeded = results.filter((r) => r.status === "fulfilled").length;
+      const failed = results.length - succeeded;
+      if (failed > 0 && succeeded > 0) {
+        toast({ title: t("feedback.batchPartial", { succeeded, failed }), tone: "warning" });
+      } else if (failed > 0) {
+        toast({ title: t("feedback.batchAllFailed", { count: ids.length }), tone: "error" });
+      } else {
+        toast({ title: t("feedback.batchAllSucceeded", { count: succeeded }), tone: "success" });
+      }
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+    } finally {
+      setBulkBusy(false);
+    }
+  }
 
   async function enableKey(key: ApiKey) {
     try {
@@ -208,6 +235,27 @@ function ApiKeysContent() {
         emptyIcon={KeyRound}
         emptyTitle={t("adminApiKeys.emptyTitle")}
         emptyBody={t("adminApiKeys.emptyBody")}
+        selection={{
+          selected: list.selected,
+          onToggle: list.toggle,
+          onTogglePage: list.togglePage,
+          bulkActions: (
+            <>
+              <Button variant="outline" size="sm" loading={bulkBusy} onClick={() => void applyBulkStatus("active")}>
+                {t("adminApiKeys.bulkEnable")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                loading={bulkBusy}
+                onClick={() => setBulkRevokeOpen(true)}
+                className="border-srapi-error/40 text-srapi-error hover:bg-srapi-error/10"
+              >
+                {t("adminApiKeys.bulkRevoke")}
+              </Button>
+            </>
+          ),
+        }}
         minWidth={680}
         isFiltered={Boolean(statusFilter || userFilter)}
         onClearFilters={list.clearFilters}
@@ -349,6 +397,16 @@ function ApiKeysContent() {
           isPending={updateMut.isPending}
         />
       ) : null}
+
+      <ConfirmDialog
+        open={bulkRevokeOpen}
+        onOpenChange={setBulkRevokeOpen}
+        title={t("adminApiKeys.bulkRevokeTitle", { count: list.selected.size })}
+        body={t("adminApiKeys.bulkRevokeBody")}
+        confirmLabel={t("adminApiKeys.bulkRevoke")}
+        isPending={bulkBusy}
+        onConfirm={() => applyBulkStatus("disabled")}
+      />
 
       {resetUsageTarget ? (
         <ConfirmDialog

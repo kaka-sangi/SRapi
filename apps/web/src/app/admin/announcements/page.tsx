@@ -26,6 +26,8 @@ import {
   useDeleteAnnouncement,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
+import { useToast } from "@/context/ToastContext";
+import { adminErrorMessage } from "@/lib/admin-api";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
@@ -70,6 +72,7 @@ function announcementSeverityTone(
 
 function AnnouncementsContent() {
   const { t } = useLanguage();
+  const { toast } = useToast();
   const list = useAdminList();
   const colVis = useColumnVisibility("admin-announcements", []);
   const statusFilter = (list.filters.status as Announcement["status"]) || undefined;
@@ -85,7 +88,64 @@ function AnnouncementsContent() {
   const [formTarget, setFormTarget] = useState<Announcement | "new" | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Announcement | null>(null);
   const [readsTarget, setReadsTarget] = useState<Announcement | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkArchiveOpen, setBulkArchiveOpen] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const isNew = formTarget === "new";
+
+  async function applyBulkStatus(status: Announcement["status"]) {
+    const rows = (items.data?.data ?? []).filter((a) => list.selected.has(a.id));
+    if (rows.length === 0) return;
+    setBulkBusy(true);
+    try {
+      const results = await Promise.allSettled(
+        rows.map((a) => {
+          const form = announcementFormFromAnnouncement(a);
+          form.status = status;
+          return updateMut.mutateAsync({ id: a.id, body: buildAnnouncementBody(form) });
+        }),
+      );
+      list.clearSelection();
+      const succeeded = results.filter((r) => r.status === "fulfilled").length;
+      const failed = results.length - succeeded;
+      if (failed > 0 && succeeded > 0) {
+        toast({ title: t("feedback.batchPartial", { succeeded, failed }), tone: "warning" });
+      } else if (failed > 0) {
+        toast({ title: t("feedback.batchAllFailed", { count: rows.length }), tone: "error" });
+      } else {
+        toast({ title: t("feedback.batchAllSucceeded", { count: succeeded }), tone: "success" });
+      }
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  async function applyBulkDelete() {
+    const ids = [...list.selected];
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    try {
+      const results = await Promise.allSettled(
+        ids.map((id) => deleteMut.mutateAsync(id)),
+      );
+      list.clearSelection();
+      const succeeded = results.filter((r) => r.status === "fulfilled").length;
+      const failed = results.length - succeeded;
+      if (failed > 0 && succeeded > 0) {
+        toast({ title: t("feedback.batchPartial", { succeeded, failed }), tone: "warning" });
+      } else if (failed > 0) {
+        toast({ title: t("feedback.batchAllFailed", { count: ids.length }), tone: "error" });
+      } else {
+        toast({ title: t("feedback.batchAllSucceeded", { count: succeeded }), tone: "success" });
+      }
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+    } finally {
+      setBulkBusy(false);
+    }
+  }
 
   const enumOptions = (values: readonly string[]) => values.map((v) => ({ value: v, label: t(`common.${v}`) }));
   const fields: FieldConfig<AnnouncementFormState>[] = [
@@ -232,6 +292,30 @@ function AnnouncementsContent() {
         emptyIcon={Megaphone}
         emptyTitle={t("adminAnnouncements.emptyTitle")}
         emptyBody={t("adminAnnouncements.emptyBody")}
+        selection={{
+          selected: list.selected,
+          onToggle: list.toggle,
+          onTogglePage: list.togglePage,
+          bulkActions: (
+            <>
+              <Button variant="outline" size="sm" loading={bulkBusy} onClick={() => void applyBulkStatus("published")}>
+                {t("adminAnnouncements.bulkPublish")}
+              </Button>
+              <Button variant="outline" size="sm" loading={bulkBusy} onClick={() => setBulkArchiveOpen(true)}>
+                {t("adminAnnouncements.bulkArchive")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                loading={bulkBusy}
+                onClick={() => setBulkDeleteOpen(true)}
+                className="border-srapi-error/40 text-srapi-error hover:bg-srapi-error/10"
+              >
+                {t("adminAnnouncements.bulkDelete")}
+              </Button>
+            </>
+          ),
+        }}
         emptyAction={
           <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
             ＋ {t("adminAnnouncements.create")}
@@ -311,6 +395,26 @@ function AnnouncementsContent() {
           isPending={deleteMut.isPending}
         />
       ) : null}
+
+      <ConfirmDialog
+        open={bulkArchiveOpen}
+        onOpenChange={setBulkArchiveOpen}
+        title={t("adminAnnouncements.bulkArchiveTitle", { count: list.selected.size })}
+        body={t("adminAnnouncements.bulkArchiveBody")}
+        confirmLabel={t("adminAnnouncements.bulkArchive")}
+        isPending={bulkBusy}
+        onConfirm={() => applyBulkStatus("archived")}
+      />
+
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        title={t("adminAnnouncements.bulkDeleteTitle", { count: list.selected.size })}
+        body={t("adminAnnouncements.bulkDeleteBody")}
+        confirmLabel={t("adminAnnouncements.bulkDelete")}
+        isPending={bulkBusy}
+        onConfirm={() => applyBulkDelete()}
+      />
 
       <AnnouncementReadStatusDialog
         announcementId={readsTarget?.id ?? null}

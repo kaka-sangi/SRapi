@@ -25,6 +25,8 @@ import {
   useDeletePromoCode,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
+import { useToast } from "@/context/ToastContext";
+import { adminErrorMessage } from "@/lib/admin-api";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
 import { DataTooltip } from "@/components/ui/data-tooltip";
@@ -51,6 +53,7 @@ export default function AdminPromoCodesPage() {
 
 function PromoContent() {
   const { t } = useLanguage();
+  const { toast } = useToast();
   const list = useAdminList();
   const colVis = useColumnVisibility("admin-promo-codes", []);
   const statusFilter = (list.filters.status as PromoCode["status"]) || undefined;
@@ -68,7 +71,64 @@ function PromoContent() {
   const [formTarget, setFormTarget] = useState<PromoCode | "new" | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<PromoCode | null>(null);
   const [usagesTarget, setUsagesTarget] = useState<PromoCode | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkDisableOpen, setBulkDisableOpen] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const isNew = formTarget === "new";
+
+  async function applyBulkStatus(status: PromoCode["status"]) {
+    const rows = (promos.data?.data ?? []).filter((p) => list.selected.has(p.id));
+    if (rows.length === 0) return;
+    setBulkBusy(true);
+    try {
+      const results = await Promise.allSettled(
+        rows.map((p) => {
+          const form = promoFormFromCode(p);
+          form.status = status;
+          return updateMut.mutateAsync({ id: p.id, body: buildPromoCodeBody(form) });
+        }),
+      );
+      list.clearSelection();
+      const succeeded = results.filter((r) => r.status === "fulfilled").length;
+      const failed = results.length - succeeded;
+      if (failed > 0 && succeeded > 0) {
+        toast({ title: t("feedback.batchPartial", { succeeded, failed }), tone: "warning" });
+      } else if (failed > 0) {
+        toast({ title: t("feedback.batchAllFailed", { count: rows.length }), tone: "error" });
+      } else {
+        toast({ title: t("feedback.batchAllSucceeded", { count: succeeded }), tone: "success" });
+      }
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  async function applyBulkDelete() {
+    const ids = [...list.selected];
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    try {
+      const results = await Promise.allSettled(
+        ids.map((id) => deleteMut.mutateAsync(id)),
+      );
+      list.clearSelection();
+      const succeeded = results.filter((r) => r.status === "fulfilled").length;
+      const failed = results.length - succeeded;
+      if (failed > 0 && succeeded > 0) {
+        toast({ title: t("feedback.batchPartial", { succeeded, failed }), tone: "warning" });
+      } else if (failed > 0) {
+        toast({ title: t("feedback.batchAllFailed", { count: ids.length }), tone: "error" });
+      } else {
+        toast({ title: t("feedback.batchAllSucceeded", { count: succeeded }), tone: "success" });
+      }
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+    } finally {
+      setBulkBusy(false);
+    }
+  }
 
   const fields: FieldConfig<PromoCodeFormState>[] = [
     { name: "code", label: t("adminPromos.code") },
@@ -252,6 +312,30 @@ function PromoContent() {
         emptyIcon={Ticket}
         emptyTitle={t("adminPromos.emptyPromo")}
         emptyBody={t("adminPromos.emptyPromoBody")}
+        selection={{
+          selected: list.selected,
+          onToggle: list.toggle,
+          onTogglePage: list.togglePage,
+          bulkActions: (
+            <>
+              <Button variant="outline" size="sm" loading={bulkBusy} onClick={() => void applyBulkStatus("active")}>
+                {t("adminPromos.bulkEnable")}
+              </Button>
+              <Button variant="outline" size="sm" loading={bulkBusy} onClick={() => setBulkDisableOpen(true)}>
+                {t("adminPromos.bulkDisable")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                loading={bulkBusy}
+                onClick={() => setBulkDeleteOpen(true)}
+                className="border-srapi-error/40 text-srapi-error hover:bg-srapi-error/10"
+              >
+                {t("adminPromos.bulkDelete")}
+              </Button>
+            </>
+          ),
+        }}
         emptyAction={
           <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
             ＋ {t("adminPromos.createPromo")}
@@ -337,6 +421,26 @@ function PromoContent() {
           isPending={deleteMut.isPending}
         />
       ) : null}
+
+      <ConfirmDialog
+        open={bulkDisableOpen}
+        onOpenChange={setBulkDisableOpen}
+        title={t("adminPromos.bulkDisableTitle", { count: list.selected.size })}
+        body={t("adminPromos.bulkDisableBody")}
+        confirmLabel={t("adminPromos.bulkDisable")}
+        isPending={bulkBusy}
+        onConfirm={() => applyBulkStatus("disabled")}
+      />
+
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        title={t("adminPromos.bulkDeleteTitle", { count: list.selected.size })}
+        body={t("adminPromos.bulkDeleteBody")}
+        confirmLabel={t("adminPromos.bulkDelete")}
+        isPending={bulkBusy}
+        onConfirm={() => applyBulkDelete()}
+      />
 
       <PromoCodeUsagesDialog
         promoId={usagesTarget?.id ?? null}
