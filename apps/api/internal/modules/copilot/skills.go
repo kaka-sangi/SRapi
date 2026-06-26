@@ -70,6 +70,23 @@ func (r *SkillRegistry) CatalogText() string {
 	return b.String()
 }
 
+// InlineText renders the full instructions of every skill, grouped by name,
+// for direct inclusion in the system prompt. This removes the need for the
+// LLM to call get_skill — all skill instructions are always available.
+func (r *SkillRegistry) InlineText() string {
+	var b strings.Builder
+	for _, s := range r.skills {
+		b.WriteString("### skill: ")
+		b.WriteString(s.Name)
+		b.WriteString("\n> ")
+		b.WriteString(s.Description)
+		b.WriteString("\n\n")
+		b.WriteString(s.Body)
+		b.WriteString("\n\n---\n\n")
+	}
+	return b.String()
+}
+
 // parseSkill extracts YAML frontmatter (name, description) and the markdown
 // body from a skill file. Frontmatter is delimited by --- lines.
 func parseSkill(content string) (Skill, error) {

@@ -175,9 +175,11 @@ SRapi is an AI gateway / API management platform. Key concepts:
 
 `)
 	if skills != nil && len(skills.List()) > 0 {
-		b.WriteString("## Skills\nWhen the user's request matches a skill below, call get_skill(name) FIRST and follow its instructions step by step. Do not improvise — the skill defines the exact API sequence.\n\n")
-		b.WriteString(skills.CatalogText())
-		b.WriteString("\n")
+		b.WriteString(`## Skills — MANDATORY
+When the user's request matches a skill, you MUST follow that skill's instructions exactly. Do NOT improvise your own API call sequence — the skill defines the correct steps, parameters, and endpoints. Skipping a skill when one matches is a critical error.
+
+`)
+		b.WriteString(skills.InlineText())
 	}
 
 	b.WriteString("Operation catalog (METHOD path  operationId — summary):\n\n")
