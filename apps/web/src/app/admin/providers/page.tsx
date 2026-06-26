@@ -87,6 +87,10 @@ function ProvidersContent() {
 
   const [formTarget, setFormTarget] = useState<Provider | "new" | null>(null);
   const [toDelete, setToDelete] = useState<Provider | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkDisableOpen, setBulkDisableOpen] = useState(false);
+  const [bulkArchiveOpen, setBulkArchiveOpen] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
   async function runInstallPresets() {
     try {
@@ -132,6 +136,56 @@ function ProvidersContent() {
       toast({ title: t("feedback.saved"), tone: "success" });
     } catch (err) {
       toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+    }
+  }
+
+  async function applyBulkStatus(status: Provider["status"]) {
+    const ids = [...list.selected];
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    try {
+      const results = await Promise.allSettled(
+        ids.map((id) => updateMut.mutateAsync({ id, body: { status } })),
+      );
+      list.clearSelection();
+      const succeeded = results.filter((r) => r.status === "fulfilled").length;
+      const failed = results.length - succeeded;
+      if (failed > 0 && succeeded > 0) {
+        toast({ title: t("feedback.batchPartial", { succeeded, failed }), tone: "warning" });
+      } else if (failed > 0) {
+        toast({ title: t("feedback.batchAllFailed", { count: ids.length }), tone: "error" });
+      } else {
+        toast({ title: t("feedback.batchAllSucceeded", { count: succeeded }), tone: "success" });
+      }
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  async function applyBulkDelete() {
+    const ids = [...list.selected];
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    try {
+      const results = await Promise.allSettled(
+        ids.map((id) => deleteMut.mutateAsync(id)),
+      );
+      list.clearSelection();
+      const succeeded = results.filter((r) => r.status === "fulfilled").length;
+      const failed = results.length - succeeded;
+      if (failed > 0 && succeeded > 0) {
+        toast({ title: t("feedback.batchPartial", { succeeded, failed }), tone: "warning" });
+      } else if (failed > 0) {
+        toast({ title: t("feedback.batchAllFailed", { count: ids.length }), tone: "error" });
+      } else {
+        toast({ title: t("feedback.batchAllSucceeded", { count: succeeded }), tone: "success" });
+      }
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+    } finally {
+      setBulkBusy(false);
     }
   }
 
@@ -369,6 +423,33 @@ function ProvidersContent() {
         columnVisibility={colVis}
         getRowId={(p) => p.id}
         emptyIcon={Plug}
+        selection={{
+          selected: list.selected,
+          onToggle: list.toggle,
+          onTogglePage: list.togglePage,
+          bulkActions: (
+            <>
+              <Button variant="outline" size="sm" loading={bulkBusy} onClick={() => void applyBulkStatus("active")}>
+                {t("adminProviders.bulkEnable")}
+              </Button>
+              <Button variant="outline" size="sm" loading={bulkBusy} onClick={() => setBulkDisableOpen(true)}>
+                {t("adminProviders.bulkDisable")}
+              </Button>
+              <Button variant="outline" size="sm" loading={bulkBusy} onClick={() => setBulkArchiveOpen(true)}>
+                {t("adminProviders.bulkArchive")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                loading={bulkBusy}
+                onClick={() => setBulkDeleteOpen(true)}
+                className="border-srapi-error/40 text-srapi-error hover:bg-srapi-error/10"
+              >
+                {t("adminProviders.bulkDelete")}
+              </Button>
+            </>
+          ),
+        }}
         rowSeverity={(p) => {
           if (p.status === "disabled" || p.status === "archived") return "warning";
           const counts = accountCountByProvider.get(p.id);
@@ -458,6 +539,36 @@ function ProvidersContent() {
         onConfirm={async () => {
           if (toDelete) await deleteMut.mutateAsync(toDelete.id);
         }}
+      />
+
+      <ConfirmDialog
+        open={bulkDisableOpen}
+        onOpenChange={setBulkDisableOpen}
+        title={t("adminProviders.bulkDisableTitle", { count: list.selected.size })}
+        body={t("adminProviders.bulkDisableBody")}
+        confirmLabel={t("adminProviders.bulkDisable")}
+        isPending={bulkBusy}
+        onConfirm={() => applyBulkStatus("disabled")}
+      />
+
+      <ConfirmDialog
+        open={bulkArchiveOpen}
+        onOpenChange={setBulkArchiveOpen}
+        title={t("adminProviders.bulkArchiveTitle", { count: list.selected.size })}
+        body={t("adminProviders.bulkArchiveBody")}
+        confirmLabel={t("adminProviders.bulkArchive")}
+        isPending={bulkBusy}
+        onConfirm={() => applyBulkStatus("archived")}
+      />
+
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        title={t("adminProviders.bulkDeleteTitle", { count: list.selected.size })}
+        body={t("adminProviders.bulkDeleteBody")}
+        confirmLabel={t("adminProviders.bulkDelete")}
+        isPending={bulkBusy}
+        onConfirm={() => applyBulkDelete()}
       />
 
       {formTarget === "new" ? (
