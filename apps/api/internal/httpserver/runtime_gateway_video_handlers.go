@@ -222,7 +222,7 @@ func (s *Server) recordVideoGatewayFailure(r *http.Request, authed apikeycontrac
 }
 
 func (s *Server) recordVideoGatewaySuccess(r *http.Request, authed apikeycontract.AuthResult, canonical gatewaycontract.CanonicalRequest, result schedulercontract.ScheduleResult, modelID int, usage gatewaycontract.Usage, quotaSignals []provideradaptercontract.QuotaSignal, startedAt time.Time, statusCode int) {
-	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequestForCanonical(modelID, result.Candidate, canonical, usage), ptrInt(result.Candidate.Account.ID), usage.Estimated)
+	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequestForCanonical(modelID, result.Candidate, canonical, usage), ptrInt(result.Candidate.Account.ID), authed.Key.GroupIDs, usage.Estimated)
 	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
 		Authed:                authed,

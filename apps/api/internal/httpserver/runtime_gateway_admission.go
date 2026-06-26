@@ -70,7 +70,7 @@ func (rt *runtimeState) prepareGatewayAdmissionWithOptions(ctx context.Context, 
 		InputTokens:  estimatedUsage.InputTokens,
 		OutputTokens: estimatedUsage.OutputTokens,
 		At:           time.Now().UTC(),
-	}, nil, true)
+	}, nil, nil, true)
 	now := time.Now().UTC()
 	periodUsage, err := rt.gatewayUserPeriodUsage(ctx, canonical.UserID, now)
 	if err != nil {
@@ -532,8 +532,8 @@ func (rt *runtimeState) filterCandidatesByAccountGroupScope(ctx context.Context,
 // estimated price returned to the caller matches the eventual debit by the
 // balance_charger worker (which reads the multiplier from the persisted usage
 // log, see runtime_gateway_usage.go:66).
-func (rt *runtimeState) gatewayPricing(ctx context.Context, req billingcontract.PricingRequest, accountID *int, estimated bool) gatewayPricingEvidence {
-	rateMultiplier := rt.gatewayAccountRateMultiplier(ctx, accountID)
+func (rt *runtimeState) gatewayPricing(ctx context.Context, req billingcontract.PricingRequest, accountID *int, apiKeyGroupIDs []int, estimated bool) gatewayPricingEvidence {
+	rateMultiplier := rt.gatewayAccountRateMultiplier(ctx, accountID, apiKeyGroupIDs)
 	gatewayReq := contractGatewayPricingRequest(req, rateMultiplier, estimated)
 	result, err := rt.billing.PriceGatewayUsage(ctx, gatewayReq)
 	if err != nil {

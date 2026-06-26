@@ -57,7 +57,7 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 	model := fallbackModelName(rec.Model)
 	pricing := rec.Pricing.withDefaults()
 	rt.warnDefaultZeroGatewayPricing(rec, model, pricing)
-	rateMultiplier := rt.gatewayAccountRateMultiplier(ctx, rec.AccountID)
+	rateMultiplier := rt.gatewayAccountRateMultiplier(ctx, rec.AccountID, rec.Authed.Key.GroupIDs)
 	pricing = rt.gatewayUsageCost(ctx, rec, pricing, rateMultiplier)
 	usageLog, usageErr := rt.usage.Record(ctx, usagecontract.RecordRequest{
 		RequestID:                rec.RequestID,
@@ -589,20 +589,37 @@ func (rt *runtimeState) recordGatewayMaterializedCosts(ctx context.Context, rec 
 	}
 }
 
-func (rt *runtimeState) gatewayAccountRateMultiplier(ctx context.Context, accountID *int) string {
+func (rt *runtimeState) gatewayAccountRateMultiplier(ctx context.Context, accountID *int, apiKeyGroupIDs []int) string {
 	if rt == nil || rt.accounts == nil || accountID == nil || *accountID <= 0 {
 		return "1.00000000"
 	}
-	groupIDs, err := rt.accounts.ListGroupIDsByAccount(ctx, *accountID)
-	if err != nil || len(groupIDs) == 0 {
+	accountGroupIDs, err := rt.accounts.ListGroupIDsByAccount(ctx, *accountID)
+	if err != nil || len(accountGroupIDs) == 0 {
 		return "1.00000000"
 	}
-	groups, err := rt.accounts.FindGroupsByID(ctx, groupIDs)
+	// Find the group that BOTH the account and the API key belong to.
+	// This is the "channel" — the group whose rate_multiplier applies.
+	// If the API key has no group binding, use the account's first active group.
+	var targetGroupIDs []int
+	if len(apiKeyGroupIDs) > 0 {
+		for _, agid := range accountGroupIDs {
+			for _, kgid := range apiKeyGroupIDs {
+				if agid == kgid {
+					targetGroupIDs = append(targetGroupIDs, agid)
+				}
+			}
+		}
+	} else {
+		targetGroupIDs = accountGroupIDs
+	}
+	if len(targetGroupIDs) == 0 {
+		return "1.00000000"
+	}
+	groups, err := rt.accounts.FindGroupsByID(ctx, targetGroupIDs)
 	if err != nil || len(groups) == 0 {
 		return "1.00000000"
 	}
-	multiplier := big.NewRat(1, 1)
-	found := false
+	// Use the FIRST matching active group's multiplier (not the product of all).
 	for _, group := range groups {
 		if group.Status != accountcontract.GroupStatusActive {
 			continue
@@ -614,13 +631,9 @@ func (rt *runtimeState) gatewayAccountRateMultiplier(ctx context.Context, accoun
 			}
 			continue
 		}
-		multiplier.Mul(multiplier, rate)
-		found = true
+		return money.FormatRatFixed(rate, 8)
 	}
-	if !found {
-		return "1.00000000"
-	}
-	return money.FormatRatFixed(multiplier, 8)
+	return "1.00000000"
 }
 
 func (rt *runtimeState) warnDefaultZeroGatewayPricing(rec gatewayUsageRecord, model string, pricing gatewayPricingEvidence) {
