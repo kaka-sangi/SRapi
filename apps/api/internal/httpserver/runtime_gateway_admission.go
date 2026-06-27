@@ -49,9 +49,12 @@ func (rt *runtimeState) prepareGatewayAdmissionWithOptions(ctx context.Context, 
 		contentSafetyResult = result
 	}
 	estimatedUsage := estimateGatewayRequestUsage(*canonical)
+	// Only reject when the estimate clearly exceeds the context window.
+	// The estimator is coarse (words×2), so a 1.5x margin avoids false
+	// rejections on borderline requests while still catching obvious misses.
 	if cw := resolution.Model.ContextWindow; cw != nil && *cw > 0 {
 		totalEstimated := estimatedUsage.InputTokens + estimatedUsage.OutputTokens
-		if totalEstimated > *cw {
+		if totalEstimated > *cw*3/2 {
 			return gatewayAdmission{
 				EstimatedUsage: estimatedUsage,
 				Pricing:        zeroGatewayPricing(),
