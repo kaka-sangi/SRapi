@@ -24,6 +24,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -50,6 +51,10 @@ type Service struct {
 	pools       map[int64]*list.Element
 	order       *list.List
 	maxAccounts int
+
+	acquiredTotal atomic.Int64
+	releasedTotal atomic.Int64
+	timeoutTotal  atomic.Int64
 }
 
 type accountPool struct {
@@ -105,6 +110,7 @@ func (s *Service) AcquireSlot(ctx context.Context, accountID int64, capacity int
 	// Fast path: a slot is immediately available.
 	select {
 	case pool.sem <- struct{}{}:
+		s.acquiredTotal.Add(1)
 		return s.releaseClosure(pool), nil
 	default:
 	}
@@ -115,8 +121,10 @@ func (s *Service) AcquireSlot(ctx context.Context, accountID int64, capacity int
 		defer cancel()
 		select {
 		case pool.sem <- struct{}{}:
+			s.acquiredTotal.Add(1)
 			return s.releaseClosure(pool), nil
 		case <-waitCtx.Done():
+			s.timeoutTotal.Add(1)
 			if ctx.Err() != nil {
 				return nil, ctx.Err()
 			}
@@ -125,8 +133,10 @@ func (s *Service) AcquireSlot(ctx context.Context, accountID int64, capacity int
 	}
 	select {
 	case pool.sem <- struct{}{}:
+		s.acquiredTotal.Add(1)
 		return s.releaseClosure(pool), nil
 	case <-ctx.Done():
+		s.timeoutTotal.Add(1)
 		return nil, ctx.Err()
 	}
 }
@@ -204,13 +214,36 @@ func (s *Service) poolFor(accountID int64, capacity int) *accountPool {
 	return pool
 }
 
+type Snapshot struct {
+	ActivePools   int
+	InFlight      int
+	AcquiredTotal int64
+	ReleasedTotal int64
+	TimeoutTotal  int64
+}
+
+func (s *Service) Snapshot() Snapshot {
+	s.mu.Lock()
+	activePools := s.order.Len()
+	inFlight := 0
+	for e := s.order.Front(); e != nil; e = e.Next() {
+		inFlight += len(e.Value.(*accountPool).sem)
+	}
+	s.mu.Unlock()
+	return Snapshot{
+		ActivePools:   activePools,
+		InFlight:      inFlight,
+		AcquiredTotal: s.acquiredTotal.Load(),
+		ReleasedTotal: s.releasedTotal.Load(),
+		TimeoutTotal:  s.timeoutTotal.Load(),
+	}
+}
+
 func (s *Service) releaseClosure(pool *accountPool) func() {
 	var once sync.Once
 	return func() {
 		once.Do(func() {
-			// Non-blocking drain — if the pool was resized down between
-			// acquire and release the buffer may already be empty, in which
-			// case the token has already been accounted for.
+			s.releasedTotal.Add(1)
 			select {
 			case <-pool.sem:
 			default:

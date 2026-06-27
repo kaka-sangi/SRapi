@@ -1080,8 +1080,10 @@ func (w appWorkers) shutdown(ctx context.Context) error {
 	type shutdowner interface {
 		Shutdown(context.Context) error
 	}
-	all := []shutdowner{
-		w.outbox, w.retention, w.availability, w.backup,
+	// Shut down all workers except outbox first (parallel). Workers may emit
+	// domain events during shutdown; the outbox must stay alive to process them.
+	others := []shutdowner{
+		w.retention, w.availability, w.backup,
 		w.authClean, w.idemClean, w.quotaRefresh, w.tokenRefresh,
 		w.liteLLMPricing, w.connectivityTest, w.scheduledTest,
 		w.channelMonitor, w.proxyProbe, w.expirer, w.reconcile,
@@ -1089,8 +1091,8 @@ func (w appWorkers) shutdown(ctx context.Context) error {
 		w.sloEval, w.alertNotifications, w.usageReconciler,
 	}
 	var wg sync.WaitGroup
-	errs := make(chan error, len(all))
-	for _, s := range all {
+	errs := make(chan error, len(others)+1)
+	for _, s := range others {
 		if s == nil || reflect.ValueOf(s).IsNil() {
 			continue
 		}
@@ -1103,6 +1105,12 @@ func (w appWorkers) shutdown(ctx context.Context) error {
 		}(s)
 	}
 	wg.Wait()
+	// Outbox last: drain any events emitted by other workers during shutdown.
+	if w.outbox != nil {
+		if err := w.outbox.Shutdown(ctx); err != nil {
+			errs <- err
+		}
+	}
 	close(errs)
 	var collected []error
 	for err := range errs {

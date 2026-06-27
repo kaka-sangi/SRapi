@@ -79,6 +79,11 @@ type runtimeMetricDescs struct {
 	dbPoolInUseConns              *prometheus.Desc
 	dbPoolWaitCount               *prometheus.Desc
 	dbPoolWaitDuration            *prometheus.Desc
+	concurrencySlotsInFlight      *prometheus.Desc
+	concurrencySlotsActivePools   *prometheus.Desc
+	concurrencySlotsAcquiredTotal *prometheus.Desc
+	concurrencySlotsReleasedTotal *prometheus.Desc
+	concurrencySlotsTimeoutTotal  *prometheus.Desc
 }
 
 func newRuntimeMetricsCollector(ctx context.Context, rt *runtimeState) *runtimeMetricsCollector {
@@ -97,6 +102,7 @@ func newRuntimeMetricDescs() runtimeMetricDescs {
 	initWorkerMetricDescs(&descs)
 	initOpsErrorLogMetricDescs(&descs)
 	initDBPoolMetricDescs(&descs)
+	initConcurrencySlotsMetricDescs(&descs)
 	return descs
 }
 
@@ -119,6 +125,34 @@ func initDBPoolMetricDescs(descs *runtimeMetricDescs) {
 	descs.dbPoolWaitDuration = prometheus.NewDesc(
 		"srapi_db_pool_wait_duration_seconds_total",
 		"Total time blocked waiting for a new connection.",
+		nil, nil,
+	)
+}
+
+func initConcurrencySlotsMetricDescs(descs *runtimeMetricDescs) {
+	descs.concurrencySlotsInFlight = prometheus.NewDesc(
+		"srapi_concurrency_slots_in_flight",
+		"Number of concurrency slots currently held across all accounts.",
+		nil, nil,
+	)
+	descs.concurrencySlotsActivePools = prometheus.NewDesc(
+		"srapi_concurrency_slots_active_pools",
+		"Number of active per-account concurrency slot pools.",
+		nil, nil,
+	)
+	descs.concurrencySlotsAcquiredTotal = prometheus.NewDesc(
+		"srapi_concurrency_slots_acquired_total",
+		"Total concurrency slots successfully acquired.",
+		nil, nil,
+	)
+	descs.concurrencySlotsReleasedTotal = prometheus.NewDesc(
+		"srapi_concurrency_slots_released_total",
+		"Total concurrency slots released.",
+		nil, nil,
+	)
+	descs.concurrencySlotsTimeoutTotal = prometheus.NewDesc(
+		"srapi_concurrency_slots_timeout_total",
+		"Total concurrency slot acquisitions that timed out.",
 		nil, nil,
 	)
 }
@@ -418,6 +452,11 @@ func (d runtimeMetricDescs) all() []*prometheus.Desc {
 		d.opsErrorLogProcessed,
 		d.opsErrorLogDropped,
 		d.opsErrorLogWriteFailures,
+		d.concurrencySlotsInFlight,
+		d.concurrencySlotsActivePools,
+		d.concurrencySlotsAcquiredTotal,
+		d.concurrencySlotsReleasedTotal,
+		d.concurrencySlotsTimeoutTotal,
 	}
 }
 
@@ -437,6 +476,7 @@ func (c *runtimeMetricsCollector) Collect(ch chan<- prometheus.Metric) {
 	c.collectWorkerMetrics(ch, emitted)
 	c.collectBaselineMetrics(ch, emitted)
 	c.collectDBPoolMetrics(ch, emitted)
+	c.collectConcurrencySlotsMetrics(ch, emitted)
 }
 
 func (c *runtimeMetricsCollector) collectDBPoolMetrics(ch chan<- prometheus.Metric, emitted map[string]bool) {
@@ -448,6 +488,18 @@ func (c *runtimeMetricsCollector) collectDBPoolMetrics(ch chan<- prometheus.Metr
 	emitConstMetric(ch, emitted, "srapi_db_pool_in_use_connections", c.descs.dbPoolInUseConns, prometheus.GaugeValue, float64(stats.InUse))
 	emitConstMetric(ch, emitted, "srapi_db_pool_wait_total", c.descs.dbPoolWaitCount, prometheus.CounterValue, float64(stats.WaitCount))
 	emitConstMetric(ch, emitted, "srapi_db_pool_wait_duration_seconds_total", c.descs.dbPoolWaitDuration, prometheus.CounterValue, stats.WaitDuration.Seconds())
+}
+
+func (c *runtimeMetricsCollector) collectConcurrencySlotsMetrics(ch chan<- prometheus.Metric, emitted map[string]bool) {
+	if c.rt.concurrencySlots == nil {
+		return
+	}
+	snap := c.rt.concurrencySlots.Snapshot()
+	emitConstMetric(ch, emitted, "srapi_concurrency_slots_in_flight", c.descs.concurrencySlotsInFlight, prometheus.GaugeValue, float64(snap.InFlight))
+	emitConstMetric(ch, emitted, "srapi_concurrency_slots_active_pools", c.descs.concurrencySlotsActivePools, prometheus.GaugeValue, float64(snap.ActivePools))
+	emitConstMetric(ch, emitted, "srapi_concurrency_slots_acquired_total", c.descs.concurrencySlotsAcquiredTotal, prometheus.CounterValue, float64(snap.AcquiredTotal))
+	emitConstMetric(ch, emitted, "srapi_concurrency_slots_released_total", c.descs.concurrencySlotsReleasedTotal, prometheus.CounterValue, float64(snap.ReleasedTotal))
+	emitConstMetric(ch, emitted, "srapi_concurrency_slots_timeout_total", c.descs.concurrencySlotsTimeoutTotal, prometheus.CounterValue, float64(snap.TimeoutTotal))
 }
 
 func (c *runtimeMetricsCollector) collectWorkerMetrics(ch chan<- prometheus.Metric, emitted map[string]bool) {

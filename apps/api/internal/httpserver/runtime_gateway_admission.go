@@ -49,6 +49,19 @@ func (rt *runtimeState) prepareGatewayAdmissionWithOptions(ctx context.Context, 
 		contentSafetyResult = result
 	}
 	estimatedUsage := estimateGatewayRequestUsage(*canonical)
+	if cw := resolution.Model.ContextWindow; cw != nil && *cw > 0 {
+		totalEstimated := estimatedUsage.InputTokens + estimatedUsage.OutputTokens
+		if totalEstimated > *cw {
+			return gatewayAdmission{
+				EstimatedUsage: estimatedUsage,
+				Pricing:        zeroGatewayPricing(),
+				Entitlement: subscriptioncontract.EntitlementDecision{
+					Allowed: false,
+					Reason:  "context_window_exceeded",
+				},
+			}, nil
+		}
+	}
 	if contentSafetyResult.Blocked {
 		return gatewayAdmission{
 			EstimatedUsage: estimatedUsage,
