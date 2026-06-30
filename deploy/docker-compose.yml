@@ -8,8 +8,6 @@ services:
       POSTGRES_USER: ${DATABASE_USER:-srapi}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-srapi_dev_password_change_me}
       POSTGRES_DB: ${DATABASE_DBNAME:-srapi}
-    ports:
-      - "${DATABASE_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -27,8 +25,6 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -43,9 +39,6 @@ services:
           memory: 512m
 
   api:
-    # Run one API container in local Compose. Before using `docker compose up
-    # --scale api=N`, validate process-local metrics, worker leader-gate skips,
-    # and DATABASE_MAX_OPEN_CONNS / REDIS_POOL_SIZE against the target N.
     build:
       context: ..
       dockerfile: apps/api/Dockerfile
@@ -81,18 +74,10 @@ services:
       JWT_SECRET: ${JWT_SECRET:-local_dev_jwt_secret_32_bytes_minimum_change_me}
       SRAPI_MASTER_KEY: ${SRAPI_MASTER_KEY:-local_dev_master_key_32_bytes_minimum_change_me}
       API_KEY_PEPPER: ${API_KEY_PEPPER:-local_dev_api_key_pepper_change_me_32+}
-      # TOTP secrets are encrypted with this key; if unset the backend silently
-      # aliases the master key, so pass it explicitly.
       TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:-local_dev_totp_key_32_bytes_minimum_change_me}
       BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@srapi.local}
-      # No insecure default for the admin login: the deploy fails fast unless you
-      # set a strong password in your env (a bare `docker compose up` must not
-      # silently create an admin with a known password).
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?set a strong BOOTSTRAP_ADMIN_PASSWORD in your env file}
       BOOTSTRAP_ADMIN_NAME: ${BOOTSTRAP_ADMIN_NAME:-Admin}
-      # Synchronously reject balance-billed requests from users whose balance no
-      # longer covers them (closes the deferred-charging overspend window). On by
-      # default for the deploy so a zero-balance user can't drain real upstreams.
       GATEWAY_REQUIRE_POSITIVE_BALANCE: ${GATEWAY_REQUIRE_POSITIVE_BALANCE:-true}
       DATA_RETENTION_USAGE_LOGS_DAYS: ${DATA_RETENTION_USAGE_LOGS_DAYS:-90}
       DATA_RETENTION_SCHEDULER_DECISIONS_DAYS: ${DATA_RETENTION_SCHEDULER_DECISIONS_DAYS:-90}
@@ -109,8 +94,6 @@ services:
       QUALITY_EVAL_JUDGE_TIMEOUT_SECONDS: ${QUALITY_EVAL_JUDGE_TIMEOUT_SECONDS:-20}
       QUALITY_EVAL_OPENAI_BASE_URL: ${QUALITY_EVAL_OPENAI_BASE_URL:-https://api.openai.com/v1}
       QUALITY_EVAL_OPENAI_API_KEY: ${QUALITY_EVAL_OPENAI_API_KEY:-}
-    ports:
-      - "${SERVER_PORT:-8080}:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -139,10 +122,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      # Same-origin proxy: the console forwards /api and /v1 to the API service.
       SRAPI_API_PROXY_TARGET: ${SRAPI_API_PROXY_TARGET:-http://api:8080}
-    ports:
-      - "${WEB_PORT:-3000}:3000"
     depends_on:
       api:
         condition: service_healthy
@@ -152,56 +132,6 @@ services:
           cpus: "1.00"
           memory: 512m
 
-  prometheus:
-    image: prom/prometheus:v3.7.3
-    profiles: ["observability"]
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-    ports:
-      - "${PROMETHEUS_PORT:-9090}:9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./prometheus-srapi-alerts.yaml:/etc/prometheus/rules/prometheus-srapi-alerts.yaml:ro
-      - prometheus_data:/prometheus
-    depends_on:
-      api:
-        condition: service_healthy
-      alertmanager:
-        condition: service_started
-
-  alertmanager:
-    image: prom/alertmanager:v0.29.0
-    profiles: ["observability"]
-    command:
-      - "--config.file=/etc/alertmanager/alertmanager.yml"
-      - "--storage.path=/alertmanager"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    ports:
-      - "${ALERTMANAGER_PORT:-9093}:9093"
-    volumes:
-      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
-      - alertmanager_data:/alertmanager
-
-  # FlareSolverr — automated Cloudflare clearance for the ChatGPT-web
-  # reverse-proxy pathway. Disabled by default (profile "cf-clearance");
-  # enable with `--profile cf-clearance` and point the api container at
-  # FLARESOLVERR_URL=http://flaresolverr:8191/v1. Optional FLARESOLVERR_TIMEOUT
-  # (seconds; default 60) and FLARESOLVERR_SESSION_TTL (seconds; cache window
-  # for resolved bundles) override the defaults.
-  flaresolverr:
-    image: ghcr.io/flaresolverr/flaresolverr:v3.4.1
-    profiles: ["cf-clearance"]
-    restart: unless-stopped
-    environment:
-      - LOG_LEVEL=info
-      - TZ=UTC
-    ports:
-      - "${FLARESOLVERR_PORT:-8191}:8191"
-
 volumes:
   postgres_data:
   redis_data:
-  prometheus_data:
-  alertmanager_data:
