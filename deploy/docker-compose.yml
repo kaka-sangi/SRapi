@@ -20,6 +20,8 @@ services:
         limits:
           cpus: "1.50"
           memory: 1g
+    networks:
+      - srapi
 
   redis:
     image: redis:7-alpine
@@ -37,6 +39,8 @@ services:
         limits:
           cpus: "0.50"
           memory: 512m
+    networks:
+      - srapi
 
   api:
     build:
@@ -114,8 +118,8 @@ services:
           cpus: "2.00"
           memory: 1g
     networks:
-      - srapi_default
-      - dokploy_traefik
+      - srapi
+      - traefik
 
   web:
     build:
@@ -135,15 +139,15 @@ services:
           cpus: "1.00"
           memory: 512m
     networks:
-      - srapi_default
-      - dokploy_traefik
+      - srapi
+      - traefik
 
 volumes:
   postgres_data:
   redis_data:
 
 networks:
-  srapi_default:
-  dokploy_traefik:
+  srapi:
+  traefik:
     external: true
     name: dokploy-network
