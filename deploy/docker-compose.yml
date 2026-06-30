@@ -113,6 +113,9 @@ services:
         limits:
           cpus: "2.00"
           memory: 1g
+    networks:
+      - srapi_default
+      - dokploy_traefik
 
   web:
     build:
@@ -131,7 +134,16 @@ services:
         limits:
           cpus: "1.00"
           memory: 512m
+    networks:
+      - srapi_default
+      - dokploy_traefik
 
 volumes:
   postgres_data:
   redis_data:
+
+networks:
+  srapi_default:
+  dokploy_traefik:
+    external: true
+    name: dokploy-network
